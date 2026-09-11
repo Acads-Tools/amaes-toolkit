@@ -2832,11 +2832,10 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     assert.ok(script.includes('@version      1.6.6'), "Userscript header must specify v1.6.6");
     assert.ok(script.includes('const SCRIPT_VERSION = "v1.6.6";'), "Constant SCRIPT_VERSION must be v1.6.6");
 
-    // 2. Topbar brand badge injector
-    assert.ok(script.includes("function injectTopNavbarToolkitBadge()"), "Must define injectTopNavbarToolkitBadge");
-    assert.ok(script.includes("id = 'amaes-topbar-version-badge'"), "Badge element must use id amaes-topbar-version-badge");
-    assert.ok(script.includes("querySelector('.navbar-brand, a.navbar-brand, .site-name"), "Must query Moodle navbar brand selectors");
-    assert.ok(script.includes("toggleToolkitPanel();"), "Badge click must toggle toolkit panel");
+    // 2. Elimination of redundant topbar brand badge clutter
+    assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
+    assert.ok(!script.includes("badge.id = 'amaes-topbar-version-badge'"), "Must not create amaes-topbar-version-badge element");
+    assert.ok(script.includes("document.getElementById('amaes-topbar-version-badge')?.remove()"), "Must clean up any leftover badge element from previous sessions");
 
     // 3. Top-right persistent notification item
     assert.ok(script.includes("function injectTopNavUpdateNotification(latestVersion)"), "Must define injectTopNavUpdateNotification");
