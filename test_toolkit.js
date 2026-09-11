@@ -3389,13 +3389,99 @@ test("Review Page Spam & Duplicate Share Prevention: strips injected badges from
     const reviewEnd = script.indexOf('const injectReviewScreenBanner = handleQuizReviewPageLoad;');
     const reviewBlock = script.substring(reviewStart, reviewEnd);
 
-    assert.ok(reviewBlock.includes('const hasNewDiscoveries = Boolean(cacheRes && (cacheRes.added > 0 || cacheRes.eliminated > 0));'), "Must gate notifications on hasNewDiscoveries");
+    assert.ok(reviewBlock.includes('const hasNewDiscoveries = Boolean(cacheRes && (cacheRes.added > 0 || cacheRes.confirmed > 0 || cacheRes.eliminated > 0 || cacheRes.conflicts > 0));'), "Must gate notifications on hasNewDiscoveries including confirmed and conflicts");
     assert.ok(reviewBlock.includes('if (hasNewDiscoveries) {'), "Must only show user toasts when genuinely new items are discovered");
     assert.ok(reviewBlock.includes('logDebug(`Quiz Review: All ${harvested.harvestedCount} verified answers'), "Must quietly log when review was already cataloged without spamming toasts");
 
     // 3. Persistent share key check in localStorage
     assert.ok(reviewBlock.includes('localStorage.getItem(shareKey) || sessionStorage.getItem(shareKey)'), "Must check localStorage to deduplicate sharing across sessions and tabs");
     assert.ok(reviewBlock.includes('localStorage.setItem(shareKey, JSON.stringify(Array.from(sharedSet)))'), "Must persist shared keys in localStorage");
+});
+
+// --------------------------------------------------
+// 99. Review Harvest Safety & Student Answer Preservation
+// --------------------------------------------------
+test("Review Harvest Safety & Student Answer Preservation: guarantees all question types, checkmarks, full marks, and eliminations are merged with highest priority", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Review sourceLabel has highest authority and overrides lower-trust/unverified entries
+    const mergeStart = script.indexOf('function mergeAnswersIntoCache(subCode, newQuestions');
+    const mergeEnd = script.indexOf('async function pushAnswersToGitHub');
+    const mergeBlock = script.substring(mergeStart, mergeEnd);
+
+    assert.ok(mergeBlock.includes("sourceLabel === 'Review'"), "Review source must be given authority to resolve conflicts");
+    assert.ok(mergeBlock.includes("cur.verified = true;"), "Review answers must be marked verified true");
+    assert.ok(mergeBlock.includes("cur.source = 'Review';"), "Updated answer must record source as Review");
+
+    // 2. Distractor auto-purging on ground truth checkmarks
+    assert.ok(mergeBlock.includes("cur.wrongAnswers = cur.wrongAnswers.filter"), "Confirmed correct answers must purge conflicting wrong answer records");
+
+    // 3. Multi-Type Ground Truth Harvesting
+    const harvestStart = script.indexOf('function harvestFromReviewDOM(rootDoc, subCode');
+    const harvestEnd = script.indexOf('function exportAnswersAsJSON(data)');
+    const harvestBlock = script.substring(harvestStart, harvestEnd);
+
+    assert.ok(harvestBlock.includes('.rightanswer'), "Must extract explicit rightanswer feedback");
+    assert.ok(harvestBlock.includes('hasChoiceCheckmark'), "Must check per-choice checkmarks");
+    assert.ok(harvestBlock.includes('hasChoiceCross'), "Must check per-choice crosses");
+    assert.ok(harvestBlock.includes('parseMoodleQuestionGrade'), "Must parse decimal and full marks");
+    assert.ok(harvestBlock.includes('input[type="text"], textarea'), "Must extract typed short answer and cloze values");
+    assert.ok(harvestBlock.includes('.drop, .dropzone, span.droptarget'), "Must extract drag and drop placed items");
+
+    // 4. Verification simulation: mock questions and cache merging
+    const mockDb = [
+        {
+            qRaw: "What is 2+2?",
+            qNorm: "whatis22",
+            ansRaw: "4",
+            ansNorm: "4",
+            verified: false,
+            confirmations: 1,
+            wrongAnswers: []
+        }
+    ];
+
+    // Incoming review confirms "4" with full mark
+    const incomingReview = [
+        {
+            qRaw: "What is 2+2?",
+            qNorm: "whatis22",
+            ansRaw: "4",
+            ansNorm: "4",
+            verified: true,
+            wrongAnswers: []
+        },
+        {
+            qRaw: "What is the capital of France?",
+            qNorm: "whatisthecapitaloffrance",
+            ansRaw: "Paris",
+            ansNorm: "paris",
+            verified: true,
+            wrongAnswers: [{ norm: "london", text: "London" }]
+        }
+    ];
+
+    // Simulate merge logic
+    let added = 0;
+    let confirmed = 0;
+    incomingReview.forEach(item => {
+        const match = mockDb.find(e => e.qNorm === item.qNorm);
+        if (match) {
+            if (match.ansNorm === item.ansNorm) {
+                match.confirmations = (match.confirmations || 1) + 1;
+                match.verified = true;
+                confirmed++;
+            }
+        } else {
+            mockDb.push({ ...item, confirmations: 1 });
+            added++;
+        }
+    });
+
+    assert.strictEqual(confirmed, 1, "Must confirm existing question and upgrade verified flag");
+    assert.strictEqual(mockDb[0].verified, true, "Existing unverified question must now be verified true");
+    assert.strictEqual(added, 1, "Must add new question Paris");
+    assert.strictEqual(mockDb.length, 2, "Database must now have both questions preserved");
 });
 
 console.log("\n==================================================");

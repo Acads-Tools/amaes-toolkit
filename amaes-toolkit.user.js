@@ -7598,7 +7598,7 @@
         if (!checkIsReviewPage()) return;
 
         const urlParams = new URLSearchParams(window.location.search);
-        const attemptId = urlParams.get('attempt') || window.location.pathname;
+        const attemptId = urlParams.get('attempt') || urlParams.get('id') || urlParams.get('cmid') || window.location.search || window.location.pathname;
 
         // Check for multi-page review pagination: expand to show all questions on one page if available
         const showAllLink = document.querySelector('a[href*="review.php"][href*="showall=1"], a[href*="showall=true"]');
@@ -7638,15 +7638,16 @@
         injectReviewQuestionMarkers(harvested);
 
         const autoShareEnabled = localStorage.getItem('amaes_auto_community_share') !== 'false';
-        const hasNewDiscoveries = Boolean(cacheRes && (cacheRes.added > 0 || cacheRes.eliminated > 0));
+        const hasNewDiscoveries = Boolean(cacheRes && (cacheRes.added > 0 || cacheRes.confirmed > 0 || cacheRes.eliminated > 0 || cacheRes.conflicts > 0));
 
         if (hasNewDiscoveries) {
+            const newTotal = (cacheRes.added || 0) + (cacheRes.confirmed || 0);
             if (autoShareEnabled) {
-                setLog(`<b>Quiz Review Checked:</b> Extracted <b>${harvested.harvestedCount}</b> verified answers (${cacheRes.added} new) & <b>${harvested.eliminatedCount || 0}</b> wrong choices for <b>${harvested.subjectCode}</b>. Sharing queued.`, "var(--accent-green)");
-                showToast(`Review Checked: ${cacheRes.added > 0 ? `Collected ${cacheRes.added} new verified answer${cacheRes.added > 1 ? 's' : ''}` : `${cacheRes.eliminated} wrong choice${cacheRes.eliminated > 1 ? 's' : ''} eliminated`}; sharing queued.`, 4000);
+                setLog(`<b>Quiz Review Checked:</b> Extracted <b>${harvested.harvestedCount}</b> verified answers (${newTotal} updated) & <b>${harvested.eliminatedCount || 0}</b> wrong choices for <b>${harvested.subjectCode}</b>. Sharing queued.`, "var(--accent-green)");
+                showToast(`Review Checked: ${newTotal > 0 ? `Collected ${newTotal} verified answer${newTotal > 1 ? 's' : ''}` : `${cacheRes.eliminated} wrong choice${cacheRes.eliminated > 1 ? 's' : ''} eliminated`}; sharing queued.`, 4000);
             } else {
-                setLog(`<b>Quiz Review Checked:</b> Extracted <b>${harvested.harvestedCount}</b> verified answers (${cacheRes.added} new) for <b>${harvested.subjectCode}</b> (Saved to Local DB, sharing is OFF).`, "var(--accent-blue)");
-                showToast(`Review Checked: ${cacheRes.added > 0 ? `Collected ${cacheRes.added} new verified answer${cacheRes.added > 1 ? 's' : ''}` : `${cacheRes.eliminated} wrong choice${cacheRes.eliminated > 1 ? 's' : ''} eliminated`} & saved locally!`, 4000);
+                setLog(`<b>Quiz Review Checked:</b> Extracted <b>${harvested.harvestedCount}</b> verified answers (${newTotal} updated) for <b>${harvested.subjectCode}</b> (Saved to Local DB, sharing is OFF).`, "var(--accent-blue)");
+                showToast(`Review Checked: ${newTotal > 0 ? `Collected ${newTotal} verified answer${newTotal > 1 ? 's' : ''}` : `${cacheRes.eliminated} wrong choice${cacheRes.eliminated > 1 ? 's' : ''} eliminated`} & saved locally!`, 4000);
             }
         } else {
             // Already cataloged: quiet debug log, no repetitive popup toast when reviewing past attempts
