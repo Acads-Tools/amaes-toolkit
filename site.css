@@ -229,6 +229,7 @@ video {
 .version-result.outdated { color: #fbbf24; }
 .version-result.current { color: #6ee7b7; }
 .version-result a { color: #93c5fd; margin-left: 4px; }
+.about-card,
 .terms-card {
   animation: card-in .5s ease both;
   background: var(--panel);
@@ -239,47 +240,67 @@ video {
   padding: 24px;
   transition: border-color .2s ease, box-shadow .2s ease;
 }
+.about-card:hover,
 .terms-card:hover {
   border-color: rgba(16, 185, 129, .4);
 }
+.about-card h2,
 .terms-card h2 {
   font-size: 19px;
   letter-spacing: -.03em;
   margin: 0 0 8px;
 }
+.about-intro,
 .terms-intro {
   color: #c9d1d9;
   font-size: 13px;
   line-height: 1.6;
   margin: 0 0 16px;
 }
+.about-intro strong,
 .terms-intro strong {
   color: var(--text);
 }
+.about-grid,
 .terms-grid {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(3, 1fr);
   margin-bottom: 16px;
 }
+.about-item,
 .terms-item {
   background: rgba(16, 22, 30, .7);
   border: 1px solid rgba(48, 54, 61, .7);
   border-radius: 8px;
   padding: 14px;
 }
+.about-item h3,
 .terms-item h3 {
   color: #e6edf3;
   font-size: 13px;
   font-weight: 700;
   margin: 0 0 6px;
 }
+.about-item p,
 .terms-item p {
   color: #8b949e;
   font-size: 12px;
   line-height: 1.5;
   margin: 0;
 }
+.about-item kbd {
+  background: rgba(48, 54, 61, .8);
+  border: 1px solid rgba(110, 118, 129, .4);
+  border-radius: 4px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .3);
+  color: #58a6ff;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 5px;
+}
+.about-footer-action,
 .terms-footer-action {
   align-items: center;
   border-top: 1px solid var(--line);
@@ -311,8 +332,8 @@ footer a { color: #d8b4fe; }
   to { opacity: 1; transform: translateY(0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .demo-stage, .action-card, .terms-card { animation: none; }
-  .action-card, .terms-card { transition: none; }
+  .demo-stage, .action-card, .about-card, .terms-card { animation: none; }
+  .action-card, .about-card, .terms-card { transition: none; }
 }
 @media (max-width: 760px) {
   body { min-height: 100vh; }
@@ -327,7 +348,7 @@ footer a { color: #d8b4fe; }
   .demo-column { min-height: 0; padding: 14px; }
 
   .action-card { min-height: 0; }
-  .terms-grid { grid-template-columns: 1fr; }
+  .about-grid, .terms-grid { grid-template-columns: 1fr; }
   .status-action .primary { margin-top: 5px; }
   .demo-stage { max-width: 360px; width: min(100%, 360px); }
   footer { height: auto; text-align: center; }
