@@ -298,61 +298,6 @@
         }
     }
 
-    function injectTopNavbarToolkitBadge() {
-        if (document.getElementById('amaes-topbar-version-badge')) return;
-
-        const brandTarget = document.querySelector('.navbar-brand, a.navbar-brand, .site-name, nav.navbar .navbar-brand, header .logo, .navbar .brand, #page-header .navbar-brand');
-        if (!brandTarget) {
-            setTimeout(injectTopNavbarToolkitBadge, 500);
-            return;
-        }
-
-        const badge = document.createElement('span');
-        badge.id = 'amaes-topbar-version-badge';
-        badge.className = 'badge amaes-navbar-badge';
-        badge.title = `AMAES Toolkit ${SCRIPT_VERSION} - Click to toggle panel`;
-        badge.style.cssText = `
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            margin-left: 8px;
-            padding: 2px 8px;
-            font-size: 10.5px;
-            font-weight: 700;
-            line-height: 1.3;
-            color: #38bdf8;
-            background: rgba(14, 165, 233, 0.12);
-            border: 1px solid rgba(56, 189, 248, 0.35);
-            border-radius: 12px;
-            cursor: pointer;
-            vertical-align: middle;
-            user-select: none;
-            transition: all 0.2s ease;
-            text-decoration: none;
-        `;
-        badge.innerHTML = `<span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #10b981;"></span> Toolkit ${SCRIPT_VERSION}`;
-
-        badge.addEventListener('mouseenter', () => {
-            badge.style.background = 'rgba(14, 165, 233, 0.22)';
-            badge.style.borderColor = 'rgba(56, 189, 248, 0.6)';
-        });
-        badge.addEventListener('mouseleave', () => {
-            badge.style.background = 'rgba(14, 165, 233, 0.12)';
-            badge.style.borderColor = 'rgba(56, 189, 248, 0.35)';
-        });
-        badge.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleToolkitPanel();
-        });
-
-        if (brandTarget.parentNode) {
-            brandTarget.parentNode.insertBefore(badge, brandTarget.nextSibling);
-        } else {
-            brandTarget.appendChild(badge);
-        }
-    }
-
     function injectTopNavUpdateNotification(latestVersion) {
         if (!latestVersion || !isNewerVersion(latestVersion, SCRIPT_VERSION)) return;
 
@@ -561,21 +506,7 @@
             }
         }
 
-        // 3. Top Navbar Version Badge Update Tag
-        const topbarBadge = document.getElementById('amaes-topbar-version-badge');
-        if (topbarBadge) {
-            const targetVer = latestVersion.startsWith('v') ? latestVersion : `v${latestVersion}`;
-            const targetPending = pending ? (pending.startsWith('v') ? pending : `v${pending}`) : '';
-            if (pending) {
-                topbarBadge.innerHTML = `<span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #f59e0b; animation: amaesPulse 1.5s infinite;"></span> Toolkit ${SCRIPT_VERSION} <span style="color: #f59e0b; font-weight: 800;">→ ${targetPending}</span>`;
-                topbarBadge.title = `Update ${targetPending} is waiting for confirmation in Violentmonkey`;
-            } else {
-                topbarBadge.innerHTML = `<span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #f59e0b; animation: amaesPulse 1.5s infinite;"></span> Toolkit ${SCRIPT_VERSION} <span style="background: #10b981; color: #fff; padding: 0 4px; border-radius: 3px; font-size: 8.5px; font-weight: 800; margin-left: 2px;">→ ${targetVer}</span>`;
-                topbarBadge.title = `Update available: ${targetVer}. Click to toggle panel or install`;
-            }
-        }
-
-        // 4. Top-Right Persistent Notification Area Update Item
+        // 3. Top-Right Persistent Notification Area Update Item
         injectTopNavUpdateNotification(latestVersion);
 
         // 5. Persistent Banner in Panel Body
@@ -10692,7 +10623,7 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
 
         checkPendingUpdateInstallation();
         setupPendingUpdateFocusListener();
-        injectTopNavbarToolkitBadge();
+        document.getElementById('amaes-topbar-version-badge')?.remove();
 
         const cachedLatest = localStorage.getItem('amaes_latest_version_seen');
         if (cachedLatest && isNewerVersion(cachedLatest, SCRIPT_VERSION)) {
