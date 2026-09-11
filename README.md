@@ -41,6 +41,14 @@
 
 ---
 
+## Technical Documentation
+
+Comprehensive guides covering system architecture, DOM injections, and quiz harvesting are available in the **[`docs/`](docs/)** directory:
+
+* **[DOM Injections & UI Overlays](docs/dom-injections.md)**: Complete catalog of every injected element, HUD component, action button, and status badge.
+* **[Quiz Lifecycle & Answer Harvesting](docs/quiz-lifecycle-and-harvesting.md)**: Complete guide to question detection, solver matching tiers, 4-tier ground truth harvesting on review pages, and all real-world scenarios.
+* **[Community Pipeline & Cloud Architecture](docs/pipeline-and-cloud-architecture.md)**: Deep dive into the serverless pipeline (Cloudflare Worker Relay, GitHub Issues, GitHub Actions, and Python anti-sabotage merge engine).
+
 ## Frequently Asked Questions
 
 <details>
