@@ -3345,6 +3345,24 @@ test("Web Scraper Answers: simplified accordion, auto-scrape, removed manual inp
     assert.ok(script.includes("updateAmauoedDisplay"), "updateAmauoedDisplay function must be defined");
 });
 
+// --------------------------------------------------
+// 97. Dashboard Course Badges Single Injection & De-duplication
+// --------------------------------------------------
+test("Dashboard Course Badges: prevents double badge injection and deduplicates per course card", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Selector exclusion: coursename must not be treated as a separate card container
+    const badgeFnStart = script.indexOf('function injectDashboardCourseBadges()');
+    const badgeFnEnd = script.indexOf('function injectDashboardGuideBanner()');
+    const badgeFnBlock = script.substring(badgeFnStart, badgeFnEnd);
+    const cardQueryBlock = badgeFnBlock.substring(badgeFnBlock.indexOf('let courseCards ='), badgeFnBlock.indexOf('if (courseCards.length === 0)'));
+
+    assert.ok(!cardQueryBlock.includes('.coursename'), "Course link (.coursename) must not be in course card selectors to prevent double injection");
+    assert.ok(badgeFnBlock.includes('const processedCards = new Set();'), "Must use Set to track processed root cards");
+    assert.ok(badgeFnBlock.includes('existingBadges.forEach((b, idx) => { if (idx > 0) b.remove(); });'), "Must purge duplicate badges on the same card");
+    assert.ok(badgeFnBlock.includes("document.querySelectorAll('.coursename .amaes-home-db-badge"), "Must clean up any badges mistakenly injected into course name links");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

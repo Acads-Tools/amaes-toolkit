@@ -1210,23 +1210,39 @@
     function injectDashboardCourseBadges() {
         if (!isUserLoggedIn()) return;
 
-        const courseCards = document.querySelectorAll(`
+        // Clean up any stray badges accidentally injected inside course title anchors
+        document.querySelectorAll('.coursename .amaes-home-db-badge, a .amaes-home-db-badge').forEach(b => b.remove());
+
+        let courseCards = document.querySelectorAll(`
             .dashboard-card,
             [data-region="card-item"],
-            .course-info-container,
-            .card.dashboard-card,
-            .coursename,
-            [data-region="course-content"],
-            .coursebox
+            .coursebox,
+            .dashboard-card-list-item,
+            .course-summaryitem
         `);
+
+        if (courseCards.length === 0) {
+            courseCards = document.querySelectorAll('.course-info-container');
+        }
 
         if (courseCards.length === 0) return;
 
-        courseCards.forEach(card => {
-            if (card.querySelector('.amaes-home-db-badge')) return;
+        const processedCards = new Set();
 
-            const titleElem = card.querySelector('.coursename, .coursename .multiline, h3, h4, .text-truncate, a') || card;
-            const cardText = (titleElem.innerText || card.innerText || '').trim();
+        courseCards.forEach(card => {
+            const rootCard = card.closest('.dashboard-card, [data-region="card-item"], .coursebox, .dashboard-card-list-item, .course-summaryitem') || card;
+            if (processedCards.has(rootCard)) return;
+            processedCards.add(rootCard);
+
+            const existingBadges = rootCard.querySelectorAll('.amaes-home-db-badge');
+            if (existingBadges.length > 0) {
+                // Keep only one badge, purge any duplicate badges
+                existingBadges.forEach((b, idx) => { if (idx > 0) b.remove(); });
+                return;
+            }
+
+            const titleElem = rootCard.querySelector('.coursename, .coursename .multiline, h3, h4, .text-truncate, a') || rootCard;
+            const cardText = (titleElem.innerText || rootCard.innerText || '').trim();
             if (!cardText) return;
 
             let subCode = '';
@@ -1270,16 +1286,16 @@
 
             if (readyTerms.length === 4 || count >= 100) {
                 badge.innerHTML = `${ICONS.checkBadge} <span><b>All Terms Ready</b> • ${count} Qs</span>`;
-                badge.title = `${subCode}: Complete question bank covering Prelim, Midterm, Prefi & Final (${count} verified questions)`;
+                badge.title = `${subCode} Study Database: Complete question bank covering Prelim, Midterm, Prefi & Final (${count} verified questions). Click to open database.`;
             } else if (readyTerms.length > 0) {
                 badge.innerHTML = `${ICONS.database} <span><b>${readyTerms.join('/')} Ready</b> • ${count} Qs</span>`;
-                badge.title = `${subCode}: ${readyTerms.join(', ')} covered (${count} questions). Click to open DB.`;
+                badge.title = `${subCode} Study Database: ${readyTerms.join(', ')} covered (${count} verified questions). Click to open database.`;
             } else if (count > 0) {
                 badge.innerHTML = `${ICONS.database} <span><b>Verified DB</b> • ${count} Qs</span>`;
-                badge.title = `${subCode}: ${count} questions verified in local DB. Click to view.`;
+                badge.title = `${subCode} Study Database: ${count} verified questions available. Click to view in toolkit.`;
             } else {
                 badge.innerHTML = `${ICONS.cloudDownload} <span>${subCode} • Check Cloud Hub</span>`;
-                badge.title = `Click to auto-pull community answers for ${subCode}`;
+                badge.title = `${subCode}: Click to auto-pull community answers from study archive.`;
             }
 
             badge.onmouseenter = () => { badge.style.transform = 'translateY(-1px)'; };
@@ -1300,7 +1316,7 @@
                 }
             };
 
-            const targetContainer = card.querySelector('.course-info-container, .card-body, [data-region="course-content"]') || card;
+            const targetContainer = rootCard.querySelector('.course-info-container, .card-body, [data-region="course-content"]') || rootCard;
             targetContainer.appendChild(badge);
         });
     }
