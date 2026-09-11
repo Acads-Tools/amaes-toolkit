@@ -7564,9 +7564,15 @@
     function getReviewQuestionStateSignature(que) {
         const qData = extractQuestionData(que);
         const qText = normalizeText(qData ? qData.qText : '');
-        const feedback = normalizeText(Array.from(que.querySelectorAll('.info, .outcome, .rightanswer, .feedback'))
-            .map(el => el.innerText || '')
-            .join('|'));
+        // Extract native Moodle feedback, excluding toolkit's own injected banners/pills
+        const feedbackEls = que.querySelectorAll('.info, .outcome, .rightanswer, .feedback');
+        const feedbackTexts = [];
+        feedbackEls.forEach(el => {
+            const clone = el.cloneNode(true);
+            clone.querySelectorAll('[class*="amaes-"]').forEach(inj => inj.remove());
+            feedbackTexts.push(clone.innerText || '');
+        });
+        const feedback = normalizeText(feedbackTexts.join('|'));
         const inputs = Array.from(que.querySelectorAll('input, select, textarea')).map(input => {
             const selected = input.type === 'checkbox' || input.type === 'radio'
                 ? (input.checked ? 'checked' : '')
@@ -7574,6 +7580,7 @@
             return `${input.type || input.tagName}:${selected}`;
         }).join('|');
         const markedChoices = Array.from(que.querySelectorAll('.answer [class*="correct" i], .answer [class*="incorrect" i], .answer .fa-check, .answer .fa-times'))
+            .filter(el => !el.closest('[class*="amaes-"]') && !(el.className && typeof el.className === 'string' && el.className.includes('amaes-')))
             .map(el => `${el.className || ''}:${normalizeText(el.innerText || '')}`)
             .join('|');
         return `${qText}::${feedback}::${inputs}::${markedChoices}`;
@@ -7631,12 +7638,19 @@
         injectReviewQuestionMarkers(harvested);
 
         const autoShareEnabled = localStorage.getItem('amaes_auto_community_share') !== 'false';
-        if (autoShareEnabled) {
-            setLog(`<b>Quiz Review Checked:</b> Extracted <b>${harvested.harvestedCount}</b> verified answers & <b>${harvested.eliminatedCount || 0}</b> wrong choices for <b>${harvested.subjectCode}</b>. Sharing queued.`, "var(--accent-green)");
-            showToast(`Review Checked: Collected ${harvested.harvestedCount} verified answers; sharing queued.`, 4000);
+        const hasNewDiscoveries = Boolean(cacheRes && (cacheRes.added > 0 || cacheRes.eliminated > 0));
+
+        if (hasNewDiscoveries) {
+            if (autoShareEnabled) {
+                setLog(`<b>Quiz Review Checked:</b> Extracted <b>${harvested.harvestedCount}</b> verified answers (${cacheRes.added} new) & <b>${harvested.eliminatedCount || 0}</b> wrong choices for <b>${harvested.subjectCode}</b>. Sharing queued.`, "var(--accent-green)");
+                showToast(`Review Checked: ${cacheRes.added > 0 ? `Collected ${cacheRes.added} new verified answer${cacheRes.added > 1 ? 's' : ''}` : `${cacheRes.eliminated} wrong choice${cacheRes.eliminated > 1 ? 's' : ''} eliminated`}; sharing queued.`, 4000);
+            } else {
+                setLog(`<b>Quiz Review Checked:</b> Extracted <b>${harvested.harvestedCount}</b> verified answers (${cacheRes.added} new) for <b>${harvested.subjectCode}</b> (Saved to Local DB, sharing is OFF).`, "var(--accent-blue)");
+                showToast(`Review Checked: ${cacheRes.added > 0 ? `Collected ${cacheRes.added} new verified answer${cacheRes.added > 1 ? 's' : ''}` : `${cacheRes.eliminated} wrong choice${cacheRes.eliminated > 1 ? 's' : ''} eliminated`} & saved locally!`, 4000);
+            }
         } else {
-            setLog(`<b>Quiz Review Checked:</b> Extracted <b>${harvested.harvestedCount}</b> verified answers for <b>${harvested.subjectCode}</b> (Saved to Local DB, sharing is OFF).`, "var(--accent-blue)");
-            showToast(`Review Checked: Collected ${harvested.harvestedCount} verified answers & saved locally!`, 4000);
+            // Already cataloged: quiet debug log, no repetitive popup toast when reviewing past attempts
+            logDebug(`Quiz Review: All ${harvested.harvestedCount} verified answers for ${harvested.subjectCode} are already cataloged.`);
         }
 
         const autoDlEnabled = localStorage.getItem('amaes_auto_dl_json') === 'true';
@@ -7679,11 +7693,11 @@
         }
 
         // 3. Auto-Share newly harvested answers to Community Hub (Default: ON).
-        // Store individual evidence keys so late-loaded questions are shared too.
+        // Store individual evidence keys in localStorage so across tabs and sessions, duplicate network requests are avoided.
         if (autoShareEnabled && (harvested.harvestedCount > 0 || (harvested.eliminatedCount || 0) > 0)) {
             let sharedKeys = [];
             try {
-                sharedKeys = JSON.parse(sessionStorage.getItem(shareKey) || '[]');
+                sharedKeys = JSON.parse(localStorage.getItem(shareKey) || sessionStorage.getItem(shareKey) || '[]');
                 if (!Array.isArray(sharedKeys)) sharedKeys = [];
             } catch (e) {
                 sharedKeys = [];
@@ -7697,6 +7711,7 @@
                 return true;
             });
             if (pendingQuestions.length > 0) {
+                localStorage.setItem(shareKey, JSON.stringify(Array.from(sharedSet)));
                 sessionStorage.setItem(shareKey, JSON.stringify(Array.from(sharedSet)));
                 setTimeout(() => {
                     Promise.resolve(dispatchCommunityContribution(harvested.subjectCode, pendingQuestions, {
