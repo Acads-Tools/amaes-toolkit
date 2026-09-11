@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Install the AMAES Moodle Toolkit with browser-specific guidance and a live demo.">
+  <link rel="canonical" href="https://acads-tools.github.io/amaes-toolkit/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://acads-tools.github.io/amaes-toolkit/">
+  <meta property="og:title" content="AMAES Toolkit | Friendly Installer">
+  <meta property="og:description" content="Install the AMAES Toolkit with browser-specific guidance, a live interface preview, and installation status checking.">
+  <meta property="og:image" content="https://acads-tools.github.io/amaes-toolkit/assets/amaes-toolkit-logo.png">
+  <meta property="og:image:alt" content="AMAES Toolkit shield-terminal logo">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="AMAES Toolkit | Friendly Installer">
+  <meta name="twitter:description" content="Install the AMAES Toolkit with browser-specific guidance and installation status checking.">
+  <meta name="twitter:image" content="https://acads-tools.github.io/amaes-toolkit/assets/amaes-toolkit-logo.png">
+  <title>AMAES Toolkit | Friendly Installer</title>
+  <link rel="icon" type="image/png" href="assets/amaes-toolkit-logo.png">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./"><img src="assets/amaes-toolkit-logo.png" alt="" aria-hidden="true"><span><strong>AMAES</strong> Toolkit</span></a>
+    <nav class="top-links" aria-label="Site links">
+      <a class="github-link" href="#terms">Terms & Disclaimer</a>
+      <a class="github-link" href="https://github.com/Acads-Tools/database" target="_blank" rel="noreferrer">Database ↗</a>
+      <a class="github-link" href="https://github.com/Acads-Tools/amaes-toolkit" target="_blank" rel="noreferrer">GitHub ↗</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="eyebrow">A friendlier way to get started</div>
+      <h1><span class="hero-title-line"><span>Install the toolkit in a few clicks.</span><span class="release-badge">v1.6.6</span></span></h1>
+      <p class="hero-copy">Choose your browser, install a userscript manager, and install the latest stable AMAES Toolkit for Moodle.</p>
+    </section>
+
+    <section class="dashboard-body" aria-label="Demo and installation steps">
+      <div class="demo-column">
+      <div class="demo-stage">
+        <video autoplay muted loop playsinline preload="auto" poster="assets/amaes-toolkit-live-demo.gif" aria-label="AMAES Toolkit interface preview">
+          <source src="assets/amaes-toolkit-live-demo.mp4" type="video/mp4">
+        </video>
+      </div>
+      <p class="muted">Interface preview · The toolkit does not submit quizzes automatically.</p>
+      </div>
+
+    <div class="action-grid" aria-label="Installation steps">
+      <article class="action-card" id="browser-step">
+        <div class="card-kicker">STEP 1</div>
+        <h2>Choose your browser</h2>
+        <p>Detected: <strong id="browser-name">your browser</strong></p>
+      <div class="browser-grid" role="group" aria-label="Browser choices">
+        <button class="browser-choice" data-browser="chrome"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Google_Chrome_icon_(February_2022).svg?width=64" alt="Google Chrome logo"><span>Chrome</span></button>
+        <button class="browser-choice" data-browser="edge"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Microsoft_Edge_logo_(2019).svg?width=64" alt="Microsoft Edge logo"><span>Edge</span></button>
+        <button class="browser-choice" data-browser="firefox"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Firefox_logo,_2019.svg?width=64" alt="Firefox logo"><span>Firefox</span></button>
+        <button class="browser-choice" data-browser="other"><span class="generic-browser-icon" aria-hidden="true"></span><span>Other</span></button>
+      </div>
+      </article>
+
+      <article class="action-card" id="manager-step">
+        <div class="card-kicker">STEP 2</div>
+        <h3>Install Violentmonkey</h3>
+        <p>Violentmonkey is the free, open-source manager that runs the toolkit.</p>
+        <a class="button secondary" id="manager-link" href="https://chromewebstore.google.com/detail/violentmonkey/jinjaccalgkegednnccohejagnlnfdag" target="_blank" rel="noreferrer">Install Violentmonkey ↗</a>
+        <div class="manager-instructions">
+          <span>1</span><p>Install the extension, then open its toolbar menu.</p>
+          <span>2</span><p id="allow-scripts-text">In Violentmonkey settings, enable <strong>Allow access to user scripts</strong>.</p>
+        </div>
+      </article>
+
+      <article class="action-card status-action" id="toolkit-step">
+        <div class="card-kicker" id="toolkit-step-kicker">STEP 3</div>
+        <h2 id="toolkit-step-title">Install Toolkit</h2>
+        <a class="button primary" id="script-link" href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js">Install AMAES Toolkit</a>
+        <p class="install-terms-note">By installing, you agree to the <a href="#terms">Terms of Use & Disclaimer</a>.</p>
+        <div class="active-actions" id="active-actions" hidden>
+          <a class="subdued-link" href="https://github.com/Acads-Tools/amaes-toolkit#-features" target="_blank" rel="noreferrer">Documentation / Shortcuts ↗</a>
+          <a class="subdued-link" id="reinstall-link" href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js">Reinstall / Update</a>
+        </div>
+        <div class="status-block">
+          <div class="check-actions">
+            <button class="button outline" id="check-button" type="button">Check status</button>
+            <span class="check-result" id="check-result" aria-live="polite"></span>
+            <span class="version-result" id="version-result" aria-live="polite"></span>
+          </div>
+          <p>Release <strong class="release-badge" id="release-version">checking…</strong> is ready.</p>
+        </div>
+      </article>
+    </div>
+    </section>
+
+    <section class="terms-card" id="terms" aria-label="Terms of Use and Disclaimer">
+      <div class="card-kicker">LEGAL NOTICE</div>
+      <h2>Terms of Use & Important Disclaimer</h2>
+      <p class="terms-intro">
+        AMAES Toolkit is an independent, unofficial assistive study tool designed for students of AMA Education System and ACLC College. It is <strong>not affiliated with, endorsed by, sponsored by, or operated by</strong> AMA Education System, ACLC, Moodle, or browser vendors.
+      </p>
+      <div class="terms-grid">
+        <div class="terms-item">
+          <h3>Academic Integrity & Responsibility</h3>
+          <p>Use the toolkit strictly where permitted by your institution. Do not use it to cheat, bypass access controls or proctoring, or submit work violating academic integrity policies. You are solely responsible for your use and coursework submissions.</p>
+        </div>
+        <div class="terms-item">
+          <h3>Privacy & Anonymous Data</h3>
+          <p>Zero collection of personal information. The toolkit never transmits your name, student ID, email address, passwords, grades, or Moodle authentication session tokens. Community answer evidence is strictly anonymized.</p>
+        </div>
+        <div class="terms-item">
+          <h3>"As Is" Warranty & Liability</h3>
+          <p>Provided without warranties of any kind. Authors and contributors are not responsible for academic outcomes, disciplinary actions, lost data, or service interruptions arising from use or misuse.</p>
+        </div>
+      </div>
+      <div class="terms-footer-action">
+        <a class="button secondary" href="https://github.com/Acads-Tools/amaes-toolkit/blob/main/TERMS.md" target="_blank" rel="noreferrer">Read Full Legal Terms (TERMS.md) ↗</a>
+      </div>
+    </section>
+  </main>
+  <footer>
+    <span>Privacy-first checker · no extension inspection or data collection</span>
+    <span class="footer-links">· <a href="#terms">Terms of Use & Disclaimer</a> · <a href="https://github.com/Acads-Tools/database" target="_blank" rel="noreferrer">Database Repo ↗</a> · <a href="https://github.com/Acads-Tools/amaes-toolkit/blob/main/TERMS.md" target="_blank" rel="noreferrer">Full Terms ↗</a> · <a href="https://github.com/Acads-Tools/amaes-toolkit/releases" target="_blank" rel="noreferrer">Releases</a> · <a href="https://github.com/Acads-Tools/amaes-toolkit/blob/main/LICENSE" target="_blank" rel="noreferrer">MIT License</a></span>
+  </footer>
+  <script src="site.js"></script>
+</body>
+</html>
