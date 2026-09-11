@@ -1309,13 +1309,8 @@
 
             badgeWrapper.appendChild(badge);
 
-            const categoryElem = rootCard.querySelector('.categoryname, .text-muted.muted, .text-muted, [data-region="category"]');
-            if (categoryElem && categoryElem.parentNode) {
-                categoryElem.parentNode.insertBefore(badgeWrapper, categoryElem.nextSibling);
-            } else {
-                const targetContainer = rootCard.querySelector('.course-info-container, .card-body, [data-region="course-content"]') || rootCard;
-                targetContainer.appendChild(badgeWrapper);
-            }
+            const targetContainer = rootCard.querySelector('.course-info-container, .card-body, [data-region="course-content"]') || rootCard;
+            targetContainer.appendChild(badgeWrapper);
         });
     }
 
