@@ -3361,6 +3361,13 @@ test("Dashboard Course Badges: prevents double badge injection and deduplicates 
     assert.ok(badgeFnBlock.includes('const processedCards = new Set();'), "Must use Set to track processed root cards");
     assert.ok(badgeFnBlock.includes('existingBadges.forEach((b, idx) => { if (idx > 0) b.remove(); });'), "Must purge duplicate badges on the same card");
     assert.ok(badgeFnBlock.includes("document.querySelectorAll('.coursename .amaes-home-db-badge"), "Must clean up any badges mistakenly injected into course name links");
+
+    // 2. Non-interactive display and proper layout ordering
+    assert.ok(badgeFnBlock.includes('cursor: default;'), "Badge must use default cursor as an informational display");
+    assert.ok(badgeFnBlock.includes('pointer-events: none;'), "Badge must have pointer-events disabled to avoid interfering with course card clicks");
+    assert.ok(!badgeFnBlock.includes('badge.onclick ='), "Badge must not have click handler");
+    assert.ok(!badgeFnBlock.includes('badge.onmouseenter ='), "Badge must not have hover transform animation");
+    assert.ok(badgeFnBlock.includes('categoryElem.parentNode.insertBefore(badgeWrapper, categoryElem.nextSibling)'), "Badge must be placed in logical order after category element");
 });
 
 console.log("\n==================================================");

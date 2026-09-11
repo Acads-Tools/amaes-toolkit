@@ -1262,62 +1262,60 @@
             if (termStats.prefi > 0) readyTerms.push('Prefi');
             if (termStats.final > 0) readyTerms.push('Final');
 
-            const badge = document.createElement('div');
+            const badgeWrapper = document.createElement('div');
+            badgeWrapper.className = 'amaes-home-db-badge-wrapper';
+            badgeWrapper.style.cssText = `
+                display: flex;
+                align-items: center;
+                margin-top: 4px;
+                margin-bottom: 2px;
+                pointer-events: none;
+            `;
+
+            const badge = document.createElement('span');
             badge.className = 'amaes-home-db-badge';
             badge.style.cssText = `
                 display: inline-flex;
                 align-items: center;
-                gap: 5px;
-                margin-top: 6px;
-                padding: 3px 8px;
-                border-radius: 6px;
-                font-size: 11px;
+                gap: 4px;
+                padding: 2px 7px;
+                border-radius: 4px;
+                font-size: 10px;
                 font-weight: 600;
-                cursor: pointer;
-                transition: transform 0.15s ease, background 0.15s ease;
+                line-height: 1.3;
+                cursor: default;
                 user-select: none;
-                z-index: 10;
+                pointer-events: none;
                 ${count >= 100 || readyTerms.length === 4
-                    ? 'background: rgba(16, 185, 129, 0.2); border: 1.5px solid #10b981; color: #10b981;' 
+                    ? 'background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.4); color: #059669;' 
                     : count > 0 
-                    ? 'background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); color: #34d399;' 
-                    : 'background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.25); color: #94a3b8;'}
+                    ? 'background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); color: #047857;' 
+                    : 'background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.25); color: #64748b;'}
             `;
 
             if (readyTerms.length === 4 || count >= 100) {
                 badge.innerHTML = `${ICONS.checkBadge} <span><b>All Terms Ready</b> • ${count} Qs</span>`;
-                badge.title = `${subCode} Study Database: Complete question bank covering Prelim, Midterm, Prefi & Final (${count} verified questions). Click to open database.`;
+                badge.title = `${subCode} Study Database: Complete question bank covering Prelim, Midterm, Prefi & Final (${count} verified questions).`;
             } else if (readyTerms.length > 0) {
                 badge.innerHTML = `${ICONS.database} <span><b>${readyTerms.join('/')} Ready</b> • ${count} Qs</span>`;
-                badge.title = `${subCode} Study Database: ${readyTerms.join(', ')} covered (${count} verified questions). Click to open database.`;
+                badge.title = `${subCode} Study Database: ${readyTerms.join(', ')} covered (${count} verified questions).`;
             } else if (count > 0) {
                 badge.innerHTML = `${ICONS.database} <span><b>Verified DB</b> • ${count} Qs</span>`;
-                badge.title = `${subCode} Study Database: ${count} verified questions available. Click to view in toolkit.`;
+                badge.title = `${subCode} Study Database: ${count} verified questions available.`;
             } else {
-                badge.innerHTML = `${ICONS.cloudDownload} <span>${subCode} • Check Cloud Hub</span>`;
-                badge.title = `${subCode}: Click to auto-pull community answers from study archive.`;
+                badge.innerHTML = `${ICONS.cloudDownload} <span>${subCode} • No Local DB</span>`;
+                badge.title = `${subCode}: No verified answers cached in local database.`;
             }
 
-            badge.onmouseenter = () => { badge.style.transform = 'translateY(-1px)'; };
-            badge.onmouseleave = () => { badge.style.transform = 'translateY(0)'; };
+            badgeWrapper.appendChild(badge);
 
-            badge.onclick = (e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                const panel = document.getElementById('amaes-toolkit-panel');
-                if (panel) {
-                    panel.style.display = 'flex';
-                    const tabBtnDb = document.querySelector('.amaes-tab-btn[data-tab="db"]');
-                    if (tabBtnDb) tabBtnDb.click();
-                    setLog(`Selected course <b>${subCode}</b> (${count} answers in DB).`, "var(--accent-blue)");
-                    if (count === 0 && typeof autoFetchCloudAnswersIfMissing === 'function') {
-                        autoFetchCloudAnswersIfMissing(subCode);
-                    }
-                }
-            };
-
-            const targetContainer = rootCard.querySelector('.course-info-container, .card-body, [data-region="course-content"]') || rootCard;
-            targetContainer.appendChild(badge);
+            const categoryElem = rootCard.querySelector('.categoryname, .text-muted.muted, .text-muted, [data-region="category"]');
+            if (categoryElem && categoryElem.parentNode) {
+                categoryElem.parentNode.insertBefore(badgeWrapper, categoryElem.nextSibling);
+            } else {
+                const targetContainer = rootCard.querySelector('.course-info-container, .card-body, [data-region="course-content"]') || rootCard;
+                targetContainer.appendChild(badgeWrapper);
+            }
         });
     }
 
