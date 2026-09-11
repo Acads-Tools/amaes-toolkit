@@ -148,4 +148,24 @@
       }
     })
     .catch(function () { document.getElementById('release-version').textContent = 'latest stable'; });
+
+  // Always open at the top on load/refresh and clear any lingering hash
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
+  if (window.location.hash) {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+  window.scrollTo(0, 0);
+
+  // Smooth scroll to sections without leaving hash in address bar
+  document.querySelectorAll('a[href^="#"]').forEach(function (anchor) {
+    anchor.addEventListener('click', function (e) {
+      const target = document.querySelector(this.getAttribute('href'));
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
 }());
