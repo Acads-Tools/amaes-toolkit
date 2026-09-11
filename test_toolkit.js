@@ -3367,7 +3367,7 @@ test("Dashboard Course Badges: prevents double badge injection and deduplicates 
     assert.ok(badgeFnBlock.includes('pointer-events: none;'), "Badge must have pointer-events disabled to avoid interfering with course card clicks");
     assert.ok(!badgeFnBlock.includes('badge.onclick ='), "Badge must not have click handler");
     assert.ok(!badgeFnBlock.includes('badge.onmouseenter ='), "Badge must not have hover transform animation");
-    assert.ok(badgeFnBlock.includes('categoryElem.parentNode.insertBefore(badgeWrapper, categoryElem.nextSibling)'), "Badge must be placed in logical order after category element");
+    assert.ok(badgeFnBlock.includes('targetContainer.appendChild(badgeWrapper)'), "Badge must be placed in target container without getting cut off by text-truncate");
 });
 
 console.log("\n==================================================");
