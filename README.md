@@ -6,6 +6,10 @@
 
 > A smart, privacy-preserving study companion and autonomous quiz assistant for AMA Education System and ACLC College students on Moodle (`semestral.amaes.com`).
 
+<p align="center">
+  <img src="assets/amaes-toolkit-live-demo.gif" alt="AMAES Toolkit Live Interface Demo" width="100%" style="border-radius: 8px;">
+</p>
+
 ---
 
 ## Features
