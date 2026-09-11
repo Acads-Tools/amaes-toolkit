@@ -3370,6 +3370,34 @@ test("Dashboard Course Badges: prevents double badge injection and deduplicates 
     assert.ok(badgeFnBlock.includes('targetContainer.appendChild(badgeWrapper)'), "Badge must be placed in target container without getting cut off by text-truncate");
 });
 
+// --------------------------------------------------
+// 98. Review Page Spam & Duplicate Share Prevention
+// --------------------------------------------------
+test("Review Page Spam & Duplicate Share Prevention: strips injected badges from question state signature and only alerts on new discoveries", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Signature calculation must exclude toolkit's own injected markers to prevent MutationObserver re-trigger loops
+    const sigStart = script.indexOf('function getReviewQuestionStateSignature(que)');
+    const sigEnd = script.indexOf('function getReviewShareKey(question)');
+    const sigBlock = script.substring(sigStart, sigEnd);
+
+    assert.ok(sigBlock.includes('clone.querySelectorAll(\'[class*="amaes-"]\').forEach'), "Must strip injected amaes classes from cloned feedback");
+    assert.ok(sigBlock.includes('filter(el => !el.closest(\'[class*="amaes-"]\')'), "Must exclude choices inside injected amaes containers");
+
+    // 2. Notification gating: only alert when new verified answers or eliminations are discovered
+    const reviewStart = script.indexOf('function handleQuizReviewPageLoad()');
+    const reviewEnd = script.indexOf('const injectReviewScreenBanner = handleQuizReviewPageLoad;');
+    const reviewBlock = script.substring(reviewStart, reviewEnd);
+
+    assert.ok(reviewBlock.includes('const hasNewDiscoveries = Boolean(cacheRes && (cacheRes.added > 0 || cacheRes.eliminated > 0));'), "Must gate notifications on hasNewDiscoveries");
+    assert.ok(reviewBlock.includes('if (hasNewDiscoveries) {'), "Must only show user toasts when genuinely new items are discovered");
+    assert.ok(reviewBlock.includes('logDebug(`Quiz Review: All ${harvested.harvestedCount} verified answers'), "Must quietly log when review was already cataloged without spamming toasts");
+
+    // 3. Persistent share key check in localStorage
+    assert.ok(reviewBlock.includes('localStorage.getItem(shareKey) || sessionStorage.getItem(shareKey)'), "Must check localStorage to deduplicate sharing across sessions and tabs");
+    assert.ok(reviewBlock.includes('localStorage.setItem(shareKey, JSON.stringify(Array.from(sharedSet)))'), "Must persist shared keys in localStorage");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);
