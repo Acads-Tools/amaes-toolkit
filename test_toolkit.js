@@ -3564,6 +3564,27 @@ test("Quick Start Guide Secret Developer Console: integrated in guide, protected
     assert.ok(!/[⚡🔒🚀🛡️👀]/.test(devSecMarkup), "Dev section must not use emojis, matching clean professional toolkit styling");
 });
 
+// --------------------------------------------------
+// 104. Background Multitasking & Autonomous Execution Indicators
+// --------------------------------------------------
+test("Background Execution: notifies users that Auto-Quiz runs hands-free in background during multitasking", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    const dashHtml = fs.readFileSync('dashboard.html', 'utf8');
+
+    // 1. Quiz panel background execution badge & indicator
+    assert.ok(script.includes('id="amaes-autoquiz-bg-notice"'), "Must include background multitasking notice in Quiz tab");
+    assert.ok(script.includes('id="amaes-autoquiz-bg-dot"'), "Must include status indicator dot for background execution");
+    assert.ok(script.includes('id="amaes-autoquiz-bg-text"'), "Must include descriptive text for background execution status");
+    assert.ok(script.includes('syncAutoQuizUI'), "Must dynamically update background notice in syncAutoQuizUI");
+
+    // 2. Quick Start Guide onboarding notice
+    assert.ok(script.includes('Background Capable'), "Quick Start Guide must reassure users about background execution");
+    assert.ok(script.includes('Auto-Quiz runs autonomously in the background'), "Quick Start Guide text must explain background multitasking");
+
+    // 3. Standalone Dashboard status
+    assert.ok(dashHtml.includes('Background Execution Capable'), "Dashboard status panel must indicate background execution capability");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);
