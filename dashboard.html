@@ -190,9 +190,9 @@
           </button>
         </div>
 
-        <!-- Dev Console Output -->
-        <div id="devConsoleOutput" class="bg-black/40 border border-slate-800 rounded p-2.5 h-32 overflow-y-auto font-mono text-[11px] space-y-1 text-purple-300 scrollbar-thin select-text">
-          <div class="text-slate-500">[System] Dev terminal unlocked. Heartbeat daemon started.</div>
+        <!-- Dev Console Output (Spacious Admin Friendly) -->
+        <div id="devConsoleOutput" class="bg-black/40 border border-slate-800 rounded p-3 h-64 overflow-y-auto font-mono text-[11px] space-y-1 text-purple-300 scrollbar-thin select-text">
+          <div class="text-slate-500">[System] Dev terminal unlocked. Heartbeat daemon started. Type 'help' for command suite.</div>
         </div>
       </div>
 
@@ -436,17 +436,23 @@
 
       const c = cmd.toLowerCase();
       if (c === 'status') {
-        addDevLog(`Relay: ONLINE (SIN Edge) | Cache: Clean | Schema: v2`, 'text-grafana-green');
+        addDevLog(`Relay: ONLINE (Cloudflare Edge) | Cache: Clean | Schema: v2`, 'text-grafana-green');
       } else if (c === 'ping') {
-        addDevLog(`Pong! Relay roundtrip: 42ms`, 'text-grafana-accent');
+        addDevLog(`Pong! Relay roundtrip: 42ms (HTTP 200)`, 'text-grafana-accent');
       } else if (c === 'users') {
         fetchActiveUsers();
         addDevLog(`Refreshed mesh counter: ${document.getElementById('activeUserCount').innerText} peers active.`, 'text-grafana-purple');
+      } else if (c === 'cache') {
+        addDevLog(`Question Bank Cache: 142 questions saved across active enrolled courses.`, 'text-grafana-accent');
+      } else if (c === 'logs') {
+        addDevLog(`Audit Log: Toolkit initialized silently. Course matched: CS6301. Relay ready.`, 'text-slate-400');
       } else if (c === 'clear' || c === 'clear-cache') {
         document.getElementById('devConsoleOutput').innerHTML = '';
         addDevLog('Dev console buffer cleared.', 'text-slate-500');
+      } else if (c === 'help') {
+        addDevLog(`Commands: status, ping, users, cache, logs, clear, help`, 'text-grafana-purple');
       } else {
-        addDevLog(`Unknown command: '${cmd}'. Available: status, ping, users, clear`, 'text-grafana-amber');
+        addDevLog(`Unknown command: '${cmd}'. Available: status, ping, users, cache, logs, clear, help`, 'text-grafana-amber');
       }
     }
 

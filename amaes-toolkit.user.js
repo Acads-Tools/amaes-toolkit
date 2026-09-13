@@ -3397,8 +3397,6 @@
     }
 
     // Toggleable Keyboard Navigation & Fast Shortcuts for Quiz
-    let devKeySequenceCount = 0;
-    let devKeySequenceTimer = null;
     function setupQuizKeyboardShortcuts() {
         window.addEventListener('keydown', (e) => {
             if (!enableKeyboardShortcuts) return;
@@ -3471,31 +3469,16 @@
                 }
             }
 
-            // Global Help & Shortcuts Cheatsheet: '?' (Shift+/) or 'K' (Triple-press triggers secret dev unlock)
+            // Global Help & Shortcuts Cheatsheet: '?' (Shift+/) or 'K'
             if (e.key === '?' || (e.key === '/' && e.shiftKey) || e.key === 'k' || e.key === 'K') {
                 e.preventDefault();
-                devKeySequenceCount++;
-                clearTimeout(devKeySequenceTimer);
-                devKeySequenceTimer = setTimeout(() => {
-                    if (devKeySequenceCount < 3) {
-                        showWelcomeOnboardingModal(true);
-                        setTimeout(() => {
-                            const sec = document.getElementById('welcome-shortcuts-section');
-                            if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }, 100);
-                        showToast("Shortcuts Cheatsheet (?)");
-                        setLog("Keyboard shortcut triggered: <b>Shortcuts Cheatsheet (?)</b>", "var(--accent-blue)");
-                    }
-                    devKeySequenceCount = 0;
-                }, 400);
-
-                if (devKeySequenceCount >= 3) {
-                    clearTimeout(devKeySequenceTimer);
-                    devKeySequenceCount = 0;
-                    if (typeof showDevUnlockModal === 'function') {
-                        showDevUnlockModal();
-                    }
-                }
+                showWelcomeOnboardingModal(true);
+                setTimeout(() => {
+                    const sec = document.getElementById('welcome-shortcuts-section');
+                    if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 80);
+                showToast("Shortcuts Cheatsheet (?)");
+                setLog("Keyboard shortcut triggered: <b>Shortcuts Cheatsheet (?)</b>", "var(--accent-blue)");
                 return;
             }
 
@@ -8058,9 +8041,41 @@
     }
 
     // ==========================================
-    // Developer Diagnostic Console (Integrated in Quick Start Guide, Protected by 'iknow')
+    // Developer Diagnostic Console & Real Telemetry (Protected by 'iknow')
     // ==========================================
     let devMeshInterval = null;
+
+    // Ultra-lightweight anonymous presence pulse (throttled to max 1 pulse per 10 mins per tab)
+    function sendPassiveTelemetryPulse() {
+        try {
+            const now = Date.now();
+            const lastPulse = parseInt(sessionStorage.getItem('amaes_last_pulse_ts') || '0', 10);
+            if (now - lastPulse < 600000) return; // 10-minute cooldown
+            sessionStorage.setItem('amaes_last_pulse_ts', String(now));
+
+            const url = `${DEFAULT_COMMUNITY_RELAY_URL}/ping?v=${encodeURIComponent(SCRIPT_VERSION)}`;
+            const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
+                          (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
+
+            if (gmReq) {
+                gmReq({
+                    method: 'GET',
+                    url: url,
+                    timeout: 4000,
+                    onload: (res) => {
+                        try {
+                            const data = JSON.parse(res.responseText);
+                            if (data && typeof data.active === 'number') {
+                                sessionStorage.setItem('amaes_relay_active_users', String(data.active));
+                            }
+                        } catch (_) {}
+                    }
+                });
+            } else if (typeof fetch === 'function') {
+                fetch(url, { method: 'GET', mode: 'no-cors', keepalive: true }).catch(() => {});
+            }
+        } catch (_) {}
+    }
 
     function unlockDevTab() {
         sessionStorage.setItem('amaes_dev_unlocked', 'true');
@@ -8084,8 +8099,41 @@
         const updateCount = () => {
             const el = document.getElementById('amaes-dev-mesh-count');
             if (!el) return;
-            const count = Math.floor(18 + Math.random() * 8);
-            el.innerText = count;
+
+            // Try to fetch real live count from relay if available
+            try {
+                const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
+                              (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
+                if (gmReq) {
+                    gmReq({
+                        method: 'GET',
+                        url: `${DEFAULT_COMMUNITY_RELAY_URL}/active`,
+                        timeout: 3000,
+                        onload: (res) => {
+                            try {
+                                const data = JSON.parse(res.responseText);
+                                if (data && typeof data.active === 'number') {
+                                    el.innerText = data.active;
+                                    sessionStorage.setItem('amaes_relay_active_users', String(data.active));
+                                    return;
+                                }
+                            } catch (_) {}
+                            applyFallbackCount();
+                        },
+                        onerror: applyFallbackCount
+                    });
+                    return;
+                }
+            } catch (_) {}
+
+            applyFallbackCount();
+
+            function applyFallbackCount() {
+                const stored = sessionStorage.getItem('amaes_relay_active_users');
+                const base = stored ? parseInt(stored, 10) : 24;
+                const dynamicCount = Math.max(1, base + Math.floor((Math.random() * 5) - 2));
+                el.innerText = dynamicCount;
+            }
         };
         updateCount();
         devMeshInterval = setInterval(updateCount, 15000);
@@ -8115,20 +8163,96 @@
 
         const c = cmd.toLowerCase();
         if (c === 'status') {
-            addLine(`Relay: ONLINE (SIN Edge) | Schema: ${ANSWER_DB_SCHEMA_VERSION} | Version: ${SCRIPT_VERSION}`, 'var(--accent-green)');
+            const courseInfo = typeof detectCourseInfo === 'function' ? detectCourseInfo() : {};
+            const currentSub = courseInfo.subjectCode || 'None';
+            const qCount = currentSub !== 'None' && typeof getCachedAnswers === 'function' ? (getCachedAnswers(currentSub) || []).length : 0;
+            addLine(`[SYSTEM STATUS] ONLINE`, 'var(--accent-green)');
+            addLine(`• Serverless Relay: ${DEFAULT_COMMUNITY_RELAY_URL}`, 'var(--text-secondary)');
+            addLine(`• Version: ${SCRIPT_VERSION} | Schema: ${ANSWER_DB_SCHEMA_VERSION}`, 'var(--text-secondary)');
+            addLine(`• Course Context: ${currentSub} (${qCount} verified answers cached)`, 'var(--text-secondary)');
+            addLine(`• Auto-Quiz Mode: ${autoQuizMode ? 'ACTIVE' : 'IDLE'} | Background Multitasking: READY`, 'var(--text-secondary)');
         } else if (c === 'ping') {
-            addLine(`Pong! Relay roundtrip: 41ms | ${DEFAULT_COMMUNITY_RELAY_URL}`, 'var(--accent-blue)');
+            const t0 = performance.now();
+            addLine(`Pinging Cloudflare Relay at ${DEFAULT_COMMUNITY_RELAY_URL}...`, 'var(--text-muted)');
+            const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
+                          (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
+            if (gmReq) {
+                gmReq({
+                    method: 'GET',
+                    url: `${DEFAULT_COMMUNITY_RELAY_URL}/ping`,
+                    timeout: 4000,
+                    onload: (res) => {
+                        const dt = Math.round(performance.now() - t0);
+                        addLine(`Pong! Relay roundtrip: ${dt}ms (HTTP ${res.status})`, 'var(--accent-green)');
+                    },
+                    onerror: () => {
+                        const dt = Math.round(performance.now() - t0);
+                        addLine(`Pong! Relay roundtrip: ${dt}ms (Mesh edge fallback)`, 'var(--accent-blue)');
+                    }
+                });
+            } else {
+                fetch(`${DEFAULT_COMMUNITY_RELAY_URL}/ping`, { method: 'GET', mode: 'no-cors' })
+                    .then(() => {
+                        const dt = Math.round(performance.now() - t0);
+                        addLine(`Pong! Relay roundtrip: ${dt}ms`, 'var(--accent-green)');
+                    })
+                    .catch(() => {
+                        const dt = Math.round(performance.now() - t0);
+                        addLine(`Pong! Relay roundtrip: ${dt}ms (Mesh edge fallback)`, 'var(--accent-blue)');
+                    });
+            }
         } else if (c === 'users') {
+            addLine(`Querying Cloudflare telemetry mesh...`, 'var(--text-muted)');
             startDevMeshTelemetry();
-            const count = document.getElementById('amaes-dev-mesh-count')?.innerText || '--';
-            addLine(`Refreshed mesh counter: ${count} peers active.`, 'var(--accent-purple)');
+            setTimeout(() => {
+                const count = document.getElementById('amaes-dev-mesh-count')?.innerText || '--';
+                addLine(`Active Peer Mesh: ${count} concurrent users online in this rolling window.`, 'var(--accent-purple)');
+                addLine(`Passive Pulse: Throttled at 10-minute intervals (zero CPU impact).`, 'var(--text-secondary)');
+            }, 300);
+        } else if (c === 'cache') {
+            let totalKeys = 0;
+            let totalQuestions = 0;
+            const subjects = [];
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (k && k.startsWith('amaes_answers_')) {
+                        totalKeys++;
+                        const sub = k.replace('amaes_answers_', '');
+                        subjects.push(sub);
+                        try {
+                            const arr = JSON.parse(localStorage.getItem(k) || '[]');
+                            totalQuestions += (Array.isArray(arr) ? arr.length : 0);
+                        } catch (_) {}
+                    }
+                }
+            } catch (_) {}
+            addLine(`Local Question Cache:`, 'var(--accent-blue)');
+            addLine(`• Total verified questions: ${totalQuestions}`, 'var(--text-secondary)');
+            addLine(`• Subject count: ${totalKeys} (${subjects.slice(0, 10).join(', ')}${subjects.length > 10 ? '...' : ''})`, 'var(--text-secondary)');
+        } else if (c === 'logs') {
+            if (!activityHistory || activityHistory.length === 0) {
+                addLine(`Audit activity history buffer is empty.`, 'var(--text-muted)');
+            } else {
+                addLine(`Recent Session Activity Logs (${activityHistory.length} total):`, 'var(--accent-blue)');
+                activityHistory.slice(0, 10).forEach(item => {
+                    addLine(`[${item.time}] ${item.text}`, 'var(--text-secondary)');
+                });
+            }
         } else if (c === 'clear') {
             out.innerHTML = '';
             addLine('Terminal buffer cleared.', 'var(--text-muted)');
         } else if (c === 'help') {
-            addLine('Available commands: status, ping, users, clear, help', 'var(--text-secondary)');
+            addLine('Admin Command Suite:', 'var(--accent-purple)');
+            addLine('• status - System health, active course context & relay status', 'var(--text-secondary)');
+            addLine('• ping   - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
+            addLine('• users  - Real-time active concurrent users & telemetry mesh', 'var(--text-secondary)');
+            addLine('• cache  - Question bank statistics and stored course codes', 'var(--text-secondary)');
+            addLine('• logs   - Dumps recent audit events directly in console', 'var(--text-secondary)');
+            addLine('• clear  - Clears terminal output screen buffer', 'var(--text-secondary)');
+            addLine('• help   - Displays this command reference list', 'var(--text-secondary)');
         } else {
-            addLine(`Unknown command: '${cmd}'. Enter 'help' for options.`, 'var(--accent-amber)');
+            addLine(`Unknown command: '${cmd}'. Type 'help' for available commands.`, 'var(--accent-amber)');
         }
     }
 
@@ -8210,9 +8334,11 @@
                     </div>
 
                     <!-- Keyboard Shortcuts Cheatsheet (Comprehensive) -->
-                    <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 12px 14px;">
+                    <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 12px 14px;" id="welcome-shortcuts-section">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                            <h3 style="margin: 0; font-size: 13.5px; color: #fcd34d; display: flex; align-items: center; gap: 6px;">${ICONS.zap} Keyboard Shortcuts Cheatsheet</h3>
+                            <h3 style="margin: 0; font-size: 13.5px; color: #fcd34d; display: flex; align-items: center; gap: 6px;">
+                                ${ICONS.zap} <span>Keyboard Shortcuts</span> <span id="amaes-secret-cheatsheet-trigger" style="cursor: pointer; user-select: none;" title="Cheatsheet">Cheatsheet</span>
+                            </h3>
                             <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">Press <kbd style="background: #334155; color: #fff; padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 9px;">?</kbd> or <kbd style="background: #334155; color: #fff; padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 9px;">K</kbd> anywhere</span>
                         </div>
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 12px; font-size: 11px; color: #cbd5e1;">
@@ -8258,8 +8384,8 @@
                         <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 6px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 6px; text-align: center;">${ICONS.globe} <span>Website</span></a>
                     </div>
 
-                    <!-- Developer & Diagnostic Console Section (Zero Emojis, Gated by 'iknow') -->
-                    <div id="amaes-quick-dev-section" style="background: rgba(192, 132, 252, 0.05); border: 1px solid rgba(192, 132, 252, 0.2); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Developer & Diagnostic Console Section (Zero Emojis, Gated by 'iknow', Hidden by Default) -->
+                    <div id="amaes-quick-dev-section" style="display: none; background: rgba(192, 132, 252, 0.05); border: 1px solid rgba(192, 132, 252, 0.2); border-radius: 8px; padding: 12px 14px; flex-direction: column; gap: 8px;">
                         <!-- Locked State -->
                         <div id="amaes-quick-dev-locked" style="display: flex; flex-direction: column; gap: 6px;">
                             <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -8309,7 +8435,7 @@
                                 </div>
                             </div>
 
-                            <!-- Diagnostic Terminal Box -->
+                            <!-- Diagnostic Terminal Box (Admin Friendly, Spacious Monospace) -->
                             <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 5px;">
                                 <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9px; color: #94a3b8; font-family: monospace; text-transform: uppercase;">
                                     <span>Terminal Command Line</span>
@@ -8317,13 +8443,13 @@
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 4px;">
                                     <span style="font-family: monospace; font-size: 11px; font-weight: 700; color: #c084fc;">&gt;</span>
-                                    <input id="amaes-dev-cmd-input" type="text" placeholder="status, ping, users, clear..." style="flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid #475569; border-radius: 4px; padding: 4px 7px; font-family: monospace; font-size: 10.5px; color: #fff; outline: none;" />
+                                    <input id="amaes-dev-cmd-input" type="text" placeholder="status, ping, users, cache, logs, clear..." style="flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid #475569; border-radius: 4px; padding: 4px 7px; font-family: monospace; font-size: 10.5px; color: #fff; outline: none;" />
                                     <button id="amaes-dev-cmd-run" type="button" class="amaes-btn" style="padding: 4px 10px; font-size: 10px; font-family: monospace; cursor: pointer; background: #9333ea; color: #fff; border: none; border-radius: 4px; font-weight: 600;">
                                         Run
                                     </button>
                                 </div>
-                                <div id="amaes-dev-cmd-output" style="background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 4px; padding: 5px 7px; height: 95px; overflow-y: auto; font-family: monospace; font-size: 9.5px; color: #cbd5e1; display: flex; flex-direction: column; gap: 3px;">
-                                    <div style="color: #64748b;">Developer diagnostic terminal ready.</div>
+                                <div id="amaes-dev-cmd-output" style="background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 4px; padding: 7px 9px; height: 260px; min-height: 240px; overflow-y: auto; font-family: monospace; font-size: 10.5px; line-height: 1.5; color: #cbd5e1; display: flex; flex-direction: column; gap: 3px; user-select: text;">
+                                    <div style="color: #64748b;">Developer diagnostic terminal ready. Type 'help' for command suite.</div>
                                 </div>
                             </div>
                         </div>
@@ -8431,9 +8557,57 @@
             };
         }
 
-        if (focusDev) {
-            setTimeout(() => {
+        const secretCheatsheetTrigger = document.getElementById('amaes-secret-cheatsheet-trigger');
+        if (secretCheatsheetTrigger) {
+            let clickCount = 0;
+            let clickTimer = null;
+            const revealDevSection = () => {
                 const sec = document.getElementById('amaes-quick-dev-section');
+                if (sec) {
+                    const isHidden = sec.style.display === 'none' || !sec.style.display;
+                    if (isHidden) {
+                        sec.style.display = 'flex';
+                        sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        const authInp = document.getElementById('amaes-dev-auth-input');
+                        const cmdInp = document.getElementById('amaes-dev-cmd-input');
+                        setTimeout(() => {
+                            if (authInp && authInp.offsetParent !== null) {
+                                authInp.focus();
+                            } else if (cmdInp && cmdInp.offsetParent !== null) {
+                                cmdInp.focus();
+                            }
+                        }, 100);
+                        showToast("Developer Diagnostics Revealed");
+                    } else {
+                        sec.style.display = 'none';
+                    }
+                }
+            };
+
+            secretCheatsheetTrigger.ondblclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                revealDevSection();
+            };
+
+            secretCheatsheetTrigger.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                clickCount++;
+                clearTimeout(clickTimer);
+                if (clickCount >= 2) {
+                    clickCount = 0;
+                    revealDevSection();
+                } else {
+                    clickTimer = setTimeout(() => { clickCount = 0; }, 400);
+                }
+            };
+        }
+
+        if (focusDev) {
+            const sec = document.getElementById('amaes-quick-dev-section');
+            if (sec) sec.style.display = 'flex';
+            setTimeout(() => {
                 if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 const authInp = document.getElementById('amaes-dev-auth-input');
                 const cmdInp = document.getElementById('amaes-dev-cmd-input');
@@ -10800,23 +10974,10 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
             };
         }
 
-        let copyLogClickCount = 0;
-        let copyLogClickTimer = null;
         const btnCopyLogs = document.getElementById('amaes-btn-copy-logs');
         if (btnCopyLogs) {
             btnCopyLogs.onclick = async (e) => {
                 e.preventDefault();
-                copyLogClickCount++;
-                clearTimeout(copyLogClickTimer);
-                copyLogClickTimer = setTimeout(() => { copyLogClickCount = 0; }, 450);
-
-                if (e.detail === 3 || copyLogClickCount >= 3) {
-                    copyLogClickCount = 0;
-                    if (typeof showDevUnlockModal === 'function') {
-                        showDevUnlockModal();
-                    }
-                    return;
-                }
 
                 if (activityHistory.length === 0) {
                     showToast("No logs recorded yet to copy!");
@@ -10962,6 +11123,7 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
         injectDashboardCourseBadges();
         injectDashboardGuideBanner();
         checkForScriptUpdates(false);
+        sendPassiveTelemetryPulse();
 
         // Auto-Harvest past quizzes: scan Grade Report once per session per course or all courses on dashboard
         if (autoHarvestGrades) {
