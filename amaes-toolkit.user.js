@@ -965,7 +965,6 @@
         localStorage.setItem('amaes_auto_pick_quiz', 'true');
         localStorage.setItem('amaes_auto_next_quiz', 'false');
         localStorage.setItem('amaes_auto_next_verified', 'true');
-        localStorage.setItem('amaes_auto_dl_json', 'false');
         localStorage.setItem('amaes_auto_push_github', 'false');
         localStorage.setItem('amaes_auto_copy_search', 'true');
         localStorage.setItem('amaes_auto_cloud_sync', 'true');
@@ -5923,18 +5922,6 @@
     // Quiz Review Harvester & Answer Sharing
     // ==========================================
 
-    function downloadJsonFile(filename, jsonString) {
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
     // Intelligent Multi-Source Answer Cross-Referencing, Elimination & Consensus Engine
     let communityShareDebounceTimer = null;
     function getQuestionIdentity(item) {
@@ -7654,25 +7641,12 @@
             logDebug(`Quiz Review: All ${harvested.harvestedCount} verified answers for ${harvested.subjectCode} are already cataloged.`);
         }
 
-        const autoDlEnabled = localStorage.getItem('amaes_auto_dl_json') === 'true';
         const autoPushEnabled = localStorage.getItem('amaes_auto_push_github') === 'true';
         const hasGithubToken = Boolean(localStorage.getItem('amaes_github_token'));
 
         // Prevent repeated auto-actions on refresh using sessionStorage attempt keys
-        const dlKey = `amaes_autodl_${attemptId}`;
         const pushKey = `amaes_autopush_${attemptId}`;
         const shareKey = `amaes_autoshare_${attemptId}_${harvested.subjectCode}`;
-
-        // 1. Auto-Download JSON file on review screen load (opt-in)
-        if (autoDlEnabled && !sessionStorage.getItem(dlKey)) {
-            sessionStorage.setItem(dlKey, '1');
-            const json = exportAnswersAsJSON(harvested);
-            const filename = `${harvested.subjectCode}_${harvested.quizTitle.replace(/[^a-zA-Z0-9_-]/g, '_')}_Answers.json`;
-            setTimeout(() => {
-                downloadJsonFile(filename, json);
-                showToast(`Auto-downloaded ${harvested.harvestedCount} verified answers!`);
-            }, 500);
-        }
 
         // 2. Auto-Push to GitHub if configured
         if (autoPushEnabled && hasGithubToken && !sessionStorage.getItem(pushKey)) {
@@ -10546,11 +10520,33 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
                     return;
                 }
                 const lines = activityHistory.map(item => `[${item.time}] ${item.text}`).reverse();
-                const logText = `AMAES Moodle Toolkit Activity Log\nSubject: ${subCode || 'General'}\nExported: ${new Date().toLocaleString()}\n\n` + lines.join('\n');
+                const userAgent = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : 'Unknown';
+                const platform = (typeof navigator !== 'undefined' && (navigator.userAgentData?.platform || navigator.platform)) ? (navigator.userAgentData?.platform || navigator.platform) : 'Unknown';
+                const screenSize = (typeof window !== 'undefined' && window.screen) ? `${window.screen.width}x${window.screen.height}` : 'Unknown';
+                const currentUrl = (typeof window !== 'undefined' && window.location) ? window.location.href : 'Unknown';
+                const cachedCount = (typeof getCachedAnswers === 'function' && subCode) ? (getCachedAnswers(subCode) || []).length : 0;
+
+                const diagnosticHeader = [
+                    `=== AMAES MOODLE TOOLKIT DIAGNOSTIC AUDIT LOG ===`,
+                    `Timestamp: ${new Date().toISOString()}`,
+                    `Toolkit Version: ${SCRIPT_VERSION}`,
+                    `Subject / Course: ${subCode || 'General'}`,
+                    `Page URL: ${currentUrl}`,
+                    `User Agent: ${userAgent}`,
+                    `Platform: ${platform}`,
+                    `Screen: ${screenSize}`,
+                    `Active Mode: ${autoQuizMode ? 'Auto-Quiz' : 'Passive'} (Personality: ${quizPersonality})`,
+                    `Cloud Sync: ${localStorage.getItem('amaes_auto_cloud_sync') !== 'false'}`,
+                    `Cached DB Questions: ${cachedCount}`,
+                    ``,
+                    `--- ACTIVITY LOG TIMELINE ---`
+                ].join('\n');
+
+                const logText = `${diagnosticHeader}\n` + lines.join('\n') + `\n=== END DIAGNOSTIC LOG ===`;
                 try {
                     await copyToClipboard(logText);
-                    showToast(`Copied ${activityHistory.length} log events to clipboard!`);
-                    setLog(`Copied <b>${activityHistory.length}</b> activity log entries to clipboard.`, "var(--accent-blue)");
+                    showToast(`Copied ${activityHistory.length} log events + diagnostics!`);
+                    setLog(`Copied <b>${activityHistory.length}</b> activity log entries with system diagnostics to clipboard.`, "var(--accent-blue)");
                 } catch (err) {
                     showToast("Failed to copy logs to clipboard.");
                 }
