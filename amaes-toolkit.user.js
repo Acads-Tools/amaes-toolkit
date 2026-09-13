@@ -8291,7 +8291,7 @@
                     ${force ? `<button id="btn-welcome-close" style="background:none; border:none; color:#94a3b8; font-size:24px; cursor:pointer; line-height:1; padding: 4px;">&times;</button>` : ''}
                 </div>
                 
-                <div style="padding: 24px; font-size: 13px; line-height: 1.5; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;">
+                <div id="amaes-welcome-scroll-container" style="padding: 24px; font-size: 13px; line-height: 1.5; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;">
                     
                     <!-- Core Features -->
                     <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 8px; padding: 12px 14px;">
@@ -8336,8 +8336,8 @@
                     <!-- Keyboard Shortcuts Cheatsheet (Comprehensive) -->
                     <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 12px 14px;" id="welcome-shortcuts-section">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                            <h3 style="margin: 0; font-size: 13.5px; color: #fcd34d; display: flex; align-items: center; gap: 6px;">
-                                ${ICONS.zap} <span>Keyboard Shortcuts</span> <span id="amaes-secret-cheatsheet-trigger" style="cursor: pointer; user-select: none;" title="Cheatsheet">Cheatsheet</span>
+                            <h3 id="welcome-shortcuts-title" style="margin: 0; font-size: 13.5px; color: #fcd34d; display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;" title="Double-click to toggle Developer Console">
+                                ${ICONS.zap} <span>Keyboard Shortcuts</span> <span id="amaes-secret-cheatsheet-trigger" style="cursor: pointer; user-select: none; border-bottom: 1px dotted #fcd34d;" title="Double-click to toggle Developer Console">Cheatsheet</span>
                             </h3>
                             <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">Press <kbd style="background: #334155; color: #fff; padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 9px;">?</kbd> or <kbd style="background: #334155; color: #fff; padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 9px;">K</kbd> anywhere</span>
                         </div>
@@ -8377,29 +8377,22 @@
                         </div>
                     </div>
 
-                    <!-- Links with Equal Flex-Grid Widths: GitHub, Greasy Fork, Website -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
-                        <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 6px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 6px; text-align: center;">${ICONS.github} <span>GitHub</span></a>
-                        <a href="${GREASYFORK_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 6px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 6px; text-align: center;">${ICONS.greasyfork} <span>Greasy Fork</span></a>
-                        <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 6px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 6px; text-align: center;">${ICONS.globe} <span>Website</span></a>
-                    </div>
-
-                    <!-- Developer & Diagnostic Console Section (Zero Emojis, Gated by 'iknow', Hidden by Default) -->
-                    <div id="amaes-quick-dev-section" style="display: none; background: rgba(192, 132, 252, 0.05); border: 1px solid rgba(192, 132, 252, 0.2); border-radius: 8px; padding: 12px 14px; flex-direction: column; gap: 8px;">
+                    <!-- Developer & Diagnostic Console Section (Zero Emojis, Gated by 'iknow', Placed Directly Below Cheatsheet) -->
+                    <div id="amaes-quick-dev-section" style="display: none; background: #15102a; border: 2px solid #a855f7; border-radius: 8px; padding: 14px; flex-direction: column; gap: 10px; box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);">
                         <!-- Locked State -->
-                        <div id="amaes-quick-dev-locked" style="display: flex; flex-direction: column; gap: 6px;">
+                        <div id="amaes-quick-dev-locked" style="display: flex; flex-direction: column; gap: 8px;">
                             <div style="display: flex; align-items: center; justify-content: space-between;">
                                 <h3 style="margin: 0; font-size: 13px; color: #c084fc; display: flex; align-items: center; gap: 6px;">
                                     ${ICONS.debug} <span>Developer & Diagnostics Console</span>
                                 </h3>
-                                <span style="font-size: 9px; color: #94a3b8; font-family: monospace; text-transform: uppercase;">Restricted</span>
+                                <span style="font-size: 9px; color: #c084fc; font-family: monospace; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); padding: 1px 6px; border-radius: 3px; text-transform: uppercase;">Restricted</span>
                             </div>
-                            <p style="margin: 0; color: #94a3b8; font-size: 11px; line-height: 1.4;">
+                            <p style="margin: 0; color: #cbd5e1; font-size: 11px; line-height: 1.4;">
                                 Enter authorization key to unlock active telemetry mesh, diagnostic terminal, and runtime inspection:
                             </p>
-                            <div style="display: flex; gap: 6px; margin-top: 2px;">
-                                <input id="amaes-dev-auth-input" type="password" placeholder="Access key..." autocomplete="off" style="flex: 1; background: rgba(0, 0, 0, 0.35); border: 1px solid #475569; border-radius: 6px; padding: 6px 9px; font-family: monospace; font-size: 11.5px; color: #f8fafc; outline: none;" />
-                                <button id="amaes-dev-auth-submit" type="button" class="amaes-btn" style="padding: 6px 14px; font-size: 11px; background: #9333ea; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 700;">
+                            <div style="display: flex; gap: 8px; margin-top: 2px;">
+                                <input id="amaes-dev-auth-input" type="password" placeholder="Access key..." autocomplete="off" style="flex: 1; background: rgba(0, 0, 0, 0.5); border: 1.5px solid #a855f7; border-radius: 6px; padding: 7px 10px; font-family: monospace; font-size: 12px; color: #f8fafc; outline: none;" />
+                                <button id="amaes-dev-auth-submit" type="button" class="amaes-btn" style="padding: 7px 16px; font-size: 11.5px; background: #9333ea; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 700;">
                                     Unlock
                                 </button>
                             </div>
@@ -8453,6 +8446,13 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Links with Equal Flex-Grid Widths: GitHub, Greasy Fork, Website -->
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                        <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 6px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 6px; text-align: center;">${ICONS.github} <span>GitHub</span></a>
+                        <a href="${GREASYFORK_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 6px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 6px; text-align: center;">${ICONS.greasyfork} <span>Greasy Fork</span></a>
+                        <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 6px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 6px; text-align: center;">${ICONS.globe} <span>Website</span></a>
                     </div>
 
                     <!-- Agreement with High-Contrast Link -->
@@ -8557,62 +8557,74 @@
             };
         }
 
-        const secretCheatsheetTrigger = document.getElementById('amaes-secret-cheatsheet-trigger');
-        if (secretCheatsheetTrigger) {
-            let clickCount = 0;
-            let clickTimer = null;
-            const revealDevSection = () => {
-                const sec = document.getElementById('amaes-quick-dev-section');
-                if (sec) {
-                    const isHidden = sec.style.display === 'none' || !sec.style.display;
-                    if (isHidden) {
-                        sec.style.display = 'flex';
-                        sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const revealDevSection = () => {
+            const sec = document.getElementById('amaes-quick-dev-section');
+            const scrollBox = document.getElementById('amaes-welcome-scroll-container');
+            if (sec) {
+                const isHidden = sec.style.display === 'none' || !sec.style.display;
+                if (isHidden) {
+                    sec.style.display = 'flex';
+                    showToast("Developer Console Revealed Below Cheatsheet");
+                    setTimeout(() => {
+                        if (scrollBox) {
+                            scrollBox.scrollTo({ top: sec.offsetTop - 15, behavior: 'smooth' });
+                        }
+                        try { sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
                         const authInp = document.getElementById('amaes-dev-auth-input');
                         const cmdInp = document.getElementById('amaes-dev-cmd-input');
-                        setTimeout(() => {
-                            if (authInp && authInp.offsetParent !== null) {
-                                authInp.focus();
-                            } else if (cmdInp && cmdInp.offsetParent !== null) {
-                                cmdInp.focus();
-                            }
-                        }, 100);
-                        showToast("Developer Diagnostics Revealed");
-                    } else {
-                        sec.style.display = 'none';
-                    }
+                        if (authInp && authInp.offsetParent !== null) {
+                            authInp.focus();
+                            authInp.select();
+                        } else if (cmdInp && cmdInp.offsetParent !== null) {
+                            cmdInp.focus();
+                        }
+                    }, 50);
+                } else {
+                    sec.style.display = 'none';
+                    showToast("Developer Console Hidden");
                 }
-            };
+            }
+        };
 
-            secretCheatsheetTrigger.ondblclick = (e) => {
+        const attachSecretTrigger = (el) => {
+            if (!el) return;
+            let count = 0;
+            let timer = null;
+            el.ondblclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 revealDevSection();
             };
-
-            secretCheatsheetTrigger.onclick = (e) => {
+            el.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                clickCount++;
-                clearTimeout(clickTimer);
-                if (clickCount >= 2) {
-                    clickCount = 0;
+                count++;
+                clearTimeout(timer);
+                if (count >= 2) {
+                    count = 0;
                     revealDevSection();
                 } else {
-                    clickTimer = setTimeout(() => { clickCount = 0; }, 400);
+                    timer = setTimeout(() => { count = 0; }, 450);
                 }
             };
-        }
+        };
+
+        const secretCheatsheetTrigger = document.getElementById('amaes-secret-cheatsheet-trigger');
+        attachSecretTrigger(secretCheatsheetTrigger);
+        attachSecretTrigger(document.getElementById('welcome-shortcuts-title'));
 
         if (focusDev) {
             const sec = document.getElementById('amaes-quick-dev-section');
+            const scrollBox = document.getElementById('amaes-welcome-scroll-container');
             if (sec) sec.style.display = 'flex';
             setTimeout(() => {
-                if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (scrollBox && sec) scrollBox.scrollTo({ top: sec.offsetTop - 15, behavior: 'smooth' });
+                try { if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
                 const authInp = document.getElementById('amaes-dev-auth-input');
                 const cmdInp = document.getElementById('amaes-dev-cmd-input');
                 if (authInp && authInp.offsetParent !== null) {
                     authInp.focus();
+                    authInp.select();
                 } else if (cmdInp && cmdInp.offsetParent !== null) {
                     cmdInp.focus();
                 }
