@@ -3531,9 +3531,9 @@ test("Grafana Dashboard Widget: includes responsive panels, diagnostic copy log,
 });
 
 // --------------------------------------------------
-// 103. In-Panel Secret Developer Console & 'iknow' Password Gate
+// 103. Quick Start Guide Secret Developer Console & 'iknow' Password Gate
 // --------------------------------------------------
-test("In-Panel Secret Developer Console: protected by 'iknow' password, triggered by '?'/K triple-press or Copy Log triple-click, zero emojis", () => {
+test("Quick Start Guide Secret Developer Console: integrated in guide, protected by 'iknow', preserves clean 3-tab layout, zero emojis", () => {
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Password Protection & Keyfield
@@ -3545,18 +3545,23 @@ test("In-Panel Secret Developer Console: protected by 'iknow' password, triggere
     assert.ok(script.includes('devKeySequenceCount >= 3'), "Must detect triple-press sequence of ? or K");
     assert.ok(script.includes('copyLogClickCount >= 3'), "Must detect triple-click sequence on Copy Log button");
 
-    // 3. Tab Button and Panes
-    assert.ok(script.includes('id="amaes-tab-btn-dev"'), "Must include dev tab button in navigation bar");
-    assert.ok(script.includes('id="tab-pane-dev"'), "Must include dev tab pane in panel markup");
-    assert.ok(script.includes('id="amaes-dev-mesh-count"'), "Must include community mesh peer counter in dev pane");
-    assert.ok(script.includes('id="amaes-dev-cmd-input"'), "Must include dev terminal command input in dev pane");
+    // 3. Clean 3-Tab Main Navigation Integrity (No awkward 4th tab)
+    assert.ok(!script.includes('id="amaes-tab-btn-dev"'), "Main panel navigation bar must NOT contain an awkward 4th dev tab");
+    assert.ok(script.includes('repeat(3, minmax(0, 1fr))'), "Main panel must strictly keep a balanced 3-column tab layout");
+
+    // 4. Integrated Quick Start Guide Developer Section & Controls
+    assert.ok(script.includes('id="amaes-quick-dev-section"'), "Must integrate developer console into Quick Start Guide modal");
+    assert.ok(script.includes('id="amaes-quick-dev-locked"'), "Must include protected locked view in quick start guide");
+    assert.ok(script.includes('id="amaes-quick-dev-unlocked"'), "Must include interactive unlocked view in quick start guide");
+    assert.ok(script.includes('id="amaes-dev-mesh-count"'), "Must include community mesh peer counter in dev section");
+    assert.ok(script.includes('id="amaes-dev-cmd-input"'), "Must include dev terminal command input in dev section");
     assert.ok(script.includes('id="amaes-dev-btn-relock"'), "Must include relock button to lock and sleep dev console");
 
-    // 4. Style & Zero-Emoji Integrity
-    const devPaneStart = script.indexOf('id="tab-pane-dev"');
-    const devPaneEnd = script.indexOf('</div>\n            </div>\n        `;', devPaneStart);
-    const devPaneMarkup = script.substring(devPaneStart, devPaneEnd > devPaneStart ? devPaneEnd : devPaneStart + 500);
-    assert.ok(!/[⚡🔒🚀🛡️👀]/.test(devPaneMarkup), "Dev pane must not use emojis, matching clean professional toolkit styling");
+    // 5. Style & Zero-Emoji Integrity
+    const devSecStart = script.indexOf('id="amaes-quick-dev-section"');
+    const devSecEnd = script.indexOf('<!-- Agreement with High-Contrast Link -->', devSecStart);
+    const devSecMarkup = script.substring(devSecStart, devSecEnd > devSecStart ? devSecEnd : devSecStart + 1500);
+    assert.ok(!/[⚡🔒🚀🛡️👀]/.test(devSecMarkup), "Dev section must not use emojis, matching clean professional toolkit styling");
 });
 
 console.log("\n==================================================");
