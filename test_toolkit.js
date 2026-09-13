@@ -3596,6 +3596,25 @@ test("Background Execution: notifies users that Auto-Quiz runs hands-free in bac
     // 3. Standalone Dashboard status
     assert.ok(dashHtml.includes('Background Execution Capable'), "Dashboard status panel must indicate background execution capability");
 });
+// --------------------------------------------------
+// 105. 10-Minute Continuous Heartbeat & Telemetry Tracking
+// --------------------------------------------------
+test("Telemetry: 10-minute continuous recurring pulse with anonymous token and relay support", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    const workerScript = fs.readFileSync('../database/relay/worker.js', 'utf8');
+
+    // 1. Client-side recurring pulse & anonymous token
+    assert.ok(script.includes('setInterval(sendPassiveTelemetryPulse, 600000)'), "Must schedule recurring pulse every 10 minutes");
+    assert.ok(script.includes('amaes_anonymous_cid'), "Must generate and use anonymous client token");
+    assert.ok(script.includes('cid='), "Must append anonymous cid parameter to ping URL");
+    assert.ok(script.includes('600000'), "Must enforce 10-minute cooldown");
+
+    // 2. Server-side Cloudflare Worker endpoints & 10-minute rolling tracking
+    assert.ok(workerScript.includes('path === "/ping"'), "Worker must handle /ping endpoint");
+    assert.ok(workerScript.includes('path === "/active"'), "Worker must handle /active endpoint");
+    assert.ok(workerScript.includes('600000'), "Worker must enforce 10-minute window for active peers");
+    assert.ok(workerScript.includes('pruneAndCountActivePeers'), "Worker must prune peers older than 10 minutes");
+});
 
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);

@@ -8045,15 +8045,21 @@
     // ==========================================
     let devMeshInterval = null;
 
-    // Ultra-lightweight anonymous presence pulse (throttled to max 1 pulse per 10 mins per tab)
+    // Ultra-lightweight anonymous presence pulse (throttled to max 1 pulse per 10 mins)
     function sendPassiveTelemetryPulse() {
         try {
             const now = Date.now();
-            const lastPulse = parseInt(sessionStorage.getItem('amaes_last_pulse_ts') || '0', 10);
+            const lastPulse = parseInt(localStorage.getItem('amaes_last_pulse_ts') || '0', 10);
             if (now - lastPulse < 600000) return; // 10-minute cooldown
-            sessionStorage.setItem('amaes_last_pulse_ts', String(now));
+            localStorage.setItem('amaes_last_pulse_ts', String(now));
 
-            const url = `${DEFAULT_COMMUNITY_RELAY_URL}/ping?v=${encodeURIComponent(SCRIPT_VERSION)}`;
+            let cid = localStorage.getItem('amaes_anonymous_cid');
+            if (!cid) {
+                cid = 'c_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+                try { localStorage.setItem('amaes_anonymous_cid', cid); } catch (_) {}
+            }
+
+            const url = `${DEFAULT_COMMUNITY_RELAY_URL}/ping?v=${encodeURIComponent(SCRIPT_VERSION)}&cid=${encodeURIComponent(cid)}`;
             const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
                           (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
 
@@ -8067,6 +8073,8 @@
                             const data = JSON.parse(res.responseText);
                             if (data && typeof data.active === 'number') {
                                 sessionStorage.setItem('amaes_relay_active_users', String(data.active));
+                                const el = document.getElementById('amaes-dev-mesh-count');
+                                if (el) el.innerText = data.active;
                             }
                         } catch (_) {}
                     }
@@ -11126,6 +11134,7 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
         injectDashboardGuideBanner();
         checkForScriptUpdates(false);
         sendPassiveTelemetryPulse();
+        setInterval(sendPassiveTelemetryPulse, 600000); // 10-minute recurring telemetry pulse
 
         // Auto-Harvest past quizzes: scan Grade Report once per session per course or all courses on dashboard
         if (autoHarvestGrades) {
