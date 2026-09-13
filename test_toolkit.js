@@ -3484,6 +3484,52 @@ test("Review Harvest Safety & Student Answer Preservation: guarantees all questi
     assert.strictEqual(mockDb.length, 2, "Database must now have both questions preserved");
 });
 
+// --------------------------------------------------
+// 101. Comprehensive Diagnostic Log Export & Debug State
+// --------------------------------------------------
+test("Comprehensive Diagnostic Log Export: captures user agent, platform, screen, URL, and audit timeline for debugging", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    assert.ok(script.includes('=== AMAES MOODLE TOOLKIT DIAGNOSTIC AUDIT LOG ==='), "Must format export with diagnostic audit log header");
+    assert.ok(script.includes('User Agent:'), "Must include User Agent in copied diagnostic log");
+    assert.ok(script.includes('Platform:'), "Must include Platform in copied diagnostic log");
+    assert.ok(script.includes('Screen:'), "Must include Screen size in copied diagnostic log");
+    assert.ok(script.includes('Page URL:'), "Must include Page URL in copied diagnostic log");
+    assert.ok(script.includes('Active Mode:'), "Must include Active Mode state in copied diagnostic log");
+    assert.ok(script.includes('Cached DB Questions:'), "Must include cached DB count in copied diagnostic log");
+    assert.ok(script.includes('--- ACTIVITY LOG TIMELINE ---'), "Must format activity timeline section in copied log");
+});
+
+// --------------------------------------------------
+// 102. Grafana Dashboard Widget & Secret Dev Console
+// --------------------------------------------------
+test("Grafana Dashboard Widget: includes responsive panels, diagnostic copy log, secret triple-click dev unlock, and active mesh telemetry", () => {
+    assert.ok(fs.existsSync('dashboard.html'), "dashboard.html must exist in toolkit repository");
+    const html = fs.readFileSync('dashboard.html', 'utf8');
+
+    // 1. Theme & CDN verification
+    assert.ok(html.includes('cdn.tailwindcss.com'), "Must load Tailwind CSS CDN");
+    assert.ok(html.includes('#181b1f'), "Must use Grafana deep gray #181b1f dark mode background");
+    assert.ok(html.includes('#22252b'), "Must use Grafana panel background #22252b");
+
+    // 2. Panel verification
+    assert.ok(html.includes('id="statusText"'), "Must include Status Panel with status indicator");
+    assert.ok(html.includes('id="statCount"'), "Must include Stat Panel with key metric");
+    assert.ok(html.includes('id="logConsole"'), "Must include Log Panel with terminal console");
+    assert.ok(html.includes('id="btnCopyLog"'), "Must include Copy Log button in Action Panel");
+
+    // 3. Diagnostic Report in Copy Log
+    assert.ok(html.includes('=== AMAES TOOLKIT DIAGNOSTIC AUDIT LOG ==='), "Copy log must generate diagnostic audit report");
+    assert.ok(html.includes('generateDiagnosticReport'), "Must define generateDiagnosticReport helper");
+
+    // 4. Secret Triple-Click Dev Unlock
+    assert.ok(html.includes('e.detail === 3 || clickCount >= 3'), "Must detect triple-click natively without polling overhead");
+    assert.ok(html.includes('id="tabSecret"'), "Must contain secret dev tab");
+    assert.ok(html.includes('id="activeUserCount"'), "Must contain active mesh users online metric");
+    assert.ok(html.includes('id="devInput"'), "Must contain dev command / text panel input");
+    assert.ok(html.includes('lockDevMode'), "Must allow re-locking and stopping telemetry timers");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);
