@@ -8080,8 +8080,6 @@
     function unlockDevTab() {
         sessionStorage.setItem('amaes_dev_unlocked', 'true');
         startDevMeshTelemetry();
-        showToast("Developer Console Unlocked");
-        setLog("Developer diagnostic console unlocked.", "var(--accent-purple)");
     }
 
     function lockDevTab() {
@@ -8090,8 +8088,6 @@
             clearInterval(devMeshInterval);
             devMeshInterval = null;
         }
-        showToast("Developer Console Locked");
-        setLog("Developer diagnostic console locked.", "var(--text-muted)");
     }
 
     function startDevMeshTelemetry() {
@@ -8519,8 +8515,6 @@
                 sessionStorage.setItem('amaes_dev_unlocked', 'true');
                 if (devAuthError) devAuthError.style.display = 'none';
                 updateDevSectionView();
-                showToast("Developer Console Unlocked");
-                setLog("Developer diagnostic console unlocked.", "var(--accent-purple)");
                 setTimeout(() => {
                     const ci = document.getElementById('amaes-dev-cmd-input');
                     if (ci) ci.focus();
@@ -8545,8 +8539,6 @@
             devRelockBtn.onclick = () => {
                 sessionStorage.removeItem('amaes_dev_unlocked');
                 updateDevSectionView();
-                showToast("Developer Console Locked");
-                setLog("Developer diagnostic console locked.", "var(--text-muted)");
             };
         }
 
@@ -8564,7 +8556,6 @@
                 const isHidden = sec.style.display === 'none' || !sec.style.display;
                 if (isHidden) {
                     sec.style.display = 'flex';
-                    showToast("Developer Console Revealed Below Cheatsheet");
                     setTimeout(() => {
                         if (scrollBox) {
                             scrollBox.scrollTo({ top: sec.offsetTop - 15, behavior: 'smooth' });
@@ -8581,7 +8572,6 @@
                     }, 50);
                 } else {
                     sec.style.display = 'none';
-                    showToast("Developer Console Hidden");
                 }
             }
         };
