@@ -3533,19 +3533,18 @@ test("Grafana Dashboard Widget: includes responsive panels, diagnostic copy log,
 // --------------------------------------------------
 // 103. Quick Start Guide Secret Developer Console & 'iknow' Password Gate
 // --------------------------------------------------
-test("Quick Start Guide Secret Developer Console: hidden by default, secret 2-click Cheatsheet reveal, protected by 'iknow', spacious admin console, zero emojis", () => {
+test("Quick Start Guide Secret Developer Console: hidden by default, uncollapsed by pressing backtick 3 times, lock-free direct terminal access, spacious admin console, zero emojis", () => {
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
-    // 1. Password Protection & Keyfield
-    assert.ok(script.includes("val === 'iknow'"), "Must gate developer unlock with exact password 'iknow'");
-    assert.ok(script.includes('id="amaes-dev-auth-input"'), "Must include auth key input field");
-    assert.ok(script.includes('showDevUnlockModal'), "Must define showDevUnlockModal function");
+    // 1. Lock-Free Direct Access & Triple Backtick (```) Shortcut
+    assert.ok(!script.includes("val === 'iknow'"), "Must remove 'iknow' password lock requirement");
+    assert.ok(!script.includes('id="amaes-quick-dev-locked"'), "Must remove locked view screen");
+    assert.ok(script.includes('globalBacktickCount >= 3') && script.includes('modalBacktickCount >= 3'), "Must toggle on triple backtick (```) inside modal and across Moodle");
+    assert.ok(script.includes('toggleDeveloperConsole'), "Must define toggleDeveloperConsole function");
 
-    // 2. Secret trigger embedded in Cheatsheet title & 2-click listener (clean single-press ?/K and 1-click Copy Log)
+    // 2. Secret trigger embedded in Cheatsheet title & dblclick listener
     assert.ok(script.includes('id="amaes-secret-cheatsheet-trigger"'), "Must embed secret trigger span in Cheatsheet title");
-    assert.ok(script.includes('secretCheatsheetTrigger'), "Must attach secret trigger listener for double-click / 2 clicks");
-    assert.ok(!script.includes('devKeySequenceCount >= 3'), "Must not delay or require 3 presses of ? or K");
-    assert.ok(!script.includes('copyLogClickCount >= 3'), "Must not delay or require 3 clicks of Copy Log button");
+    assert.ok(script.includes('secretCheatsheetTrigger'), "Must attach secret trigger listener for double-click");
 
     // 3. Clean 3-Tab Main Navigation Integrity (No awkward 4th tab)
     assert.ok(!script.includes('id="amaes-tab-btn-dev"'), "Main panel navigation bar must NOT contain an awkward 4th dev tab");
@@ -3553,11 +3552,9 @@ test("Quick Start Guide Secret Developer Console: hidden by default, secret 2-cl
 
     // 4. Integrated Quick Start Guide Developer Section & Controls (Hidden by Default & Spacious Monospace)
     assert.ok(script.includes('id="amaes-quick-dev-section" style="display: none;'), "Dev console section must be completely hidden by default in Quick Start Guide");
-    assert.ok(script.includes('id="amaes-quick-dev-locked"'), "Must include protected locked view in quick start guide");
-    assert.ok(script.includes('id="amaes-quick-dev-unlocked"'), "Must include interactive unlocked view in quick start guide");
     assert.ok(script.includes('id="amaes-dev-mesh-count"'), "Must include community mesh peer counter in dev section");
     assert.ok(script.includes('id="amaes-dev-cmd-input"'), "Must include dev terminal command input in dev section");
-    assert.ok(script.includes('id="amaes-dev-btn-relock"'), "Must include relock button to lock and sleep dev console");
+    assert.ok(script.includes('id="amaes-dev-btn-close"'), "Must include collapse button to close dev console");
     assert.ok(script.includes('min-height: 240px') || script.includes('height: 260px'), "Console output buffer must be spacious/taller for admin viewing");
 
     // 5. Command suite verification
@@ -3571,7 +3568,7 @@ test("Quick Start Guide Secret Developer Console: hidden by default, secret 2-cl
 
     // 6. Style & Zero-Emoji Integrity
     const devSecStart = script.indexOf('id="amaes-quick-dev-section"');
-    const devSecEnd = script.indexOf('<!-- Agreement with High-Contrast Link -->', devSecStart);
+    const devSecEnd = script.indexOf('<!-- Links with Equal Flex-Grid Widths', devSecStart);
     const devSecMarkup = script.substring(devSecStart, devSecEnd > devSecStart ? devSecEnd : devSecStart + 1500);
     assert.ok(!/[⚡🔒🚀🛡️👀]/.test(devSecMarkup), "Dev section must not use emojis, matching clean professional toolkit styling");
 });

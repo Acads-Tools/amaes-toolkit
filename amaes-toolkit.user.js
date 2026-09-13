@@ -3482,6 +3482,19 @@
                 return;
             }
 
+            // Developer Diagnostic Console: Triple Backtick (```)
+            if (e.key === '`' || e.code === 'Backquote') {
+                globalBacktickCount++;
+                clearTimeout(globalBacktickTimer);
+                globalBacktickTimer = setTimeout(() => { globalBacktickCount = 0; }, 1200);
+                if (globalBacktickCount >= 3) {
+                    globalBacktickCount = 0;
+                    e.preventDefault();
+                    toggleDeveloperConsole();
+                    return;
+                }
+            }
+
             if (!checkIsQuizAttemptPage()) return;
 
             const key = e.key ? e.key.toUpperCase() : '';
@@ -8143,8 +8156,41 @@
         devMeshInterval = setInterval(updateCount, 15000);
     }
 
+    let globalBacktickCount = 0;
+    let globalBacktickTimer = null;
+
+    function toggleDeveloperConsole() {
+        const modal = document.getElementById('amaes-welcome-modal');
+        if (!modal) {
+            showWelcomeOnboardingModal(true, true);
+            return;
+        }
+
+        const sec = document.getElementById('amaes-quick-dev-section');
+        const scrollBox = document.getElementById('amaes-welcome-scroll-container');
+        if (sec) {
+            const isHidden = sec.style.display === 'none' || !sec.style.display;
+            if (isHidden) {
+                sec.style.display = 'flex';
+                startDevMeshTelemetry();
+                setTimeout(() => {
+                    if (scrollBox) scrollBox.scrollTo({ top: sec.offsetTop - 15, behavior: 'smooth' });
+                    try { sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
+                    const cmdInp = document.getElementById('amaes-dev-cmd-input');
+                    if (cmdInp) cmdInp.focus();
+                }, 50);
+            } else {
+                sec.style.display = 'none';
+                if (devMeshInterval) {
+                    clearInterval(devMeshInterval);
+                    devMeshInterval = null;
+                }
+            }
+        }
+    }
+
     function showDevUnlockModal() {
-        showWelcomeOnboardingModal(true, true);
+        toggleDeveloperConsole();
     }
 
     function executeToolkitDevCommand() {
@@ -8381,73 +8427,50 @@
                         </div>
                     </div>
 
-                    <!-- Developer & Diagnostic Console Section (Zero Emojis, Gated by 'iknow', Placed Directly Below Cheatsheet) -->
+                    <!-- Developer & Diagnostic Console Section (Zero Emojis, Direct Terminal Access, Placed Directly Below Cheatsheet) -->
                     <div id="amaes-quick-dev-section" style="display: none; background: #15102a; border: 2px solid #a855f7; border-radius: 8px; padding: 14px; flex-direction: column; gap: 10px; box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);">
-                        <!-- Locked State -->
-                        <div id="amaes-quick-dev-locked" style="display: flex; flex-direction: column; gap: 8px;">
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
                                 <h3 style="margin: 0; font-size: 13px; color: #c084fc; display: flex; align-items: center; gap: 6px;">
                                     ${ICONS.debug} <span>Developer & Diagnostics Console</span>
                                 </h3>
-                                <span style="font-size: 9px; color: #c084fc; font-family: monospace; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); padding: 1px 6px; border-radius: 3px; text-transform: uppercase;">Restricted</span>
+                                <span style="font-size: 9px; font-family: monospace; background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 1px 5px; border-radius: 3px;">Active</span>
                             </div>
-                            <p style="margin: 0; color: #cbd5e1; font-size: 11px; line-height: 1.4;">
-                                Enter authorization key to unlock active telemetry mesh, diagnostic terminal, and runtime inspection:
-                            </p>
-                            <div style="display: flex; gap: 8px; margin-top: 2px;">
-                                <input id="amaes-dev-auth-input" type="password" placeholder="Access key..." autocomplete="off" style="flex: 1; background: rgba(0, 0, 0, 0.5); border: 1.5px solid #a855f7; border-radius: 6px; padding: 7px 10px; font-family: monospace; font-size: 12px; color: #f8fafc; outline: none;" />
-                                <button id="amaes-dev-auth-submit" type="button" class="amaes-btn" style="padding: 7px 16px; font-size: 11.5px; background: #9333ea; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 700;">
-                                    Unlock
-                                </button>
-                            </div>
-                            <div id="amaes-dev-auth-error" style="display: none; font-size: 10px; color: var(--accent-pink, #f87171); font-weight: 600;">Invalid authorization key.</div>
+                            <button id="amaes-dev-btn-close" type="button" class="amaes-btn amaes-btn-outline" style="font-size: 9.5px; padding: 2px 8px; color: #94a3b8; border-color: #475569; cursor: pointer;" title="Collapse console">
+                                Collapse
+                            </button>
                         </div>
 
-                        <!-- Unlocked State -->
-                        <div id="amaes-quick-dev-unlocked" style="display: none; flex-direction: column; gap: 8px;">
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <div style="display: flex; align-items: center; gap: 6px;">
-                                    <h3 style="margin: 0; font-size: 13px; color: #c084fc; display: flex; align-items: center; gap: 6px;">
-                                        ${ICONS.debug} <span>Developer & Diagnostics Console</span>
-                                    </h3>
-                                    <span style="font-size: 9px; font-family: monospace; background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 1px 5px; border-radius: 3px;">Active</span>
+                        <!-- Community Mesh Telemetry Card -->
+                        <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;">
+                            <div>
+                                <div style="font-size: 9px; font-family: monospace; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Active Mesh Telemetry</div>
+                                <div style="display: flex; align-items: baseline; gap: 5px; margin-top: 2px;">
+                                    <span id="amaes-dev-mesh-count" style="font-size: 18px; font-weight: 800; font-family: monospace; color: #c084fc;">--</span>
+                                    <span style="font-size: 10.5px; color: #94a3b8;">peers active</span>
                                 </div>
-                                <button id="amaes-dev-btn-relock" type="button" class="amaes-btn amaes-btn-outline" style="font-size: 9.5px; padding: 2px 8px; color: #94a3b8; border-color: #475569; cursor: pointer;" title="Lock developer console">
-                                    Lock
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #a855f7; box-shadow: 0 0 6px #a855f7;"></span>
+                                <span style="font-size: 9.5px; color: #cbd5e1; font-family: monospace;">Mesh Connected</span>
+                            </div>
+                        </div>
+
+                        <!-- Diagnostic Terminal Box (Admin Friendly, Spacious Monospace) -->
+                        <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 5px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9px; color: #94a3b8; font-family: monospace; text-transform: uppercase;">
+                                <span>Terminal Command Line</span>
+                                <span>Type 'help' for commands</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <span style="font-family: monospace; font-size: 11px; font-weight: 700; color: #c084fc;">&gt;</span>
+                                <input id="amaes-dev-cmd-input" type="text" placeholder="status, ping, users, cache, logs, clear..." style="flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid #475569; border-radius: 4px; padding: 4px 7px; font-family: monospace; font-size: 10.5px; color: #fff; outline: none;" />
+                                <button id="amaes-dev-cmd-run" type="button" class="amaes-btn" style="padding: 4px 10px; font-size: 10px; font-family: monospace; cursor: pointer; background: #9333ea; color: #fff; border: none; border-radius: 4px; font-weight: 600;">
+                                    Run
                                 </button>
                             </div>
-
-                            <!-- Community Mesh Telemetry Card -->
-                            <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;">
-                                <div>
-                                    <div style="font-size: 9px; font-family: monospace; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Active Mesh Telemetry</div>
-                                    <div style="display: flex; align-items: baseline; gap: 5px; margin-top: 2px;">
-                                        <span id="amaes-dev-mesh-count" style="font-size: 18px; font-weight: 800; font-family: monospace; color: #c084fc;">--</span>
-                                        <span style="font-size: 10.5px; color: #94a3b8;">peers active</span>
-                                    </div>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 6px;">
-                                    <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #a855f7; box-shadow: 0 0 6px #a855f7;"></span>
-                                    <span style="font-size: 9.5px; color: #cbd5e1; font-family: monospace;">Mesh Connected</span>
-                                </div>
-                            </div>
-
-                            <!-- Diagnostic Terminal Box (Admin Friendly, Spacious Monospace) -->
-                            <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 5px;">
-                                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9px; color: #94a3b8; font-family: monospace; text-transform: uppercase;">
-                                    <span>Terminal Command Line</span>
-                                    <span>Type 'help' for commands</span>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 4px;">
-                                    <span style="font-family: monospace; font-size: 11px; font-weight: 700; color: #c084fc;">&gt;</span>
-                                    <input id="amaes-dev-cmd-input" type="text" placeholder="status, ping, users, cache, logs, clear..." style="flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid #475569; border-radius: 4px; padding: 4px 7px; font-family: monospace; font-size: 10.5px; color: #fff; outline: none;" />
-                                    <button id="amaes-dev-cmd-run" type="button" class="amaes-btn" style="padding: 4px 10px; font-size: 10px; font-family: monospace; cursor: pointer; background: #9333ea; color: #fff; border: none; border-radius: 4px; font-weight: 600;">
-                                        Run
-                                    </button>
-                                </div>
-                                <div id="amaes-dev-cmd-output" style="background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 4px; padding: 7px 9px; height: 260px; min-height: 240px; overflow-y: auto; font-family: monospace; font-size: 10.5px; line-height: 1.5; color: #cbd5e1; display: flex; flex-direction: column; gap: 3px; user-select: text;">
-                                    <div style="color: #64748b;">Developer diagnostic terminal ready. Type 'help' for command suite.</div>
-                                </div>
+                            <div id="amaes-dev-cmd-output" style="background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 4px; padding: 7px 9px; height: 260px; min-height: 240px; overflow-y: auto; font-family: monospace; font-size: 10.5px; line-height: 1.5; color: #cbd5e1; display: flex; flex-direction: column; gap: 3px; user-select: text;">
+                                <div style="color: #64748b;">Developer diagnostic terminal ready. Type 'help' for command suite.</div>
                             </div>
                         </div>
                     </div>
@@ -8491,62 +8514,19 @@
         bindWelcomeToggle('welcome-chk-harvest', 'amaes_auto_harvest_grades', (v) => { if (typeof autoHarvestGrades !== 'undefined') autoHarvestGrades = v; });
         bindWelcomeToggle('welcome-chk-scrape', 'amaes_auto_scrape_amauoed', (v) => { autoScrapeAmauoed = v; });
 
-        // Developer Section Logic
-        const devSectionLocked = document.getElementById('amaes-quick-dev-locked');
-        const devSectionUnlocked = document.getElementById('amaes-quick-dev-unlocked');
-        const devAuthInput = document.getElementById('amaes-dev-auth-input');
-        const devAuthSubmit = document.getElementById('amaes-dev-auth-submit');
-        const devAuthError = document.getElementById('amaes-dev-auth-error');
-        const devRelockBtn = document.getElementById('amaes-dev-btn-relock');
+        // Developer Section Logic (Lock-Free Direct Console)
+        const devSection = document.getElementById('amaes-quick-dev-section');
+        const devCloseBtn = document.getElementById('amaes-dev-btn-close');
         const devCmdInput = document.getElementById('amaes-dev-cmd-input');
         const devCmdRunBtn = document.getElementById('amaes-dev-cmd-run');
 
-        const updateDevSectionView = () => {
-            const isUnlocked = sessionStorage.getItem('amaes_dev_unlocked') === 'true';
-            if (devSectionLocked) devSectionLocked.style.display = isUnlocked ? 'none' : 'flex';
-            if (devSectionUnlocked) devSectionUnlocked.style.display = isUnlocked ? 'flex' : 'none';
-            if (isUnlocked) {
-                startDevMeshTelemetry();
-            } else {
+        if (devCloseBtn) {
+            devCloseBtn.onclick = () => {
+                if (devSection) devSection.style.display = 'none';
                 if (devMeshInterval) {
                     clearInterval(devMeshInterval);
                     devMeshInterval = null;
                 }
-            }
-        };
-
-        updateDevSectionView();
-
-        const submitQuickAuth = () => {
-            const val = (devAuthInput ? devAuthInput.value : '').trim();
-            if (val === 'iknow') {
-                sessionStorage.setItem('amaes_dev_unlocked', 'true');
-                if (devAuthError) devAuthError.style.display = 'none';
-                updateDevSectionView();
-                setTimeout(() => {
-                    const ci = document.getElementById('amaes-dev-cmd-input');
-                    if (ci) ci.focus();
-                }, 60);
-            } else {
-                if (devAuthError) devAuthError.style.display = 'block';
-                if (devAuthInput) {
-                    devAuthInput.style.borderColor = 'var(--accent-pink, #f87171)';
-                    devAuthInput.focus();
-                }
-            }
-        };
-
-        if (devAuthSubmit) devAuthSubmit.onclick = submitQuickAuth;
-        if (devAuthInput) {
-            devAuthInput.onkeydown = (e) => {
-                if (e.key === 'Enter') submitQuickAuth();
-            };
-        }
-
-        if (devRelockBtn) {
-            devRelockBtn.onclick = () => {
-                sessionStorage.removeItem('amaes_dev_unlocked');
-                updateDevSectionView();
             };
         }
 
@@ -8564,46 +8544,33 @@
                 const isHidden = sec.style.display === 'none' || !sec.style.display;
                 if (isHidden) {
                     sec.style.display = 'flex';
+                    startDevMeshTelemetry();
                     setTimeout(() => {
                         if (scrollBox) {
                             scrollBox.scrollTo({ top: sec.offsetTop - 15, behavior: 'smooth' });
                         }
                         try { sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
-                        const authInp = document.getElementById('amaes-dev-auth-input');
                         const cmdInp = document.getElementById('amaes-dev-cmd-input');
-                        if (authInp && authInp.offsetParent !== null) {
-                            authInp.focus();
-                            authInp.select();
-                        } else if (cmdInp && cmdInp.offsetParent !== null) {
+                        if (cmdInp && cmdInp.offsetParent !== null) {
                             cmdInp.focus();
                         }
                     }, 50);
                 } else {
                     sec.style.display = 'none';
+                    if (devMeshInterval) {
+                        clearInterval(devMeshInterval);
+                        devMeshInterval = null;
+                    }
                 }
             }
         };
 
         const attachSecretTrigger = (el) => {
             if (!el) return;
-            let count = 0;
-            let timer = null;
             el.ondblclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 revealDevSection();
-            };
-            el.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                count++;
-                clearTimeout(timer);
-                if (count >= 2) {
-                    count = 0;
-                    revealDevSection();
-                } else {
-                    timer = setTimeout(() => { count = 0; }, 450);
-                }
             };
         };
 
@@ -8612,21 +8579,7 @@
         attachSecretTrigger(document.getElementById('welcome-shortcuts-title'));
 
         if (focusDev) {
-            const sec = document.getElementById('amaes-quick-dev-section');
-            const scrollBox = document.getElementById('amaes-welcome-scroll-container');
-            if (sec) sec.style.display = 'flex';
-            setTimeout(() => {
-                if (scrollBox && sec) scrollBox.scrollTo({ top: sec.offsetTop - 15, behavior: 'smooth' });
-                try { if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
-                const authInp = document.getElementById('amaes-dev-auth-input');
-                const cmdInp = document.getElementById('amaes-dev-cmd-input');
-                if (authInp && authInp.offsetParent !== null) {
-                    authInp.focus();
-                    authInp.select();
-                } else if (cmdInp && cmdInp.offsetParent !== null) {
-                    cmdInp.focus();
-                }
-            }, 120);
+            revealDevSection();
         }
 
         const termsCheck = document.getElementById('welcome-chk-terms');
@@ -8673,14 +8626,8 @@
             };
         }
 
-        const closeModalClean = () => {
-            window.removeEventListener('keydown', handleModalEsc);
-            if (devMeshInterval) {
-                clearInterval(devMeshInterval);
-                devMeshInterval = null;
-            }
-            modal.remove();
-        };
+        let modalBacktickCount = 0;
+        let modalBacktickTimer = null;
 
         const handleModalEsc = (e) => {
             if (e.key === 'Escape' || e.key === 'Esc') {
@@ -8688,7 +8635,32 @@
                 e.stopPropagation();
                 closeModalClean();
                 showToast("Closed Quick Start (Esc)");
+                return;
             }
+            if (e.key === '`' || e.code === 'Backquote') {
+                const active = document.activeElement;
+                if (active && active.id !== 'amaes-dev-cmd-input' && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+                    return;
+                }
+                modalBacktickCount++;
+                clearTimeout(modalBacktickTimer);
+                modalBacktickTimer = setTimeout(() => { modalBacktickCount = 0; }, 1200);
+                if (modalBacktickCount >= 3) {
+                    modalBacktickCount = 0;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    revealDevSection();
+                }
+            }
+        };
+
+        const closeModalClean = () => {
+            window.removeEventListener('keydown', handleModalEsc);
+            if (devMeshInterval) {
+                clearInterval(devMeshInterval);
+                devMeshInterval = null;
+            }
+            modal.remove();
         };
         window.addEventListener('keydown', handleModalEsc);
 
