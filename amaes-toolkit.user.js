@@ -2918,6 +2918,31 @@
             }
         }
 
+        const subtext = document.getElementById('amaes-autoquiz-subtext');
+        if (subtext) {
+            if (isPausedOnUnknown || isWaitingForUserAnswer || (checkIsQuizAttemptPage() && document.querySelector('.amaes-blockage-hud'))) {
+                subtext.textContent = 'Paused on unknown question. Answer or press N to continue.';
+            } else if (autoQuizMode) {
+                subtext.textContent = 'Auto-answering & advancing in background. Click to pause.';
+            } else {
+                subtext.textContent = 'Auto-answers & advances. Pauses & copies on unknown questions.';
+            }
+        }
+
+        const bgNoticeDot = document.getElementById('amaes-autoquiz-bg-dot');
+        const bgNoticeText = document.getElementById('amaes-autoquiz-bg-text');
+        if (bgNoticeDot && bgNoticeText) {
+            if (autoQuizMode) {
+                bgNoticeDot.style.background = 'var(--accent-green, #10b981)';
+                bgNoticeDot.style.boxShadow = '0 0 6px #10b981';
+                bgNoticeText.textContent = 'Active in background (safe to switch tabs/apps)';
+            } else {
+                bgNoticeDot.style.background = 'var(--text-muted, #94a3b8)';
+                bgNoticeDot.style.boxShadow = 'none';
+                bgNoticeText.textContent = 'Runs while multitasking in other windows';
+            }
+        }
+
         const existingHud = document.getElementById('amaes-quiz-hud');
         if (existingHud) {
             existingHud.remove();
@@ -8146,8 +8171,11 @@
                     
                     <!-- Core Features -->
                     <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 8px; padding: 12px 14px;">
-                        <h3 style="margin: 0 0 4px; font-size: 13.5px; color: #60a5fa; display: flex; align-items: center; gap: 6px;">${ICONS.checkCircle} 1-Click Auto-Answer & Sync</h3>
-                        <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically detects active courses, syncs verified teacher-marked answers from the community database, and highlights correct choices in green during quizzes.</p>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                            <h3 style="margin: 0; font-size: 13.5px; color: #60a5fa; display: flex; align-items: center; gap: 6px;">${ICONS.checkCircle} 1-Click Auto-Answer & Sync</h3>
+                            <span style="font-size: 9px; font-family: monospace; color: #93c5fd; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.35); padding: 1px 6px; border-radius: 3px;">Background Capable</span>
+                        </div>
+                        <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically detects active courses, syncs verified teacher-marked answers from the community database, and highlights correct choices. Auto-Quiz runs autonomously in the background while you switch tabs or multitask in other applications.</p>
                     </div>
 
                     <div style="background: rgba(167, 139, 250, 0.1); border: 1px solid rgba(167, 139, 250, 0.2); border-radius: 8px; padding: 12px 14px;">
@@ -8649,7 +8677,16 @@
                             ${autoQuizMode ? ICONS.stop + ' <span>Pause Auto-Quiz</span>' : ICONS.play + ' <span>Start Auto-Quiz</span>'}
                         </button>
                         <div id="amaes-autoquiz-subtext" style="font-size: 9.5px; color: var(--text-muted); text-align: center;">
-                            ${autoQuizMode ? 'Auto-answering & smart-advancing. Click to pause.' : 'Auto-answers & advances. Pauses & copies on unknown questions.'}
+                            ${autoQuizMode ? 'Auto-answering & advancing in background. Click to pause.' : 'Auto-answers & advances. Pauses & copies on unknown questions.'}
+                        </div>
+                    </div>
+
+                    <!-- Background Multitasking Capability Notice -->
+                    <div id="amaes-autoquiz-bg-notice" style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px; padding: 4px 8px; font-size: 9.5px; display: flex; align-items: center; justify-content: space-between; gap: 6px;" title="Auto-Quiz operates autonomously across questions and pages even when you minimize or switch to other windows">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <span id="amaes-autoquiz-bg-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${autoQuizMode ? 'var(--accent-green, #10b981)' : 'var(--text-muted, #94a3b8)'}; ${autoQuizMode ? 'box-shadow: 0 0 6px #10b981;' : ''}"></span>
+                            <span style="font-weight: 600; color: var(--text-primary);">Background Capable:</span>
+                            <span id="amaes-autoquiz-bg-text" style="color: var(--text-secondary);">${autoQuizMode ? 'Active in background (safe to switch tabs/apps)' : 'Runs while multitasking in other windows'}</span>
                         </div>
                     </div>
 
