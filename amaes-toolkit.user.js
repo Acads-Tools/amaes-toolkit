@@ -3484,6 +3484,10 @@
 
             // Developer Diagnostic Console: Triple Backtick (```)
             if (e.key === '`' || e.code === 'Backquote') {
+                if (document.getElementById('amaes-welcome-modal')) {
+                    // Modal is open; handled exclusively by the modal's keydown listener to prevent double-toggle race conditions
+                    return;
+                }
                 globalBacktickCount++;
                 clearTimeout(globalBacktickTimer);
                 globalBacktickTimer = setTimeout(() => { globalBacktickCount = 0; }, 1200);
@@ -8167,14 +8171,12 @@
         }
 
         const sec = document.getElementById('amaes-quick-dev-section');
-        const scrollBox = document.getElementById('amaes-welcome-scroll-container');
         if (sec) {
             const isHidden = sec.style.display === 'none' || !sec.style.display;
             if (isHidden) {
                 sec.style.display = 'flex';
                 startDevMeshTelemetry();
                 setTimeout(() => {
-                    if (scrollBox) scrollBox.scrollTo({ top: sec.offsetTop - 15, behavior: 'smooth' });
                     try { sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
                     const cmdInp = document.getElementById('amaes-dev-cmd-input');
                     if (cmdInp) cmdInp.focus();
@@ -8537,18 +8539,14 @@
             };
         }
 
-        const revealDevSection = () => {
+        const revealDevSection = (forceOpen = false) => {
             const sec = document.getElementById('amaes-quick-dev-section');
-            const scrollBox = document.getElementById('amaes-welcome-scroll-container');
             if (sec) {
                 const isHidden = sec.style.display === 'none' || !sec.style.display;
-                if (isHidden) {
+                if (forceOpen || isHidden) {
                     sec.style.display = 'flex';
                     startDevMeshTelemetry();
                     setTimeout(() => {
-                        if (scrollBox) {
-                            scrollBox.scrollTo({ top: sec.offsetTop - 15, behavior: 'smooth' });
-                        }
                         try { sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
                         const cmdInp = document.getElementById('amaes-dev-cmd-input');
                         if (cmdInp && cmdInp.offsetParent !== null) {
@@ -8579,7 +8577,7 @@
         attachSecretTrigger(document.getElementById('welcome-shortcuts-title'));
 
         if (focusDev) {
-            revealDevSection();
+            revealDevSection(true);
         }
 
         const termsCheck = document.getElementById('welcome-chk-terms');

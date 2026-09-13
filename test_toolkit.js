@@ -3541,6 +3541,7 @@ test("Quick Start Guide Secret Developer Console: hidden by default, uncollapsed
     assert.ok(!script.includes('id="amaes-quick-dev-locked"'), "Must remove locked view screen");
     assert.ok(script.includes('globalBacktickCount >= 3') && script.includes('modalBacktickCount >= 3'), "Must toggle on triple backtick (```) inside modal and across Moodle");
     assert.ok(script.includes('toggleDeveloperConsole'), "Must define toggleDeveloperConsole function");
+    assert.ok(!script.includes('scrollBox.scrollTo({ top: sec.offsetTop'), "Must eliminate conflicting double-scroll calls");
 
     // 2. Secret trigger embedded in Cheatsheet title & dblclick listener
     assert.ok(script.includes('id="amaes-secret-cheatsheet-trigger"'), "Must embed secret trigger span in Cheatsheet title");
