@@ -50,8 +50,8 @@
           Metrics
         </button>
         <!-- Secret Unlocked Tab: Hidden by default (Zero DOM/Script overhead) -->
-        <button id="tabSecret" onclick="switchTab('secret')" class="hidden px-2.5 py-1 text-[11px] font-medium rounded text-grafana-purple hover:bg-grafana-purple/10 border border-grafana-purple/30 transition-all flex items-center space-x-1 animate-pulse">
-          <span>⚡ Dev Console</span>
+        <button id="tabSecret" onclick="switchTab('secret')" class="hidden px-2.5 py-1 text-[11px] font-medium rounded text-grafana-purple hover:bg-grafana-purple/10 border border-grafana-purple/30 transition-all flex items-center space-x-1">
+          <span>Dev Console</span>
         </button>
       </nav>
     </header>
@@ -109,9 +109,9 @@
             </button>
           </div>
 
-          <!-- Secret Trigger Button: Triple-clicking this button unlocks the Dev Tab -->
+          <!-- Secret Trigger Button: Triple-clicking this button unlocks with password 'iknow' -->
           <div class="flex items-center space-x-2">
-            <button id="btnCopyLog" onclick="handleCopyLogClick(event)" title="Click to copy log. (Secret: Triple-click to unlock)" class="px-2.5 py-1.5 text-xs font-mono rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-grafana-border transition-all flex items-center space-x-1.5 active:scale-95 cursor-pointer">
+            <button id="btnCopyLog" onclick="handleCopyLogClick(event)" title="Click to copy diagnostic log (Triple-click to unlock dev console)" class="px-2.5 py-1.5 text-xs font-mono rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-grafana-border transition-all flex items-center space-x-1.5 active:scale-95 cursor-pointer">
               <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
               </svg>
@@ -163,7 +163,7 @@
             <div class="text-[11px] text-grafana-subtext">Telemetry active • Click to re-lock</div>
           </div>
           <button onclick="lockDevMode()" class="px-2.5 py-1 text-xs font-mono rounded bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/50 transition-colors">
-            🔒 Lock
+            Lock
           </button>
         </div>
       </div>
@@ -181,7 +181,7 @@
           <input 
             type="text" 
             id="devInput" 
-            placeholder="Enter command or raw payload..." 
+            placeholder="Enter command (status, ping, users, clear)..." 
             onkeydown="handleDevInput(event)"
             class="flex-1 bg-black/50 border border-grafana-border focus:border-grafana-purple focus:outline-none rounded px-2.5 py-1.5 text-xs font-mono text-purple-200 placeholder:text-slate-600 transition-colors"
           />
@@ -201,10 +201,29 @@
     <!-- Footer -->
     <footer class="flex items-center justify-between text-[10px] text-grafana-subtext pt-2 border-t border-grafana-border/50">
       <span>Persona: <span class="text-slate-400">Open LMS Contributor</span></span>
-      <span id="footerStatus" class="font-mono">Zero Personal Attribution Active 🛡️</span>
+      <span id="footerStatus" class="font-mono">Zero Personal Attribution Active</span>
     </footer>
 
   </main>
+
+  <!-- Developer Auth Modal (Protected by 'iknow') -->
+  <div id="devAuthModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-grafana-panel border border-grafana-border rounded-lg max-w-xs w-full p-4 space-y-3 shadow-2xl text-slate-100">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-grafana-purple">Developer Authentication</span>
+        <button onclick="closeAuthModal()" class="text-grafana-subtext hover:text-white text-xs font-mono">✕</button>
+      </div>
+      <p class="text-[11px] text-grafana-subtext">Enter secret authorization key to unlock dev console:</p>
+      <div class="space-y-1">
+        <input id="authKeyInput" type="password" placeholder="Access key..." onkeydown="handleAuthKeyDown(event)" class="w-full bg-black/50 border border-grafana-border focus:border-grafana-purple focus:outline-none rounded px-2.5 py-1.5 text-xs font-mono text-purple-200 placeholder:text-slate-600 transition-colors" />
+        <p id="authErrorMsg" class="hidden text-[10px] text-grafana-red font-medium">Invalid access key.</p>
+      </div>
+      <div class="flex items-center justify-end space-x-2 pt-1">
+        <button onclick="closeAuthModal()" class="px-2.5 py-1 text-xs font-mono rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-grafana-border transition-colors">Cancel</button>
+        <button onclick="submitAuthKey()" class="px-3 py-1 text-xs font-mono rounded bg-grafana-purple hover:bg-purple-600 text-white transition-colors">Unlock</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Interactive Logic -->
   <script>
@@ -212,6 +231,22 @@
     let heartbeatTimer = null;
     let clickTimeout = null;
     let clickCount = 0;
+    let devKeySequenceCount = 0;
+    let devKeySequenceTimer = null;
+
+    // --- GLOBAL SHORTCUT: ? or K triple-press ---
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '?' || (e.key === '/' && e.shiftKey) || e.key === 'k' || e.key === 'K') {
+        devKeySequenceCount++;
+        clearTimeout(devKeySequenceTimer);
+        devKeySequenceTimer = setTimeout(() => { devKeySequenceCount = 0; }, 450);
+
+        if (devKeySequenceCount >= 3) {
+          devKeySequenceCount = 0;
+          promptDevUnlock();
+        }
+      }
+    });
 
     // --- FULL DIAGNOSTIC EXPORT GENERATOR ---
     function generateDiagnosticReport() {
@@ -260,26 +295,66 @@
       return successful;
     }
 
-    // --- TRIPLE-CLICK HANDLER (Zero overhead) ---
+    // --- TRIPLE-CLICK HANDLER ---
     async function handleCopyLogClick(e) {
-      // Copy full diagnostic state to clipboard
       const report = generateDiagnosticReport();
       await copyToClipboardSafe(report);
 
-      // Visual Copy Feedback
       const label = document.getElementById('copyLogLabel');
       label.innerText = 'Copied!';
       setTimeout(() => label.innerText = 'Copy Log', 1200);
 
-      // Fast detection using native event detail or standard counter
       clickCount++;
       clearTimeout(clickTimeout);
       clickTimeout = setTimeout(() => { clickCount = 0; }, 400);
 
       if (e.detail === 3 || clickCount >= 3) {
         clickCount = 0;
-        unlockDevMode();
+        promptDevUnlock();
       }
+    }
+
+    // --- PASSWORD AUTHENTICATION MODAL ('iknow') ---
+    function promptDevUnlock() {
+      if (isUnlocked) {
+        switchTab('secret');
+        return;
+      }
+      const modal = document.getElementById('devAuthModal');
+      const input = document.getElementById('authKeyInput');
+      const err = document.getElementById('authErrorMsg');
+      if (err) err.classList.add('hidden');
+      if (input) {
+        input.value = '';
+        input.classList.remove('border-grafana-red');
+      }
+      modal.classList.remove('hidden');
+      setTimeout(() => input && input.focus(), 60);
+    }
+
+    function closeAuthModal() {
+      document.getElementById('devAuthModal').classList.add('hidden');
+    }
+
+    function submitAuthKey() {
+      const input = document.getElementById('authKeyInput');
+      const val = (input?.value || '').trim();
+      if (val === 'iknow') {
+        closeAuthModal();
+        unlockDevMode();
+      } else {
+        const err = document.getElementById('authErrorMsg');
+        if (err) err.classList.remove('hidden');
+        if (input) {
+          input.classList.add('border-grafana-red');
+          input.focus();
+        }
+      }
+    }
+
+    function handleAuthKeyDown(e) {
+      if (e.key === 'Enter') submitAuthKey();
+      if (e.key === 'Escape') closeAuthModal();
     }
 
     // --- UNLOCK & LAZY INITIALIZATION ---
@@ -290,14 +365,10 @@
       }
       isUnlocked = true;
 
-      // Reveal Tab Button
       const tabSecret = document.getElementById('tabSecret');
       tabSecret.classList.remove('hidden');
 
-      // Auto-switch to Secret Tab
       switchTab('secret');
-
-      // Start lazy telemetry heartbeat (only now does it consume anything)
       startHeartbeat();
       addDevLog('Authenticated session established.', 'text-grafana-green');
       document.getElementById('footerStatus').innerText = 'Dev Console [ACTIVE]';
@@ -307,16 +378,14 @@
     function lockDevMode() {
       isUnlocked = false;
 
-      // Stop any background timer
       if (heartbeatTimer) {
         clearInterval(heartbeatTimer);
         heartbeatTimer = null;
       }
 
-      // Hide Secret Tab and switch back to standard overview
       document.getElementById('tabSecret').classList.add('hidden');
       switchTab('overview');
-      document.getElementById('footerStatus').innerText = 'Zero Personal Attribution Active 🛡️';
+      document.getElementById('footerStatus').innerText = 'Zero Personal Attribution Active';
     }
 
     // --- TAB SWITCHER ---
@@ -340,17 +409,14 @@
       }
     }
 
-    // --- TELEMETRY (Only runs when unlocked) ---
+    // --- TELEMETRY ---
     function startHeartbeat() {
       fetchActiveUsers();
-      // Light polling only while unlocked (every 15s)
       heartbeatTimer = setInterval(fetchActiveUsers, 15000);
     }
 
     function fetchActiveUsers() {
       const activeEl = document.getElementById('activeUserCount');
-      // In production, this can query: https://amaes-community-relay.acads-tools.workers.dev/active
-      // For demo, we simulate dynamic mesh nodes:
       const simulatedCount = Math.floor(18 + Math.random() * 8);
       activeEl.innerText = simulatedCount;
     }
@@ -368,7 +434,6 @@
       addDevLog(`> ${cmd}`, 'text-purple-200');
       input.value = '';
 
-      // Simple internal command parser
       const c = cmd.toLowerCase();
       if (c === 'status') {
         addDevLog(`Relay: ONLINE (SIN Edge) | Cache: Clean | Schema: v2`, 'text-grafana-green');
@@ -394,7 +459,6 @@
       out.scrollTop = out.scrollHeight;
     }
 
-    // Standard Log helpers
     function clearLog() {
       document.getElementById('logConsole').innerHTML = '';
       document.getElementById('logCount').innerText = '0 entries';

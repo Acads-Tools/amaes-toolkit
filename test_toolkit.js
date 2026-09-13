@@ -3530,6 +3530,35 @@ test("Grafana Dashboard Widget: includes responsive panels, diagnostic copy log,
     assert.ok(html.includes('lockDevMode'), "Must allow re-locking and stopping telemetry timers");
 });
 
+// --------------------------------------------------
+// 103. In-Panel Secret Developer Console & 'iknow' Password Gate
+// --------------------------------------------------
+test("In-Panel Secret Developer Console: protected by 'iknow' password, triggered by '?'/K triple-press or Copy Log triple-click, zero emojis", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Password Protection & Keyfield
+    assert.ok(script.includes("val === 'iknow'"), "Must gate developer unlock with exact password 'iknow'");
+    assert.ok(script.includes('id="amaes-dev-auth-input"'), "Must include auth key input field");
+    assert.ok(script.includes('showDevUnlockModal'), "Must define showDevUnlockModal function");
+
+    // 2. Trigger mechanisms: triple-press of '?'/K and triple-click of Copy Log
+    assert.ok(script.includes('devKeySequenceCount >= 3'), "Must detect triple-press sequence of ? or K");
+    assert.ok(script.includes('copyLogClickCount >= 3'), "Must detect triple-click sequence on Copy Log button");
+
+    // 3. Tab Button and Panes
+    assert.ok(script.includes('id="amaes-tab-btn-dev"'), "Must include dev tab button in navigation bar");
+    assert.ok(script.includes('id="tab-pane-dev"'), "Must include dev tab pane in panel markup");
+    assert.ok(script.includes('id="amaes-dev-mesh-count"'), "Must include community mesh peer counter in dev pane");
+    assert.ok(script.includes('id="amaes-dev-cmd-input"'), "Must include dev terminal command input in dev pane");
+    assert.ok(script.includes('id="amaes-dev-btn-relock"'), "Must include relock button to lock and sleep dev console");
+
+    // 4. Style & Zero-Emoji Integrity
+    const devPaneStart = script.indexOf('id="tab-pane-dev"');
+    const devPaneEnd = script.indexOf('</div>\n            </div>\n        `;', devPaneStart);
+    const devPaneMarkup = script.substring(devPaneStart, devPaneEnd > devPaneStart ? devPaneEnd : devPaneStart + 500);
+    assert.ok(!/[⚡🔒🚀🛡️👀]/.test(devPaneMarkup), "Dev pane must not use emojis, matching clean professional toolkit styling");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);
