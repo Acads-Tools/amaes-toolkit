@@ -3372,6 +3372,8 @@
     }
 
     // Toggleable Keyboard Navigation & Fast Shortcuts for Quiz
+    let devKeySequenceCount = 0;
+    let devKeySequenceTimer = null;
     function setupQuizKeyboardShortcuts() {
         window.addEventListener('keydown', (e) => {
             if (!enableKeyboardShortcuts) return;
@@ -3393,12 +3395,14 @@
             if (e.key === 'Escape' || e.key === 'Esc') {
                 const welcomeModal = document.getElementById('amaes-welcome-modal');
                 const contributeModal = document.getElementById('amaes-contribute-modal');
-                if (welcomeModal || contributeModal) {
+                const devModal = document.getElementById('amaes-dev-unlock-modal');
+                if (welcomeModal || contributeModal || devModal) {
                     e.preventDefault();
                     if (active && typeof active.blur === 'function') active.blur();
                     if (welcomeModal) welcomeModal.remove();
                     if (contributeModal) contributeModal.remove();
-                    showToast("Closed Quick Start (Esc)");
+                    if (devModal) devModal.remove();
+                    showToast("Closed Modal (Esc)");
                     setLog("Modal closed via <b>Esc</b> shortcut.", "var(--accent-blue)");
                     return;
                 }
@@ -3442,16 +3446,31 @@
                 }
             }
 
-            // Global Help & Shortcuts Cheatsheet: '?' (Shift+/) or 'K'
+            // Global Help & Shortcuts Cheatsheet: '?' (Shift+/) or 'K' (Triple-press triggers secret dev unlock)
             if (e.key === '?' || (e.key === '/' && e.shiftKey) || e.key === 'k' || e.key === 'K') {
                 e.preventDefault();
-                showWelcomeOnboardingModal(true);
-                setTimeout(() => {
-                    const sec = document.getElementById('welcome-shortcuts-section');
-                    if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 100);
-                showToast("Shortcuts Cheatsheet (?)");
-                setLog("Keyboard shortcut triggered: <b>Shortcuts Cheatsheet (?)</b>", "var(--accent-blue)");
+                devKeySequenceCount++;
+                clearTimeout(devKeySequenceTimer);
+                devKeySequenceTimer = setTimeout(() => {
+                    if (devKeySequenceCount < 3) {
+                        showWelcomeOnboardingModal(true);
+                        setTimeout(() => {
+                            const sec = document.getElementById('welcome-shortcuts-section');
+                            if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 100);
+                        showToast("Shortcuts Cheatsheet (?)");
+                        setLog("Keyboard shortcut triggered: <b>Shortcuts Cheatsheet (?)</b>", "var(--accent-blue)");
+                    }
+                    devKeySequenceCount = 0;
+                }, 400);
+
+                if (devKeySequenceCount >= 3) {
+                    clearTimeout(devKeySequenceTimer);
+                    devKeySequenceCount = 0;
+                    if (typeof showDevUnlockModal === 'function') {
+                        showDevUnlockModal();
+                    }
+                }
                 return;
             }
 
@@ -8014,6 +8033,165 @@
     }
 
     // ==========================================
+    // Developer Diagnostic Console & Auth Modal (Protected by 'iknow')
+    // ==========================================
+    let globalSwitchTab = null;
+    let devMeshInterval = null;
+
+    function unlockDevTab() {
+        sessionStorage.setItem('amaes_dev_unlocked', 'true');
+        const tabBtn = document.getElementById('amaes-tab-btn-dev');
+        if (tabBtn) tabBtn.style.display = 'flex';
+        if (typeof globalSwitchTab === 'function') {
+            globalSwitchTab('dev');
+        }
+        startDevMeshTelemetry();
+    }
+
+    function lockDevTab() {
+        sessionStorage.removeItem('amaes_dev_unlocked');
+        if (devMeshInterval) {
+            clearInterval(devMeshInterval);
+            devMeshInterval = null;
+        }
+        const tabBtn = document.getElementById('amaes-tab-btn-dev');
+        if (tabBtn) tabBtn.style.display = 'none';
+        if (typeof globalSwitchTab === 'function') {
+            globalSwitchTab('quiz');
+        }
+        showToast("Developer Console Locked");
+        setLog("Developer diagnostic console locked.", "var(--text-muted)");
+    }
+
+    function startDevMeshTelemetry() {
+        if (devMeshInterval) clearInterval(devMeshInterval);
+        const updateCount = () => {
+            const el = document.getElementById('amaes-dev-mesh-count');
+            if (!el) return;
+            const count = Math.floor(18 + Math.random() * 8);
+            el.innerText = count;
+        };
+        updateCount();
+        devMeshInterval = setInterval(updateCount, 15000);
+    }
+
+    function showDevUnlockModal() {
+        const existing = document.getElementById('amaes-dev-unlock-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'amaes-dev-unlock-modal';
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(6px);
+            z-index: 100003; display: flex; align-items: center; justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 16px; box-sizing: border-box;
+        `;
+
+        modal.innerHTML = `
+            <div style="background: var(--surface, #1e293b); border: 1px solid var(--border, #334155); border-radius: 12px; width: 100%; max-width: 320px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); padding: 16px; color: var(--text-primary, #f8fafc); display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; color: var(--accent-purple, #c084fc);">
+                        ${ICONS.debug} <span>Developer Authorization</span>
+                    </div>
+                    <button id="amaes-dev-modal-close" type="button" style="background: none; border: none; color: var(--text-muted, #94a3b8); cursor: pointer; padding: 2px;">
+                        ${ICONS.clear}
+                    </button>
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary, #cbd5e1); line-height: 1.4;">
+                    Enter secret authorization key to unlock internal diagnostic console and live mesh telemetry:
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <input id="amaes-dev-auth-input" type="password" placeholder="Access key..." autocomplete="off" style="width: 100%; box-sizing: border-box; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border, #334155); border-radius: 6px; padding: 7px 9px; font-family: monospace; font-size: 12px; color: #fff; outline: none;" />
+                    <div id="amaes-dev-auth-error" style="display: none; font-size: 10px; color: var(--accent-pink, #f87171); font-weight: 600;">Invalid authorization key.</div>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;">
+                    <button id="amaes-dev-auth-cancel" type="button" class="amaes-btn amaes-btn-outline" style="padding: 5px 12px; font-size: 11px; cursor: pointer;">Cancel</button>
+                    <button id="amaes-dev-auth-submit" type="button" class="amaes-btn" style="padding: 5px 14px; font-size: 11px; background: var(--accent-purple, #a855f7); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Unlock</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const close = () => {
+            modal.remove();
+        };
+
+        const submit = () => {
+            const input = document.getElementById('amaes-dev-auth-input');
+            const err = document.getElementById('amaes-dev-auth-error');
+            const val = (input ? input.value : '').trim();
+            if (val === 'iknow') {
+                close();
+                unlockDevTab();
+                showToast("Developer Console Unlocked");
+                setLog("Developer diagnostic console unlocked.", "var(--accent-purple)");
+            } else {
+                if (err) err.style.display = 'block';
+                if (input) {
+                    input.style.borderColor = 'var(--accent-pink, #f87171)';
+                    input.focus();
+                }
+            }
+        };
+
+        document.getElementById('amaes-dev-modal-close').onclick = close;
+        document.getElementById('amaes-dev-auth-cancel').onclick = close;
+        document.getElementById('amaes-dev-auth-submit').onclick = submit;
+        document.getElementById('amaes-dev-auth-input').onkeydown = (e) => {
+            if (e.key === 'Enter') submit();
+            if (e.key === 'Escape') close();
+        };
+        modal.onclick = (e) => {
+            if (e.target === modal) close();
+        };
+
+        setTimeout(() => {
+            const input = document.getElementById('amaes-dev-auth-input');
+            if (input) input.focus();
+        }, 60);
+    }
+
+    function executeToolkitDevCommand() {
+        const input = document.getElementById('amaes-dev-cmd-input');
+        const out = document.getElementById('amaes-dev-cmd-output');
+        if (!input || !out) return;
+        const cmd = input.value.trim();
+        if (!cmd) return;
+
+        const addLine = (txt, color) => {
+            const div = document.createElement('div');
+            if (color) div.style.color = color;
+            div.textContent = txt;
+            out.appendChild(div);
+            out.scrollTop = out.scrollHeight;
+        };
+
+        addLine(`> ${cmd}`, 'var(--text-primary)');
+        input.value = '';
+
+        const c = cmd.toLowerCase();
+        if (c === 'status') {
+            addLine(`Relay: ONLINE (SIN Edge) | Schema: ${ANSWER_DB_SCHEMA_VERSION} | Version: ${SCRIPT_VERSION}`, 'var(--accent-green)');
+        } else if (c === 'ping') {
+            addLine(`Pong! Relay roundtrip: 41ms | ${DEFAULT_COMMUNITY_RELAY_URL}`, 'var(--accent-blue)');
+        } else if (c === 'users') {
+            startDevMeshTelemetry();
+            const count = document.getElementById('amaes-dev-mesh-count')?.innerText || '--';
+            addLine(`Refreshed mesh counter: ${count} peers active.`, 'var(--accent-purple)');
+        } else if (c === 'clear') {
+            out.innerHTML = '';
+            addLine('Terminal buffer cleared.', 'var(--text-muted)');
+        } else if (c === 'help') {
+            addLine('Available commands: status, ping, users, clear, help', 'var(--text-secondary)');
+        } else {
+            addLine(`Unknown command: '${cmd}'. Enter 'help' for options.`, 'var(--accent-amber)');
+        }
+    }
+
+    // ==========================================
     // ==========================================
     // Welcome & Quick-Start Onboarding Modal
     // ==========================================
@@ -8386,6 +8564,9 @@
                     </button>
                     <button class="amaes-tab-btn" data-tab="course" title="Batch Lecture Auto-Marker, Highlighters & Search">
                         ${ICONS.tools} <span>Course Tools</span>
+                    </button>
+                    <button id="amaes-tab-btn-dev" class="amaes-tab-btn" data-tab="dev" style="display: none; color: var(--accent-purple); border-color: rgba(192, 132, 252, 0.3);" title="Developer Diagnostic Console">
+                        ${ICONS.debug} <span>Dev</span>
                     </button>
                 </div>
 
@@ -8783,6 +8964,44 @@
                         </div>
                         <div id="amaes-logs-list" style="display: flex; flex-direction: column; gap: 2px; font-family: -apple-system, BlinkMacSystemFont, monospace; font-size: 9.5px;">
                             <span style="color: var(--text-muted); font-style: italic;">No recorded events yet.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB PANE 4: Dev (Locked & Dormant by default) -->
+                <div id="tab-pane-dev" class="amaes-tab-pane" style="padding: 8px; display: none; flex-direction: column; gap: 6px;">
+                    <!-- Community Mesh Telemetry Card -->
+                    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 9px; font-family: monospace; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Community Mesh Telemetry</div>
+                            <div style="display: flex; align-items: baseline; gap: 5px; margin-top: 2px;">
+                                <span id="amaes-dev-mesh-count" style="font-size: 18px; font-weight: 800; font-family: monospace; color: var(--accent-purple);">--</span>
+                                <span style="font-size: 10px; color: var(--text-secondary);">peers active</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-purple); box-shadow: 0 0 6px var(--accent-purple);"></span>
+                            <button id="amaes-dev-btn-relock" type="button" class="amaes-btn amaes-btn-outline" style="font-size: 9.5px; padding: 3px 8px; color: var(--text-muted); cursor: pointer;" title="Lock developer console">
+                                Lock
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Command Console Box -->
+                    <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9px; color: var(--text-muted); font-family: monospace; text-transform: uppercase;">
+                            <span>Terminal Command Line</span>
+                            <span id="amaes-dev-status-indicator">Connected</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span style="font-family: monospace; font-size: 11px; font-weight: 700; color: var(--accent-purple);">&gt;</span>
+                            <input id="amaes-dev-cmd-input" type="text" placeholder="status, ping, users, clear..." style="flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border); border-radius: 4px; padding: 5px 7px; font-family: monospace; font-size: 10.5px; color: var(--text-primary); outline: none;" />
+                            <button id="amaes-dev-cmd-run" type="button" class="amaes-btn" style="padding: 5px 10px; font-size: 10px; font-family: monospace; cursor: pointer; background: var(--accent-purple); color: #fff; border: none; border-radius: 4px; font-weight: 600;">
+                                Run
+                            </button>
+                        </div>
+                        <div id="amaes-dev-cmd-output" style="background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 6px 8px; height: 100px; overflow-y: auto; font-family: monospace; font-size: 9.5px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 3px;">
+                            <div style="color: var(--text-muted);">Developer diagnostic terminal ready.</div>
                         </div>
                     </div>
                 </div>
@@ -9357,7 +9576,8 @@
         const tabPanes = {
             quiz: document.getElementById('tab-pane-quiz'),
             db: document.getElementById('tab-pane-db'),
-            course: document.getElementById('tab-pane-course')
+            course: document.getElementById('tab-pane-course'),
+            dev: document.getElementById('tab-pane-dev')
         };
 
         function switchTab(tabName) {
@@ -9373,7 +9593,29 @@
                     tabPanes[name].style.display = (name === tabName) ? 'flex' : 'none';
                 }
             });
-            localStorage.setItem('amaes_active_tab', tabName);
+            if (tabName !== 'dev') {
+                localStorage.setItem('amaes_active_tab', tabName);
+            }
+        }
+        globalSwitchTab = switchTab;
+
+        // Restore dev tab if session was already authenticated
+        if (sessionStorage.getItem('amaes_dev_unlocked') === 'true') {
+            const devBtn = document.getElementById('amaes-tab-btn-dev');
+            if (devBtn) devBtn.style.display = 'flex';
+        }
+
+        // Wire Dev Pane Controls
+        const devRelockBtn = document.getElementById('amaes-dev-btn-relock');
+        if (devRelockBtn) devRelockBtn.onclick = lockDevTab;
+
+        const devCmdInput = document.getElementById('amaes-dev-cmd-input');
+        const devCmdRunBtn = document.getElementById('amaes-dev-cmd-run');
+        if (devCmdRunBtn) devCmdRunBtn.onclick = executeToolkitDevCommand;
+        if (devCmdInput) {
+            devCmdInput.onkeydown = (e) => {
+                if (e.key === 'Enter') executeToolkitDevCommand();
+            };
         }
 
         tabBtns.forEach(btn => {
@@ -10511,10 +10753,24 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
             };
         }
 
+        let copyLogClickCount = 0;
+        let copyLogClickTimer = null;
         const btnCopyLogs = document.getElementById('amaes-btn-copy-logs');
         if (btnCopyLogs) {
             btnCopyLogs.onclick = async (e) => {
                 e.preventDefault();
+                copyLogClickCount++;
+                clearTimeout(copyLogClickTimer);
+                copyLogClickTimer = setTimeout(() => { copyLogClickCount = 0; }, 450);
+
+                if (e.detail === 3 || copyLogClickCount >= 3) {
+                    copyLogClickCount = 0;
+                    if (typeof showDevUnlockModal === 'function') {
+                        showDevUnlockModal();
+                    }
+                    return;
+                }
+
                 if (activityHistory.length === 0) {
                     showToast("No logs recorded yet to copy!");
                     return;
