@@ -3621,6 +3621,30 @@ test("Review Question Markers: Debunk failed choices on zero marks and deduce Tr
     assert.ok(script.includes('dbEntry.wrongAnswers = wrongList'), "Must update wrong answers list on dbEntry when debunked");
 });
 
+test("Website Share Card & Fullscreen QR Modal: downloads QR image and maximizes fullscreen with modal controls", () => {
+    const html = fs.readFileSync('index.html', 'utf8');
+    const css = fs.readFileSync('site.css', 'utf8');
+    const js = fs.readFileSync('site.js', 'utf8');
+
+    // Verify index.html contains download link and fullscreen modal markup
+    assert.ok(html.includes('id="qr-card-link"'), "index.html must have QR download link with id");
+    assert.ok(html.includes('download="amaes-toolkit-qr.png"'), "QR link must specify download attribute");
+    assert.ok(html.includes('id="qr-modal"'), "index.html must have qr-modal dialog");
+    assert.ok(html.includes('id="qr-modal-fullscreen-btn"'), "qr-modal must have fullscreen toggle button");
+    assert.ok(html.includes('id="qr-modal-download-btn"'), "qr-modal must have download action button");
+
+    // Verify site.css defines fullscreen backdrop and modal presentation
+    assert.ok(css.includes('.qr-modal-backdrop'), "site.css must style .qr-modal-backdrop");
+    assert.ok(css.includes('.qr-modal-backdrop.active'), "site.css must support active modal state");
+    assert.ok(css.includes('.qr-modal-card'), "site.css must style centered modal card");
+
+    // Verify site.js manages open/close lifecycle, escape key, and fullscreen
+    assert.ok(js.includes('openQrModal'), "site.js must define openQrModal");
+    assert.ok(js.includes('closeQrModal'), "site.js must define closeQrModal");
+    assert.ok(js.includes('toggleFullscreen'), "site.js must define toggleFullscreen");
+    assert.ok(js.includes("e.key === 'Escape'"), "site.js must dismiss modal on Escape");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);
