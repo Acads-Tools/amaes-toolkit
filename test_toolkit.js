@@ -2829,8 +2829,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.6.6'), "Userscript header must specify v1.6.6");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.6.6";'), "Constant SCRIPT_VERSION must be v1.6.6");
+    assert.ok(script.includes('@version      1.6.7'), "Userscript header must specify v1.6.7");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.6.7";'), "Constant SCRIPT_VERSION must be v1.6.7");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -2863,7 +2863,7 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
         'amaes_last_seen_version': '1.4.14'
     };
     let toastMessage = '';
-    const SCRIPT_VER = 'v1.6.6';
+    const SCRIPT_VER = 'v1.6.7';
 
     function simulateCheckPending() {
         const pending = mockStorage['amaes_pending_update_install'];
@@ -2877,8 +2877,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
 
     simulateCheckPending();
     assert.strictEqual(mockStorage['amaes_pending_update_install'], undefined, "Pending update flag must be cleared on successful reload");
-    assert.strictEqual(toastMessage, "Toolkit successfully updated to v1.6.6!", "Must display update success message");
-    assert.strictEqual(mockStorage['amaes_last_seen_version'], 'v1.6.6', "Last seen version must be updated");
+    assert.strictEqual(toastMessage, "Toolkit successfully updated to v1.6.7!", "Must display update success message");
+    assert.strictEqual(mockStorage['amaes_last_seen_version'], 'v1.6.7', "Last seen version must be updated");
 });
 
 test("Help Panel: includes clickable links to GitHub, Greasy Fork, and Website", () => {
@@ -3612,6 +3612,13 @@ test("Telemetry: 10-minute continuous recurring pulse with anonymous token and r
     assert.ok(workerScript.includes('path === "/active"'), "Worker must handle /active endpoint");
     assert.ok(workerScript.includes('600000'), "Worker must enforce 10-minute window for active peers");
     assert.ok(workerScript.includes('pruneAndCountActivePeers'), "Worker must prune peers older than 10 minutes");
+});
+
+test("Review Question Markers: Debunk failed choices on zero marks and deduce True/False correctly", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    assert.ok(script.includes('// Detect any selected choice that was marked wrong (red cross or zero mark)'), "Must detect crossed choices and zero mark inputs");
+    assert.ok(script.includes('// Real-time Deduction by Elimination on Review screen'), "Must support real-time deduction by elimination on review screen");
+    assert.ok(script.includes('dbEntry.wrongAnswers = wrongList'), "Must update wrong answers list on dbEntry when debunked");
 });
 
 console.log("\n==================================================");

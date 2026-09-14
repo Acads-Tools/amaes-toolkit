@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.6.6
+// @version      1.6.7
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -27,7 +27,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.6.6";
+    const SCRIPT_VERSION = "v1.6.7";
     const ANSWER_DB_SCHEMA_VERSION = 2;
     const CONTRIBUTOR_ID_STORAGE_KEY = 'amaes_anonymous_contributor_id';
 
@@ -7376,8 +7376,48 @@
                 }
             }
 
+            // Extract explicit right answer from outcome if present
+            if (rightElem && !checkmarkedTexts.length) {
+                let raw = cleanDOMToAI(rightElem);
+                raw = raw.replace(/^The correct answers? (is|are):?\s*['"]?/i, '').replace(/['"]?\s*$/i, '').trim();
+                if (raw) {
+                    ansText = raw;
+                }
+            }
+
             const wrongList = (harvestedItem && harvestedItem.wrongAnswers) || (dbEntry && dbEntry.wrongAnswers) || [];
             const wrongNorms = wrongList.map(w => typeof w === 'string' ? normalizeChoice(w) : (w.norm || normalizeChoice(w.text || '')));
+
+            // Detect any selected choice that was marked wrong (red cross or zero mark)
+            const crossedTexts = [];
+            choiceRows.forEach(row => {
+                const label = row.querySelector('label') || row;
+                let text = cleanDOMToAI(label).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
+                if (!text) return;
+                if (hasChoiceCross(row) || hasChoiceCross(label)) {
+                    if (!crossedTexts.some(c => normalizeChoice(c) === normalizeChoice(text))) {
+                        crossedTexts.push(text);
+                    }
+                }
+            });
+            if (isZeroMark) {
+                const checkedInputs = que.querySelectorAll('input[type="radio"]:checked, input[type="checkbox"]:checked, input[checked], [aria-checked="true"], .answer div.selected, .answer label.selected');
+                checkedInputs.forEach(inp => {
+                    const label = inp.closest('label') || inp.closest('div.r0, div.r1, [class*="r"]') || inp.parentElement;
+                    let text = cleanDOMToAI(label).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
+                    if (text && !crossedTexts.some(c => normalizeChoice(c) === normalizeChoice(text))) {
+                        crossedTexts.push(text);
+                    }
+                });
+            }
+            crossedTexts.forEach(txt => {
+                const norm = normalizeChoice(txt);
+                if (norm && !wrongNorms.includes(norm)) {
+                    wrongList.push(txt);
+                    wrongNorms.push(norm);
+                }
+            });
+
             const ansNorm = normalizeChoice(ansText);
             const isConfirmedByMoodle = Boolean(isFullMark || hasExplicitRightElem || checkmarkedTexts.length > 0);
 
@@ -7422,15 +7462,56 @@
             } else if (ansNorm && wrongNorms.some(w => w === ansNorm || unscriptDigits(w) === unscriptDigits(ansNorm))) {
                 isDebunked = true;
                 ansText = '';
-                if (dbEntry && (dbEntry.ansRaw || dbEntry.answer)) {
+                if (dbEntry) {
                     dbEntry.ansRaw = '';
                     dbEntry.ansNorm = '';
                     dbEntry.verified = false;
+                    dbEntry.wrongAnswers = wrongList;
+                    if (cachedDb && cachedDb.length > 0) {
+                        setCachedAnswers(subCode, cachedDb);
+                    }
+                }
+                if (harvestedItem) {
+                    harvestedItem.ansRaw = '';
+                    harvestedItem.ansNorm = '';
+                    harvestedItem.verified = false;
+                    harvestedItem.wrongAnswers = wrongList;
                 }
             }
 
-            const isVerified = Boolean(!isDebunked && ansText && (isConfirmedByMoodle || (harvestedItem && harvestedItem.verified) || (dbEntry && dbEntry.verified)));
-            const isDeduced = Boolean((harvestedItem && harvestedItem.deduced) || (dbEntry && dbEntry.deduced));
+            // Real-time Deduction by Elimination on Review screen
+            let isDeduced = Boolean((harvestedItem && harvestedItem.deduced) || (dbEntry && dbEntry.deduced));
+            if (!ansText && wrongNorms.length > 0 && Array.isArray(qData.choices) && qData.choices.length > 1) {
+                const uneliminated = qData.choices.filter(c => {
+                    const normC = normalizeChoice(c);
+                    return !wrongNorms.some(w => w === normC || unscriptDigits(w) === unscriptDigits(normC));
+                });
+                if (uneliminated.length === 1) {
+                    ansText = uneliminated[0].replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
+                    isDeduced = true;
+                    isDebunked = false;
+                    if (dbEntry) {
+                        dbEntry.ansRaw = ansText;
+                        dbEntry.ansNorm = normalizeChoice(ansText);
+                        dbEntry.answer = ansText;
+                        dbEntry.verified = true;
+                        dbEntry.deduced = true;
+                        dbEntry.wrongAnswers = wrongList;
+                        if (cachedDb && cachedDb.length > 0) {
+                            setCachedAnswers(subCode, cachedDb);
+                        }
+                    }
+                    if (harvestedItem) {
+                        harvestedItem.ansRaw = ansText;
+                        harvestedItem.ansNorm = normalizeChoice(ansText);
+                        harvestedItem.verified = true;
+                        harvestedItem.deduced = true;
+                        harvestedItem.wrongAnswers = wrongList;
+                    }
+                }
+            }
+
+            const isVerified = Boolean(!isDebunked && ansText && (isConfirmedByMoodle || isDeduced || (harvestedItem && harvestedItem.verified) || (dbEntry && dbEntry.verified)));
 
             const infoCol = que.querySelector('.info');
             const contentCol = que.querySelector('.content');
