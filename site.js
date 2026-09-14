@@ -168,4 +168,83 @@
       }
     });
   });
+
+  // Fullscreen QR Code Modal & Download
+  const qrLink = document.getElementById('qr-card-link') || document.querySelector('.qr-download-link');
+  const qrModal = document.getElementById('qr-modal');
+  const qrModalClose = document.getElementById('qr-modal-close');
+  const qrModalDismiss = document.getElementById('qr-modal-dismiss-btn');
+  const qrModalFullscreen = document.getElementById('qr-modal-fullscreen-btn');
+  const qrModalFullscreenText = document.getElementById('qr-modal-fullscreen-text');
+
+  function openQrModal() {
+    if (!qrModal) return;
+    qrModal.hidden = false;
+    requestAnimationFrame(function () {
+      qrModal.classList.add('active');
+    });
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeQrModal() {
+    if (!qrModal) return;
+    qrModal.classList.remove('active');
+    document.body.style.overflow = '';
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(function () {});
+    }
+    setTimeout(function () {
+      if (!qrModal.classList.contains('active')) {
+        qrModal.hidden = true;
+      }
+    }, 250);
+  }
+
+  function toggleFullscreen() {
+    if (!qrModal) return;
+    if (!document.fullscreenElement) {
+      const req = qrModal.requestFullscreen || qrModal.webkitRequestFullscreen || qrModal.msRequestFullscreen;
+      if (req) {
+        req.call(qrModal).catch(function () {});
+      }
+    } else {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+      if (exit) {
+        exit.call(document).catch(function () {});
+      }
+    }
+  }
+
+  function updateFullscreenButton() {
+    if (!qrModalFullscreenText) return;
+    qrModalFullscreenText.textContent = document.fullscreenElement ? 'Exit Fullscreen' : 'Fullscreen';
+  }
+
+  if (qrLink) {
+    qrLink.addEventListener('click', function () {
+      openQrModal();
+    });
+  }
+
+  if (qrModalClose) qrModalClose.addEventListener('click', closeQrModal);
+  if (qrModalDismiss) qrModalDismiss.addEventListener('click', closeQrModal);
+  if (qrModalFullscreen) qrModalFullscreen.addEventListener('click', toggleFullscreen);
+
+  if (qrModal) {
+    qrModal.addEventListener('click', function (e) {
+      if (e.target === qrModal || e.target.classList.contains('qr-modal-container')) {
+        closeQrModal();
+      }
+    });
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Escape' || e.key === 'Esc') && qrModal && qrModal.classList.contains('active')) {
+      closeQrModal();
+    }
+  });
+
+  document.addEventListener('fullscreenchange', updateFullscreenButton);
+  document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
 }());
+
