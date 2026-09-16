@@ -6,7 +6,6 @@
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
 // @match        https://shs.amaes.com/*
-// @match        o*
 // @match        https://*.amaes.com/*
 // @match        https://*.amauonline.com/*
 // @match        https://acads-tools.github.io/amaes-toolkit/*
