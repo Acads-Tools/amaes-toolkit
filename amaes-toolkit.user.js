@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.6.7
+// @version      1.6.8
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
+// @match        https://shs.amaes.com/*
+// @match        o*
 // @match        https://*.amaes.com/*
 // @match        https://*.amauonline.com/*
 // @match        https://acads-tools.github.io/amaes-toolkit/*
@@ -27,7 +29,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.6.7";
+    const SCRIPT_VERSION = "v1.6.8";
     const ANSWER_DB_SCHEMA_VERSION = 2;
     const CONTRIBUTOR_ID_STORAGE_KEY = 'amaes_anonymous_contributor_id';
 
@@ -44,8 +46,9 @@
         return;
     }
 
-    // STRICT DOMAIN LOCK: Ensure execution ONLY on semestral.amaes.com
-    if (!window.location.hostname.includes('semestral.amaes.com')) {
+    // STRICT DOMAIN LOCK: Ensure execution ONLY on amaes.com portals
+    const _hostname = window.location.hostname;
+    if (!_hostname.includes('semestral.amaes.com') && !_hostname.includes('shs.amaes.com')) {
         return;
     }
 
@@ -5120,6 +5123,18 @@
             dz.replaceWith(textNode);
         });
 
+        // Convert fill-in-the-blank text inputs into ____ so AI sees where the answer goes
+        let blankCount = 0;
+        clone.querySelectorAll('input[type="text"], input[type="number"], input:not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="hidden"])').forEach(inp => {
+            // Only convert inputs inside the question text area (not answer choice inputs)
+            if (inp.closest('.answer, .submitbtns, .amaes-card-btn-container')) return;
+            blankCount++;
+            const currentVal = (inp.value || inp.getAttribute('value') || '').trim();
+            // If user already typed something, show it in context; otherwise show blank
+            const blankLabel = currentVal ? `[____${blankCount > 1 ? ' ' + blankCount : ''}: ${currentVal}]` : `[____${blankCount > 1 ? ' ' + blankCount : ''}]`;
+            inp.replaceWith(document.createTextNode(` ${blankLabel} `));
+        });
+
         // Convert tables (Truth Tables, Logic Mappings) to markdown rows
         clone.querySelectorAll('table').forEach(table => {
             const rows = [];
@@ -5558,12 +5573,12 @@
                 output += `\n\nInstructions: Provide a detailed, accurate, and well-structured response to this question prompt.`;
             }
         } else if (data.isShortAnswer) {
-            output += `[Short Answer Question]`;
+            output += `[Fill-in-the-Blank / Short Answer Question]\n[The blank is marked as [____] in the question text above.]`;
             if (detectedAnswer && copyIncludeConfidence) {
                 output += `\n\n[DETECTED ANSWER IN DATABASE]:\n- Suggested: ${detectedAnswer.text} (${detectedAnswer.label} • ${detectedAnswer.source})`;
             }
             if (withHint) {
-                output += `\n\nInstructions: Answer ONLY with the direct text answer. No explanation.`;
+                output += `\n\nInstructions: Answer ONLY with the exact word or phrase that fills the blank [____]. No explanation.`;
             }
         } else if (data.choices.length === 0 && !data.isDragDrop && (!data.matchPairs || data.matchPairs.length === 0)) {
             // General open-ended or unexpected question fallback
@@ -7632,42 +7647,93 @@
                     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
                     cursor: default;
                 `;
-                const wrongText = wrongList.map(w => typeof w === 'string' ? w : w.text).join(', ') || 'Choice';
-                pill.title = `Wrong choice "${wrongText}" eliminated in database. Will not be selected on next attempt!`;
-                pill.innerHTML = `${ICONS.xCircle} <span>Wrong Choice Saved</span>`;
+                const wrongText = wrongList.map(w => typeof w === 'string' ? w : w.text).filter(Boolean).join(', ');
+                const isEmptyAnswer = !wrongText; // e.g. user cleared a fill-in-the-blank field
+                const pillLabel = isEmptyAnswer ? 'No Answer / Incorrect' : 'Wrong Choice Saved';
+                pill.title = isEmptyAnswer
+                    ? 'No answer was submitted or the answer field was cleared. Check the verified answer below.'
+                    : `Wrong choice "${wrongText}" eliminated in database. Will not be selected on next attempt!`;
+                pill.innerHTML = `${ICONS.xCircle} <span>${pillLabel}</span>`;
+
+                // Try to get the correct answer from the .rightanswer element for display
+                const rightAnswerForDisplay = (() => {
+                    const re = que.querySelector('.rightanswer, .outcome .rightanswer');
+                    if (!re) return '';
+                    return cleanDOMToAI(re).replace(/^The correct answers? (is|are):?\s*['"]/i, '').replace(/['"]?\s*$/i, '').trim();
+                })();
 
                 const outcomeBox = que.querySelector('.outcome');
-                if (outcomeBox) {
-                    let banner = outcomeBox.querySelector('.amaes-review-outcome-banner');
-                    if (!banner) {
-                        banner = document.createElement('div');
-                        banner.className = 'amaes-review-outcome-banner';
-                        outcomeBox.appendChild(banner);
+                if (outcomeBox || isEmptyAnswer) {
+                    let targetBox = outcomeBox;
+                    if (!targetBox) {
+                        const formulationBox = que.querySelector('.formulation, .content');
+                        if (formulationBox) {
+                            targetBox = document.createElement('div');
+                            targetBox.className = 'outcome clearfix';
+                            formulationBox.appendChild(targetBox);
+                        }
                     }
-                    banner.style.cssText = `
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        gap: 8px;
-                        margin-top: 8px;
-                        padding: 6px 12px;
-                        border-radius: 6px;
-                        font-size: 11.5px;
-                        font-weight: 600;
-                        background: rgba(239, 68, 68, 0.12);
-                        border: 1px solid rgba(239, 68, 68, 0.35);
-                        color: #991b1b;
-                    `;
-                    banner.innerHTML = `
-                        <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            ${ICONS.xCircle}
-                            <span><b>Eliminated:</b> &ldquo;${escapeHtml(wrongText)}&rdquo; (Confirmed Incorrect)</span>
-                        </div>
-                        <span style="font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700; white-space: nowrap; background: rgba(239, 68, 68, 0.25);">
-                            ELIMINATED IN DB
-                        </span>
-                    `;
+                    if (targetBox) {
+                        let banner = targetBox.querySelector('.amaes-review-outcome-banner');
+                        if (!banner) {
+                            banner = document.createElement('div');
+                            banner.className = 'amaes-review-outcome-banner';
+                            targetBox.appendChild(banner);
+                        }
+                        banner.style.cssText = `
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            gap: 8px;
+                            margin-top: 8px;
+                            padding: 6px 12px;
+                            border-radius: 6px;
+                            font-size: 11.5px;
+                            font-weight: 600;
+                            background: rgba(239, 68, 68, 0.12);
+                            border: 1px solid rgba(239, 68, 68, 0.35);
+                            color: #991b1b;
+                        `;
+                        if (isEmptyAnswer) {
+                            banner.innerHTML = `
+                                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    ${ICONS.xCircle}
+                                    <span><b>Incorrect / No Answer Submitted</b>${rightAnswerForDisplay ? ` — Correct: &ldquo;${escapeHtml(rightAnswerForDisplay)}&rdquo;` : ''}</span>
+                                </div>
+                                <span style="font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700; white-space: nowrap; background: rgba(239, 68, 68, 0.25);">
+                                    INCORRECT
+                                </span>
+                            `;
+                        } else {
+                            banner.innerHTML = `
+                                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    ${ICONS.xCircle}
+                                    <span><b>Eliminated:</b> &ldquo;${escapeHtml(wrongText)}&rdquo; (Confirmed Incorrect)</span>
+                                </div>
+                                <span style="font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700; white-space: nowrap; background: rgba(239, 68, 68, 0.25);">
+                                    ELIMINATED IN DB
+                                </span>
+                            `;
+                        }
+                    }
                 }
+            }
+
+            // ── Review Card Border Highlight ──────────────────────────────────────
+            // Visually highlight the entire question card so users instantly see
+            // which questions were wrong (red), partial (orange), or correct (green).
+            // This prevents confusion especially for fill-in-the-blank where students
+            // may have cleared their answer and can't see what they entered.
+            que.style.transition = 'border-left 0.3s ease';
+            if (isFullMark) {
+                que.style.borderLeft = '4px solid rgba(16, 185, 129, 0.75)';
+                que.style.borderRadius = '0 6px 6px 0';
+            } else if (isPartialMark) {
+                que.style.borderLeft = '4px solid rgba(245, 158, 11, 0.85)';
+                que.style.borderRadius = '0 6px 6px 0';
+            } else if (isZeroMark) {
+                que.style.borderLeft = '4px solid rgba(239, 68, 68, 0.8)';
+                que.style.borderRadius = '0 6px 6px 0';
             }
         });
     }
