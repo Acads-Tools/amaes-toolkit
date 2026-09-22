@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.7.0
+// @version      1.7.1
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -25,7 +25,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.7.0";
+    const SCRIPT_VERSION = "v1.7.1";
     const ANSWER_DB_SCHEMA_VERSION = 2;
     const CONTRIBUTOR_ID_STORAGE_KEY = 'amaes_anonymous_contributor_id';
 
@@ -8574,9 +8574,9 @@
                 <div style="padding: 20px 24px; text-align: center; border-bottom: 1px solid #334155; background: linear-gradient(135deg, #1e293b, #0f172a); display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; flex-direction: column; align-items: flex-start;">
                         <h2 style="margin: 0; font-size: 20px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px;">
-                            ${ICONS.zap} AMAES Toolkit Setup
+                            ${ICONS.zap} Welcome to AMAES Toolkit
                         </h2>
-                        <span style="font-size: 11px; color: #94a3b8; font-weight: 600; margin-top: 4px;">Clean & Safe Study Assistant</span>
+                        <span style="font-size: 11px; color: #94a3b8; font-weight: 600; margin-top: 4px;">Your All-in-One Study & Quiz Companion</span>
                     </div>
                     ${force ? `<button id="btn-welcome-close" style="background:none; border:none; color:#94a3b8; font-size:24px; cursor:pointer; line-height:1; padding: 4px;">&times;</button>` : ''}
                 </div>
@@ -8586,21 +8586,21 @@
                     <!-- Core Features -->
                     <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 8px; padding: 12px 14px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                            <h3 style="margin: 0; font-size: 13.5px; color: #60a5fa; display: flex; align-items: center; gap: 6px;">${ICONS.checkCircle} 1-Click Auto-Answer & Sync</h3>
+                            <h3 style="margin: 0; font-size: 13.5px; color: #60a5fa; display: flex; align-items: center; gap: 6px;">${ICONS.checkCircle} Smart Auto-Answer & Highlighter</h3>
                             <span style="font-size: 9px; font-family: monospace; color: #93c5fd; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.35); padding: 1px 6px; border-radius: 3px;">Background Capable</span>
                         </div>
-                        <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically detects active courses, syncs verified teacher-marked answers from the community database, and highlights correct choices. Auto-Quiz runs autonomously in the background while you switch tabs or multitask in other applications.</p>
+                        <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically recognizes your subject, finds verified answers shared by students, and highlights the right choices. Auto-Quiz runs autonomously in the background while you switch tabs or multitask in other applications.</p>
                     </div>
 
                     <div style="background: rgba(167, 139, 250, 0.1); border: 1px solid rgba(167, 139, 250, 0.2); border-radius: 8px; padding: 12px 14px;">
-                        <h3 style="margin: 0 0 4px; font-size: 13.5px; color: #c4b5fd; display: flex; align-items: center; gap: 6px;">${ICONS.search} Online Study Guide Rescue</h3>
-                        <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically checks online study guides (AMAUOED) in the background to provide answers when verified question entries are missing.</p>
+                        <h3 style="margin: 0 0 4px; font-size: 13.5px; color: #c4b5fd; display: flex; align-items: center; gap: 6px;">${ICONS.search} Online Study Guide Backup</h3>
+                        <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically checks online student study guides (AMAUOED) to find answers whenever a question isn't in your saved library yet.</p>
                     </div>
 
                     <!-- Collect & Share Anonymously -->
                     <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 12px 14px;">
                         <h3 style="margin: 0 0 4px; font-size: 13.5px; color: #34d399; display: flex; align-items: center; gap: 6px;">${ICONS.upload} Collect & Share Anonymously</h3>
-                        <p style="margin: 0 0 6px; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Help classmates! Confirmed review answers are collected and shared to the community library <b>100% anonymously</b>. No student credentials or personal data are ever sent.</p>
+                        <p style="margin: 0 0 6px; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Help your fellow students! Confirmed answers from completed quizzes are automatically saved and shared <b>100% anonymously</b>. No names, IDs, or personal info are ever shared.</p>
                         
                         <!-- Mini Toggles with Comfortable Touch Spacing -->
                         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px; background: rgba(0, 0, 0, 0.2); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05);">
@@ -8725,13 +8725,13 @@
                     <!-- Agreement with High-Contrast Link -->
                     <label style="display: flex; align-items: flex-start; gap: 12px; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 14px; cursor: pointer; transition: all 0.2s; margin-top: 2px;" id="welcome-terms-container">
                         <input id="welcome-chk-terms" type="checkbox" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer; accent-color: #10b981; flex-shrink: 0;" />
-                        <span style="color: #e2e8f0; font-size: 11.5px; line-height: 1.45;">I understand this is an independent tool. I agree to the <a href="https://github.com/Acads-Tools/amaes-toolkit#important-use-disclaimer" target="_blank" rel="noopener noreferrer" style="color: #93c5fd; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;" onclick="event.stopPropagation();">Terms of Use & Disclaimer</a>, will use it responsibly, and consent to anonymous answer sharing to help the community database.</span>
+                        <span style="color: #e2e8f0; font-size: 11.5px; line-height: 1.45;">I understand this is an independent study aid. I agree to the <a href="https://github.com/Acads-Tools/amaes-toolkit#important-use-disclaimer" target="_blank" rel="noopener noreferrer" style="color: #93c5fd; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;" onclick="event.stopPropagation();">Terms of Use & Disclaimer</a>, will use it responsibly, and agree to share verified answers anonymously to help classmates.</span>
                     </label>
                 </div>
 
                 <div style="padding: 16px 24px; border-top: 1px solid #334155; background: #0f172a; display: flex; justify-content: flex-end; gap: 12px;">
                     <button id="btn-got-it-welcome" class="amaes-btn amaes-btn-green" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '' : 'disabled'} style="padding: 10px 24px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; opacity: ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '1' : '0.5'};">
-                        ${ICONS.zap} Initialize Database & Start
+                        ${ICONS.zap} Get Started
                     </button>
                 </div>
             </div>
@@ -8918,7 +8918,7 @@
             // Initialize database / auto-sync
             const dashCourses = typeof detectDashboardCourses === 'function' ? detectDashboardCourses() : [];
             if (dashCourses && dashCourses.length > 0) {
-                showToast(`Initializing database for ${dashCourses.length} courses...`, 3000);
+                showToast(`Downloading answers for ${dashCourses.length} courses...`, 3000);
                 if (typeof setLog === 'function') setLog(`Auto-syncing ${dashCourses.length} courses...`, "var(--accent-blue)");
                 dashCourses.forEach(c => {
                     sessionStorage.setItem(`amaes_cloud_synced_${c.code}`, '1');
@@ -8927,7 +8927,7 @@
                     }
                 });
             } else {
-                showToast("Database initialized! Open a course to start.", 3000);
+                showToast("Ready! Open any course or quiz to start.", 3000);
             }
         };
 
@@ -9024,7 +9024,7 @@
                         ${ICONS.lock} <span>Toolkit Locked</span>
                     </div>
                     <div style="font-size: 10.5px; color: var(--text-secondary, #cbd5e1); margin-top: 4px; line-height: 1.4;">
-                        Terms and conditions acceptance is required to unlock tools and automation.
+                        Please agree to the study disclaimer below to unlock the toolkit and quiz tools.
                     </div>
                 </div>
 

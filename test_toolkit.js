@@ -2829,8 +2829,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.7.0'), "Userscript header must specify v1.7.0");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.0";'), "Constant SCRIPT_VERSION must be v1.7.0");
+    assert.ok(script.includes('@version      1.7.1'), "Userscript header must specify v1.7.1");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.1";'), "Constant SCRIPT_VERSION must be v1.7.1");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
