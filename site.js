@@ -107,9 +107,15 @@
       ? 'Install from Firefox Add-ons ↗'
       : 'Get Violentmonkey ↗';
     if (allowScriptsText) {
-      allowScriptsText.innerHTML = browser === 'firefox'
-        ? 'In Violentmonkey settings, enable <strong>Allow access to user scripts</strong> if shown.'
-        : 'In the browser extension settings, enable <strong>Allow user scripts</strong> if shown.';
+      if (browser === 'chrome') {
+        allowScriptsText.innerHTML = '<strong>Important for Chrome &amp; Brave:</strong> Open <code>chrome://extensions</code> or click the 🧩 puzzle piece icon → turn <strong>Developer mode</strong> ON (top right), then toggle ON <strong>Allow access to user scripts</strong> on Violentmonkey.';
+      } else if (browser === 'edge') {
+        allowScriptsText.innerHTML = '<strong>Important for Edge:</strong> Open <code>edge://extensions</code> → toggle <strong>Developer mode</strong> ON to allow Violentmonkey to run scripts.';
+      } else if (browser === 'firefox') {
+        allowScriptsText.innerHTML = '<strong>Firefox:</strong> Just click <strong>Add to Firefox</strong>! Scripts run automatically with no extra developer mode needed.';
+      } else {
+        allowScriptsText.innerHTML = 'In your browser extension settings, make sure <strong>Developer mode</strong> or <strong>Allow user scripts</strong> is turned <strong>ON</strong>.';
+      }
     }
   }
 
@@ -125,11 +131,11 @@
     detectFromPageMarker();
     if (!detectedVersion) {
       setTimeout(function () {
-        checkResult.textContent = 'Not detected yet — enable user scripts, then refresh this page.';
+        checkResult.textContent = 'Not detected yet — make sure you clicked "Confirm installation" in Violentmonkey, then refresh this page.';
         checkResult.style.color = '#fbbf24';
       }, 250);
     } else {
-      checkResult.textContent = '✓ Toolkit detected';
+      checkResult.textContent = '✓ Toolkit detected and active!';
     }
     renderVersionStatus();
   });
