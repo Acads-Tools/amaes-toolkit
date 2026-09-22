@@ -261,7 +261,12 @@ video {
 .terms-intro strong {
   color: var(--text);
 }
-.about-grid,
+.about-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-bottom: 16px;
+}
 .terms-grid {
   display: grid;
   gap: 12px;

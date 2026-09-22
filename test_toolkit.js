@@ -3939,6 +3939,30 @@ test("Gemini AI: 8s Watchdog Timeout, Automatic Retry, Abort Handling, and Fallb
     assert.ok(script.includes("if (activeAiAbortController) {") && script.includes("activeAiAbortController.abort();"), "Pausing auto-quiz must abort any active AI request");
 });
 
+// --------------------------------------------------
+// 91. Gemini AI Welcome Modal, Documentation, and Website Presentation
+// --------------------------------------------------
+test("Gemini AI: Welcome Modal, README documentation, and Website Presentation", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    const readme = fs.readFileSync('README.md', 'utf8');
+    const indexHtml = fs.readFileSync('index.html', 'utf8');
+
+    // 1. Welcome Guide card & setup button
+    assert.ok(script.includes("Built-in Google Gemini AI"), "Welcome guide must feature Built-in Google Gemini AI card");
+    assert.ok(script.includes("id=\"welcome-btn-setup-ai\""), "Welcome guide must provide direct setup button for AI assistant");
+    assert.ok(script.includes("welcomeAiBtn.onclick"), "Must wire click listener for welcome-btn-setup-ai to showGeminiSetupModal");
+
+    // 2. README documentation
+    assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
+    assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
+    assert.ok(readme.includes("version-1.7.3-blue.svg"), "README badge must show v1.7.3");
+
+    // 3. Website (index.html)
+    assert.ok(indexHtml.includes("release-badge\">v1.7.3<"), "Website must display v1.7.3 badge");
+    assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

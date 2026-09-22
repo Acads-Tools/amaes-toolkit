@@ -36,9 +36,14 @@
 * **Consensus-Driven Question Sharing:** Confirmed review answers from completed quiz attempts are pooled anonymously to expand coverage for fellow students.
 * **Strict Zero-PII Guarantee:** Student names, student IDs, email addresses, passwords, grades, and Moodle session tokens are never collected, logged, or transmitted.
 
-### 4. AI Study Assistant & Rapid Keystroke Workflow
-* **Instant AI Prompt Formatter (`C`):** Formats the active question, choices, and instructions into a clean prompt ready for your preferred AI tool.
-* **1-Click AI Answer Paste (`V`):** Automatically parses clipboard content and checks or fills the corresponding answer in the browser.
+### 4. Built-in Google Gemini AI Assistant (Experimental) & Study Tools
+* **Native In-Quiz AI Solver:** Directly answers uncertain Multiple Choice and True/False questions in real time using Google Gemini 1.5 Flash via a free personal Google AI Studio API key.
+* **Token-Conservation Architecture:** Strictly triggers only on questions without confirmed answers in the database or online study guides, consuming **0 tokens** on known questions.
+* **Auto-Select or Suggestion Review:** Choose between automated choice selection or visual highlighting with a `✦ AI Suggestion (Gemini)` badge and purple outline for manual confirmation.
+* **Watchdog Timer & Safe Fallbacks:** 8-second timeout with 1 automatic retry, interactive cancel button, and an in-question fallback bar with `[ ↺ Retry AI ]` and `[ ✦ Copy for AI ]`. Complex formats (drag-and-drop, dropdown matching, short answers) automatically fall back to manual copy.
+* **Instant Keystroke Shortcuts:**
+  * `C`: Formats the active question, choices, and instructions ready for your preferred AI tool.
+  * `V`: Automatically parses clipboard content and selects matching choices or fills text inputs in the browser.
 
 ### 5. Autonomous Web Scraper Fallback Engine
 * **Background Study Search:** When an answer is missing from the local database, the toolkit searches verified online study guides and extracts confirmed answer keys automatically.
@@ -80,6 +85,12 @@ Install the **[Violentmonkey](https://violentmonkey.github.io/)** extension for 
 ### Step 3: Open Moodle
 * Navigate to your Moodle portal (e.g., **[semestral.amaes.com](https://semestral.amaes.com/)** or your term's specific portal path like `semestral.amaes.com/xxxx/`, such as `/2612/` depending on your current school year and semester) and log in.
 * The toolkit panel will appear in the bottom-right corner of your screen.
+
+### Step 4: (Optional) Setup Free Google Gemini AI
+1. In the toolkit panel on Moodle, navigate to the **Course Tools** tab and expand **AI Assistant (Google Gemini)**.
+2. Click **Setup Free AI Assistant**.
+3. Follow the 4-step guide to get your free personal API key from [Google AI Studio](https://aistudio.google.com/app/apikey) (100% free with any standard Google account).
+4. Paste your key and click **Test & Save Key**. The toolkit is now ready to assist with uncertain quiz questions automatically!
 
 ---
 

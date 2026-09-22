@@ -9563,6 +9563,20 @@
                         <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically checks online student study guides (AMAUOED) to find answers whenever a question isn't in your saved library yet.</p>
                     </div>
 
+                    <!-- Built-in Gemini AI Assistant -->
+                    <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 8px; padding: 12px 14px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                            <h3 style="margin: 0; font-size: 13.5px; color: #c084fc; display: flex; align-items: center; gap: 6px;">${ICONS.zap} Built-in Google Gemini AI</h3>
+                            <span style="font-size: 9px; font-family: monospace; color: #d8b4fe; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.35); padding: 1px 6px; border-radius: 3px;">100% Free · Experimental</span>
+                        </div>
+                        <p style="margin: 0 0 8px; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Direct in-quiz AI solving for uncertain Multiple Choice and True/False questions. Uses <b>0 tokens</b> on questions already in the verified database. Connect your free Google AI Studio key anytime in Course Tools.</p>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button id="welcome-btn-setup-ai" type="button" class="amaes-btn" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; font-size: 11px; padding: 4px 10px; border-radius: 5px; font-weight: 700; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 4px;">
+                                ✦ <span>${geminiApiKey ? 'Configure AI Key' : 'Setup Free AI Assistant'}</span>
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Collect & Share Anonymously -->
                     <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 12px 14px;">
                         <h3 style="margin: 0 0 4px; font-size: 13.5px; color: #34d399; display: flex; align-items: center; gap: 6px;">${ICONS.upload} Collect & Share Anonymously</h3>
@@ -9796,6 +9810,13 @@
                 gotItButton.style.opacity = checked ? '1' : '0.5';
                 termsContainer.style.borderColor = checked ? 'rgba(16, 185, 129, 0.5)' : 'rgba(16, 185, 129, 0.2)';
                 if (typeof window._amaesUpdatePanelLockState === 'function') window._amaesUpdatePanelLockState();
+            };
+        }
+
+        const welcomeAiBtn = document.getElementById('welcome-btn-setup-ai');
+        if (welcomeAiBtn) {
+            welcomeAiBtn.onclick = () => {
+                showGeminiSetupModal();
             };
         }
 
