@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.7.3
+// @version      1.7.4
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -26,7 +26,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.7.3";
+    const SCRIPT_VERSION = "v1.7.4";
     const ANSWER_DB_SCHEMA_VERSION = 2;
     const CONTRIBUTOR_ID_STORAGE_KEY = 'amaes_anonymous_contributor_id';
 
@@ -6261,12 +6261,12 @@
 
     // Multi-Model Fallback Registry: Google AI Studio accounts support different versions and models
     const GEMINI_CANDIDATES = [
-        { version: 'v1', model: 'gemini-1.5-flash' },
+        { version: 'v1beta', model: 'gemini-2.5-flash' },
         { version: 'v1beta', model: 'gemini-2.0-flash' },
         { version: 'v1', model: 'gemini-2.0-flash' },
+        { version: 'v1beta', model: 'gemini-2.5-flash-lite' },
         { version: 'v1beta', model: 'gemini-1.5-flash' },
-        { version: 'v1beta', model: 'gemini-2.5-flash' },
-        { version: 'v1beta', model: 'gemini-1.5-flash-latest' }
+        { version: 'v1', model: 'gemini-1.5-flash' }
     ];
 
     let cachedWorkingEndpoint = null;
@@ -6276,10 +6276,11 @@
     } catch (_) {}
 
     // Low-level request executor for a specific candidate version and model
-    function executeGeminiRequest({ apiKey, prompt, maxOutputTokens = 64, signal, version = 'v1', model = GEMINI_MODEL }) {
+    function executeGeminiRequest({ apiKey, prompt, maxOutputTokens = 64, signal, version = 'v1beta', model = GEMINI_MODEL }) {
         return new Promise((resolve, reject) => {
             if (!apiKey) return reject(new Error('Missing Gemini API key'));
-            const url = `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+            // Use standard clean endpoint without query parameter to prevent multiple auth credential rejections
+            const url = `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent`;
             const payload = JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
                 generationConfig: {
@@ -6416,8 +6417,12 @@
                     continue;
                 }
 
-                // If authentication is rejected (wrong key) or user aborted, fail fast
-                if (errLower.includes('api key not valid') || errLower.includes('unauthenticated') || errLower.includes('aborted')) {
+                // If authentication is rejected (wrong key, blocked, or unauthenticated) or user aborted, fail fast
+                if (errLower.includes('api key not valid') || 
+                    errLower.includes('unauthenticated') || 
+                    errLower.includes('api_key_service_blocked') || 
+                    errLower.includes('access_token_type_unsupported') || 
+                    errLower.includes('aborted')) {
                     throw err;
                 }
             }
@@ -6431,8 +6436,8 @@
         if (!aiResponseText || !que || !qData || !qData.choices) return null;
         const cleanAi = aiResponseText.trim();
 
-        // 1. Match by choice prefix letter (e.g. "b. ROM" or "b) ROM" or "b:")
-        const letterMatch = cleanAi.match(/^([a-eA-E])[.:\)\-–\s]/);
+        // 1. Match by choice prefix letter (e.g. "b. ROM", "b) ROM", "Option B", or standalone "b")
+        const letterMatch = cleanAi.match(/^(?:option\s+|choice\s+)?\(?([a-eA-E])\)?(?:\b|[.:\)\-–\s]|$)/i) || cleanAi.match(/^([a-eA-E])[.:\)\-–\s]/);
         let matchedChoiceIndex = -1;
         if (letterMatch) {
             const letter = letterMatch[1].toLowerCase();
@@ -6443,11 +6448,17 @@
         }
 
         // 2. Match normalized choice content text
-        const cleanAnswerText = normalizeChoice(cleanAi.replace(/^[a-eA-E][.:\)\-–\s]*/, ''));
+        const cleanAnswerText = normalizeChoice(cleanAi.replace(/^(?:option\s+|choice\s+)?\(?[a-eA-E]\)?(?:\b|[.:\)\-–\s]|$)/i, ''));
         if (matchedChoiceIndex === -1 && cleanAnswerText) {
             for (let i = 0; i < qData.choices.length; i++) {
                 const normChoice = normalizeChoice(qData.choices[i]);
-                if (normChoice === cleanAnswerText || normChoice.includes(cleanAnswerText) || cleanAnswerText.includes(normChoice)) {
+                if (!normChoice) continue;
+                if (normChoice === cleanAnswerText) {
+                    matchedChoiceIndex = i;
+                    break;
+                }
+                // Guard against short substring false matches (require at least 4 chars)
+                if (cleanAnswerText.length >= 4 && (normChoice.includes(cleanAnswerText) || cleanAnswerText.includes(normChoice))) {
                     matchedChoiceIndex = i;
                     break;
                 }
@@ -6533,8 +6544,8 @@
         }
     }
 
-    // Fallback bar with [ ↺ Retry AI ] and [ ✦ Copy for AI ]
-    function showAiFallbackBar(que, qData, promptText, onRetry) {
+    // Fallback bar with dynamic failure reason, [ ⚙ Configure Key ] (if auth error), [ ↺ Retry AI ], and [ ✦ Copy for AI ]
+    function showAiFallbackBar(que, qData, promptText, onRetry, { reason = '', isAuthError = false } = {}) {
         que.querySelectorAll('.amaes-ai-fallback-bar').forEach(el => el.remove());
         const formulation = que.querySelector('.formulation, .content') || que;
         const bar = document.createElement('div');
@@ -6553,13 +6564,30 @@
             font-size: 11px;
             color: #86198f;
             box-sizing: border-box;
+            flex-wrap: wrap;
         `;
+        const displayReason = reason || 'AI took too long or was unavailable.';
         bar.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px;">
                 <span style="font-size: 13px;">⚠️</span>
-                <span style="font-weight: 600;">AI took too long or was unavailable.</span>
+                <span style="font-weight: 600;">${displayReason}</span>
             </div>
-            <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                ${isAuthError ? `
+                <button type="button" class="amaes-ai-config-btn" style="
+                    background: #7c3aed;
+                    color: #ffffff;
+                    border: none;
+                    padding: 4px 10px;
+                    border-radius: 5px;
+                    font-size: 10.5px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 3px;
+                ">⚙ Configure Key</button>
+                ` : ''}
                 <button type="button" class="amaes-ai-retry-btn" style="
                     background: #a21caf;
                     color: #ffffff;
@@ -6590,6 +6618,15 @@
         `;
 
         formulation.insertBefore(bar, formulation.firstChild);
+
+        const configBtn = bar.querySelector('.amaes-ai-config-btn');
+        if (configBtn) {
+            configBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                showGeminiSetupModal();
+            };
+        }
 
         const retryBtn = bar.querySelector('.amaes-ai-retry-btn');
         if (retryBtn && typeof onRetry === 'function') {
@@ -6633,7 +6670,7 @@
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span class="amaes-ai-spin" style="display: inline-block; font-size: 14px; color: #9333ea;">✦</span>
-                    <span style="font-weight: 700; color: #7e22ce; font-size: 12px;">Gemini 1.5 Flash is analyzing Question #${qData ? qData.qNum : ''}...</span>
+                    <span style="font-weight: 700; color: #7e22ce; font-size: 12px;">Gemini is analyzing Question #${qData ? qData.qNum : ''}...</span>
                 </div>
                 <button type="button" class="amaes-ai-cancel-btn" style="
                     background: #f3e8ff;
@@ -6653,6 +6690,7 @@
         formulation.insertBefore(thinkingEl, formulation.firstChild);
 
         let isAborted = false;
+        let timedOut = false;
         const abortCtrl = new AbortController();
         activeAiAbortController = abortCtrl;
 
@@ -6669,17 +6707,19 @@
             };
         }
 
-        setLog(`[AI Assistant] Asking Gemini 1.5 Flash for Question #${qData ? qData.qNum : ''}...`, "var(--accent-purple)");
+        setLog(`[AI Assistant] Asking Gemini for Question #${qData ? qData.qNum : ''}...`, "var(--accent-purple)");
 
         let timeoutId = setTimeout(() => {
+            timedOut = true;
             abortCtrl.abort();
         }, GEMINI_TIMEOUT_MS);
 
         let answerText = null;
         let attempt = 0;
+        let lastError = null;
         const maxAttempts = 2; // 1 initial request + 1 automatic retry
 
-        while (attempt < maxAttempts && !answerText && !isAborted) {
+        while (attempt < maxAttempts && !answerText && !isAborted && !timedOut) {
             attempt++;
             try {
                 const res = await callGeminiApi({
@@ -6693,8 +6733,17 @@
                     break;
                 }
             } catch (err) {
-                if (isAborted) return;
+                lastError = err;
+                if (isAborted || timedOut) break;
                 logDebug(`Gemini attempt ${attempt} error: ${err.message}`);
+                const errLower = (err.message || '').toLowerCase();
+                // If authentication is rejected, fail fast instead of doing a pointless retry
+                if (errLower.includes('api key not valid') || 
+                    errLower.includes('unauthenticated') || 
+                    errLower.includes('api_key_service_blocked') || 
+                    errLower.includes('access_token_type_unsupported')) {
+                    break;
+                }
                 if (attempt < maxAttempts) {
                     await new Promise(r => setTimeout(r, 600));
                 }
@@ -6716,16 +6765,50 @@
                 return;
             } else {
                 logDebug(`Gemini returned "${answerText}" but could not be mapped to choices.`);
+                const cleanSnippet = answerText.trim().replace(/\s+/g, ' ').slice(0, 32);
+                const mismatchReason = `AI suggested "${cleanSnippet}", but it couldn't be matched to any option.`;
+                showAiFallbackBar(que, qData, promptText, async () => {
+                    await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
+                }, { reason: mismatchReason, isAuthError: false });
+                showToast(mismatchReason, 4500);
+                setLog(`[AI Choice Mismatch] Question #${qData ? qData.qNum : ''}: ${mismatchReason}`, "var(--accent-amber)");
+                if (typeof onFallback === 'function') onFallback();
+                return;
             }
         }
 
-        // Failure or timeout: inject fallback bar with Retry AI and Copy buttons
+        // Categorize the true failure reason for clear feedback
+        let failureReason = 'AI was unavailable.';
+        let isAuthError = false;
+
+        if (timedOut) {
+            failureReason = 'AI took too long to respond (timed out after 8s).';
+        } else if (lastError) {
+            const errMsg = lastError.message || '';
+            const errLower = errMsg.toLowerCase();
+            if (errLower.includes('unauthenticated') || 
+                errLower.includes('invalid authentication') || 
+                errLower.includes('api key not valid') || 
+                errLower.includes('api_key_service_blocked') || 
+                errLower.includes('access_token_type_unsupported')) {
+                failureReason = 'Google rejected API key. Check key in Course Tools.';
+                isAuthError = true;
+            } else if (errLower.includes('quota') || errLower.includes('429') || errLower.includes('rate limit')) {
+                failureReason = 'AI Studio rate limit / quota exceeded.';
+            } else if (errLower.includes('not found') || errLower.includes('no available gemini model') || errLower.includes('404')) {
+                failureReason = 'Gemini model unavailable. Check key permissions.';
+            } else {
+                failureReason = `AI Error: ${errMsg.slice(0, 48)}`;
+            }
+        }
+
+        // Failure or timeout: inject fallback bar with clear reason and direct configure button if auth error
         showAiFallbackBar(que, qData, promptText, async () => {
             await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
-        });
+        }, { reason: failureReason, isAuthError: isAuthError });
 
-        showToast('AI took too long to respond. You can retry or copy manually.', 4000);
-        setLog(`[AI Timeout] Question #${qData ? qData.qNum : ''}: No response within 8s. Switched to manual copy.`, "var(--accent-amber)");
+        showToast(failureReason, 4500);
+        setLog(`[AI Fallback] Question #${qData ? qData.qNum : ''}: ${failureReason}`, "var(--accent-amber)");
 
         if (typeof onFallback === 'function') {
             onFallback();
@@ -6832,7 +6915,10 @@
 
                         <div style="display: flex; align-items: flex-start; gap: 8px;">
                             <span style="background: #7c3aed; color: #fff; font-weight: 800; font-size: 10px; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">3</span>
-                            <div style="color: var(--text-secondary, #cbd5e1); font-size: 11.5px;">Click <b>"Create API Key"</b> and copy your key.</div>
+                            <div style="color: var(--text-secondary, #cbd5e1); font-size: 11.5px;">
+                                Click <b>"Create API Key"</b> and copy your key.<br>
+                                <span style="font-size: 10.5px; color: #a78bfa;">(Tip: If prompted, select "Create API key in new project" for automatic free setup)</span>
+                            </div>
                         </div>
 
                         <div style="display: flex; align-items: flex-start; gap: 8px;">
@@ -6970,7 +7056,15 @@
                     feedback.style.background = 'rgba(239, 68, 68, 0.15)';
                     feedback.style.color = '#f87171';
                     feedback.style.border = '1px solid rgba(239, 68, 68, 0.3)';
-                    feedback.innerText = `Validation Failed: ${err.message || 'Invalid API key or network error.'}`;
+                    const msg = err.message || 'Invalid API key or network error.';
+                    const msgLower = msg.toLowerCase();
+                    if (msgLower.includes('api_key_service_blocked') || 
+                        msgLower.includes('unauthenticated') || 
+                        msgLower.includes('access_token_type_unsupported')) {
+                        feedback.innerText = `Validation Failed: Key was rejected by Google. In Google AI Studio, ensure you click "Create API key in new project" so the Generative Language API is automatically enabled.`;
+                    } else {
+                        feedback.innerText = `Validation Failed: ${msg}`;
+                    }
                 }
             };
         }

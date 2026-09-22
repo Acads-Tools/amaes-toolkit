@@ -2829,8 +2829,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.7.3'), "Userscript header must specify v1.7.3");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.3";'), "Constant SCRIPT_VERSION must be v1.7.3");
+    assert.ok(script.includes('@version      1.7.4'), "Userscript header must specify v1.7.4");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.4";'), "Constant SCRIPT_VERSION must be v1.7.4");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3926,7 +3926,7 @@ test("Gemini AI: 8s Watchdog Timeout, Automatic Retry, Abort Handling, and Fallb
     // 3. Retry loop and fallback bar in handleGeminiQuestionInference
     assert.ok(script.includes("function handleGeminiQuestionInference("), "Must define handleGeminiQuestionInference");
     assert.ok(script.includes("const maxAttempts = 2; // 1 initial request + 1 automatic retry"), "Must support exactly 1 automatic retry on failure");
-    assert.ok(script.includes("function showAiFallbackBar(que, qData, promptText, onRetry)"), "Must define showAiFallbackBar");
+    assert.ok(script.includes("function showAiFallbackBar(que, qData, promptText, onRetry"), "Must define showAiFallbackBar");
     assert.ok(script.includes("class=\"amaes-ai-retry-btn\""), "Fallback bar must include Retry AI button");
     assert.ok(script.includes("class=\"amaes-ai-copy-btn\""), "Fallback bar must include Copy for AI button");
 
@@ -3961,11 +3961,40 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.7.3-blue.svg"), "README badge must show v1.7.3");
+    assert.ok(readme.includes("version-1.7.4-blue.svg"), "README badge must show v1.7.4");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.7.3<"), "Website must display v1.7.3 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.7.4<"), "Website must display v1.7.4 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
+});
+
+// --------------------------------------------------
+// 92. Gemini AI Granular Failure Diagnostics & Choice Matcher Flexibility
+// --------------------------------------------------
+test("Gemini AI: Granular Failure Diagnostics, Actionable Key Re-Authentication, and Choice Matcher Prefix Flexibility", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Dynamic failure reasons instead of misleading generic timeout message
+    assert.ok(script.includes("Google rejected API key. Check key in Course Tools."), "Must diagnose authentication and key block failures specifically");
+    assert.ok(script.includes("AI Studio rate limit / quota exceeded."), "Must diagnose rate limit and quota failures");
+    assert.ok(script.includes("Gemini model unavailable. Check key permissions."), "Must diagnose missing model permissions");
+    assert.ok(script.includes("AI took too long to respond (timed out after 8s)."), "Must only state took too long when timedOut is actually true");
+
+    // 2. Actionable Configure Key button in fallback bar on auth failure
+    assert.ok(script.includes("class=\"amaes-ai-config-btn\""), "Fallback bar must render Configure Key button on auth errors");
+    assert.ok(script.includes("showGeminiSetupModal()"), "Clicking Configure Key button must open setup modal directly");
+
+    // 3. Choice matcher prefix and standalone letter flexibility
+    assert.ok(script.includes("(?:option\\s+|choice\\s+)?\\(?([a-eA-E])\\)?"), "Matcher must parse standalone letters (e.g. 'b', 'Option B', '(b)')");
+
+    // Unit test of letter matcher regex
+    const regex = /^(?:option\s+|choice\s+)?\(?([a-eA-E])\)?(?:\b|[.:\)\-–\s]|$)/i;
+    assert.strictEqual(regex.test("b"), true, "Must match standalone 'b'");
+    assert.strictEqual(regex.test("B"), true, "Must match standalone 'B'");
+    assert.strictEqual(regex.test("Option B"), true, "Must match 'Option B'");
+    assert.strictEqual(regex.test("(B)"), true, "Must match '(B)'");
+    assert.strictEqual(regex.test("b. Executive Summary"), true, "Must match 'b. Executive Summary'");
 });
 
 console.log("\n==================================================");
