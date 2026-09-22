@@ -4237,6 +4237,37 @@ test("Gemini AI v1.7.5: Unverified AI Suggestion Safeguards, Copy Question Filte
     assert.strictEqual(mockExisting[0].isAiSuggestion, false);
 });
 
+// --------------------------------------------------
+// 106. Gemini AI: Card-Level Question Tagging & Attribution
+// --------------------------------------------------
+test("Gemini AI: AI Question Tagging & Unverified Attribution displays clean card-level pill, cleans up unanswered hints, and integrates with choices", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Definition and naming of setQuestionAiTag
+    assert.ok(script.includes("function setQuestionAiTag(que, isAi = true)"), "Must define setQuestionAiTag helper");
+
+    // 2. Class name and content of card-level AI question tag
+    assert.ok(script.includes("tag.className = 'amaes-ai-question-tag';"), "Must create amaes-ai-question-tag");
+    assert.ok(script.includes("✦ AI-SOLVED"), "Must display ✦ AI-SOLVED badge in card header");
+    assert.ok(script.includes("Answered by Google Gemini AI"), "Must prominently attribute solver to Google Gemini AI");
+    assert.ok(script.includes("Unverified Suggestion — Review before submitting"), "Must clearly designate suggestion as unverified for user review");
+
+    // 3. Removal of 'No answer known yet' hint when AI answers
+    assert.ok(script.includes("que.querySelectorAll('.amaes-unanswered-hint').forEach(el => el.remove());"), "Must purge unanswered hint when question is answered by AI");
+
+    // 4. Called automatically in applyAiChoiceHighlight
+    const applyBlock = script.slice(script.indexOf("function applyAiChoiceHighlight(targetRow)"), script.indexOf("function showAiFallbackBar"));
+    assert.ok(applyBlock.includes("setQuestionAiTag(que, true);"), "applyAiChoiceHighlight must automatically invoke setQuestionAiTag on the question container");
+
+    // 5. Called in highlightQuizAnswers when choice has hasAiSource
+    assert.ok(script.includes("if (hasAiSource) {\n                            setQuestionAiTag(que, true);"), "highlightQuizAnswers must set question AI tag when choice has hasAiSource");
+
+    // 6. Complete CSS and sanitization stripping in cleanDOMToAI and review harvesting
+    assert.ok(script.includes(".amaes-ai-question-tag"), "cleanDOMToAI and DOM sanitizers must strip .amaes-ai-question-tag");
+    assert.ok(script.includes(".amaes-ai-question-tag {\n                    user-select: none;\n                }"), "Must define CSS user-select rule for amaes-ai-question-tag");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

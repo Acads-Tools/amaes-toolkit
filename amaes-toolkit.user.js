@@ -2976,6 +2976,12 @@
                 if (existingAiChoice && !isChoiceRowEliminated(existingAiChoice)) {
                     // Clean up any stale blockage HUD if previously injected
                     firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());
+                    firstBlockedQue.querySelectorAll('.amaes-que-top-toolbar').forEach(toolbar => {
+                        toolbar.style.display = 'flex';
+                    });
+                    firstBlockedQue.style.outline = '2px solid rgba(139, 92, 246, 0.7)';
+                    firstBlockedQue.style.borderRadius = '8px';
+                    setQuestionAiTag(firstBlockedQue, true);
                     // Already solved by AI and highlighted! Keep paused for review without re-querying API.
                     setLog(`[AI Suggestion] Question #${qData ? qData.qNum : ''} has an AI suggestion. (Prompt auto-copied 📋) Paused for review—press <b>N</b> or click Next page when ready.`, "var(--accent-purple)");
                     isSolverRunning = false;
@@ -2999,6 +3005,12 @@
                         onSuccess: async (matched) => {
                             // Ensure blockage HUD is removed upon successful AI resolution
                             firstBlockedQue.querySelectorAll('.amaes-blockage-hud, .amaes-unanswered-hint').forEach(el => el.remove());
+                            firstBlockedQue.querySelectorAll('.amaes-que-top-toolbar').forEach(toolbar => {
+                                toolbar.style.display = 'flex';
+                            });
+                            firstBlockedQue.style.outline = '2px solid rgba(139, 92, 246, 0.7)';
+                            firstBlockedQue.style.borderRadius = '8px';
+                            setQuestionAiTag(firstBlockedQue, true);
                             if (aiAutoSelect && matched && matched.input) {
                                 const anyChecked = Boolean(firstBlockedQue.querySelector('.answer input[type="radio"]:checked, .answer input[type="checkbox"]:checked'));
                                 if (!anyChecked) {
@@ -3040,6 +3052,7 @@
                     // The solver HUD is the full unknown-answer notice. Remove
                     // the compact matcher hint so the same warning is not shown twice.
                     firstBlockedQue.querySelectorAll('.amaes-unanswered-hint').forEach(hint => hint.remove());
+                    setQuestionAiTag(firstBlockedQue, false);
                     const hud = document.createElement('div');
                     hud.className = 'amaes-blockage-hud';
                     hud.style.cssText = `
@@ -3908,7 +3921,7 @@
 
             // Clone qtext and remove input, select, textarea, drop zones, and badges so inline blanks match AMAUOED entries cleanly
             const qClone = qtextElem.cloneNode(true);
-            qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn').forEach(el => el.remove());
+            qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-question-tag').forEach(el => el.remove());
             const moodleQRaw = qClone.innerText.trim();
             const moodleQNorm = normalizeText(moodleQRaw);
 
@@ -3981,7 +3994,7 @@
                 el.style.backgroundColor = '';
                 el.style.borderRadius = '';
             });
-            que.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-select-elim-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge').forEach(b => b.remove());
+            que.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-select-elim-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag').forEach(b => b.remove());
 
             // Safety: collect all verified/confirmed answers for this question
             const verifiedNorms = new Set();
@@ -4164,6 +4177,11 @@
                         // Apply full row highlight on container
                         const targetRow = row;
                         targetRow.classList.add(hasAiSource ? 'amaes-ai-suggested-choice' : 'amaes-highlighted-choice');
+                        if (hasAiSource) {
+                            setQuestionAiTag(que, true);
+                        } else if (hasVerifiedSource) {
+                            setQuestionAiTag(que, false);
+                        }
                         targetRow.style.outline = `2px solid ${sourceColor}`;
                         targetRow.style.backgroundColor = sourceBg;
                         targetRow.style.boxShadow = `0 0 0 1px ${sourceColor}33`;
@@ -5408,7 +5426,7 @@
         const clone = rootNode.cloneNode(true);
 
         // Strip non-content scripts, toolkit buttons, injected UI badges & Moodle feedback icons/accessibility text
-        clone.querySelectorAll('script, style, noscript, .amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-copy-ai-card-btn, .amaes-copy-img-card-btn, .amaes-paste-ai-card-btn, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-thinking-indicator, .amaes-ai-fallback-bar, .amaes-ai-suggested-badge, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, .accesshide, .sr-only').forEach(el => el.remove());
+        clone.querySelectorAll('script, style, noscript, .amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-copy-ai-card-btn, .amaes-copy-img-card-btn, .amaes-paste-ai-card-btn, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-thinking-indicator, .amaes-ai-fallback-bar, .amaes-ai-suggested-badge, .amaes-ai-question-tag, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, .accesshide, .sr-only').forEach(el => el.remove());
 
         // Convert Superscripts (e.g. 2^3 -> 2³, x^2 -> x², or ^{complex})
         clone.querySelectorAll('sup').forEach(sup => {
@@ -5568,7 +5586,7 @@
         if (!qText) {
             const fallbackElem = que.querySelector('.content, .formulation, [class*="formulation"]') || que;
             const clone = fallbackElem.cloneNode(true);
-            clone.querySelectorAll('.answer, .submitbtns, .info, .im-controls, .amaes-card-btn-container, .amaes-que-top-toolbar').forEach(el => el.remove());
+            clone.querySelectorAll('.answer, .submitbtns, .info, .im-controls, .amaes-card-btn-container, .amaes-que-top-toolbar, .amaes-ai-question-tag').forEach(el => el.remove());
             qText = cleanDOMToAI(clone);
         }
 
@@ -6693,6 +6711,63 @@
         };
     }
 
+    // Injects a prominent, clean card-level pill indicating the question was answered by Google Gemini AI
+    function setQuestionAiTag(que, isAi = true) {
+        if (!que) return;
+        que.querySelectorAll('.amaes-ai-question-tag').forEach(el => el.remove());
+        if (!isAi) return;
+
+        // Clean up any "No answer known yet" hint since AI answered it
+        que.querySelectorAll('.amaes-unanswered-hint').forEach(el => el.remove());
+
+        const formulation = que.querySelector('.formulation, .content') || que;
+        const tag = document.createElement('div');
+        tag.className = 'amaes-ai-question-tag';
+        tag.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+            padding: 4px 10px;
+            background: rgba(139, 92, 246, 0.09);
+            border: 1px solid rgba(139, 92, 246, 0.32);
+            border-left: 3px solid #8b5cf6;
+            border-radius: 6px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 11px;
+            line-height: 1.35;
+            box-sizing: border-box;
+            transition: all 0.2s ease;
+        `;
+        tag.title = 'This question was answered using Google Gemini AI. Please verify before submitting.';
+        tag.innerHTML = `
+            <div style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <span class="amaes-ai-tag-pill" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: #ffffff !important; padding: 2px 7px; border-radius: 4px; font-weight: 800; font-size: 9.5px; letter-spacing: 0.4px; display: inline-flex; align-items: center; gap: 3px;">
+                    ✦ AI-SOLVED
+                </span>
+                <span style="color: #6d28d9; font-weight: 700; font-size: 11px;">
+                    Answered by Google Gemini AI
+                </span>
+                <span style="color: #7c3aed; font-size: 10px; opacity: 0.85;">
+                    (Unverified Suggestion — Review before submitting)
+                </span>
+            </div>
+        `;
+
+        const qtextElem = que.querySelector('.qtext, .formulation .qtext');
+        if (qtextElem && qtextElem.parentNode === formulation) {
+            formulation.insertBefore(tag, qtextElem);
+        } else {
+            const toolbar = formulation.querySelector('.amaes-que-top-toolbar');
+            if (toolbar && toolbar.nextSibling) {
+                formulation.insertBefore(tag, toolbar.nextSibling);
+            } else {
+                formulation.insertBefore(tag, formulation.firstChild);
+            }
+        }
+    }
+
     // Apply purple outline and ✦ AI Suggestion (Gemini) badge
     function applyAiChoiceHighlight(targetRow) {
         if (!targetRow) return;
@@ -6724,6 +6799,11 @@
                 flex-shrink: 0;
             `;
             targetRow.appendChild(badge);
+        }
+
+        const que = targetRow.closest('.que');
+        if (que) {
+            setQuestionAiTag(que, true);
         }
     }
 
@@ -8014,7 +8094,7 @@
 
         // Clone and strip any toolkit-injected badges so toolkit's own check icons don't trigger false positives
         const clone = elem.cloneNode(true);
-        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-card-btn-container, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint').forEach(el => el.remove());
+        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-card-btn-container, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag').forEach(el => el.remove());
 
         const text = (clone.innerText || clone.textContent || '');
         if (/[✓✔]/.test(text)) return true;
@@ -8029,7 +8109,7 @@
 
         // Clone and strip any toolkit-injected badges
         const clone = elem.cloneNode(true);
-        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-card-btn-container, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint').forEach(el => el.remove());
+        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-card-btn-container, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag').forEach(el => el.remove());
 
         const text = (clone.innerText || clone.textContent || '');
         if (/[✗✘✕✖]/.test(text)) return true;
@@ -11595,6 +11675,10 @@
                 }
 
                 .amaes-ai-suggested-badge {
+                    user-select: none;
+                }
+
+                .amaes-ai-question-tag {
                     user-select: none;
                 }
             `;
