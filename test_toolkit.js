@@ -4064,6 +4064,48 @@ test("Gemini AI v1.7.5: Session Caching, Elimination Safety Guard, Configurable 
     assert.ok(!prompt.includes("a. RAM [CONFIRMED WRONG"), "Valid choice must not be annotated as wrong");
 });
 
+// --------------------------------------------------
+// 95. Gemini AI v1.7.5: Unverified AI Suggestion Safeguards, Copy Question Filter, and Pause for Review Lifecycle
+// --------------------------------------------------
+test("Gemini AI v1.7.5: Unverified AI Suggestion Safeguards, Copy Question Filter, and Pause for Review Lifecycle", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Copy Question: Exclude unverified AI suggestions from detected answer
+    assert.ok(script.includes("const verifiedNonAiCandidates = validCandidates.filter(c => {"), "formatQuestionForAI must filter candidate list for AI exclusions");
+    assert.ok(script.includes("if (c.isAiSuggestion) return false;"), "Candidate with isAiSuggestion must be excluded from copied prompt");
+    assert.ok(script.includes("srcLower.includes('gemini') || srcLower.includes('ai assistant') || srcLower === 'ai'"), "Candidate with Gemini or AI source must be excluded from copied prompt");
+
+    // Simulation of candidate filtering logic
+    const mockCandidates = [
+        { answer: "b. ROM", isAiSuggestion: true, source: "Google Gemini AI", verified: false },
+        { answer: "a. RAM", isAiSuggestion: false, source: "Verified Database", verified: true }
+    ];
+    const filtered = mockCandidates.filter(c => {
+        if (c.isAiSuggestion) return false;
+        const srcLower = (c.source || '').toLowerCase();
+        if (srcLower.includes('gemini') || srcLower.includes('ai assistant') || srcLower === 'ai') return false;
+        return true;
+    });
+    assert.strictEqual(filtered.length, 1, "Must filter out AI suggestion");
+    assert.strictEqual(filtered[0].answer, "a. RAM", "Must retain verified database answer");
+
+    // 2. Auto-Quiz Pause on AI Suggestion: No automatic advance timer
+    assert.ok(script.includes("showToast(`✦ Gemini selected choice for #${qData ? qData.qNum : ''}! (Paused for review)`, 3000);"), "Toast must notify student that AI choice was selected and paused for review");
+    assert.ok(script.includes("Paused for review—press <b>N</b> or click Next page when ready."), "Status log must confirm pause for student review");
+
+    // 3. AI Suggestion Caching: Saved to local course bank as unverified AI suggestion
+    assert.ok(script.includes("mergeAnswersIntoCache(sCode, [{"), "handleGeminiQuestionInference must merge AI answer into cache");
+    assert.ok(script.includes("isAiSuggestion: true,"), "Merged AI answer must have isAiSuggestion: true");
+    assert.ok(script.includes("source: 'Google Gemini AI'"), "Merged AI answer must have source 'Google Gemini AI'");
+    assert.ok(script.includes("verified: false,"), "Merged AI answer must have verified: false");
+
+    // 4. Distinct AI styling and badge in highlightQuizAnswers
+    assert.ok(script.includes("targetRow.classList.add(hasAiSource ? 'amaes-ai-suggested-choice' : 'amaes-highlighted-choice');"), "Must apply distinct CSS class amaes-ai-suggested-choice");
+    assert.ok(script.includes("badge.className = hasAiSource ? 'amaes-ai-suggested-badge' : `amaes-verified-badge ${hasAmauoedSource ? 'amaes-badge-amauoed' : 'amaes-badge-db'}`;"), "Must attach amaes-ai-suggested-badge for AI sources");
+    assert.ok(script.includes("sourceLabels.push('AI Suggestion (Gemini)');"), "Must label AI source as 'AI Suggestion (Gemini)'");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

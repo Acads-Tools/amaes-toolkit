@@ -2991,25 +2991,11 @@
                                     matched.input.dispatchEvent(new Event('input', { bubbles: true }));
                                     matched.input.dispatchEvent(new Event('change', { bubbles: true }));
                                 }
-                                showToast(`✦ Gemini selected choice for #${qData ? qData.qNum : ''}!`, 2500);
-                                setLog(`[AI Suggestion] Gemini selected <b>${escapeHtml(matched.choiceText)}</b> for #${qData ? qData.qNum : ''}`, "var(--accent-purple)");
-
-                                const allAnswered = areAllPageQuestionsAnswered();
-                                const nextBtn = findQuizNextButton();
-                                if (allAnswered && nextBtn && autoNextVerified && autoQuizMode) {
-                                    const btnText = (nextBtn.value || nextBtn.innerText || '').toLowerCase();
-                                    const isFinish = btnText.includes('finish') || btnText.includes('submit');
-                                    if (!isFinish) {
-                                        setLog(`[AI Auto-Next] Advancing to next question in <b>1.0s</b>...`, "var(--accent-blue)");
-                                        autoNextTimer = setTimeout(() => {
-                                            if (!autoQuizMode) return;
-                                            clickQuizNextButton(nextBtn);
-                                        }, 1000);
-                                    }
-                                }
+                                showToast(`✦ Gemini selected choice for #${qData ? qData.qNum : ''}! (Paused for review)`, 3000);
+                                setLog(`[AI Suggestion] Gemini selected <b>${escapeHtml(matched.choiceText)}</b> for #${qData ? qData.qNum : ''}. Paused for review—press <b>N</b> or click Next page when ready.`, "var(--accent-purple)");
                             } else {
-                                showToast(`✦ Gemini suggested answer for #${qData ? qData.qNum : ''}`, 2500);
-                                setLog(`[AI Suggestion] Gemini suggested <b>${escapeHtml(matched ? matched.choiceText : '')}</b> for #${qData ? qData.qNum : ''}. Click to select.`, "var(--accent-purple)");
+                                showToast(`✦ Gemini suggested answer for #${qData ? qData.qNum : ''} (Paused for review)`, 3000);
+                                setLog(`[AI Suggestion] Gemini suggested <b>${escapeHtml(matched ? matched.choiceText : '')}</b> for #${qData ? qData.qNum : ''}. Paused for review—click to select and proceed.`, "var(--accent-purple)");
                             }
                         }
                     });
@@ -4128,19 +4114,31 @@
                             Boolean((candidate.source || '').toLowerCase().includes('amauoed') ||
                             (Array.isArray(candidate.sources) && candidate.sources.some(source => String(source).toLowerCase().includes('amauoed'))))
                         );
-                        const isAmauoed = !hasVerifiedSource && hasAmauoedSource;
+                        const hasAiSource = !hasVerifiedSource && !hasAmauoedSource && sourceCandidates.some(candidate =>
+                            Boolean(candidate.isAiSuggestion || (candidate.source || '').toLowerCase().includes('gemini') ||
+                            (Array.isArray(candidate.sources) && candidate.sources.some(source => String(source).toLowerCase().includes('gemini'))))
+                        );
+                        const isAmauoed = !hasVerifiedSource && !hasAiSource && hasAmauoedSource;
                         const isDeduced = cand.deduced === true;
-                        const sourceColor = hasVerifiedSource ? '#10b981' : '#0284c7';
-                        const sourceBg = hasVerifiedSource ? 'rgba(16, 185, 129, 0.14)' : 'rgba(2, 132, 199, 0.12)';
+                        let sourceColor = '#0284c7';
+                        let sourceBg = 'rgba(2, 132, 199, 0.12)';
+                        if (hasVerifiedSource) {
+                            sourceColor = '#10b981';
+                            sourceBg = 'rgba(16, 185, 129, 0.14)';
+                        } else if (hasAiSource) {
+                            sourceColor = '#8b5cf6';
+                            sourceBg = 'rgba(139, 92, 246, 0.12)';
+                        }
                         const sourceLabels = [];
                         if (hasVerifiedSource) {
                             sourceLabels.push(isDeduced ? 'Deduced Answer' : 'Verified Answer');
                         }
-                        if (hasAmauoedSource) sourceLabels.push('Web Study Guide');
+                        if (hasAmauoedSource && !hasAiSource) sourceLabels.push('Web Study Guide');
+                        if (hasAiSource) sourceLabels.push('AI Suggestion (Gemini)');
 
                         // Apply full row highlight on container
                         const targetRow = row;
-                        targetRow.classList.add('amaes-highlighted-choice');
+                        targetRow.classList.add(hasAiSource ? 'amaes-ai-suggested-choice' : 'amaes-highlighted-choice');
                         targetRow.style.outline = `2px solid ${sourceColor}`;
                         targetRow.style.backgroundColor = sourceBg;
                         targetRow.style.boxShadow = `0 0 0 1px ${sourceColor}33`;
@@ -4175,12 +4173,12 @@
                         });
 
                         // Add source badge if not already present
-                        let badge = targetRow.querySelector('.amaes-verified-badge');
+                        let badge = targetRow.querySelector('.amaes-verified-badge, .amaes-ai-suggested-badge');
                         if (!badge) {
                             badge = document.createElement(isAmauoed && !hasVerifiedSource ? 'a' : 'span');
-                            badge.className = `amaes-verified-badge ${hasAmauoedSource ? 'amaes-badge-amauoed' : 'amaes-badge-db'}`;
+                            badge.className = hasAiSource ? 'amaes-ai-suggested-badge' : `amaes-verified-badge ${hasAmauoedSource ? 'amaes-badge-amauoed' : 'amaes-badge-db'}`;
                             badge.innerHTML = sourceLabels.map(label => {
-                                const icon = label.startsWith('Web Study Guide') || label.startsWith('AMAUOED') ? ICONS.external : (isDeduced ? ICONS.lightbulb : ICONS.checkCircle);
+                                const icon = label.startsWith('AI Suggestion') ? '✦' : ((label.startsWith('Web Study Guide') || label.startsWith('AMAUOED')) ? ICONS.external : (isDeduced ? ICONS.lightbulb : ICONS.checkCircle));
                                 return `${icon} <span>${label}</span>`;
                             }).join('<span style="opacity:.55"> + </span>');
                             const courseInfo = detectCourseInfo();
@@ -4218,13 +4216,15 @@
                         const canSelectAnswer = isManualSelect || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode));
                         const anyRadioChecked = isRadio && Boolean(que.querySelector('.answer input[type="radio"]:checked'));
                         if (canSelectAnswer && input && !input.checked && (!anyRadioChecked || isManualSelect)) {
-                            input.checked = true;
-                            input.click();
-                            if (label && label !== input) {
-                                label.click();
+                            if (!hasAiSource || aiAutoSelect) {
+                                input.checked = true;
+                                input.click();
+                                if (label && label !== input) {
+                                    label.click();
+                                }
+                                input.dispatchEvent(new Event('input', { bubbles: true }));
+                                input.dispatchEvent(new Event('change', { bubbles: true }));
                             }
-                            input.dispatchEvent(new Event('input', { bubbles: true }));
-                            input.dispatchEvent(new Event('change', { bubbles: true }));
                         }
 
                         return;
@@ -5819,10 +5819,20 @@
                 return !isConfirmedWrong;
             });
 
-            if (validCandidates.length > 0) {
+            // When copying question for AI, NEVER include unverified AI suggestions as detected answers!
+            // Only verified teacher keys, deduced answers, or human study guides (AMAUOED) can be suggested.
+            const verifiedNonAiCandidates = validCandidates.filter(c => {
+                if (c.isAiSuggestion) return false;
+                const srcLower = (c.source || '').toLowerCase();
+                if (srcLower.includes('gemini') || srcLower.includes('ai assistant') || srcLower === 'ai') return false;
+                if (Array.isArray(c.sources) && c.sources.some(s => String(s).toLowerCase().includes('gemini') || String(s).toLowerCase().includes('ai assistant'))) return false;
+                return true;
+            });
+
+            if (verifiedNonAiCandidates.length > 0) {
                 // Sort by verification & consensus
-                validCandidates.sort((a, b) => ((b.verified ? 10 : 0) + (b.confirmations || 1)) - ((a.verified ? 10 : 0) + (a.confirmations || 1)));
-                const bestCand = validCandidates[0];
+                verifiedNonAiCandidates.sort((a, b) => ((b.verified ? 10 : 0) + (b.confirmations || 1)) - ((a.verified ? 10 : 0) + (a.confirmations || 1)));
+                const bestCand = verifiedNonAiCandidates[0];
                 const isDeduced = Boolean(bestCand.deduced);
                 const isVerified = Boolean(bestCand.verified);
                 const isAmauoed = Boolean((bestCand.source || '').toLowerCase().includes('amauoed') || (Array.isArray(bestCand.sources) && bestCand.sources.some(s => s.toLowerCase().includes('amauoed'))));
@@ -6972,6 +6982,26 @@
                 // Valid answer that is NOT eliminated
                 saveAiAnswerToCache(qData, matched);
                 applyAiChoiceHighlight(matched.row);
+
+                // Cache as unverified AI suggestion in course study bank
+                try {
+                    const courseInfo = detectCourseInfo();
+                    const sCode = courseInfo.subjectCode || 'GENERAL';
+                    const rawAns = (matched.choiceText || '').replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
+                    if (rawAns && qData && qData.qText) {
+                        mergeAnswersIntoCache(sCode, [{
+                            qRaw: qData.qText,
+                            qNorm: normalizeText(qData.qText),
+                            ansRaw: rawAns,
+                            ansNorm: normalizeChoice(rawAns),
+                            choices: qData.choices || [],
+                            verified: false,
+                            isAiSuggestion: true,
+                            source: 'Google Gemini AI'
+                        }], 'Google Gemini AI');
+                    }
+                } catch (_) {}
+
                 if (typeof onSuccess === 'function') {
                     await onSuccess(matched);
                 }
