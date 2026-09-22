@@ -8961,7 +8961,7 @@
                     `• Greasy Fork: ${GREASYFORK_URL}\n` +
                     `• GitHub Repo: ${GITHUB_REPO_URL}\n` +
                     `• Violentmonkey will open a tab — click "Confirm installation".\n\n` +
-                    `Step 4: Go to https://semestral.amaes.com/ and log in!\n` +
+                    `Step 4: Go to https://semestral.amaes.com/ (e.g. /2612/ or your semester's term path) and log in!\n` +
                     `The toolkit panel will automatically appear in the bottom-right corner!`;
 
                 if (typeof GM_setClipboard !== 'undefined') {

@@ -78,7 +78,7 @@ Install the **[Violentmonkey](https://violentmonkey.github.io/)** extension for 
 * In the Violentmonkey tab that opens, click the green **"Confirm installation"** button.
 
 ### Step 3: Open Moodle
-* Navigate to **[semestral.amaes.com](https://semestral.amaes.com/)** and log in.
+* Navigate to your Moodle portal (e.g., **[semestral.amaes.com](https://semestral.amaes.com/)** or your term's specific portal path like `semestral.amaes.com/xxxx/`, such as `/2612/` depending on your current school year and semester) and log in.
 * The toolkit panel will appear in the bottom-right corner of your screen.
 
 ---
