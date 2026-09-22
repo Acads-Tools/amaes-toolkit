@@ -870,10 +870,42 @@
     let autoMinimizeQuiz = localStorage.getItem('amaes_auto_min_quiz') !== 'false'; // default true: smart pill in quiz
 
     const GEMINI_API_KEY_STORAGE_KEY = 'amaes_gemini_api_key';
+    const GEMINI_API_KEYS_STORAGE_KEY = 'amaes_gemini_api_keys';
     const GEMINI_MODEL = 'gemini-1.5-flash';
     const GEMINI_TIMEOUT_MS = 8000;
 
-    let geminiApiKey = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY) || '';
+    function getGeminiApiKeys() {
+        try {
+            const raw = localStorage.getItem(GEMINI_API_KEYS_STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    const clean = parsed.map(k => (k || '').trim()).filter(Boolean);
+                    if (clean.length > 0) return clean;
+                }
+            }
+        } catch (_) {}
+        const single = (localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY) || '').trim();
+        return single ? [single] : [];
+    }
+
+    function setGeminiApiKeys(keys) {
+        const clean = Array.isArray(keys) ? keys.map(k => (k || '').trim()).filter(Boolean) : [];
+        if (clean.length > 0) {
+            try {
+                localStorage.setItem(GEMINI_API_KEYS_STORAGE_KEY, JSON.stringify(clean));
+            } catch (_) {}
+            localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, clean[0]);
+            geminiApiKey = clean[0];
+        } else {
+            localStorage.removeItem(GEMINI_API_KEYS_STORAGE_KEY);
+            localStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
+            geminiApiKey = '';
+        }
+        updateAiAssistantUI();
+    }
+
+    let geminiApiKey = (getGeminiApiKeys()[0] || '');
     let aiQuizEnabled = localStorage.getItem('amaes_ai_quiz_enabled') !== 'false'; // default true
     let aiAutoSelect = localStorage.getItem('amaes_ai_auto_select') !== 'false'; // default true: auto-select AI suggestion
     let aiRetryCount = parseInt(localStorage.getItem('amaes_ai_retry_count') || '2', 10);
@@ -901,6 +933,10 @@
         localStorage.setItem('amaes_ai_auto_copy_on_fail', aiAutoCopyOnFail ? 'true' : 'false');
     }
 
+    let aiAutoNextOnAiAnswer = localStorage.getItem('amaes_ai_auto_next_on_ai') === 'true'; // default false
+    function getAiAutoNextOnAiAnswer() { return localStorage.getItem('amaes_ai_auto_next_on_ai') === 'true'; }
+    function setAiAutoNextOnAiAnswer(val) { aiAutoNextOnAiAnswer = Boolean(val); localStorage.setItem('amaes_ai_auto_next_on_ai', aiAutoNextOnAiAnswer ? 'true' : 'false'); }
+
     const GEMINI_FREE_RPM = 15; // 15 requests per minute limit on Google AI Studio Free Tier
     let aiPlanTier = localStorage.getItem('amaes_ai_plan_tier') || 'free'; // 'free' or 'paid'
     let aiRateLimitCooldownUntil = 0;
@@ -919,9 +955,15 @@
         localStorage.setItem('amaes_ai_plan_tier', aiPlanTier);
     }
 
-    function getStoredRequestTimestamps() {
+    function getAiKeyId(key) {
+        if (!key) return 'primary';
+        return key.length > 8 ? key.slice(-8) : key;
+    }
+
+    function getStoredRequestTimestamps(key = null) {
         try {
-            const raw = sessionStorage.getItem('amaes_ai_req_timestamps');
+            const storageKey = key ? `amaes_ai_req_timestamps_${getAiKeyId(key)}` : 'amaes_ai_req_timestamps';
+            const raw = sessionStorage.getItem(storageKey);
             if (raw) {
                 const arr = JSON.parse(raw);
                 if (Array.isArray(arr)) {
@@ -933,27 +975,67 @@
         return [];
     }
 
-    function saveRequestTimestamps(arr) {
+    function saveRequestTimestamps(arr, key = null) {
         try {
-            sessionStorage.setItem('amaes_ai_req_timestamps', JSON.stringify(arr));
+            const storageKey = key ? `amaes_ai_req_timestamps_${getAiKeyId(key)}` : 'amaes_ai_req_timestamps';
+            sessionStorage.setItem(storageKey, JSON.stringify(arr));
         } catch (_) {}
     }
 
-    function recordAiRequest() {
+    function recordAiRequest(key = null) {
         const now = Date.now();
         const cutoff = now - 60000;
-        const current = getStoredRequestTimestamps().filter(t => t > cutoff);
-        current.push(now);
-        saveRequestTimestamps(current);
+        
+        // Always maintain global timestamps for backwards compatibility
+        const currentGlobal = getStoredRequestTimestamps(null).filter(t => t > cutoff);
+        currentGlobal.push(now);
+        saveRequestTimestamps(currentGlobal, null);
+
+        // Also record per-key if key provided
+        if (key) {
+            const currentPerKey = getStoredRequestTimestamps(key).filter(t => t > cutoff);
+            currentPerKey.push(now);
+            saveRequestTimestamps(currentPerKey, key);
+        }
     }
 
-    function triggerAiRateLimitCooldown(suggestedWaitSec = 20) {
+    function triggerAiRateLimitCooldown(suggestedWaitSec = 20, key = null) {
         const waitSec = Math.max(5, Math.min(60, suggestedWaitSec));
-        aiRateLimitCooldownUntil = Math.max(aiRateLimitCooldownUntil, Date.now() + (waitSec * 1000));
+        const cooldownUntil = Date.now() + (waitSec * 1000);
+        aiRateLimitCooldownUntil = Math.max(aiRateLimitCooldownUntil, cooldownUntil);
         try {
             sessionStorage.setItem('amaes_ai_cooldown_until', String(aiRateLimitCooldownUntil));
+            if (key) {
+                sessionStorage.setItem(`amaes_ai_cooldown_${getAiKeyId(key)}`, String(cooldownUntil));
+            }
         } catch (_) {}
         return Math.ceil((aiRateLimitCooldownUntil - Date.now()) / 1000);
+    }
+
+    function getKeyRateLimitStatus(key) {
+        const now = Date.now();
+        const keyId = getAiKeyId(key);
+        let cooldownUntil = 0;
+        try {
+            const stored = parseInt(sessionStorage.getItem(`amaes_ai_cooldown_${keyId}`) || '0', 10);
+            if (stored > now) cooldownUntil = stored;
+        } catch (_) {}
+
+        if (cooldownUntil > now) {
+            const remainingSec = Math.max(1, Math.ceil((cooldownUntil - now) / 1000));
+            return { isLimited: true, remainingSec, reason: 'cooldown', key };
+        }
+
+        if (getAiPlanTier() === 'free') {
+            const timestamps = getStoredRequestTimestamps(key);
+            if (timestamps.length >= GEMINI_FREE_RPM) {
+                const oldest = timestamps[0];
+                const remainingSec = Math.max(1, Math.ceil((oldest + 60000 - now) / 1000));
+                return { isLimited: true, remainingSec, reason: 'rpm_cap', key };
+            }
+        }
+
+        return { isLimited: false, remainingSec: 0, reason: null, key };
     }
 
     function getAiRateLimitStatus() {
@@ -963,21 +1045,69 @@
             if (storedCooldown > aiRateLimitCooldownUntil) aiRateLimitCooldownUntil = storedCooldown;
         } catch (_) {}
 
-        if (aiRateLimitCooldownUntil > now) {
-            const remainingSec = Math.max(1, Math.ceil((aiRateLimitCooldownUntil - now) / 1000));
-            return { isLimited: true, remainingSec, reason: 'cooldown' };
-        }
+        const keys = typeof getGeminiApiKeys === 'function' ? getGeminiApiKeys() : [];
 
-        if (getAiPlanTier() === 'free') {
-            const timestamps = getStoredRequestTimestamps();
-            if (timestamps.length >= GEMINI_FREE_RPM) {
-                const oldest = timestamps[0];
-                const remainingSec = Math.max(1, Math.ceil((oldest + 60000 - now) / 1000));
-                return { isLimited: true, remainingSec, reason: 'rpm_cap' };
+        // Single key or unconfigured: standard global behavior
+        if (keys.length <= 1) {
+            if (aiRateLimitCooldownUntil > now) {
+                const remainingSec = Math.max(1, Math.ceil((aiRateLimitCooldownUntil - now) / 1000));
+                return { isLimited: true, remainingSec, reason: 'cooldown', activeKey: keys[0] || null };
             }
+
+            if (getAiPlanTier() === 'free') {
+                const timestamps = getStoredRequestTimestamps();
+                if (timestamps.length >= GEMINI_FREE_RPM) {
+                    const oldest = timestamps[0];
+                    const remainingSec = Math.max(1, Math.ceil((oldest + 60000 - now) / 1000));
+                    return { isLimited: true, remainingSec, reason: 'rpm_cap', activeKey: keys[0] || null };
+                }
+            }
+
+            return { isLimited: false, remainingSec: 0, reason: null, activeKey: keys[0] || null };
         }
 
-        return { isLimited: false, remainingSec: 0, reason: null };
+        // Multiple keys: check each key individually
+        const statuses = keys.map(k => getKeyRateLimitStatus(k));
+        const available = statuses.filter(s => !s.isLimited);
+
+        if (available.length > 0) {
+            // Sort by request count in last 60s (least loaded key first for optimal load-balancing)
+            available.sort((a, b) => {
+                const countA = getStoredRequestTimestamps(a.key).length;
+                const countB = getStoredRequestTimestamps(b.key).length;
+                return countA - countB;
+            });
+            return {
+                isLimited: false,
+                remainingSec: 0,
+                reason: null,
+                activeKey: available[0].key,
+                availableCount: available.length,
+                totalKeys: keys.length
+            };
+        }
+
+        // All keys limited: find soonest recovery time
+        const minWait = Math.min(...statuses.map(s => s.remainingSec));
+        return {
+            isLimited: true,
+            remainingSec: Math.max(1, minWait),
+            reason: 'all_keys_limited',
+            availableCount: 0,
+            totalKeys: keys.length
+        };
+    }
+
+    function getAvailableGeminiKey() {
+        const keys = getGeminiApiKeys();
+        if (keys.length === 0) return '';
+        if (keys.length === 1) return keys[0];
+
+        const status = getAiRateLimitStatus();
+        if (!status.isLimited && status.activeKey) {
+            return status.activeKey;
+        }
+        return keys[0];
     }
 
     function getAiSessionCacheStorageKey() {
@@ -3038,6 +3168,12 @@
                 const willIncludeContext = shouldInjectAiContext(qData ? qData.qNum : null);
                 const aiPromptText = formatQuestionForAI(firstBlockedQue, aiPromptHint);
 
+                // Feature 1: Instant Auto-Copy — copy prompt immediately on unknown question detection,
+                // before AI is invoked or any condition is checked (aiAutoCopyOnFail guard respected).
+                if (aiAutoCopyOnFail) {
+                    copyToClipboard(aiPromptText).catch(() => {});
+                }
+
                 firstBlockedQue.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 firstBlockedQue.style.outline = '2.5px solid #f59e0b';
                 firstBlockedQue.style.borderRadius = '8px';
@@ -3045,6 +3181,33 @@
                 firstBlockedQue.querySelectorAll('.amaes-que-top-toolbar').forEach(toolbar => {
                     toolbar.style.display = 'none';
                 });
+
+                // Feature 4: Moodle Server Error Guard — detect empty/failed question load
+                if (detectMoodleServerError(firstBlockedQue)) {
+                    firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());
+                    const errHud = document.createElement('div');
+                    errHud.className = 'amaes-blockage-hud';
+                    errHud.style.cssText = `
+                        margin-bottom: 12px; padding: 8px 12px;
+                        background: #fff7ed; border: 1.5px solid #f97316;
+                        border-radius: 8px; display: flex; align-items: center; gap: 8px;
+                        font-size: 11px; color: #9a3412; font-family: -apple-system, sans-serif;
+                    `;
+                    errHud.innerHTML = `
+                        <span style="font-size: 16px;">⚠️</span>
+                        <div>
+                            <div style="font-weight: 700;">Moodle Server Glitch Detected</div>
+                            <div style="font-size: 10px; color: #c2410c;">Question content failed to load from Moodle database. Try refreshing the page.</div>
+                        </div>
+                        <button type="button" onclick="location.reload()" style="margin-left:auto; background:#ea580c; color:#fff; border:none; border-radius:5px; padding:4px 10px; font-size:10px; font-weight:700; cursor:pointer;">Reload</button>
+                    `;
+                    const formEl = firstBlockedQue.querySelector('.formulation, .content') || firstBlockedQue;
+                    formEl.insertBefore(errHud, formEl.firstChild);
+                    setLog('[Server Error] Moodle database glitch detected. Question content is empty — cannot solve. Try refreshing.', 'var(--accent-amber)');
+                    showToast('⚠️ Moodle server glitch: Question failed to load.', 4000);
+                    isSolverRunning = false;
+                    return;
+                }
 
                 const navState = getQuizNavQuestionStates();
 
@@ -3129,6 +3292,14 @@
                             } else {
                                 showToast(`✦ Gemini suggested answer for #${qData ? qData.qNum : ''} (Paused for review)`, 3000);
                                 setLog(`[AI Suggestion] Gemini suggested <b>${escapeHtml(matched ? matched.choiceText : '')}</b> for #${qData ? qData.qNum : ''}. (Prompt auto-copied 📋) Paused for review—click to select and proceed.`, "var(--accent-purple)");
+                            }
+                            // Feature 2: Auto-Advance after AI answer if setting is enabled
+                            if (aiAutoNextOnAiAnswer) {
+                                const nextBtn = document.querySelector('input[type="submit"][name="next"], input[type="submit"][value*="Next"], button[name="next"]');
+                                if (nextBtn) {
+                                    showToast('AI answered ✦ Auto-advancing...', 1200);
+                                    setTimeout(() => nextBtn.click(), 1500);
+                                }
                             }
                         }
                     });
@@ -6462,39 +6633,60 @@
     // Google Gemini AI Assistant (Experimental)
     // ==========================================
 
+
+    /**
+     * Feature 4: Moodle Database Error / Empty Question Guard
+     * Returns true if the question appears to have failed to load from the Moodle database
+     * (e.g. empty formulation text, or page shows database error indicators).
+     */
+    function detectMoodleServerError(que) {
+        if (!que) return false;
+        const formulation = que.querySelector('.formulation');
+        const qText = formulation ? (formulation.innerText || '').trim() : '';
+        if (qText.length < 5) return true;
+        const pageText = document.body ? (document.body.innerText || '').toLowerCase() : '';
+        if (pageText.includes('error reading from database') || pageText.includes('a database error has occurred')) return true;
+        return false;
+    }
+
     function getGeminiApiKey() {
-        return localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY) || geminiApiKey || '';
+        const keys = getGeminiApiKeys();
+        return keys.length > 0 ? keys[0] : (localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY) || geminiApiKey || '');
     }
 
     function setGeminiApiKey(key) {
         const trimmed = (key || '').trim();
-        geminiApiKey = trimmed;
         if (trimmed) {
-            localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, trimmed);
+            setGeminiApiKeys([trimmed]);
         } else {
-            localStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
+            setGeminiApiKeys([]);
         }
-        updateAiAssistantUI();
     }
 
     function isGeminiConfigured() {
-        return Boolean(getGeminiApiKey());
+        return getGeminiApiKeys().length > 0;
     }
 
     function updateAiAssistantUI() {
-        const key = getGeminiApiKey();
-        const isConfigured = Boolean(key);
+        const keys = getGeminiApiKeys();
+        const isConfigured = keys.length > 0;
 
         const badge = document.getElementById('gemini-status-badge');
         if (badge) {
             const activeModel = cachedWorkingEndpoint ? cachedWorkingEndpoint.model : 'Gemini Flash';
             badge.style.color = isConfigured ? 'var(--accent-green)' : 'var(--text-muted)';
-            badge.innerHTML = isConfigured ? `✔ Ready (${activeModel})` : '● Not Configured';
+            if (isConfigured) {
+                badge.innerHTML = keys.length > 1
+                    ? `✔ Ready (${keys.length} Keys · ${keys.length * 15} RPM)`
+                    : `✔ Ready (${activeModel})`;
+            } else {
+                badge.innerHTML = '● Not Configured';
+            }
         }
 
         const setupBtn = document.getElementById('btn-open-gemini-setup');
         if (setupBtn) {
-            setupBtn.innerHTML = `<span>${isConfigured ? '⚙ Configure AI Key' : '✦ Setup Free AI Assistant'}</span>`;
+            setupBtn.innerHTML = `<span>${isConfigured ? (keys.length > 1 ? `⚙ Configure AI Keys (${keys.length})` : '⚙ Configure AI Key') : '✦ Setup Free AI Assistant'}</span>`;
         }
 
         const quizAiBlock = document.getElementById('amaes-ai-quiz-settings-block');
@@ -6694,7 +6886,7 @@
             }
 
             try {
-                recordAiRequest();
+                recordAiRequest(apiKey);
                 const res = await executeGeminiRequest({
                     apiKey,
                     prompt,
@@ -6730,7 +6922,7 @@
                     errLower.includes('resource_exhausted')) {
                     const delayMatch = (err.message || '').match(/retry\s*(?:in|delay)?\s*[:\s]*(\d+)\s*s/i) || (err.message || '').match(/(\d+)\s*seconds?/i);
                     const waitSec = delayMatch ? parseInt(delayMatch[1], 10) : 20;
-                    triggerAiRateLimitCooldown(waitSec);
+                    triggerAiRateLimitCooldown(waitSec, apiKey);
                     throw err;
                 }
 
@@ -7546,23 +7738,28 @@
                         <div style="display: flex; align-items: flex-start; gap: 8px;">
                             <span style="background: #7c3aed; color: #fff; font-weight: 800; font-size: 10px; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;">4</span>
                             <div style="flex: 1;">
-                                <span style="font-weight: 600; color: #f8fafc;">Paste your key here:</span>
-                                <div style="display: flex; gap: 6px; margin-top: 5px;">
-                                    <input id="amaes-gemini-input-key" type="password" placeholder="AIzaSy... or AQ..." value="${currentKey}" style="
-                                        flex: 1;
-                                        background: var(--surface, #1e293b);
-                                        color: #f8fafc;
-                                        border: 1px solid var(--border, #334155);
-                                        padding: 6px 10px;
-                                        border-radius: 5px;
-                                        font-size: 11.5px;
-                                        outline: none;
-                                        font-family: monospace;
-                                    " />
-                                    <button id="amaes-gemini-btn-paste" type="button" class="amaes-btn amaes-btn-outline" style="padding: 6px 10px; font-size: 11px;">
-                                        ${ICONS.copy} <span>Paste</span>
-                                    </button>
+                                <span style="font-weight: 600; color: #f8fafc;">Paste your key(s) here:</span>
+                                <!-- Speed explanation box -->
+                                <div id="amaes-multikey-explain" style="margin: 6px 0; padding: 7px 10px; background: rgba(124,58,237,0.10); border: 1px solid rgba(168,85,247,0.35); border-radius: 6px; font-size: 10px; color: #c4b5fd; line-height: 1.5;">
+                                    <b style="color:#e9d5ff;">⚡ Why add multiple keys? (Faster answering, zero waiting)</b><br>
+                                    Google AI Studio is free but limits each key to <b>15 questions/min</b>. On long quizzes you may need to wait. Adding extra keys (from different Google/Gmail accounts) lets the toolkit rotate between them automatically:<br>
+                                    <span style="color:#a78bfa;">• 1 Key: 15 q/min &nbsp;|&nbsp; 2 Keys: 30 q/min &nbsp;|&nbsp; 3 Keys: 45 q/min (Turbo ⚡)</span><br>
+                                    <span style="font-size:9.5px; color:#94a3b8;">💡 Tip: Use your school email + personal Gmail to get 2 free keys in 2 minutes.</span>
                                 </div>
+                                <!-- Dynamic key rows rendered by JS -->
+                                <div id="amaes-gemini-key-rows" style="display: flex; flex-direction: column; gap: 5px; margin-top: 4px;"></div>
+                                <button id="amaes-gemini-btn-add-key" type="button" style="
+                                    margin-top: 6px;
+                                    background: transparent;
+                                    border: 1px dashed rgba(168,85,247,0.5);
+                                    color: #a78bfa;
+                                    border-radius: 5px;
+                                    font-size: 10px;
+                                    font-weight: 700;
+                                    padding: 4px 10px;
+                                    cursor: pointer;
+                                    width: 100%;
+                                ">+ Add Another Key (for faster answering)</button>
                             </div>
                         </div>
 
@@ -7624,39 +7821,85 @@
             if (e.target === modal) closeModal();
         };
 
-        const pasteBtn = modal.querySelector('#amaes-gemini-btn-paste');
+        // inputKey kept for backward compat (returns null since element removed from DOM)
         const inputKey = modal.querySelector('#amaes-gemini-input-key');
         const feedback = modal.querySelector('#amaes-gemini-status-feedback');
         const testSaveBtn = modal.querySelector('#amaes-gemini-btn-test-save');
         const removeBtn = modal.querySelector('#amaes-gemini-btn-remove');
 
-        if (pasteBtn && inputKey) {
-            pasteBtn.onclick = async () => {
-                try {
-                    if (navigator.clipboard && navigator.clipboard.readText) {
-                        const text = await navigator.clipboard.readText();
-                        if (text) inputKey.value = text.trim();
-                    } else {
-                        inputKey.focus();
-                        inputKey.select();
-                    }
-                } catch (_) {
-                    inputKey.focus();
+        // Feature 3: Multi-key UI
+        const existingKeys = getGeminiApiKeys();
+        const keyRowsContainer = modal.querySelector('#amaes-gemini-key-rows');
+        const addKeyBtn = modal.querySelector('#amaes-gemini-btn-add-key');
+
+        const KEY_LABELS = ['Key #1 (Primary)', 'Key #2 (Backup · +15 RPM)', 'Key #3 (Turbo ⚡ · +15 RPM)', 'Key #4', 'Key #5'];
+        const MAX_KEYS = 5;
+
+        function renderKeyRowsWithVals(vals) {
+            keyRowsContainer.innerHTML = '';
+            vals.forEach((val, idx) => {
+                const row = document.createElement('div');
+                row.className = 'amaes-key-row';
+                row.style.cssText = 'display: flex; gap: 5px; align-items: center;';
+                row.innerHTML = `
+                    <span style="font-size:9.5px; color:#a78bfa; min-width:90px; font-weight:600;">${KEY_LABELS[idx] || ('Key #' + (idx+1))}</span>
+                    <input type="password" placeholder="AIzaSy..." value="${val.replace(/"/g, '&quot;')}" style="flex:1; background:var(--surface,#1e293b); color:#f8fafc; border:1px solid var(--border,#334155); padding:5px 8px; border-radius:5px; font-size:11px; outline:none; font-family:monospace;" />
+                    <button type="button" class="amaes-key-paste-btn" style="background:var(--surface,#1e293b); border:1px solid var(--border,#334155); color:#a78bfa; border-radius:5px; padding:4px 8px; font-size:10px; cursor:pointer;">Paste</button>
+                    ${idx > 0 ? `<button type="button" class="amaes-key-remove-btn" style="background:transparent; border:1px solid rgba(239,68,68,0.35); color:#f87171; border-radius:5px; padding:4px 8px; font-size:10px; cursor:pointer;">✕</button>` : ''}
+                `;
+                row.querySelector('.amaes-key-paste-btn').onclick = async () => {
+                    const inp = row.querySelector('input');
+                    try {
+                        if (navigator.clipboard && navigator.clipboard.readText) {
+                            const t = await navigator.clipboard.readText();
+                            if (t) inp.value = t.trim();
+                        } else { inp.focus(); inp.select(); }
+                    } catch (_) { inp.focus(); }
+                };
+                const removeRowBtn = row.querySelector('.amaes-key-remove-btn');
+                if (removeRowBtn) {
+                    removeRowBtn.onclick = () => {
+                        const current = Array.from(keyRowsContainer.querySelectorAll('.amaes-key-row'))
+                            .map(r => r.querySelector('input').value.trim())
+                            .filter((_, i) => i !== idx);
+                        if (current.length === 0) current.push('');
+                        renderKeyRowsWithVals(current);
+                        if (addKeyBtn) addKeyBtn.style.display = current.length >= MAX_KEYS ? 'none' : 'block';
+                    };
+                }
+                keyRowsContainer.appendChild(row);
+            });
+            if (addKeyBtn) addKeyBtn.style.display = vals.length >= MAX_KEYS ? 'none' : 'block';
+        }
+
+        // Initial render
+        renderKeyRowsWithVals(existingKeys.length > 0 ? existingKeys : ['']);
+
+        if (addKeyBtn) {
+            addKeyBtn.onclick = () => {
+                const currentVals = Array.from(keyRowsContainer.querySelectorAll('.amaes-key-row'))
+                    .map(r => r.querySelector('input').value.trim());
+                if (currentVals.length < MAX_KEYS) {
+                    currentVals.push('');
+                    renderKeyRowsWithVals(currentVals);
                 }
             };
         }
 
         if (removeBtn) {
             removeBtn.onclick = () => {
-                setGeminiApiKey('');
+                setGeminiApiKeys([]);
                 showToast('Gemini API key removed.');
                 closeModal();
             };
         }
 
-        if (testSaveBtn && inputKey && feedback) {
+        if (testSaveBtn && feedback) {
             testSaveBtn.onclick = async () => {
-                const rawKey = inputKey.value.trim();
+                const allKeyVals = Array.from(keyRowsContainer.querySelectorAll('.amaes-key-row input'))
+                    .map(inp => inp.value.trim())
+                    .filter(Boolean);
+                const rawKey = allKeyVals[0] || '';
                 if (!rawKey) {
                     feedback.style.display = 'block';
                     feedback.style.background = 'rgba(239, 68, 68, 0.15)';
@@ -7681,7 +7924,7 @@
                         maxOutputTokens: 2
                     });
                     if (res && res.success) {
-                        setGeminiApiKey(rawKey);
+                        setGeminiApiKeys(allKeyVals);
                         const planSelect = modal.querySelector('#amaes-gemini-plan-select');
                         if (planSelect) {
                             setAiPlanTier(planSelect.value);
@@ -8489,6 +8732,8 @@
                 const label = row.querySelector('label') || row;
                 let text = cleanDOMToAI(label).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
                 if (!text) return;
+                // Feature 4: Empty choice sanitizer — skip choices with insufficient text after prefix strip
+                if (text.length < 2) return;
                 if (hasChoiceCheckmark(row) || hasChoiceCheckmark(label)) {
                     if (!checkmarkedTexts.some(c => normalizeChoice(c) === normalizeChoice(text))) {
                         checkmarkedTexts.push(text);
@@ -10988,6 +11233,13 @@
                                 <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Copies question to clipboard if AI fails or times out (Default: ON)</div>
                             </div>
                         </label>
+                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="When enabled, automatically moves to the next page 1.5s after AI selects a choice">
+                            <input id="chk-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
+                            <div>
+                                <span>Auto-Advance After AI Answer</span>
+                                <subtitle>Automatically moves to next page 1.5s after AI selects a choice (Default: OFF)</subtitle>
+                            </div>
+                        </label>
                         <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
                             <span style="font-size: 10px; color: #e9d5ff; font-weight: 600;">Retry Attempts on Failure:</span>
                             <select id="sel-ai-retry-count" style="background: rgba(0,0,0,0.35); border: 1px solid #a855f7; border-radius: 4px; color: #f3e8ff; font-size: 10px; padding: 2px 6px; cursor: pointer;">
@@ -11320,6 +11572,10 @@
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically copy question to clipboard if AI inference fails or times out">
                                 <input id="chk-course-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Auto-Copy Question on AI Failure (Default: ON)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically moves to next page 1.5s after AI selects a choice">
+                                <input id="chk-course-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Auto-Advance After AI Answer (Default: OFF)</span>
                             </label>
                             <div style="display: flex; align-items: center; justify-content: space-between;">
                                 <span style="font-size: 10px; color: var(--text-secondary);">AI Retry Attempts:</span>
@@ -12267,6 +12523,26 @@
                 const quizChk = document.getElementById('chk-ai-auto-copy-on-fail');
                 if (quizChk) quizChk.checked = getAiAutoCopyOnFail();
                 showToast(`Auto-Copy on AI Failure: ${getAiAutoCopyOnFail() ? 'ON' : 'OFF'}`);
+            };
+        }
+
+        const chkAiAutoNextOnAi = document.getElementById('chk-ai-auto-next-on-ai');
+        if (chkAiAutoNextOnAi) {
+            chkAiAutoNextOnAi.onchange = () => {
+                setAiAutoNextOnAiAnswer(chkAiAutoNextOnAi.checked);
+                const courseChk = document.getElementById('chk-course-ai-auto-next-on-ai');
+                if (courseChk) courseChk.checked = getAiAutoNextOnAiAnswer();
+                showToast(`Auto-Advance After AI Answer: ${getAiAutoNextOnAiAnswer() ? 'ON' : 'OFF'}`);
+            };
+        }
+
+        const chkCourseAiAutoNextOnAi = document.getElementById('chk-course-ai-auto-next-on-ai');
+        if (chkCourseAiAutoNextOnAi) {
+            chkCourseAiAutoNextOnAi.onchange = () => {
+                setAiAutoNextOnAiAnswer(chkCourseAiAutoNextOnAi.checked);
+                const quizChk = document.getElementById('chk-ai-auto-next-on-ai');
+                if (quizChk) quizChk.checked = getAiAutoNextOnAiAnswer();
+                showToast(`Auto-Advance After AI Answer: ${getAiAutoNextOnAiAnswer() ? 'ON' : 'OFF'}`);
             };
         }
 
