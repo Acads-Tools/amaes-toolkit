@@ -629,43 +629,41 @@ test("Page Completeness & Summary Submit Gate: checks all questions answered bef
 });
 
 // --------------------------------------------------
-// 20. Choice Probability Badges & Wrong Choice Highlighting
+// 20. Choice Badges & Wrong Choice Highlighting
 // --------------------------------------------------
-test("Choice Probability & Wrong Badges: accurately formats confidence weights and wrong choices", () => {
+test("Choice Badges & Wrong Choice Highlighting: formats user-friendly plain English badges without developer jargon", () => {
     function formatSourceBadge(cand) {
         const isDeduced = cand.deduced === true;
         const isAmauoed = cand.source === 'amauoed';
-        const confSuffix = (cand.confirmations && cand.confirmations > 1) ? ` (${cand.confirmations}x)` : '';
-        return isDeduced ? `Deduced • 100% Prob${confSuffix}` : (isAmauoed ? `AMAUOED • 95% Prob${confSuffix}` : `Verified • 100% Prob${confSuffix}`);
+        return isDeduced ? 'Deduced Answer' : (isAmauoed ? 'Web Study Guide' : 'Verified Answer');
     }
 
     function formatWrongBadge(matchedWrong) {
-        return matchedWrong.count > 1 ? `Wrong (${matchedWrong.count}x) • 0% Prob` : 'Wrong • 0% Prob';
+        return '(❌ Incorrect Choice)';
     }
 
     function formatCandidateProb(uneliminatedCount) {
-        const remainingProb = Math.round(100 / uneliminatedCount);
-        return `Candidate • ${remainingProb}% Prob`;
+        return 'Possible Option';
     }
 
     // Verified correct DB
-    assert.strictEqual(formatSourceBadge({ verified: true, source: 'verified_db' }), "Verified • 100% Prob");
-    assert.strictEqual(formatSourceBadge({ verified: true, confirmations: 3, source: 'verified_db' }), "Verified • 100% Prob (3x)");
+    assert.strictEqual(formatSourceBadge({ verified: true, source: 'verified_db' }), "Verified Answer");
+    assert.strictEqual(formatSourceBadge({ verified: true, confirmations: 3, source: 'verified_db' }), "Verified Answer");
 
     // AMAUOED catalog
-    assert.strictEqual(formatSourceBadge({ verified: false, source: 'amauoed' }), "AMAUOED • 95% Prob");
-    assert.strictEqual(formatSourceBadge({ verified: false, confirmations: 2, source: 'amauoed' }), "AMAUOED • 95% Prob (2x)");
+    assert.strictEqual(formatSourceBadge({ verified: false, source: 'amauoed' }), "Web Study Guide");
+    assert.strictEqual(formatSourceBadge({ verified: false, confirmations: 2, source: 'amauoed' }), "Web Study Guide");
 
-    // Deduced 100%
-    assert.strictEqual(formatSourceBadge({ deduced: true, verified: true }), "Deduced • 100% Prob");
+    // Deduced
+    assert.strictEqual(formatSourceBadge({ deduced: true, verified: true }), "Deduced Answer");
 
     // Confirmed wrong choices
-    assert.strictEqual(formatWrongBadge({ count: 1 }), "Wrong • 0% Prob");
-    assert.strictEqual(formatWrongBadge({ count: 4 }), "Wrong (4x) • 0% Prob");
+    assert.strictEqual(formatWrongBadge({ count: 1 }), "(❌ Incorrect Choice)");
+    assert.strictEqual(formatWrongBadge({ count: 4 }), "(❌ Incorrect Choice)");
 
-    // Elimination probabilities
-    assert.strictEqual(formatCandidateProb(2), "Candidate • 50% Prob");
-    assert.strictEqual(formatCandidateProb(3), "Candidate • 33% Prob");
+    // Candidate options
+    assert.strictEqual(formatCandidateProb(2), "Possible Option");
+    assert.strictEqual(formatCandidateProb(3), "Possible Option");
 });
 
 // --------------------------------------------------
@@ -1806,13 +1804,13 @@ test("Review Harvesting: extracts Cloze, Select, Drag & Drop, and deduces True/F
 // --------------------------------------------------
 // 57. Question Status Markers on Review Screen
 // --------------------------------------------------
-test("Review Question Markers: displays Uploaded to DB badge when share is ON vs Saved Locally when OFF", () => {
+test("Review Question Markers: displays Saved to Study Bank badge when share is ON vs Saved Locally when OFF", () => {
     function getMarkerStatus(isVerified, isDeduced, isZeroMark, autoShareEnabled) {
         if (isVerified) {
             if (autoShareEnabled) {
-                return { label: isDeduced ? "Deduced & Uploaded" : "Uploaded to DB", type: "cloud", liveTag: "UPLOADED TO DB" };
+                return { label: isDeduced ? "Deduced & Saved" : "Saved to Study Bank", type: "cloud", liveTag: "Saved to Study Bank" };
             } else {
-                return { label: isDeduced ? "Deduced Locally" : "Saved to Local DB", type: "local", liveTag: "SAVED LOCALLY" };
+                return { label: isDeduced ? "Deduced Locally" : "Saved Locally", type: "local", liveTag: "Saved Locally" };
             }
         } else if (isZeroMark) {
             return { label: "Wrong Choice Saved", type: "eliminated" };
@@ -1822,18 +1820,18 @@ test("Review Question Markers: displays Uploaded to DB badge when share is ON vs
 
     // When sharing is ON
     const cloudVerified = getMarkerStatus(true, false, false, true);
-    assert.strictEqual(cloudVerified.label, "Uploaded to DB");
+    assert.strictEqual(cloudVerified.label, "Saved to Study Bank");
     assert.strictEqual(cloudVerified.type, "cloud");
-    assert.strictEqual(cloudVerified.liveTag, "UPLOADED TO DB");
+    assert.strictEqual(cloudVerified.liveTag, "Saved to Study Bank");
 
     const cloudDeduced = getMarkerStatus(true, true, false, true);
-    assert.strictEqual(cloudDeduced.label, "Deduced & Uploaded");
+    assert.strictEqual(cloudDeduced.label, "Deduced & Saved");
 
     // When sharing is OFF
     const localVerified = getMarkerStatus(true, false, false, false);
-    assert.strictEqual(localVerified.label, "Saved to Local DB");
+    assert.strictEqual(localVerified.label, "Saved Locally");
     assert.strictEqual(localVerified.type, "local");
-    assert.strictEqual(localVerified.liveTag, "SAVED LOCALLY");
+    assert.strictEqual(localVerified.liveTag, "Saved Locally");
 
     // Wrong choice eliminated
     const wrongElim = getMarkerStatus(false, false, true, true);
@@ -1846,8 +1844,8 @@ test("Review Question Markers: displays Uploaded to DB badge when share is ON vs
     assert.ok(script.includes("function injectReviewQuestionMarkers"), "Must define injectReviewQuestionMarkers");
     assert.ok(script.includes("amaes-review-status-pill"), "Must inject amaes-review-status-pill into question info");
     assert.ok(script.includes("amaes-review-outcome-banner"), "Must inject amaes-review-outcome-banner into outcome");
-    assert.ok(script.includes("Uploaded to DB"), "Must show Uploaded to DB when cloud sharing is on");
-    assert.ok(script.includes("Saved to Local DB"), "Must show Saved to Local DB when cloud sharing is off");
+    assert.ok(script.includes("Saved to Study Bank"), "Must show Saved to Study Bank when cloud sharing is on");
+    assert.ok(script.includes("Saved Locally"), "Must show Saved Locally when cloud sharing is off");
 });
 
 // --------------------------------------------------
@@ -3669,6 +3667,59 @@ test("Subject Naming & Course Code Resolution: guarantees human-readable titles 
     // 3. Payloads include resolved subjectName
     assert.ok(script.includes('subjectName: resolvedName'), "Community relay payload must include resolved subjectName");
     assert.ok(script.includes('subjectName: resolvedName || code'), "generatePayload must include resolved subjectName");
+});
+
+// --------------------------------------------------
+// 98. Review Screen Ground Truth Override, Jargon Elimination & Review Clutter Removal
+// --------------------------------------------------
+test("Review Screen Ground Truth Override, Jargon Elimination & Clutter Removal: blocks contradictory verified highlight on failed choices, strips technical jargon, and removes Copy AI on review screens", () => {
+    // 1. Contradiction Guard: Failed choice (0.00 / red cross) cannot be marked verified
+    function evaluateChoiceHighlight(choiceText, isCrossed, isCheckedZero, verifiedNorms, allWrongList) {
+        const norm = normalizeChoice(choiceText);
+        const isCrossedRow = isCrossed || isCheckedZero;
+        const isVerifiedChoice = !isCrossedRow && verifiedNorms.has(norm);
+        const isEliminatedChoice = isCrossedRow || (!isVerifiedChoice && allWrongList.some(w => w.norm === norm));
+
+        let highlightColor = null;
+        let badgeText = null;
+
+        if (!isEliminatedChoice && isVerifiedChoice) {
+            highlightColor = 'green';
+            badgeText = 'Verified Answer';
+        } else if (isEliminatedChoice) {
+            highlightColor = 'red';
+            badgeText = '(❌ Incorrect Choice)';
+        }
+
+        return { isVerifiedChoice, isEliminatedChoice, highlightColor, badgeText };
+    }
+
+    // "strategic plan" was previously marked verified in cache, but user got it wrong with red cross
+    const verifiedSet = new Set(["strategic plan"]);
+    const wrongList = [{ norm: "strategic plan", count: 1 }];
+
+    const res = evaluateChoiceHighlight("strategic plan", true, true, verifiedSet, wrongList);
+    assert.strictEqual(res.isVerifiedChoice, false, "Crossed / zero-mark choice MUST NOT be marked verified");
+    assert.strictEqual(res.isEliminatedChoice, true, "Crossed / zero-mark choice MUST be eliminated");
+    assert.strictEqual(res.highlightColor, 'red', "Highlight outline MUST be red, NEVER green");
+    assert.strictEqual(res.badgeText, '(❌ Incorrect Choice)', "Badge MUST be plain English incorrect choice, not 0% Prob");
+
+    // 2. Userscript code integrity verification
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // Review screen button cleanup
+    assert.ok(script.includes("checkIsReviewPage() || !showInQuestionAiBtns"), "injectQuestionCopyButtons must exit and clean buttons on review pages");
+
+    // Ground truth override in highlightQuizAnswers
+    assert.ok(script.includes("qGradeInfo.isZeroMark"), "highlightQuizAnswers must inspect zero-mark attempts for ground truth debunking");
+    assert.ok(script.includes("verifiedNorms.delete(txt)"), "highlightQuizAnswers must delete debunked choices from verifiedNorms");
+
+    // Jargon replacement
+    assert.ok(script.includes("'Web Study Guide'"), "Must use user-friendly 'Web Study Guide' instead of AMAUOED probability jargon");
+    assert.ok(script.includes("'(❌ Incorrect Choice)'"), "Must use '(❌ Incorrect Choice)' instead of '0% Prob'");
+    assert.ok(!script.includes("'UPLOADED TO DB'"), "Must eliminate shouting all-caps 'UPLOADED TO DB'");
+    assert.ok(!script.includes("'ELIMINATED IN DB'"), "Must eliminate shouting all-caps 'ELIMINATED IN DB'");
 });
 
 console.log("\n==================================================");
