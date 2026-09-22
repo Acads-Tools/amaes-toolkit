@@ -2838,15 +2838,14 @@
                 const willIncludeContext = shouldInjectAiContext(qData ? qData.qNum : null);
                 const aiPromptText = formatQuestionForAI(firstBlockedQue, aiPromptHint);
 
-                // Auto-copy for AI
+                // Copy question for AI helper
                 copyToClipboard(aiPromptText).then(() => {
-                    const ctxLabel = willIncludeContext ? 'with Course Context' : 'for AI';
-                    showToast(`Question #${qData ? qData.qNum : ''} not in DB: Auto-copied ${ctxLabel}!`);
+                    showToast(`Question #${qData ? qData.qNum : ''} not in database — ready for your answer!`);
                 }).catch(() => {});
 
                 setLog(
-                    `<b>Waiting for Answer:</b> Question #${qData ? qData.qNum : ''} not in DB (auto-copied ${willIncludeContext ? 'with Course Context' : 'for AI'}). ` +
-                    `Select or type your answer and click <b>Next page</b> or press <b>N</b> to proceed.`,
+                    `<b>Waiting for Answer:</b> Question #${qData ? qData.qNum : ''} has no saved answer yet. ` +
+                    `Select your answer, or paste from AI (press <b>V</b>), then press <b>N</b> or click <b>Next page</b> to proceed.`,
                     "var(--accent-amber)"
                 );
 
@@ -2888,8 +2887,11 @@
                         <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 200px;">
                             <span style="background: #f59e0b; color: #ffffff; padding: 3px 8px; border-radius: 5px; font-weight: 800; font-size: 10px; letter-spacing: 0.5px; flex-shrink: 0;">WAITING FOR ANSWER</span>
                             <div>
-                                <div style="font-weight: 700; color: #92400e;">Question #${qData ? qData.qNum : ''}: No answer known to the system yet.</div>
-                                <div style="color: #b45309; font-size: 11px;">Be the first to answer and share it! Auto-copied for AI (press <b>V</b> to paste), then review and click <b>Next page</b> or press <b>N</b> to proceed.</div>
+                                <div style="font-weight: 700; color: #92400e; font-size: 12px; margin-bottom: 2px;">Question #${qData ? qData.qNum : ''}: No saved answer yet</div>
+                                <div style="color: #b45309; font-size: 11px; line-height: 1.45;">
+                                    <div><strong>1. Answer:</strong> Pick a choice, or paste an AI answer (press <b>V</b> to paste)</div>
+                                    <div><strong>2. Continue:</strong> Click <b>Next page</b> or press <b>N</b> to proceed</div>
+                                </div>
                             </div>
                         </div>
                         <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
@@ -5976,11 +5978,11 @@
         lastCopiedSignature = signature;
 
         copyToClipboard(textToCopy).then(() => {
-            logDebug('Auto-copied unknown question for AI');
-            showToast('Question & choices auto-copied for AI!');
+            logDebug('Copied unknown question for AI helper');
+            showToast('Question copied! Ready to paste into AI helper.');
             const statusEl = document.getElementById('amaes-status');
             if (statusEl) {
-                statusEl.innerHTML = `<span style="color:var(--accent-green);">Auto-copied question to clipboard for AI!</span>`;
+                statusEl.innerHTML = `<span style="color:var(--accent-green);">Question ready to paste into AI helper!</span>`;
             }
         }).catch(err => {
             logDebug('Auto-copy failed:', err.message);

@@ -2552,9 +2552,11 @@ test("Unanswered Question Reassurance: displays 'be the first to answer and shar
     assert.ok(script.includes("amaes-unanswered-hint"), "Userscript must define amaes-unanswered-hint badge class");
     assert.ok(script.includes("No answer known to the system yet — <b>be the first to answer and share it!</b>"), "Must include motivating prompt to be the first to answer");
 
-    // 2. Verify blockage HUD includes the same reassuring message
-    assert.ok(script.includes("No answer known to the system yet."), "HUD must inform student that question is new to system");
-    assert.ok(script.includes("Be the first to answer and share it! Auto-copied for AI"), "HUD must reassure user to be the first to answer and share");
+    // 2. Verify blockage HUD includes explicit, low-cognitive-load steps and keyboard shortcuts
+    assert.ok(script.includes("No saved answer yet"), "HUD must inform student that question is not yet in database");
+    assert.ok(script.includes("press <b>V</b> to paste"), "HUD must explicitly instruct user to press V to paste");
+    assert.ok(script.includes("press <b>N</b> to proceed"), "HUD must explicitly instruct user to press N to proceed");
+    assert.ok(!script.includes("Auto-copied for AI (press <b>V</b> to paste), then review and click <b>Next page</b> or press <b>N</b> to proceed"), "Dense technical jargon run-on sentence must be eliminated");
 
     // 3. Verify cleanDOMToAI strips the unanswered hint so AI prompt is clean
     const aiCleanStart = script.indexOf("function cleanDOMToAI(");
