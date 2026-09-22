@@ -4086,7 +4086,7 @@
                         if (!badge) {
                             badge = document.createElement('span');
                             badge.className = 'amaes-eliminated-badge';
-                            const countText = '(❌ Incorrect Choice)';
+                            const countText = 'Incorrect Choice';
                             badge.innerHTML = `${ICONS.xCircle} <span>${countText}</span>`;
                             badge.title = `Attempt or classmate history confirmed this choice is incorrect`;
                             badge.style.cssText = `

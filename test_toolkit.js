@@ -639,7 +639,7 @@ test("Choice Badges & Wrong Choice Highlighting: formats user-friendly plain Eng
     }
 
     function formatWrongBadge(matchedWrong) {
-        return '(❌ Incorrect Choice)';
+        return 'Incorrect Choice';
     }
 
     function formatCandidateProb(uneliminatedCount) {
@@ -658,8 +658,8 @@ test("Choice Badges & Wrong Choice Highlighting: formats user-friendly plain Eng
     assert.strictEqual(formatSourceBadge({ deduced: true, verified: true }), "Deduced Answer");
 
     // Confirmed wrong choices
-    assert.strictEqual(formatWrongBadge({ count: 1 }), "(❌ Incorrect Choice)");
-    assert.strictEqual(formatWrongBadge({ count: 4 }), "(❌ Incorrect Choice)");
+    assert.strictEqual(formatWrongBadge({ count: 1 }), "Incorrect Choice");
+    assert.strictEqual(formatWrongBadge({ count: 4 }), "Incorrect Choice");
 
     // Candidate options
     assert.strictEqual(formatCandidateProb(2), "Possible Option");
@@ -3688,7 +3688,7 @@ test("Review Screen Ground Truth Override, Jargon Elimination & Clutter Removal:
             badgeText = 'Verified Answer';
         } else if (isEliminatedChoice) {
             highlightColor = 'red';
-            badgeText = '(❌ Incorrect Choice)';
+            badgeText = 'Incorrect Choice';
         }
 
         return { isVerifiedChoice, isEliminatedChoice, highlightColor, badgeText };
@@ -3702,7 +3702,7 @@ test("Review Screen Ground Truth Override, Jargon Elimination & Clutter Removal:
     assert.strictEqual(res.isVerifiedChoice, false, "Crossed / zero-mark choice MUST NOT be marked verified");
     assert.strictEqual(res.isEliminatedChoice, true, "Crossed / zero-mark choice MUST be eliminated");
     assert.strictEqual(res.highlightColor, 'red', "Highlight outline MUST be red, NEVER green");
-    assert.strictEqual(res.badgeText, '(❌ Incorrect Choice)', "Badge MUST be plain English incorrect choice, not 0% Prob");
+    assert.strictEqual(res.badgeText, 'Incorrect Choice', "Badge MUST be plain English incorrect choice, not 0% Prob");
 
     // 2. Userscript code integrity verification
     const fs = require('fs');
@@ -3717,7 +3717,7 @@ test("Review Screen Ground Truth Override, Jargon Elimination & Clutter Removal:
 
     // Jargon replacement
     assert.ok(script.includes("'Web Study Guide'"), "Must use user-friendly 'Web Study Guide' instead of AMAUOED probability jargon");
-    assert.ok(script.includes("'(❌ Incorrect Choice)'"), "Must use '(❌ Incorrect Choice)' instead of '0% Prob'");
+    assert.ok(script.includes("'Incorrect Choice'"), "Must use 'Incorrect Choice' instead of '0% Prob'");
     assert.ok(!script.includes("'UPLOADED TO DB'"), "Must eliminate shouting all-caps 'UPLOADED TO DB'");
     assert.ok(!script.includes("'ELIMINATED IN DB'"), "Must eliminate shouting all-caps 'ELIMINATED IN DB'");
 });
