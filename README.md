@@ -1,6 +1,6 @@
 # AMAES Toolkit
 
-[![Version](https://img.shields.io/badge/version-1.7.2-blue.svg)](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js)
+[![Version](https://img.shields.io/badge/version-1.7.3-blue.svg)](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js)
 [![Platform](https://img.shields.io/badge/platform-Violentmonkey%20%7C%20Tampermonkey-darkblue.svg)](https://acads-tools.github.io/amaes-toolkit/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 

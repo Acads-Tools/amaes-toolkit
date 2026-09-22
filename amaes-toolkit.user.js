@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.7.2
+// @version      1.7.3
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -16,6 +16,7 @@
 // @connect      api.github.com
 // @connect      amauoed.com
 // @connect      amaes-community-relay.acads-tools.workers.dev
+// @connect      generativelanguage.googleapis.com
 // @run-at       document-end
 // @license      MIT
 // @homepageURL  https://github.com/Acads-Tools/amaes-toolkit
@@ -25,7 +26,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.7.2";
+    const SCRIPT_VERSION = "v1.7.3";
     const ANSWER_DB_SCHEMA_VERSION = 2;
     const CONTRIBUTOR_ID_STORAGE_KEY = 'amaes_anonymous_contributor_id';
 
@@ -868,6 +869,15 @@
     let autoCommunityShare = localStorage.getItem('amaes_auto_community_share') !== 'false'; // default true: auto-share on review / harvest
     let autoMinimizeQuiz = localStorage.getItem('amaes_auto_min_quiz') !== 'false'; // default true: smart pill in quiz
 
+    const GEMINI_API_KEY_STORAGE_KEY = 'amaes_gemini_api_key';
+    const GEMINI_MODEL = 'gemini-1.5-flash';
+    const GEMINI_TIMEOUT_MS = 8000;
+
+    let geminiApiKey = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY) || '';
+    let aiQuizEnabled = localStorage.getItem('amaes_ai_quiz_enabled') !== 'false'; // default true
+    let aiAutoSelect = localStorage.getItem('amaes_ai_auto_select') !== 'false'; // default true: auto-select AI suggestion
+    let activeAiAbortController = null;
+
     // ==========================================
     // Authentic ACLC Transparent PNG Logo
     // ==========================================
@@ -978,6 +988,8 @@
         localStorage.setItem('amaes_ai_prompt_hint', 'true');
         localStorage.setItem('amaes_auto_community_share', 'true');
         localStorage.setItem('amaes_auto_min_quiz', 'false');
+        localStorage.setItem('amaes_ai_quiz_enabled', 'true');
+        localStorage.setItem('amaes_ai_auto_select', 'true');
 
         autoQuizMode = false;
         quizPersonality = 'passive';
@@ -998,6 +1010,8 @@
         enableKeyboardShortcuts = true;
         autoCommunityShare = true;
         autoMinimizeQuiz = false;
+        aiQuizEnabled = true;
+        aiAutoSelect = true;
 
         // Clear any running solver timers or state
         clearTimeout(autoNextTimer);
@@ -2838,17 +2852,6 @@
                 const willIncludeContext = shouldInjectAiContext(qData ? qData.qNum : null);
                 const aiPromptText = formatQuestionForAI(firstBlockedQue, aiPromptHint);
 
-                // Copy question for AI helper
-                copyToClipboard(aiPromptText).then(() => {
-                    showToast(`Question #${qData ? qData.qNum : ''} not in database — ready for your answer!`);
-                }).catch(() => {});
-
-                setLog(
-                    `<b>Waiting for Answer:</b> Question #${qData ? qData.qNum : ''} has no saved answer yet. ` +
-                    `Select your answer, or paste from AI (press <b>V</b>), then press <b>N</b> or click <b>Next page</b> to proceed.`,
-                    "var(--accent-amber)"
-                );
-
                 firstBlockedQue.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 firstBlockedQue.style.outline = '2.5px solid #f59e0b';
                 firstBlockedQue.style.borderRadius = '8px';
@@ -2858,6 +2861,63 @@
                 });
 
                 const navState = getQuizNavQuestionStates();
+
+                // GOOGLE GEMINI AI ASSISTANT: Only trigger on uncertain Multiple Choice & True/False questions!
+                // Fall back to manual copy for complex types (drag & drop, dropdown, text inputs) or if AI not configured
+                const isEligibleChoice = isEligibleForAiSolver(firstBlockedQue, qData);
+                if (geminiApiKey && aiQuizEnabled && isEligibleChoice) {
+                    const courseInfo = detectCourseInfo();
+                    const courseCode = courseInfo.subjectCode || '';
+                    const promptText = buildGeminiCompactPrompt(qData, courseCode);
+
+                    await handleGeminiQuestionInference({
+                        que: firstBlockedQue,
+                        qData: qData,
+                        promptText: promptText,
+                        onSuccess: async (matched) => {
+                            if (aiAutoSelect && matched && matched.input) {
+                                const anyChecked = Boolean(firstBlockedQue.querySelector('.answer input[type="radio"]:checked, .answer input[type="checkbox"]:checked'));
+                                if (!anyChecked) {
+                                    matched.input.checked = true;
+                                    matched.input.click();
+                                    if (matched.input.parentElement) matched.input.parentElement.click();
+                                    matched.input.dispatchEvent(new Event('input', { bubbles: true }));
+                                    matched.input.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                                showToast(`✦ Gemini selected choice for #${qData ? qData.qNum : ''}!`, 2500);
+                                setLog(`[AI Suggestion] Gemini selected <b>${escapeHtml(matched.choiceText)}</b> for #${qData ? qData.qNum : ''}`, "var(--accent-purple)");
+
+                                const allAnswered = areAllPageQuestionsAnswered();
+                                const nextBtn = findQuizNextButton();
+                                if (allAnswered && nextBtn && autoNextVerified && autoQuizMode) {
+                                    const btnText = (nextBtn.value || nextBtn.innerText || '').toLowerCase();
+                                    const isFinish = btnText.includes('finish') || btnText.includes('submit');
+                                    if (!isFinish) {
+                                        setLog(`[AI Auto-Next] Advancing to next question in <b>1.0s</b>...`, "var(--accent-blue)");
+                                        autoNextTimer = setTimeout(() => {
+                                            if (!autoQuizMode) return;
+                                            clickQuizNextButton(nextBtn);
+                                        }, 1000);
+                                    }
+                                }
+                            } else {
+                                showToast(`✦ Gemini suggested answer for #${qData ? qData.qNum : ''}`, 2500);
+                                setLog(`[AI Suggestion] Gemini suggested <b>${escapeHtml(matched ? matched.choiceText : '')}</b> for #${qData ? qData.qNum : ''}. Click to select.`, "var(--accent-purple)");
+                            }
+                        }
+                    });
+                } else {
+                    // Copy question for AI helper
+                    copyToClipboard(aiPromptText).then(() => {
+                        showToast(`Question #${qData ? qData.qNum : ''} not in database — ready for your answer!`);
+                    }).catch(() => {});
+                }
+
+                setLog(
+                    `<b>Waiting for Answer:</b> Question #${qData ? qData.qNum : ''} has no saved answer yet. ` +
+                    `Select your answer, or paste from AI (press <b>V</b>), then press <b>N</b> or click <b>Next page</b> to proceed.`,
+                    "var(--accent-amber)"
+                );
 
                 if (!firstBlockedQue.querySelector('.amaes-blockage-hud')) {
                     // The solver HUD is the full unknown-answer notice. Remove
@@ -2933,7 +2993,7 @@
                     firstBlockedQue.style.outline = '2px solid #10b981';
                     const hud = firstBlockedQue.querySelector('.amaes-blockage-hud');
                     const allAnswered = areAllPageQuestionsAnswered();
-                    const isMultiQuestionPage = queContainers.length > 1;
+                    const isMultiQuestionPage = queContainers && queContainers.length > 1;
 
                     if (hud) {
                         hud.style.borderColor = '#10b981';
@@ -3105,6 +3165,11 @@
             clearTimeout(pageLoadSolverTimer);
             pageLoadSolverTimer = null;
             isSolverRunning = false;
+            if (activeAiAbortController) {
+                try { activeAiAbortController.abort(); } catch (_) {}
+                activeAiAbortController = null;
+            }
+            document.querySelectorAll('.amaes-ai-thinking-indicator').forEach(el => el.remove());
             showToast("Auto-Quiz Paused");
             setLog("Auto-Quiz <b>paused</b>. Auto-answers & auto-navigation completely stopped.", "var(--accent-amber)");
         }
@@ -3517,12 +3582,14 @@
                 const welcomeModal = document.getElementById('amaes-welcome-modal');
                 const contributeModal = document.getElementById('amaes-contribute-modal');
                 const devModal = document.getElementById('amaes-dev-unlock-modal');
-                if (welcomeModal || contributeModal || devModal) {
+                const geminiModal = document.getElementById('amaes-gemini-modal');
+                if (welcomeModal || contributeModal || devModal || geminiModal) {
                     e.preventDefault();
                     if (active && typeof active.blur === 'function') active.blur();
                     if (welcomeModal) welcomeModal.remove();
                     if (contributeModal) contributeModal.remove();
                     if (devModal) devModal.remove();
+                    if (geminiModal) geminiModal.remove();
                     showToast("Closed Modal (Esc)");
                     setLog("Modal closed via <b>Esc</b> shortcut.", "var(--accent-blue)");
                     return;
@@ -3796,7 +3863,7 @@
                 el.style.backgroundColor = '';
                 el.style.borderRadius = '';
             });
-            que.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-select-elim-hint, .amaes-unanswered-hint').forEach(b => b.remove());
+            que.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-select-elim-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge').forEach(b => b.remove());
 
             // Safety: collect all verified/confirmed answers for this question
             const verifiedNorms = new Set();
@@ -5187,7 +5254,7 @@
         const clone = rootNode.cloneNode(true);
 
         // Strip non-content scripts, toolkit buttons, injected UI badges & Moodle feedback icons/accessibility text
-        clone.querySelectorAll('script, style, noscript, .amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-copy-ai-card-btn, .amaes-copy-img-card-btn, .amaes-paste-ai-card-btn, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, .accesshide, .sr-only').forEach(el => el.remove());
+        clone.querySelectorAll('script, style, noscript, .amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-copy-ai-card-btn, .amaes-copy-img-card-btn, .amaes-paste-ai-card-btn, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-thinking-indicator, .amaes-ai-fallback-bar, .amaes-ai-suggested-badge, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, .accesshide, .sr-only').forEach(el => el.remove());
 
         // Convert Superscripts (e.g. 2^3 -> 2³, x^2 -> x², or ^{complex})
         clone.querySelectorAll('sup').forEach(sup => {
@@ -6102,6 +6169,726 @@
         const target = document.querySelector('#region-main, .course-content, body');
         if (target) {
             observer.observe(target, { childList: true, subtree: true });
+        }
+    }
+
+    // ==========================================
+    // Google Gemini AI Assistant (Experimental)
+    // ==========================================
+
+    function getGeminiApiKey() {
+        return localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY) || geminiApiKey || '';
+    }
+
+    function setGeminiApiKey(key) {
+        const trimmed = (key || '').trim();
+        geminiApiKey = trimmed;
+        if (trimmed) {
+            localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, trimmed);
+        } else {
+            localStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
+        }
+        updateAiAssistantUI();
+    }
+
+    function isGeminiConfigured() {
+        return Boolean(getGeminiApiKey());
+    }
+
+    function updateAiAssistantUI() {
+        const key = getGeminiApiKey();
+        const isConfigured = Boolean(key);
+
+        const badge = document.getElementById('gemini-status-badge');
+        if (badge) {
+            badge.style.color = isConfigured ? 'var(--accent-green)' : 'var(--text-muted)';
+            badge.innerHTML = isConfigured ? '✔ Ready (Gemini 1.5 Flash)' : '● Not Configured';
+        }
+
+        const setupBtn = document.getElementById('btn-open-gemini-setup');
+        if (setupBtn) {
+            setupBtn.innerHTML = `<span>${isConfigured ? '⚙ Configure AI Key' : '✦ Setup Free AI Assistant'}</span>`;
+        }
+
+        const quizAiBlock = document.getElementById('amaes-ai-quiz-settings-block');
+        if (quizAiBlock) {
+            quizAiBlock.style.display = isConfigured ? 'flex' : 'none';
+        }
+    }
+
+    // Ultra-Compact Prompt Builder: 0 fluff, max token efficiency (~60-120 tokens total)
+    function buildGeminiCompactPrompt(qData, courseCode = '') {
+        const lines = [];
+        if (courseCode) {
+            lines.push(`[Course: ${courseCode}]`);
+        }
+        lines.push(`Question: ${qData.qText || ''}`);
+        lines.push(`Choices:`);
+        if (Array.isArray(qData.choices)) {
+            qData.choices.forEach(c => lines.push(c));
+        }
+        lines.push(``);
+        lines.push(`Reply with ONLY the correct option letter and exact text (e.g., "b. ROM"). No explanations.`);
+        return lines.join('\n');
+    }
+
+    // Question Type Eligibility Guard: ONLY Multiple Choice & True/False are eligible for auto-AI
+    function isEligibleForAiSolver(que, qData) {
+        if (!que || !qData) return false;
+        // Drag and drop questions MUST fall back to manual copy
+        if (qData.isDragDrop) return false;
+        if (que.classList.contains('ddwtos') || que.classList.contains('ddimageortext') || que.classList.contains('ddmarker')) return false;
+        if (que.querySelectorAll('.draghome, .drop, .dropzone, span.droptarget, .droppable').length > 0) return false;
+
+        // Dropdown / Select matching questions MUST fall back to manual copy
+        if (que.querySelectorAll('select').length > 0) return false;
+        if (qData.matchPairs && qData.matchPairs.length > 0) return false;
+
+        // Text inputs / Essay questions MUST fall back to manual copy
+        if (qData.isShortAnswer || qData.isEssay) return false;
+        if (que.querySelectorAll('input[type="text"]:not([type="hidden"]), textarea').length > 0) return false;
+
+        // Must have at least 2 choices
+        if (!Array.isArray(qData.choices) || qData.choices.length < 2) return false;
+
+        // Must have radio or checkbox inputs
+        const choiceInputs = que.querySelectorAll('.answer input[type="radio"], .answer input[type="checkbox"]');
+        if (choiceInputs.length === 0) return false;
+
+        return true;
+    }
+
+    // Cross-origin and test-runner compatible Gemini API request executor
+    function callGeminiApi({ apiKey, prompt, maxOutputTokens = 64, signal }) {
+        return new Promise((resolve, reject) => {
+            if (!apiKey) return reject(new Error('Missing Gemini API key'));
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+            const payload = JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                    temperature: 0.1,
+                    maxOutputTokens: maxOutputTokens
+                }
+            });
+
+            const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
+                          (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
+
+            if (gmReq) {
+                let aborted = false;
+                let reqHandle = null;
+
+                if (signal) {
+                    if (signal.aborted) {
+                        return reject(new Error('Request aborted'));
+                    }
+                    signal.addEventListener('abort', () => {
+                        aborted = true;
+                        if (reqHandle && typeof reqHandle.abort === 'function') {
+                            try { reqHandle.abort(); } catch (_) {}
+                        }
+                        reject(new Error('Request aborted'));
+                    });
+                }
+
+                reqHandle = gmReq({
+                    method: "POST",
+                    url: url,
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    data: payload,
+                    timeout: GEMINI_TIMEOUT_MS,
+                    onload: function (res) {
+                        if (aborted) return;
+                        try {
+                            const data = JSON.parse(res.responseText || '{}');
+                            if (res.status >= 200 && res.status < 300) {
+                                const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                                resolve({ success: true, text: text.trim(), data });
+                            } else {
+                                const errMsg = data?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+                                reject(new Error(errMsg));
+                            }
+                        } catch (e) {
+                            reject(new Error(`Failed to parse response: ${e.message}`));
+                        }
+                    },
+                    ontimeout: function () {
+                        if (aborted) return;
+                        reject(new Error('Request timed out after 8 seconds'));
+                    },
+                    onerror: function (err) {
+                        if (aborted) return;
+                        reject(new Error(err?.error || err?.statusText || 'Network connection error'));
+                    }
+                });
+            } else {
+                fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: payload,
+                    signal: signal
+                })
+                .then(async res => {
+                    const data = await res.json().catch(() => ({}));
+                    if (res.ok) {
+                        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                        resolve({ success: true, text: text.trim(), data });
+                    } else {
+                        reject(new Error(data?.error?.message || `HTTP ${res.status}`));
+                    }
+                })
+                .catch(reject);
+            }
+        });
+    }
+
+    // Match AI answer text to the correct choice option in the question
+    function matchAiAnswerToChoice(aiResponseText, que, qData) {
+        if (!aiResponseText || !que || !qData || !qData.choices) return null;
+        const cleanAi = aiResponseText.trim();
+
+        // 1. Match by choice prefix letter (e.g. "b. ROM" or "b) ROM" or "b:")
+        const letterMatch = cleanAi.match(/^([a-eA-E])[.:\)\-–\s]/);
+        let matchedChoiceIndex = -1;
+        if (letterMatch) {
+            const letter = letterMatch[1].toLowerCase();
+            const charCode = letter.charCodeAt(0) - 97; // 'a' -> 0, 'b' -> 1
+            if (charCode >= 0 && charCode < qData.choices.length) {
+                matchedChoiceIndex = charCode;
+            }
+        }
+
+        // 2. Match normalized choice content text
+        const cleanAnswerText = normalizeChoice(cleanAi.replace(/^[a-eA-E][.:\)\-–\s]*/, ''));
+        if (matchedChoiceIndex === -1 && cleanAnswerText) {
+            for (let i = 0; i < qData.choices.length; i++) {
+                const normChoice = normalizeChoice(qData.choices[i]);
+                if (normChoice === cleanAnswerText || normChoice.includes(cleanAnswerText) || cleanAnswerText.includes(normChoice)) {
+                    matchedChoiceIndex = i;
+                    break;
+                }
+            }
+        }
+
+        // 3. True / False matching
+        if (matchedChoiceIndex === -1) {
+            const lowerAi = cleanAi.toLowerCase();
+            if (lowerAi.includes('true')) {
+                matchedChoiceIndex = qData.choices.findIndex(c => normalizeChoice(c).includes('true'));
+            } else if (lowerAi.includes('false')) {
+                matchedChoiceIndex = qData.choices.findIndex(c => normalizeChoice(c).includes('false'));
+            }
+        }
+
+        if (matchedChoiceIndex === -1) return null;
+
+        // Resolve DOM element corresponding to matched choice index
+        let choiceRows = que.querySelectorAll('.answer > div, .answer div.r0, .answer div.r1, .answer li, .answer tr');
+        if (choiceRows.length === 0) {
+            choiceRows = que.querySelectorAll('.answer div.r0, .answer div.r1, .answer li, .answer tr');
+        }
+        if (choiceRows.length === 0) {
+            choiceRows = que.querySelectorAll('.answer label');
+        }
+
+        let targetRow = null;
+        let targetInput = null;
+
+        if (choiceRows.length > matchedChoiceIndex) {
+            targetRow = choiceRows[matchedChoiceIndex];
+            targetInput = targetRow.querySelector('input[type="radio"], input[type="checkbox"]');
+        }
+
+        if (!targetInput) {
+            const allInputs = que.querySelectorAll('.answer input[type="radio"], .answer input[type="checkbox"]');
+            if (allInputs.length > matchedChoiceIndex) {
+                targetInput = allInputs[matchedChoiceIndex];
+                targetRow = targetInput.closest('label, div.r0, div.r1, tr, li, div') || targetInput.parentElement;
+            }
+        }
+
+        return {
+            choiceIndex: matchedChoiceIndex,
+            choiceText: qData.choices[matchedChoiceIndex],
+            row: targetRow,
+            input: targetInput
+        };
+    }
+
+    // Apply purple outline and ✦ AI Suggestion (Gemini) badge
+    function applyAiChoiceHighlight(targetRow) {
+        if (!targetRow) return;
+        targetRow.classList.add('amaes-ai-suggested-choice');
+        targetRow.style.outline = '2px solid rgba(139, 92, 246, 0.85)';
+        targetRow.style.backgroundColor = 'rgba(139, 92, 246, 0.09)';
+        targetRow.style.boxShadow = '0 0 0 1px rgba(139, 92, 246, 0.2)';
+        targetRow.style.borderRadius = '6px';
+        targetRow.style.padding = '5px 10px';
+
+        let badge = targetRow.querySelector('.amaes-ai-suggested-badge');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'amaes-ai-suggested-badge';
+            badge.innerHTML = `✦ <span>AI Suggestion (Gemini)</span>`;
+            badge.style.cssText = `
+                background: #7c3aed;
+                color: #ffffff !important;
+                font-size: 10px;
+                font-weight: 700;
+                padding: 2px 7px;
+                border-radius: 4px;
+                margin-left: auto;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                box-shadow: 0 1px 3px rgba(124, 58, 237, 0.3);
+                white-space: nowrap;
+                flex-shrink: 0;
+            `;
+            targetRow.appendChild(badge);
+        }
+    }
+
+    // Fallback bar with [ ↺ Retry AI ] and [ ✦ Copy for AI ]
+    function showAiFallbackBar(que, qData, promptText, onRetry) {
+        que.querySelectorAll('.amaes-ai-fallback-bar').forEach(el => el.remove());
+        const formulation = que.querySelector('.formulation, .content') || que;
+        const bar = document.createElement('div');
+        bar.className = 'amaes-ai-fallback-bar';
+        bar.style.cssText = `
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: #fdf4ff;
+            border: 1.5px solid #d946ef;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 11px;
+            color: #86198f;
+            box-sizing: border-box;
+        `;
+        bar.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 13px;">⚠️</span>
+                <span style="font-weight: 600;">AI took too long or was unavailable.</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <button type="button" class="amaes-ai-retry-btn" style="
+                    background: #a21caf;
+                    color: #ffffff;
+                    border: none;
+                    padding: 4px 10px;
+                    border-radius: 5px;
+                    font-size: 10.5px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 3px;
+                ">↺ Retry AI</button>
+                <button type="button" class="amaes-ai-copy-btn" style="
+                    background: #fae8ff;
+                    color: #86198f;
+                    border: 1px solid #e879f9;
+                    padding: 4px 10px;
+                    border-radius: 5px;
+                    font-size: 10.5px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 3px;
+                ">✦ Copy for AI</button>
+            </div>
+        `;
+
+        formulation.insertBefore(bar, formulation.firstChild);
+
+        const retryBtn = bar.querySelector('.amaes-ai-retry-btn');
+        if (retryBtn && typeof onRetry === 'function') {
+            retryBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                bar.remove();
+                onRetry();
+            };
+        }
+
+        const copyBtn = bar.querySelector('.amaes-ai-copy-btn');
+        if (copyBtn) {
+            copyBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                copyToClipboard(promptText).then(() => {
+                    showToast('✦ Copied question for AI to clipboard!');
+                }).catch(() => {});
+            };
+        }
+    }
+
+    // Handles thinking indicator, watchdog timeout, 1 retry, and callbacks
+    async function handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback }) {
+        que.querySelectorAll('.amaes-ai-thinking-indicator, .amaes-ai-fallback-bar').forEach(el => el.remove());
+
+        const formulation = que.querySelector('.formulation, .content') || que;
+        const thinkingEl = document.createElement('div');
+        thinkingEl.className = 'amaes-ai-thinking-indicator';
+        thinkingEl.style.cssText = `
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(99, 102, 241, 0.08));
+            border: 1.5px solid #a855f7;
+            border-radius: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            box-shadow: 0 2px 8px rgba(168, 85, 247, 0.12);
+        `;
+        thinkingEl.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="amaes-ai-spin" style="display: inline-block; font-size: 14px; color: #9333ea;">✦</span>
+                    <span style="font-weight: 700; color: #7e22ce; font-size: 12px;">Gemini 1.5 Flash is analyzing Question #${qData ? qData.qNum : ''}...</span>
+                </div>
+                <button type="button" class="amaes-ai-cancel-btn" style="
+                    background: #f3e8ff;
+                    color: #7e22ce;
+                    border: 1px solid #d8b4fe;
+                    padding: 3px 8px;
+                    border-radius: 5px;
+                    font-size: 10.5px;
+                    font-weight: 700;
+                    cursor: pointer;
+                ">Cancel AI</button>
+            </div>
+            <div style="width: 100%; height: 5px; background: rgba(168, 85, 247, 0.2); border-radius: 3px; overflow: hidden; position: relative;">
+                <div class="amaes-ai-progress-bar" style="width: 35%; height: 100%; background: linear-gradient(90deg, #9333ea, #6366f1); border-radius: 3px;"></div>
+            </div>
+        `;
+        formulation.insertBefore(thinkingEl, formulation.firstChild);
+
+        let isAborted = false;
+        const abortCtrl = new AbortController();
+        activeAiAbortController = abortCtrl;
+
+        const cancelBtn = thinkingEl.querySelector('.amaes-ai-cancel-btn');
+        if (cancelBtn) {
+            cancelBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                isAborted = true;
+                abortCtrl.abort();
+                thinkingEl.remove();
+                showToast('AI analysis cancelled.');
+                if (typeof onFallback === 'function') onFallback();
+            };
+        }
+
+        setLog(`[AI Assistant] Asking Gemini 1.5 Flash for Question #${qData ? qData.qNum : ''}...`, "var(--accent-purple)");
+
+        let timeoutId = setTimeout(() => {
+            abortCtrl.abort();
+        }, GEMINI_TIMEOUT_MS);
+
+        let answerText = null;
+        let attempt = 0;
+        const maxAttempts = 2; // 1 initial request + 1 automatic retry
+
+        while (attempt < maxAttempts && !answerText && !isAborted) {
+            attempt++;
+            try {
+                const res = await callGeminiApi({
+                    apiKey: geminiApiKey,
+                    prompt: promptText,
+                    maxOutputTokens: 64,
+                    signal: abortCtrl.signal
+                });
+                if (res && res.text) {
+                    answerText = res.text;
+                    break;
+                }
+            } catch (err) {
+                if (isAborted) return;
+                logDebug(`Gemini attempt ${attempt} error: ${err.message}`);
+                if (attempt < maxAttempts) {
+                    await new Promise(r => setTimeout(r, 600));
+                }
+            }
+        }
+
+        clearTimeout(timeoutId);
+        thinkingEl.remove();
+
+        if (isAborted) return;
+
+        if (answerText) {
+            const matched = matchAiAnswerToChoice(answerText, que, qData);
+            if (matched && matched.row) {
+                applyAiChoiceHighlight(matched.row);
+                if (typeof onSuccess === 'function') {
+                    await onSuccess(matched);
+                }
+                return;
+            } else {
+                logDebug(`Gemini returned "${answerText}" but could not be mapped to choices.`);
+            }
+        }
+
+        // Failure or timeout: inject fallback bar with Retry AI and Copy buttons
+        showAiFallbackBar(que, qData, promptText, async () => {
+            await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
+        });
+
+        showToast('AI took too long to respond. You can retry or copy manually.', 4000);
+        setLog(`[AI Timeout] Question #${qData ? qData.qNum : ''}: No response within 8s. Switched to manual copy.`, "var(--accent-amber)");
+
+        if (typeof onFallback === 'function') {
+            onFallback();
+        }
+    }
+
+    // Non-tech student setup modal for Google AI Studio API key
+    function showGeminiSetupModal() {
+        let modal = document.getElementById('amaes-gemini-modal');
+        if (modal) modal.remove();
+
+        const currentKey = getGeminiApiKey();
+
+        modal = document.createElement('div');
+        modal.id = 'amaes-gemini-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(4px);
+            z-index: 10000000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        `;
+
+        modal.innerHTML = `
+            <div style="
+                background: var(--surface, #1e293b);
+                border: 1px solid var(--border, #334155);
+                border-radius: 12px;
+                width: 90%;
+                max-width: 490px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+                overflow: hidden;
+                color: var(--text-primary, #f8fafc);
+                font-size: 12px;
+            ">
+                <!-- Modal Header -->
+                <div style="
+                    padding: 14px 18px;
+                    background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(79, 70, 229, 0.2));
+                    border-bottom: 1px solid var(--border, #334155);
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                ">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 16px; color: #c084fc;">✦</span>
+                        <span style="font-weight: 800; font-size: 13.5px; color: #f8fafc;">Setup Free Google Gemini AI</span>
+                    </div>
+                    <button id="amaes-gemini-modal-close" type="button" style="
+                        background: transparent;
+                        border: none;
+                        color: var(--text-muted, #94a3b8);
+                        font-size: 18px;
+                        cursor: pointer;
+                        line-height: 1;
+                        padding: 4px;
+                    ">&times;</button>
+                </div>
+
+                <!-- Modal Content -->
+                <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px; max-height: 75vh; overflow-y: auto;">
+                    <div style="font-size: 11.5px; color: var(--text-secondary, #cbd5e1); line-height: 1.45;">
+                        Get instant answers on uncertain questions directly in your quiz.
+                        <span style="color: #34d399; font-weight: 600;">100% Free</span> with your personal Google account. 
+                        <span style="color: #a78bfa; font-weight: 600;">0 tokens used</span> on questions already in the verified database.
+                    </div>
+
+                    <!-- 4 Steps -->
+                    <div style="display: flex; flex-direction: column; gap: 10px; background: var(--bg, #0f172a); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
+                        <div style="display: flex; align-items: flex-start; gap: 8px;">
+                            <span style="background: #7c3aed; color: #fff; font-weight: 800; font-size: 10px; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;">1</span>
+                            <div>
+                                <span style="font-weight: 600; color: #f8fafc;">Open Google AI Studio</span>
+                                <div style="margin-top: 4px;">
+                                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="
+                                        display: inline-flex;
+                                        align-items: center;
+                                        gap: 5px;
+                                        background: #4f46e5;
+                                        color: #fff;
+                                        text-decoration: none;
+                                        padding: 5px 10px;
+                                        border-radius: 5px;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                    ">
+                                        ${ICONS.external} <span>Open Google AI Studio (Free)</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; align-items: flex-start; gap: 8px;">
+                            <span style="background: #7c3aed; color: #fff; font-weight: 800; font-size: 10px; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">2</span>
+                            <div style="color: var(--text-secondary, #cbd5e1); font-size: 11.5px;">Sign in with any standard Google or Gmail account.</div>
+                        </div>
+
+                        <div style="display: flex; align-items: flex-start; gap: 8px;">
+                            <span style="background: #7c3aed; color: #fff; font-weight: 800; font-size: 10px; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">3</span>
+                            <div style="color: var(--text-secondary, #cbd5e1); font-size: 11.5px;">Click <b>"Create API Key"</b> and copy your key.</div>
+                        </div>
+
+                        <div style="display: flex; align-items: flex-start; gap: 8px;">
+                            <span style="background: #7c3aed; color: #fff; font-weight: 800; font-size: 10px; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;">4</span>
+                            <div style="flex: 1;">
+                                <span style="font-weight: 600; color: #f8fafc;">Paste your key here:</span>
+                                <div style="display: flex; gap: 6px; margin-top: 5px;">
+                                    <input id="amaes-gemini-input-key" type="password" placeholder="AIzaSy..." value="${currentKey}" style="
+                                        flex: 1;
+                                        background: var(--surface, #1e293b);
+                                        color: #f8fafc;
+                                        border: 1px solid var(--border, #334155);
+                                        padding: 6px 10px;
+                                        border-radius: 5px;
+                                        font-size: 11.5px;
+                                        outline: none;
+                                        font-family: monospace;
+                                    " />
+                                    <button id="amaes-gemini-btn-paste" type="button" class="amaes-btn amaes-btn-outline" style="padding: 6px 10px; font-size: 11px;">
+                                        ${ICONS.copy} <span>Paste</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status Feedback -->
+                    <div id="amaes-gemini-status-feedback" style="display: none; padding: 8px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;"></div>
+
+                    <!-- Action Buttons -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px;">
+                        <div>
+                            ${currentKey ? `
+                            <button id="amaes-gemini-btn-remove" type="button" class="amaes-btn" style="
+                                background: transparent;
+                                color: #ef4444;
+                                border: 1px solid rgba(239, 68, 68, 0.4);
+                                padding: 6px 12px;
+                                font-size: 11px;
+                            ">Remove Key</button>
+                            ` : ''}
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button id="amaes-gemini-btn-cancel" type="button" class="amaes-btn amaes-btn-outline" style="padding: 6px 14px;">Cancel</button>
+                            <button id="amaes-gemini-btn-test-save" type="button" class="amaes-btn amaes-btn-blue" style="
+                                background: linear-gradient(135deg, #7c3aed, #4f46e5);
+                                padding: 6px 16px;
+                                font-weight: 700;
+                            ">Test & Save Key</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const closeModal = () => modal.remove();
+        modal.querySelector('#amaes-gemini-modal-close').onclick = closeModal;
+        modal.querySelector('#amaes-gemini-btn-cancel').onclick = closeModal;
+        modal.onclick = (e) => {
+            if (e.target === modal) closeModal();
+        };
+
+        const pasteBtn = modal.querySelector('#amaes-gemini-btn-paste');
+        const inputKey = modal.querySelector('#amaes-gemini-input-key');
+        const feedback = modal.querySelector('#amaes-gemini-status-feedback');
+        const testSaveBtn = modal.querySelector('#amaes-gemini-btn-test-save');
+        const removeBtn = modal.querySelector('#amaes-gemini-btn-remove');
+
+        if (pasteBtn && inputKey) {
+            pasteBtn.onclick = async () => {
+                try {
+                    if (navigator.clipboard && navigator.clipboard.readText) {
+                        const text = await navigator.clipboard.readText();
+                        if (text) inputKey.value = text.trim();
+                    } else {
+                        inputKey.focus();
+                        inputKey.select();
+                    }
+                } catch (_) {
+                    inputKey.focus();
+                }
+            };
+        }
+
+        if (removeBtn) {
+            removeBtn.onclick = () => {
+                setGeminiApiKey('');
+                showToast('Gemini API key removed.');
+                closeModal();
+            };
+        }
+
+        if (testSaveBtn && inputKey && feedback) {
+            testSaveBtn.onclick = async () => {
+                const rawKey = inputKey.value.trim();
+                if (!rawKey) {
+                    feedback.style.display = 'block';
+                    feedback.style.background = 'rgba(239, 68, 68, 0.15)';
+                    feedback.style.color = '#f87171';
+                    feedback.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+                    feedback.innerText = 'Please paste or type your Gemini API key first.';
+                    return;
+                }
+
+                testSaveBtn.disabled = true;
+                testSaveBtn.innerText = 'Testing Key...';
+                feedback.style.display = 'block';
+                feedback.style.background = 'rgba(59, 130, 246, 0.15)';
+                feedback.style.color = '#60a5fa';
+                feedback.style.border = '1px solid rgba(59, 130, 246, 0.3)';
+                feedback.innerText = 'Testing connection with Google Gemini 1.5 Flash...';
+
+                try {
+                    const res = await callGeminiApi({
+                        apiKey: rawKey,
+                        prompt: 'Ping',
+                        maxOutputTokens: 2
+                    });
+                    if (res && res.success) {
+                        setGeminiApiKey(rawKey);
+                        feedback.style.background = 'rgba(16, 185, 129, 0.15)';
+                        feedback.style.color = '#34d399';
+                        feedback.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+                        feedback.innerText = '✔ API Key Verified & Saved! Google Gemini is ready.';
+                        showToast('✔ Google Gemini AI Connected!');
+                        setTimeout(closeModal, 1200);
+                    }
+                } catch (err) {
+                    testSaveBtn.disabled = false;
+                    testSaveBtn.innerText = 'Test & Save Key';
+                    feedback.style.background = 'rgba(239, 68, 68, 0.15)';
+                    feedback.style.color = '#f87171';
+                    feedback.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+                    feedback.innerText = `Validation Failed: ${err.message || 'Invalid API key or network error.'}`;
+                }
+            };
         }
     }
 
@@ -9300,6 +10087,30 @@
                         </label>
                     </div>
 
+                    <!-- Dynamic Google Gemini AI Settings Block (Visible when key is configured) -->
+                    <div id="amaes-ai-quiz-settings-block" style="display: ${geminiApiKey ? 'flex' : 'none'}; flex-direction: column; gap: 5px; margin-top: 2px; border-top: 1px solid var(--border-subtle); padding-top: 6px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <span style="font-size: 9.5px; font-weight: 700; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
+                                ✦ <span>Google Gemini AI (Experimental)</span>
+                            </span>
+                            <span id="amaes-ai-quiz-status-pill" style="font-size: 8.5px; font-weight: 700; color: #34d399; background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.3); border-radius: 3px; padding: 1px 5px;">Active</span>
+                        </div>
+                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #c084fc; cursor: pointer; font-weight: 700;" title="When question is not in DB, automatically ask Google Gemini 1.5 Flash for the answer">
+                            <input id="chk-ai-quiz-enabled" type="checkbox" ${aiQuizEnabled ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
+                            <div>
+                                <span>Get Answers from AI on Unknown Questions</span>
+                                <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Auto-answers uncertain multiple choice and true/false questions</div>
+                            </div>
+                        </label>
+                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="When enabled, automatically selects the option suggested by AI. When disabled, only highlights it with a purple badge">
+                            <input id="chk-ai-auto-select" type="checkbox" ${aiAutoSelect ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
+                            <div>
+                                <span>Auto-Select AI Answers</span>
+                                <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Automatically checks AI choice (if off, highlights in purple for manual review)</div>
+                            </div>
+                        </label>
+                    </div>
+
                     <!-- Collapsible Advanced Settings (Collapsed by default for clean UX) -->
                     <details id="amaes-advanced-quiz-settings" style="margin-top: 2px; border: 1px solid var(--border-subtle); border-radius: 6px; background: rgba(0,0,0,0.12); overflow: hidden;">
                         <summary style="cursor: pointer; padding: 5px 8px; font-size: 10px; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; user-select: none;">
@@ -9585,6 +10396,38 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- MODULE 4: Smart AI Assistant (Google Gemini) -->
+                <div id="mod-ai-card" class="amaes-card">
+                    <div id="mod-ai-header" class="amaes-card-header">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="color: #a855f7;">✦</span>
+                            <span class="header-label">Smart AI Assistant</span>
+                            <span style="font-size: 8.5px; font-weight: 800; background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); padding: 1px 5px; border-radius: 4px;">EXPERIMENTAL</span>
+                        </div>
+                        <span id="mod-ai-arrow" class="arrow-container">${ICONS.chevronRight}</span>
+                    </div>
+
+                    <div id="mod-ai-body" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 6px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border);">
+                            <span style="color: var(--text-muted);">Status:</span>
+                            <span id="gemini-status-badge" style="font-weight: 700; font-size: 10px; color: ${geminiApiKey ? 'var(--accent-green)' : 'var(--text-muted)'}; background: var(--surface); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border);">
+                                ${geminiApiKey ? '✔ Ready (Gemini 1.5 Flash)' : '● Not Configured'}
+                            </span>
+                        </div>
+
+                        <p style="font-size: 10px; color: var(--text-secondary); line-height: 1.4; margin: 0;">
+                            Answers unknown multiple-choice & true/false questions automatically using your free Google AI Studio key. 0 tokens used on questions already in DB.
+                        </p>
+
+                        <div style="display: flex; gap: 6px;">
+                            <button id="btn-open-gemini-setup" type="button" class="amaes-btn" style="flex: 1; justify-content: center; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; border: none; font-weight: 700; cursor: pointer;">
+                                <span>${geminiApiKey ? '⚙ Configure AI Key' : '✦ Setup Free AI Assistant'}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Stop Button -->
                 <button id="amaes-stop-btn" class="amaes-btn amaes-btn-stop" style="display: none; margin-bottom: 6px;">
                     ${ICONS.stop} <span>Stop Execution</span>
@@ -10171,6 +11014,42 @@
                     overflow-y: auto;
                     border: 1px solid var(--border-subtle);
                 }
+
+                @keyframes amaes-spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+
+                @keyframes amaes-ai-progress {
+                    0% { width: 10%; transform: translateX(0); }
+                    50% { width: 60%; transform: translateX(50%); }
+                    100% { width: 10%; transform: translateX(120%); }
+                }
+
+                .amaes-ai-spin {
+                    animation: amaes-spin 1.2s linear infinite;
+                    display: inline-block;
+                }
+
+                .amaes-ai-thinking-indicator {
+                    box-sizing: border-box;
+                    width: 100%;
+                }
+
+                .amaes-ai-progress-bar {
+                    animation: amaes-ai-progress 2s ease-in-out infinite;
+                }
+
+                .amaes-ai-suggested-choice {
+                    outline: 2px solid rgba(139, 92, 246, 0.85) !important;
+                    background-color: rgba(139, 92, 246, 0.09) !important;
+                    box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.2) !important;
+                    border-radius: 6px !important;
+                }
+
+                .amaes-ai-suggested-badge {
+                    user-select: none;
+                }
             `;
 
             const themeBtn = document.getElementById('amaes-theme-btn');
@@ -10384,6 +11263,26 @@
                 localStorage.setItem('amaes_ai_prompt_hint', aiPromptHint);
                 showToast(`Strict AI Prompt: ${aiPromptHint ? 'Enabled' : 'Disabled'}`);
                 setLog(`Strict AI Prompt Format: <b>${aiPromptHint ? 'ON (1-Shot Output)' : 'OFF (Standard)'}</b>`, "var(--accent-blue)", "Directs AI to respond with choice letter only");
+            };
+        }
+
+        const chkAiQuizEnabled = document.getElementById('chk-ai-quiz-enabled');
+        if (chkAiQuizEnabled) {
+            chkAiQuizEnabled.onchange = () => {
+                aiQuizEnabled = chkAiQuizEnabled.checked;
+                localStorage.setItem('amaes_ai_quiz_enabled', aiQuizEnabled);
+                showToast(`AI Quiz Solver: ${aiQuizEnabled ? 'Enabled' : 'Disabled'}`);
+                setLog(`Gemini AI Quiz Solver: <b>${aiQuizEnabled ? 'ON' : 'OFF'}</b>`, aiQuizEnabled ? "var(--accent-purple)" : "var(--accent-amber)");
+            };
+        }
+
+        const chkAiAutoSelect = document.getElementById('chk-ai-auto-select');
+        if (chkAiAutoSelect) {
+            chkAiAutoSelect.onchange = () => {
+                aiAutoSelect = chkAiAutoSelect.checked;
+                localStorage.setItem('amaes_ai_auto_select', aiAutoSelect);
+                showToast(`AI Auto-Select: ${aiAutoSelect ? 'Auto-Select ON' : 'Highlight Only'}`);
+                setLog(`AI Auto-Select Answers: <b>${aiAutoSelect ? 'ON (Auto-select AI answers)' : 'OFF (Highlight only)'}</b>`, aiAutoSelect ? "var(--accent-purple)" : "var(--accent-amber)");
             };
         }
 
@@ -11152,6 +12051,16 @@
             showToast(`Opened Google search for "${query}"`);
             setLog(`Opened Google search for: "<b>${query}</b>"`, "var(--accent-blue)");
         };
+
+        // --- MODULE 4: Smart AI Assistant (Google Gemini) ---
+        setupPersistentAccordion('mod-ai-header', 'mod-ai-body', 'mod-ai-arrow', 'amaes_pref_mod_ai', false);
+
+        const btnOpenGeminiSetup = document.getElementById('btn-open-gemini-setup');
+        if (btnOpenGeminiSetup) {
+            btnOpenGeminiSetup.onclick = () => {
+                showGeminiSetupModal();
+            };
+        }
 
         // Header Reset Settings Button Handler
         const resetBtn = document.getElementById('amaes-reset-btn');

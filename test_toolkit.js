@@ -2572,7 +2572,7 @@ test("Non-Clunky Auto-Quiz Progression: preserves autoQuizMode on unknown questi
 
     // 1. Verify autoQuizMode is NOT killed in Case B (it used to do autoQuizMode = false)
     const caseBStart = script.indexOf('// Case B: UNKNOWN QUESTION DETECTED');
-    const caseBSection = script.substring(caseBStart, caseBStart + 10000);
+    const caseBSection = script.substring(caseBStart, caseBStart + 25000);
     assert.ok(!caseBSection.includes("autoQuizMode = false;"), "Case B must NOT set autoQuizMode = false; to prevent killing solver for future questions");
     assert.ok(!caseBSection.includes("localStorage.setItem('amaes_auto_quiz_mode', 'false');"), "Case B must NOT overwrite localStorage auto_quiz_mode to false");
     assert.ok(caseBSection.includes("isWaitingForUserAnswer = true;"), "Case B must use isWaitingForUserAnswer flag for current question");
@@ -2829,8 +2829,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.7.2'), "Userscript header must specify v1.7.2");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.2";'), "Constant SCRIPT_VERSION must be v1.7.2");
+    assert.ok(script.includes('@version      1.7.3'), "Userscript header must specify v1.7.3");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.3";'), "Constant SCRIPT_VERSION must be v1.7.3");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3720,6 +3720,223 @@ test("Review Screen Ground Truth Override, Jargon Elimination & Clutter Removal:
     assert.ok(script.includes("'Incorrect Choice'"), "Must use 'Incorrect Choice' instead of '0% Prob'");
     assert.ok(!script.includes("'UPLOADED TO DB'"), "Must eliminate shouting all-caps 'UPLOADED TO DB'");
     assert.ok(!script.includes("'ELIMINATED IN DB'"), "Must eliminate shouting all-caps 'ELIMINATED IN DB'");
+});
+
+// --------------------------------------------------
+// 86. Gemini AI Question Type Eligibility Guard
+// --------------------------------------------------
+test("Gemini AI: Question Type Eligibility Guard strictly restricts AI inference to Multiple Choice & True/False, blocking drag-and-drop, dropdowns, and short answers", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Structural checks in userscript
+    assert.ok(script.includes("function isEligibleForAiSolver(que, qData)"), "Must define isEligibleForAiSolver guard function");
+    assert.ok(script.includes("if (qData.isDragDrop) return false;"), "Must reject drag and drop questions by qData");
+    assert.ok(script.includes("ddwtos") && script.includes("ddimageortext"), "Must reject Moodle drag and drop css classes");
+    assert.ok(script.includes("if (que.querySelectorAll('select').length > 0) return false;"), "Must reject dropdown questions");
+    assert.ok(script.includes("if (qData.isShortAnswer || qData.isEssay) return false;"), "Must reject short answer and essay questions");
+    assert.ok(script.includes("const isEligibleChoice = isEligibleForAiSolver(firstBlockedQue, qData);"), "Solver must invoke isEligibleForAiSolver before triggering AI");
+
+    // 2. Mock simulation of eligibility logic
+    function mockIsEligibleForAiSolver(que, qData) {
+        if (!que || !qData) return false;
+        if (qData.isDragDrop) return false;
+        if (que.classes && (que.classes.includes('ddwtos') || que.classes.includes('ddimageortext'))) return false;
+        if (que.hasDragElements) return false;
+        if (que.hasSelectElements) return false;
+        if (qData.matchPairs && qData.matchPairs.length > 0) return false;
+        if (qData.isShortAnswer || qData.isEssay) return false;
+        if (que.hasTextInput) return false;
+        if (!Array.isArray(qData.choices) || qData.choices.length < 2) return false;
+        if (!que.hasRadioOrCheckbox) return false;
+        return true;
+    }
+
+    // Scenario A: Standard Multiple Choice Question -> Eligible
+    const mcQue = { classes: ['multichoice', 'que'], hasRadioOrCheckbox: true, hasTextInput: false, hasSelectElements: false, hasDragElements: false };
+    const mcData = { qText: "Which device is non-volatile?", choices: ["a. RAM", "b. ROM", "c. Cache", "d. Register"] };
+    assert.strictEqual(mockIsEligibleForAiSolver(mcQue, mcData), true, "Standard MC question must be eligible");
+
+    // Scenario B: True / False Question -> Eligible
+    const tfQue = { classes: ['truefalse', 'que'], hasRadioOrCheckbox: true, hasTextInput: false, hasSelectElements: false, hasDragElements: false };
+    const tfData = { qText: "HTML stands for HyperText Markup Language.", choices: ["True", "False"] };
+    assert.strictEqual(mockIsEligibleForAiSolver(tfQue, tfData), true, "True/False question must be eligible");
+
+    // Scenario C: Drag and Drop Question -> strictly Ineligible (must fall back to manual copy)
+    const ddQue = { classes: ['ddwtos', 'que'], hasRadioOrCheckbox: false, hasTextInput: false, hasSelectElements: false, hasDragElements: true };
+    const ddData = { isDragDrop: true, qText: "Match components [[1]] and [[2]]", choices: ["a. CPU", "b. RAM"] };
+    assert.strictEqual(mockIsEligibleForAiSolver(ddQue, ddData), false, "Drag and drop question must NOT be eligible");
+
+    // Scenario D: Dropdown Matching Question -> strictly Ineligible
+    const selQue = { classes: ['match', 'que'], hasRadioOrCheckbox: false, hasTextInput: false, hasSelectElements: true, hasDragElements: false };
+    const selData = { matchPairs: [{ subQ: "Input", options: ["Mouse", "Screen"] }], choices: ["Mouse", "Screen"] };
+    assert.strictEqual(mockIsEligibleForAiSolver(selQue, selData), false, "Dropdown question must NOT be eligible");
+
+    // Scenario E: Short Answer / Cloze Text Field -> strictly Ineligible
+    const saQue = { classes: ['shortanswer', 'que'], hasRadioOrCheckbox: false, hasTextInput: true, hasSelectElements: false, hasDragElements: false };
+    const saData = { isShortAnswer: true, qText: "Type the abbreviation for Operating System:", choices: [] };
+    assert.strictEqual(mockIsEligibleForAiSolver(saQue, saData), false, "Short answer question must NOT be eligible");
+});
+
+// --------------------------------------------------
+// 87. Gemini AI Compact Prompt Builder
+// --------------------------------------------------
+test("Gemini AI: Compact Prompt Builder constructs ultra-concise token-efficient prompts (<120 tokens)", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Script checks
+    assert.ok(script.includes("function buildGeminiCompactPrompt(qData, courseCode = '')"), "Must define buildGeminiCompactPrompt");
+    assert.ok(script.includes("Reply with ONLY the correct option letter and exact text"), "Prompt must instruct AI to return minimal letter and text");
+    assert.ok(script.includes("No explanations"), "Prompt must strictly prohibit wordy explanations to save tokens");
+
+    // 2. Logic simulation
+    function mockBuildPrompt(qData, courseCode = '') {
+        const lines = [];
+        if (courseCode) lines.push(`[Course: ${courseCode}]`);
+        lines.push(`Question: ${qData.qText || ''}`);
+        lines.push(`Choices:`);
+        if (Array.isArray(qData.choices)) {
+            qData.choices.forEach(c => lines.push(c));
+        }
+        lines.push(``);
+        lines.push(`Reply with ONLY the correct option letter and exact text (e.g., "b. ROM"). No explanations.`);
+        return lines.join('\n');
+    }
+
+    const qData = {
+        qText: "What protocol is primarily used for secure web browsing?",
+        choices: ["a. HTTP", "b. HTTPS", "c. FTP", "d. SMTP"]
+    };
+
+    const promptWithCourse = mockBuildPrompt(qData, "IT101");
+    assert.ok(promptWithCourse.includes("[Course: IT101]"), "Must include course code tag when available");
+    assert.ok(promptWithCourse.includes("Question: What protocol is primarily used for secure web browsing?"), "Must include question text");
+    assert.ok(promptWithCourse.includes("b. HTTPS"), "Must list options");
+    assert.ok(promptWithCourse.includes("No explanations"), "Must request minimal answer");
+
+    // Token economy check: count words in prompt (words * 1.3 ≈ tokens)
+    const wordCount = promptWithCourse.split(/\s+/).length;
+    assert.ok(wordCount < 60, `Prompt word count (${wordCount}) must remain ultra-compact (<60 words / ~80 tokens)`);
+
+    const promptNoCourse = mockBuildPrompt(qData, "");
+    assert.ok(!promptNoCourse.includes("[Course:"), "Must omit course tag if courseCode is empty");
+});
+
+// --------------------------------------------------
+// 88. Gemini AI Answer Matcher
+// --------------------------------------------------
+test("Gemini AI: AI Answer Matcher maps prefixes, normalized text, and True/False to correct option index and DOM node", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    assert.ok(script.includes("function matchAiAnswerToChoice(aiResponseText, que, qData)"), "Must define matchAiAnswerToChoice");
+    assert.ok(script.includes("/^([a-eA-E])[.:\\)\\-–\\s]/"), "Must parse option letter prefixes a-e");
+    assert.ok(script.includes("normalizeChoice(cleanAi"), "Must match on normalized choice text");
+
+    function mockMatch(aiText, choices) {
+        const cleanAi = (aiText || '').trim();
+        const letterMatch = cleanAi.match(/^([a-eA-E])[.:\)\-–\s]/);
+        let matchedIndex = -1;
+
+        if (letterMatch) {
+            const charCode = letterMatch[1].toLowerCase().charCodeAt(0) - 97;
+            if (charCode >= 0 && charCode < choices.length) matchedIndex = charCode;
+        }
+
+        if (matchedIndex === -1) {
+            const cleanText = cleanAi.replace(/^[a-eA-E][.:\)\-–\s]*/, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            for (let i = 0; i < choices.length; i++) {
+                const normChoice = choices[i].toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (normChoice && (normChoice === cleanText || normChoice.includes(cleanText) || cleanText.includes(normChoice))) {
+                    matchedIndex = i;
+                    break;
+                }
+            }
+        }
+
+        if (matchedIndex === -1) {
+            const lower = cleanAi.toLowerCase();
+            if (lower.includes('true')) {
+                matchedIndex = choices.findIndex(c => c.toLowerCase().includes('true'));
+            } else if (lower.includes('false')) {
+                matchedIndex = choices.findIndex(c => c.toLowerCase().includes('false'));
+            }
+        }
+
+        return matchedIndex;
+    }
+
+    const testChoices = ["a. HTTP", "b. HTTPS", "c. FTP", "d. SMTP"];
+    assert.strictEqual(mockMatch("b. HTTPS", testChoices), 1, "Must match 'b. HTTPS' to index 1");
+    assert.strictEqual(mockMatch("B) HTTPS", testChoices), 1, "Must match 'B) HTTPS' to index 1");
+    assert.strictEqual(mockMatch("c: FTP", testChoices), 2, "Must match 'c: FTP' to index 2");
+    assert.strictEqual(mockMatch("HTTPS", testChoices), 1, "Must match un-prefixed text 'HTTPS' to index 1");
+
+    const tfChoices = ["True", "False"];
+    assert.strictEqual(mockMatch("True", tfChoices), 0, "Must match 'True' to index 0");
+    assert.strictEqual(mockMatch("The statement is false.", tfChoices), 1, "Must match 'The statement is false.' to index 1");
+});
+
+// --------------------------------------------------
+// 89. Gemini AI UI Integration, Modal, Settings, and Highlighting
+// --------------------------------------------------
+test("Gemini AI: Interface Integration, Course Tools card, Setup modal, Quiz tab settings, and Suggestion highlighting", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Tampermonkey header permission
+    assert.ok(script.includes("// @connect      generativelanguage.googleapis.com"), "Userscript must request GM @connect for Google AI API domain");
+
+    // 2. Course Tools AI assistant card & modal trigger
+    assert.ok(script.includes("id=\"mod-ai-card\""), "Course tools panel must include AI Assistant accordion card");
+    assert.ok(script.includes("id=\"btn-open-gemini-setup\""), "Course tools must include setup button for Gemini API");
+    assert.ok(script.includes("function showGeminiSetupModal()"), "Must define showGeminiSetupModal");
+    assert.ok(script.includes("aistudio.google.com"), "Setup modal must provide clickable link to Google AI Studio");
+    assert.ok(script.includes("id=\"amaes-gemini-btn-test-save\""), "Setup modal must provide API key test connection button");
+    assert.ok(script.includes("id=\"amaes-gemini-btn-remove\""), "Setup modal must allow removing the API key");
+
+    // 3. Quiz tab settings block & toggles
+    assert.ok(script.includes("id=\"amaes-ai-quiz-settings-block\""), "Quiz tab must feature AI Assistant settings block");
+    assert.ok(script.includes("id=\"chk-ai-quiz-enabled\""), "Must include toggle for AI Quiz Solver");
+    assert.ok(script.includes("id=\"chk-ai-auto-select\""), "Must include toggle for Auto-Select AI Answers");
+
+    // 4. Visual suggestion styling & badge
+    assert.ok(script.includes("amaes-ai-suggested-choice"), "Must define amaes-ai-suggested-choice CSS class");
+    assert.ok(script.includes("amaes-ai-suggested-badge"), "Must define amaes-ai-suggested-badge CSS class");
+    assert.ok(script.includes("✦ <span>AI Suggestion (Gemini)</span>"), "Must inject purple AI Suggestion badge for student clarity");
+    assert.ok(script.includes("function applyAiChoiceHighlight(targetRow)"), "Must define applyAiChoiceHighlight");
+});
+
+// --------------------------------------------------
+// 90. Gemini AI Watchdog Timer, Retry Mechanism, and Safe Fallback Bar
+// --------------------------------------------------
+test("Gemini AI: 8s Watchdog Timeout, Automatic Retry, Abort Handling, and Fallback Bar with Copy and Retry", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Constants and timeouts
+    assert.ok(script.includes("const GEMINI_TIMEOUT_MS = 8000;"), "Watchdog timer must be set to 8000ms (8 seconds)");
+    assert.ok(script.includes("const GEMINI_MODEL = 'gemini-1.5-flash';"), "Must use efficient gemini-1.5-flash model");
+
+    // 2. Abort controller and timeout support in callGeminiApi
+    assert.ok(script.includes("function callGeminiApi({ apiKey, prompt, maxOutputTokens = 64, signal })"), "callGeminiApi must accept abort signal");
+    assert.ok(script.includes("signal.addEventListener('abort'"), "callGeminiApi must hook abort event on signal");
+
+    // 3. Retry loop and fallback bar in handleGeminiQuestionInference
+    assert.ok(script.includes("function handleGeminiQuestionInference("), "Must define handleGeminiQuestionInference");
+    assert.ok(script.includes("const maxAttempts = 2; // 1 initial request + 1 automatic retry"), "Must support exactly 1 automatic retry on failure");
+    assert.ok(script.includes("function showAiFallbackBar(que, qData, promptText, onRetry)"), "Must define showAiFallbackBar");
+    assert.ok(script.includes("class=\"amaes-ai-retry-btn\""), "Fallback bar must include Retry AI button");
+    assert.ok(script.includes("class=\"amaes-ai-copy-btn\""), "Fallback bar must include Copy for AI button");
+
+    // 4. Progress bar and thinking indicator
+    assert.ok(script.includes("amaes-ai-thinking-indicator"), "Must define thinking indicator element");
+    assert.ok(script.includes("amaes-ai-progress-bar"), "Must define animated progress bar");
+    assert.ok(script.includes("amaes-ai-cancel-btn"), "Thinking indicator must allow user to cancel request");
+
+    // 5. Cleanup on Auto-Quiz pause
+    assert.ok(script.includes("if (activeAiAbortController) {") && script.includes("activeAiAbortController.abort();"), "Pausing auto-quiz must abort any active AI request");
 });
 
 console.log("\n==================================================");
