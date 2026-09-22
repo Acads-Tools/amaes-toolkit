@@ -2972,6 +2972,12 @@
                 // GOOGLE GEMINI AI ASSISTANT: Only trigger on uncertain Multiple Choice & True/False questions!
                 // Fall back to manual copy for complex types (drag & drop, dropdown, text inputs) or if AI not configured
                 const isEligibleChoice = isEligibleForAiSolver(firstBlockedQue, qData);
+                const existingAiChoice = firstBlockedQue.querySelector('.amaes-ai-suggested-choice');
+                if (existingAiChoice && !isChoiceRowEliminated(existingAiChoice)) {
+                    // Already solved by AI and highlighted! Keep paused for review without re-querying API.
+                    setLog(`[AI Suggestion] Question #${qData ? qData.qNum : ''} has an AI suggestion. Paused for review—press <b>N</b> or click Next page when ready.`, "var(--accent-purple)");
+                    return;
+                }
                 if (geminiApiKey && aiQuizEnabled && isEligibleChoice) {
                     const courseInfo = detectCourseInfo();
                     const courseCode = courseInfo.subjectCode || '';
@@ -3926,9 +3932,10 @@
             candidates.sort((a, b) => ((b.verified ? 10 : 0) + (b.confirmations || 1)) - ((a.verified ? 10 : 0) + (a.confirmations || 1)));
 
             // Clean up any prior highlighting or elimination badges on this question
-            que.querySelectorAll('.amaes-highlighted-choice, .amaes-eliminated-choice').forEach(el => {
+            que.querySelectorAll('.amaes-highlighted-choice, .amaes-eliminated-choice, .amaes-ai-suggested-choice').forEach(el => {
                 el.classList.remove('amaes-highlighted-choice');
                 el.classList.remove('amaes-eliminated-choice');
+                el.classList.remove('amaes-ai-suggested-choice');
                 el.style.outline = '';
                 el.style.backgroundColor = '';
                 el.style.borderRadius = '';
@@ -4395,7 +4402,7 @@
                     if (matchedAi && matchedAi.row && !isChoiceRowEliminated(matchedAi.row)) {
                         foundMatchForQuestion = true;
                         applyAiChoiceHighlight(matchedAi.row);
-                        const canSelectAnswer = isManualSelect || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode));
+                        const canSelectAnswer = isManualSelect || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) && aiAutoSelect);
                         const anyRadioChecked = Boolean(que.querySelector('.answer input[type="radio"]:checked'));
                         if (canSelectAnswer && matchedAi.input && !matchedAi.input.checked && (!anyRadioChecked || isManualSelect)) {
                             matchedAi.input.checked = true;
@@ -6812,7 +6819,19 @@
     async function handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback }) {
         que.querySelectorAll('.amaes-ai-thinking-indicator, .amaes-ai-fallback-bar').forEach(el => el.remove());
 
-        // 0. Cache Check: If this question was already solved by AI in this session, reuse it with 0 API requests!
+        // 0. Cache Check: If this question was already solved by AI in this session or on-screen, reuse it with 0 API requests!
+        const existingAiChoice = que.querySelector('.amaes-ai-suggested-choice');
+        if (existingAiChoice && !isChoiceRowEliminated(existingAiChoice)) {
+            const lbl = existingAiChoice.querySelector('label') || existingAiChoice;
+            const choiceText = cleanDOMToAI(lbl);
+            const input = existingAiChoice.querySelector('input[type="radio"], input[type="checkbox"]');
+            setLog(`[AI Cache] Reusing existing AI suggestion for Question #${qData ? qData.qNum : ''} (0 API requests)`, "var(--accent-purple)");
+            if (typeof onSuccess === 'function') {
+                await onSuccess({ row: existingAiChoice, choiceText, input });
+            }
+            return;
+        }
+
         const cachedAns = getCachedAiAnswer(qData);
         if (cachedAns && cachedAns.choiceText) {
             const matched = matchAiAnswerToChoice(cachedAns.choiceText, que, qData);
@@ -7377,6 +7396,7 @@
                     answers: Array.isArray(newItem.answers) && newItem.answers.length > 0 ? newItem.answers : undefined,
                     choices: newItem.choices || [],
                     verified: Boolean(newItem.verified),
+                    isAiSuggestion: Boolean(newItem.isAiSuggestion),
                     period: newItem.period || newItem.term || detectTermFromText(newItem.quizTitle || newItem.qRaw || '') || 'General',
                     quizTitle: newItem.quizTitle || '',
                     wrongAnswers: incomingWrong,
@@ -7425,6 +7445,7 @@
                         cur.ansRaw = '';
                         cur.ansNorm = '';
                         cur.verified = false;
+                        cur.isAiSuggestion = false;
                         cur.confirmations = 0;
                     }
                     if (Array.isArray(cur.answers)) {
@@ -7461,13 +7482,18 @@
                         cur.ansRaw = ansRaw;
                         cur.ansNorm = ansNorm;
                         cur.verified = Boolean(newItem.verified);
+                        cur.isAiSuggestion = Boolean(newItem.isAiSuggestion);
                         cur.confirmations = 1;
+                        if (newItem.source) cur.source = newItem.source;
                         addedCount++;
                     } else {
                         const isSameAnswer = (cur.ansNorm === ansNorm || cur.ansRaw.toLowerCase() === ansRaw.toLowerCase());
                         if (isSameAnswer) {
                             cur.confirmations = (cur.confirmations || 1) + 1;
-                            if (newItem.verified) cur.verified = true;
+                            if (newItem.verified) {
+                                cur.verified = true;
+                                cur.isAiSuggestion = false;
+                            }
                             confirmedCount++;
                         } else {
                             cur.variations = cur.variations || [];
@@ -7480,6 +7506,7 @@
                                     ansNorm: ansNorm,
                                     choices: newItem.choices || [],
                                     verified: Boolean(newItem.verified),
+                                    isAiSuggestion: Boolean(newItem.isAiSuggestion),
                                     confirmations: 1,
                                     source: sourceLabel
                                 });
@@ -7491,11 +7518,13 @@
                                     ansNorm: cur.ansNorm,
                                     choices: cur.choices || [],
                                     verified: cur.verified || false,
+                                    isAiSuggestion: cur.isAiSuggestion || false,
                                     source: cur.source || 'Previous'
                                 });
                                 cur.ansRaw = ansRaw;
                                 cur.ansNorm = ansNorm;
                                 cur.verified = true;
+                                cur.isAiSuggestion = false;
                                 cur.source = 'Review';
                             }
                             conflictCount++;
@@ -7511,8 +7540,8 @@
                     });
                 }
 
-                // Deduction check for existing item if still missing verified answer
-                if (!cur.ansRaw && Array.isArray(cur.choices) && cur.choices.length > 1) {
+                // Deduction check for existing item if still missing verified answer (or holds unverified AI guess)
+                if ((!cur.ansRaw || (!cur.verified && cur.isAiSuggestion)) && Array.isArray(cur.choices) && cur.choices.length > 1) {
                     const wrongNorms = cur.wrongAnswers.map(w => w.norm);
                     const remaining = cur.choices.filter(c => !wrongNorms.includes(normalizeChoice(c)));
                     if (remaining.length === 1) {
@@ -7520,7 +7549,8 @@
                         cur.ansNorm = normalizeChoice(cur.ansRaw);
                         cur.verified = true;
                         cur.deduced = true;
-                        cur.sources.push('Elimination Deduction');
+                        cur.isAiSuggestion = false;
+                        if (!cur.sources.includes('Elimination Deduction')) cur.sources.push('Elimination Deduction');
                     }
                 }
             }
@@ -8339,7 +8369,9 @@
                 choices: q.choices || [],
                 wrongAnswers: Array.isArray(q.wrongAnswers) ? q.wrongAnswers.map(w => typeof w === 'string' ? w : w.text) : [],
                 verified: Boolean(q.verified),
-                evidenceType: q.evidenceType || evidenceType
+                isAiSuggestion: Boolean(q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini'))),
+                source: q.source || options.source || "auto_harvester",
+                evidenceType: q.evidenceType || (q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini')) ? 'ai_inference' : evidenceType)
             }))
         };
 

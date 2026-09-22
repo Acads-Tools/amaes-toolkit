@@ -4104,6 +4104,132 @@ test("Gemini AI v1.7.5: Unverified AI Suggestion Safeguards, Copy Question Filte
     assert.ok(script.includes("targetRow.classList.add(hasAiSource ? 'amaes-ai-suggested-choice' : 'amaes-highlighted-choice');"), "Must apply distinct CSS class amaes-ai-suggested-choice");
     assert.ok(script.includes("badge.className = hasAiSource ? 'amaes-ai-suggested-badge' : `amaes-verified-badge ${hasAmauoedSource ? 'amaes-badge-amauoed' : 'amaes-badge-db'}`;"), "Must attach amaes-ai-suggested-badge for AI sources");
     assert.ok(script.includes("sourceLabels.push('AI Suggestion (Gemini)');"), "Must label AI source as 'AI Suggestion (Gemini)'");
+
+    // 5. Cleanup of .amaes-ai-suggested-choice on page reset
+    assert.ok(script.includes("el.classList.remove('amaes-ai-suggested-choice');"), "Must clean up amaes-ai-suggested-choice class on quiz answers reset");
+
+    // 6. Zero API calls when AI suggestion already highlighted on screen
+    assert.ok(script.includes("existingAiChoice && !isChoiceRowEliminated(existingAiChoice)"), "Auto-solver and inference must check for existing non-eliminated AI suggestion before calling API");
+
+    // 7. Community Relay Tagging for AI suggestions
+    assert.ok(script.includes("isAiSuggestion: Boolean(q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini')))"), "Relay payload must tag isAiSuggestion explicitly");
+    assert.ok(script.includes("evidenceType: q.evidenceType || (q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini')) ? 'ai_inference' : evidenceType)"), "Relay payload must tag evidenceType as ai_inference for AI sources");
+
+    // 8. Real Lifecycle Simulation: AI Suggestion -> Rejection/Wrong Choice -> Elimination & Deduction
+    let mockExisting = [];
+    function mockMerge(subCode, newQuestions, sourceLabel) {
+        newQuestions.forEach(newItem => {
+            const qNorm = (newItem.qNorm || newItem.question || '').toLowerCase().trim();
+            const ansRaw = newItem.ansRaw || newItem.answer || '';
+            const ansNorm = (ansRaw || '').toLowerCase().trim();
+            const incomingWrong = (newItem.wrongAnswers || []).map(w => ({
+                text: typeof w === 'string' ? w : w.text,
+                norm: (typeof w === 'string' ? w : w.text).toLowerCase().trim()
+            }));
+
+            let cur = mockExisting.find(e => e.qNorm === qNorm);
+            if (!cur) {
+                cur = {
+                    qNorm,
+                    ansRaw,
+                    ansNorm,
+                    choices: newItem.choices || [],
+                    verified: Boolean(newItem.verified),
+                    isAiSuggestion: Boolean(newItem.isAiSuggestion),
+                    wrongAnswers: incomingWrong,
+                    source: newItem.source || sourceLabel,
+                    sources: [sourceLabel]
+                };
+                mockExisting.push(cur);
+            } else {
+                incomingWrong.forEach(inW => {
+                    if (cur.ansNorm && inW.norm === cur.ansNorm) {
+                        cur.ansRaw = '';
+                        cur.ansNorm = '';
+                        cur.verified = false;
+                        cur.isAiSuggestion = false;
+                    }
+                    if (!cur.wrongAnswers.some(w => w.norm === inW.norm)) {
+                        cur.wrongAnswers.push(inW);
+                    }
+                });
+
+                if (ansRaw) {
+                    if (!cur.ansRaw) {
+                        cur.ansRaw = ansRaw;
+                        cur.ansNorm = ansNorm;
+                        cur.verified = Boolean(newItem.verified);
+                        cur.isAiSuggestion = Boolean(newItem.isAiSuggestion);
+                    } else if (cur.ansNorm === ansNorm) {
+                        if (newItem.verified) {
+                            cur.verified = true;
+                            cur.isAiSuggestion = false;
+                        }
+                    } else if (newItem.verified) {
+                        cur.ansRaw = ansRaw;
+                        cur.ansNorm = ansNorm;
+                        cur.verified = true;
+                        cur.isAiSuggestion = false;
+                    }
+                }
+
+                // Deduction check
+                if ((!cur.ansRaw || (!cur.verified && cur.isAiSuggestion)) && Array.isArray(cur.choices) && cur.choices.length > 1) {
+                    const wrongNorms = cur.wrongAnswers.map(w => w.norm);
+                    const remaining = cur.choices.filter(c => !wrongNorms.includes(c.toLowerCase().trim()));
+                    if (remaining.length === 1) {
+                        cur.ansRaw = remaining[0];
+                        cur.ansNorm = remaining[0].toLowerCase().trim();
+                        cur.verified = true;
+                        cur.deduced = true;
+                        cur.isAiSuggestion = false;
+                    }
+                }
+            }
+        });
+    }
+
+    // Step A: AI suggests "ROM" for Question CS101
+    mockMerge('CS101', [{
+        question: "Primary component?",
+        choices: ["RAM", "ROM", "Business Strategy", "Marketing Plan"],
+        ansRaw: "ROM",
+        verified: false,
+        isAiSuggestion: true,
+        source: "Google Gemini AI"
+    }], "Google Gemini AI");
+
+    assert.strictEqual(mockExisting.length, 1);
+    assert.strictEqual(mockExisting[0].ansRaw, "ROM");
+    assert.strictEqual(mockExisting[0].isAiSuggestion, true);
+    assert.strictEqual(mockExisting[0].verified, false);
+
+    // Step B: Student picks "Business Strategy" instead, Moodle marks it ❌ 0.00
+    mockMerge('CS101', [{
+        question: "Primary component?",
+        choices: ["RAM", "ROM", "Business Strategy", "Marketing Plan"],
+        wrongAnswers: ["Business Strategy"],
+        verified: false
+    }], "Review");
+
+    // ROM is NOT debunked, it remains an unverified AI suggestion; Business Strategy is eliminated
+    assert.strictEqual(mockExisting[0].ansRaw, "ROM");
+    assert.strictEqual(mockExisting[0].isAiSuggestion, true);
+    assert.strictEqual(mockExisting[0].wrongAnswers.some(w => w.norm === "business strategy"), true);
+
+    // Step C: Another attempt eliminates "Marketing Plan" and "RAM", leaving only ROM
+    mockMerge('CS101', [{
+        question: "Primary component?",
+        choices: ["RAM", "ROM", "Business Strategy", "Marketing Plan"],
+        wrongAnswers: ["Marketing Plan", "RAM"],
+        verified: false
+    }], "Review");
+
+    // Deduction must trigger and promote ROM to 100% verified deduced answer!
+    assert.strictEqual(mockExisting[0].ansRaw, "ROM");
+    assert.strictEqual(mockExisting[0].verified, true);
+    assert.strictEqual(mockExisting[0].deduced, true);
+    assert.strictEqual(mockExisting[0].isAiSuggestion, false);
 });
 
 console.log("\n==================================================");
