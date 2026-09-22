@@ -6927,10 +6927,10 @@
             clearTimeout(pendingContributionTimers[subCode]);
         }
 
-        // 12-second debounce consolidates multi-page / multi-quiz discoveries into one single submission
+        // Ultra-fast 2-second debounce: catches simultaneous page discoveries and shares immediately
         pendingContributionTimers[subCode] = setTimeout(() => {
             flushCommunityContributions(subCode, options);
-        }, 12000);
+        }, 2000);
     }
 
     async function flushCommunityContributions(subCode, options = {}) {
