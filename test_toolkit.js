@@ -2829,8 +2829,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.7.1'), "Userscript header must specify v1.7.1");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.1";'), "Constant SCRIPT_VERSION must be v1.7.1");
+    assert.ok(script.includes('@version      1.7.2'), "Userscript header must specify v1.7.2");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.2";'), "Constant SCRIPT_VERSION must be v1.7.2");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3643,6 +3643,30 @@ test("Website Share Card & Fullscreen QR Modal: downloads QR image and maximizes
     assert.ok(js.includes('closeQrModal'), "site.js must define closeQrModal");
     assert.ok(js.includes('toggleFullscreen'), "site.js must define toggleFullscreen");
     assert.ok(js.includes("e.key === 'Escape'"), "site.js must dismiss modal on Escape");
+});
+
+test("Subject Naming & Course Code Resolution: guarantees human-readable titles across IT and CS courses", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. KNOWN_COURSES dictionary and resolution helper
+    assert.ok(script.includes('const KNOWN_COURSES = {'), "Userscript must define KNOWN_COURSES dictionary");
+    assert.ok(script.includes('"IT6205A": "Information Assurance and Security 1"'), "Must map IT6205A");
+    assert.ok(script.includes('"IT6206": "Information Assurance and Security 2"'), "Must map IT6206");
+    assert.ok(script.includes('"IT6208": "System Integration and Architecture 1"'), "Must map IT6208");
+    assert.ok(script.includes('"IT6209": "Introduction to Multimedia"'), "Must map IT6209");
+    assert.ok(script.includes('"IT6224B": "Data Communications and Networking 3"'), "Must map IT6224B");
+    assert.ok(script.includes('"IT6310": "Network Security"'), "Must map IT6310");
+    assert.ok(script.includes('"IT6322A": "Mobile Application Development"'), "Must map IT6322A");
+    assert.ok(script.includes('function resolveKnownCourseName(code)'), "Must define resolveKnownCourseName helper");
+
+    // 2. detectCourseInfo parses both prefix and suffix formats and uses fallbacks
+    assert.ok(script.includes('function detectCourseInfo()'), "Must define detectCourseInfo");
+    assert.ok(script.includes('resolveKnownCourseName(subjectCode)'), "detectCourseInfo must resolve fallback from KNOWN_COURSES");
+
+    // 3. Payloads include resolved subjectName
+    assert.ok(script.includes('subjectName: resolvedName'), "Community relay payload must include resolved subjectName");
+    assert.ok(script.includes('subjectName: resolvedName || code'), "generatePayload must include resolved subjectName");
 });
 
 console.log("\n==================================================");

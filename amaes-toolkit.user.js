@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.7.1
+// @version      1.7.2
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -25,7 +25,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.7.1";
+    const SCRIPT_VERSION = "v1.7.2";
     const ANSWER_DB_SCHEMA_VERSION = 2;
     const CONTRIBUTOR_ID_STORAGE_KEY = 'amaes_anonymous_contributor_id';
 
@@ -1423,42 +1423,140 @@
     // Course & Activity Detection
     // ==========================================
 
+    const KNOWN_COURSES = {
+        // Computer Science
+        "CS6202": "Algorithms and Complexity",
+        "CS6204": "Computer Architecture and Organization",
+        "CS6205": "Automata Theory and Formal Languages",
+        "CS6206": "Principles of Operating Systems",
+        "CS6209": "Software Engineering 1",
+        "CS6300": "Software Engineering 2",
+        "CS6301": "Logic Design and Digital Computer Circuits",
+        "CS6309": "Introduction to Machine Learning",
+        "CS6326": "Mobile Application Development",
+        // Information Technology
+        "IT6201": "Data Structures and Algorithm Analysis",
+        "IT6202": "Data Structures and Algorithms",
+        "IT6203": "Web Systems and Technologies 1",
+        "IT6204": "Web Systems and Technologies 2",
+        "IT6205": "Information Assurance and Security 1",
+        "IT6205A": "Information Assurance and Security 1",
+        "IT6206": "Information Assurance and Security 2",
+        "IT6207": "Database Systems 1",
+        "IT6208": "System Integration and Architecture 1",
+        "IT6209": "Introduction to Multimedia",
+        "IT6210": "Systems Administration and Maintenance",
+        "IT6220": "Information Management",
+        "IT6221": "Data Communications and Networking 1",
+        "IT6222": "Data Communications and Networking 2",
+        "IT6224": "Data Communications and Networking 3",
+        "IT6224B": "Data Communications and Networking 3",
+        "IT6300": "Cloud Computing",
+        "IT6301": "Technopreneurship",
+        "IT6302": "System Analysis and Design",
+        "IT6310": "Network Security",
+        "IT6320": "Social and Professional Issues",
+        "IT6322": "Mobile Application Development",
+        "IT6322A": "Mobile Application Development",
+        "IT6323": "Human Computer Interaction",
+        "IT6324": "Information Assurance and Security",
+        // Information Technology Education Core
+        "ITE6100": "Introduction to Computing",
+        "ITE6101": "Computer Programming 1",
+        "ITE6102": "Computer Programming 1",
+        "ITE6103": "Computer Programming 2",
+        "ITE6104": "Computer Programming 2",
+        "ITE6200": "Application Development and Emerging Technology",
+        "ITE6201": "Data Structures and Algorithm Analysis",
+        "ITE6220": "Information Management",
+        "ITE6300": "Cloud Computing and Internet of Things",
+        "ITE6301": "Technopreneurship",
+        // Mathematics & Sciences
+        "MATH6100": "Calculus 1",
+        "MATH6101": "Calculus 2",
+        "MATH6102": "Discrete Mathematics",
+        // General Education & Institutional
+        "GE6100": "Understanding the Self",
+        "GE6101": "Readings in Philippine History",
+        "GE6102": "The Contemporary World",
+        "GE6103": "Mathematics in the Modern World",
+        "GE6104": "Purposive Communication",
+        "GE6105": "Art Appreciation",
+        "GE6106": "Science, Technology and Society",
+        "GE6107": "Ethics",
+        "GE6108": "Rizal's Life and Works",
+        "GE6115": "Art Appreciation",
+        "ETHNS6101": "Euthenics 1",
+        "ETHNS6102": "Euthenics 2",
+        "NSTP6101": "National Service Training Program 1",
+        "NSTP6102": "National Service Training Program 2",
+        "PE6101": "Physical Education 1",
+        "PE6102": "Physical Education 2",
+        "PE6103": "Physical Education 3",
+        "PE6104": "Physical Education 4"
+    };
+
+    function resolveKnownCourseName(code) {
+        if (!code) return "";
+        const clean = String(code).trim().toUpperCase();
+        if (KNOWN_COURSES[clean]) return KNOWN_COURSES[clean];
+        const base = clean.replace(/[A-Za-z]+$/, '');
+        if (base && KNOWN_COURSES[base]) return KNOWN_COURSES[base];
+        return clean;
+    }
+
     function detectCourseInfo() {
         let fullTitle = '';
+        const codeRegex = /\b([A-Za-z]{2,6}\d{3,4}[A-Za-z]*)\b/;
 
-        const heading = document.querySelector('.page-header-headings h1, #page-header h1, .page-header-title, .breadcrumb-item:nth-last-child(2) a');
-        if (heading && heading.innerText.trim()) {
-            fullTitle = heading.innerText.trim();
+        const candidates = [];
+        const heading = document.querySelector('.page-header-headings h1, #page-header h1, .page-header-title');
+        if (heading && heading.innerText.trim()) candidates.push(heading.innerText.trim());
+
+        const breadcrumbLinks = document.querySelectorAll('.breadcrumb-item a, nav.breadcrumb a, .breadcrumb a');
+        for (const link of breadcrumbLinks) {
+            const text = link.innerText.trim();
+            if (text) candidates.push(text);
         }
+        if (document.title) candidates.push(document.title);
 
-        if (!fullTitle || !fullTitle.includes('-')) {
-            const breadcrumbLinks = document.querySelectorAll('.breadcrumb-item a, nav.breadcrumb a');
-            for (const link of breadcrumbLinks) {
-                const text = link.innerText.trim();
-                if (text.includes('-')) {
-                    fullTitle = text;
-                    break;
-                }
+        let bestCandidate = '';
+        for (const cand of candidates) {
+            if (codeRegex.test(cand)) {
+                bestCandidate = cand;
+                break;
             }
         }
-
-        if (!fullTitle || !fullTitle.includes('-')) {
-            fullTitle = document.title || '';
+        if (!bestCandidate && candidates.length > 0) {
+            bestCandidate = candidates[0];
         }
+        fullTitle = bestCandidate;
 
         let subjectCode = '';
         let subjectName = '';
 
-        const codeMatch = fullTitle.match(/\b([A-Za-z]{2,6}\d{3,4}[A-Za-z]*)\b/) || fullTitle.match(/[-_]\s*([A-Za-z0-9]+)\b/);
+        const codeMatch = fullTitle.match(codeRegex) || fullTitle.match(/[-_]\s*([A-Za-z0-9]+)\b/);
         if (codeMatch) {
             subjectCode = codeMatch[1].toUpperCase();
 
             const codeIndex = fullTitle.indexOf(codeMatch[1]);
             if (codeIndex !== -1) {
-                const remainder = fullTitle.substring(codeIndex + codeMatch[1].length).trim();
-                subjectName = remainder.replace(/^[:\-–\s]+/, '').split('|')[0].trim();
+                const after = fullTitle.substring(codeIndex + codeMatch[1].length).trim().replace(/^[:\-–\s]+/, '').split('|')[0].trim();
+                const before = fullTitle.substring(0, codeIndex).trim().replace(/[:\-–\s]+$/, '').split('|')[0].trim();
+                if (after && after.length > 2) {
+                    subjectName = after;
+                } else if (before && before.length > 2) {
+                    subjectName = before;
+                }
             } else {
                 subjectName = fullTitle.replace(codeMatch[1], '').replace(/^[:\-–\s]+/, '').trim();
+            }
+        }
+
+        if (!subjectName || subjectName.toUpperCase() === subjectCode) {
+            const fallback = resolveKnownCourseName(subjectCode);
+            if (fallback && fallback !== subjectCode) {
+                subjectName = fallback;
             }
         }
 
@@ -6953,8 +7051,15 @@
         const contributionId = options.contributionId || `contribution-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const evidenceType = options.evidenceType || (options.source === 'review_screen' ? 'moodle_review' : 'community_report');
 
+        const detectedCourse = (typeof detectCourseInfo === 'function') ? detectCourseInfo() : null;
+        const resolvedName = options.subjectName ||
+            (detectedCourse && (detectedCourse.subjectCode === subCode || detectedCourse.code === subCode) && detectedCourse.subjectName) ||
+            resolveKnownCourseName(subCode) ||
+            subCode;
+
         const payload = {
             subjectCode: subCode,
+            subjectName: resolvedName,
             clientVersion: SCRIPT_VERSION.replace(/^v/i, ''),
             databaseSchema: ANSWER_DB_SCHEMA_VERSION,
             totalQuestions: validQuestions.length,
@@ -7980,9 +8085,15 @@
         function generatePayload(code, qList) {
             // Only export questions that have a verified or deduced answer
             const validQuestions = qList.filter(q => Boolean(q.ansRaw || q.answer || q.correctAnswer));
+            const cInfo = (typeof courseInfo !== 'undefined' && courseInfo) ? courseInfo :
+                          (typeof detectedCourseInfo !== 'undefined' && detectedCourseInfo) ? detectedCourseInfo :
+                          (typeof detectCourseInfo === 'function' ? detectCourseInfo() : null);
+            const resolvedName = (cInfo && (cInfo.subjectCode === code || cInfo.code === code) && cInfo.subjectName) ?
+                cInfo.subjectName : resolveKnownCourseName(code);
+
             return {
                 subjectCode: code,
-                subjectName: (typeof courseInfo !== 'undefined' && courseInfo && courseInfo.code === code) ? courseInfo.fullTitle : code,
+                subjectName: resolvedName || code,
                 contributor: "community",
                 timestamp: new Date().toISOString(),
                 totalQuestions: validQuestions.length,
