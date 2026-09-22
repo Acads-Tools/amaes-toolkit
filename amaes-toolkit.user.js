@@ -6201,8 +6201,9 @@
 
         const badge = document.getElementById('gemini-status-badge');
         if (badge) {
+            const activeModel = cachedWorkingEndpoint ? cachedWorkingEndpoint.model : 'Gemini Flash';
             badge.style.color = isConfigured ? 'var(--accent-green)' : 'var(--text-muted)';
-            badge.innerHTML = isConfigured ? '✔ Ready (Gemini 1.5 Flash)' : '● Not Configured';
+            badge.innerHTML = isConfigured ? `✔ Ready (${activeModel})` : '● Not Configured';
         }
 
         const setupBtn = document.getElementById('btn-open-gemini-setup');
@@ -6258,11 +6259,27 @@
         return true;
     }
 
-    // Cross-origin and test-runner compatible Gemini API request executor
-    function callGeminiApi({ apiKey, prompt, maxOutputTokens = 64, signal }) {
+    // Multi-Model Fallback Registry: Google AI Studio accounts support different versions and models
+    const GEMINI_CANDIDATES = [
+        { version: 'v1', model: 'gemini-1.5-flash' },
+        { version: 'v1beta', model: 'gemini-2.0-flash' },
+        { version: 'v1', model: 'gemini-2.0-flash' },
+        { version: 'v1beta', model: 'gemini-1.5-flash' },
+        { version: 'v1beta', model: 'gemini-2.5-flash' },
+        { version: 'v1beta', model: 'gemini-1.5-flash-latest' }
+    ];
+
+    let cachedWorkingEndpoint = null;
+    try {
+        const savedEp = localStorage.getItem('amaes_gemini_working_endpoint');
+        if (savedEp) cachedWorkingEndpoint = JSON.parse(savedEp);
+    } catch (_) {}
+
+    // Low-level request executor for a specific candidate version and model
+    function executeGeminiRequest({ apiKey, prompt, maxOutputTokens = 64, signal, version = 'v1', model = GEMINI_MODEL }) {
         return new Promise((resolve, reject) => {
             if (!apiKey) return reject(new Error('Missing Gemini API key'));
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+            const url = `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
             const payload = JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
                 generationConfig: {
@@ -6295,7 +6312,8 @@
                     method: "POST",
                     url: url,
                     headers: {
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "x-goog-api-key": apiKey
                     },
                     data: payload,
                     timeout: GEMINI_TIMEOUT_MS,
@@ -6305,7 +6323,7 @@
                             const data = JSON.parse(res.responseText || '{}');
                             if (res.status >= 200 && res.status < 300) {
                                 const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                                resolve({ success: true, text: text.trim(), data });
+                                resolve({ success: true, text: text.trim(), data, modelUsed: model, versionUsed: version });
                             } else {
                                 const errMsg = data?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
                                 reject(new Error(errMsg));
@@ -6326,7 +6344,10 @@
             } else {
                 fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-goog-api-key': apiKey
+                    },
                     body: payload,
                     signal: signal
                 })
@@ -6334,7 +6355,7 @@
                     const data = await res.json().catch(() => ({}));
                     if (res.ok) {
                         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                        resolve({ success: true, text: text.trim(), data });
+                        resolve({ success: true, text: text.trim(), data, modelUsed: model, versionUsed: version });
                     } else {
                         reject(new Error(data?.error?.message || `HTTP ${res.status}`));
                     }
@@ -6342,6 +6363,67 @@
                 .catch(reject);
             }
         });
+    }
+
+    // Cross-origin and test-runner compatible Gemini API request executor with multi-endpoint fallback
+    async function callGeminiApi({ apiKey, prompt, maxOutputTokens = 64, signal }) {
+        if (!apiKey) throw new Error('Missing Gemini API key');
+
+        const candidates = [...GEMINI_CANDIDATES];
+        if (cachedWorkingEndpoint && cachedWorkingEndpoint.model && cachedWorkingEndpoint.version) {
+            const idx = candidates.findIndex(c => c.model === cachedWorkingEndpoint.model && c.version === cachedWorkingEndpoint.version);
+            if (idx > -1) {
+                const [known] = candidates.splice(idx, 1);
+                candidates.unshift(known);
+            } else {
+                candidates.unshift(cachedWorkingEndpoint);
+            }
+        }
+
+        let lastError = null;
+
+        for (const candidate of candidates) {
+            if (signal && signal.aborted) {
+                throw new Error('Request aborted');
+            }
+
+            try {
+                const res = await executeGeminiRequest({
+                    apiKey,
+                    prompt,
+                    maxOutputTokens,
+                    signal,
+                    version: candidate.version,
+                    model: candidate.model
+                });
+
+                cachedWorkingEndpoint = candidate;
+                try {
+                    localStorage.setItem('amaes_gemini_working_endpoint', JSON.stringify(candidate));
+                } catch (_) {}
+
+                return res;
+            } catch (err) {
+                lastError = err;
+                const errLower = (err.message || '').toLowerCase();
+                const isModelUnavailable = errLower.includes('not found') || 
+                                           errLower.includes('not supported') || 
+                                           errLower.includes('404') ||
+                                           errLower.includes('does not exist');
+
+                if (isModelUnavailable) {
+                    logDebug(`Gemini model ${candidate.version}/${candidate.model} unavailable (${err.message}). Trying fallback candidate...`);
+                    continue;
+                }
+
+                // If authentication is rejected (wrong key) or user aborted, fail fast
+                if (errLower.includes('api key not valid') || errLower.includes('unauthenticated') || errLower.includes('aborted')) {
+                    throw err;
+                }
+            }
+        }
+
+        throw lastError || new Error('No available Gemini model found for this key.');
     }
 
     // Match AI answer text to the correct choice option in the question
@@ -6758,7 +6840,7 @@
                             <div style="flex: 1;">
                                 <span style="font-weight: 600; color: #f8fafc;">Paste your key here:</span>
                                 <div style="display: flex; gap: 6px; margin-top: 5px;">
-                                    <input id="amaes-gemini-input-key" type="password" placeholder="AIzaSy..." value="${currentKey}" style="
+                                    <input id="amaes-gemini-input-key" type="password" placeholder="AIzaSy... or AQ..." value="${currentKey}" style="
                                         flex: 1;
                                         background: var(--surface, #1e293b);
                                         color: #f8fafc;
@@ -6863,7 +6945,7 @@
                 feedback.style.background = 'rgba(59, 130, 246, 0.15)';
                 feedback.style.color = '#60a5fa';
                 feedback.style.border = '1px solid rgba(59, 130, 246, 0.3)';
-                feedback.innerText = 'Testing connection with Google Gemini 1.5 Flash...';
+                feedback.innerText = 'Testing connection with Google Gemini...';
 
                 try {
                     const res = await callGeminiApi({
@@ -6873,11 +6955,13 @@
                     });
                     if (res && res.success) {
                         setGeminiApiKey(rawKey);
+                        const modelName = res.modelUsed || 'Gemini Flash';
                         feedback.style.background = 'rgba(16, 185, 129, 0.15)';
                         feedback.style.color = '#34d399';
                         feedback.style.border = '1px solid rgba(16, 185, 129, 0.3)';
-                        feedback.innerText = '✔ API Key Verified & Saved! Google Gemini is ready.';
-                        showToast('✔ Google Gemini AI Connected!');
+                        feedback.innerText = `✔ API Key Verified & Saved! Connected via ${modelName}.`;
+                        showToast(`✔ Google Gemini Connected (${modelName})!`);
+                        updateAiAssistantUI();
                         setTimeout(closeModal, 1200);
                     }
                 } catch (err) {

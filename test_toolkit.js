@@ -3937,6 +3937,11 @@ test("Gemini AI: 8s Watchdog Timeout, Automatic Retry, Abort Handling, and Fallb
 
     // 5. Cleanup on Auto-Quiz pause
     assert.ok(script.includes("if (activeAiAbortController) {") && script.includes("activeAiAbortController.abort();"), "Pausing auto-quiz must abort any active AI request");
+
+    // 6. Multi-model fallback and authentication key compatibility
+    assert.ok(script.includes("GEMINI_CANDIDATES"), "Must define GEMINI_CANDIDATES fallback array for cross-version model support");
+    assert.ok(script.includes('"x-goog-api-key": apiKey'), "Must provide x-goog-api-key header for modern Auth keys (AQ.)");
+    assert.ok(script.includes("executeGeminiRequest"), "Must isolate low-level request execution for multi-endpoint retries");
 });
 
 // --------------------------------------------------
