@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.7.4
+// @version      1.7.5
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -26,7 +26,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.7.4";
+    const SCRIPT_VERSION = "v1.7.5";
     const ANSWER_DB_SCHEMA_VERSION = 2;
     const CONTRIBUTOR_ID_STORAGE_KEY = 'amaes_anonymous_contributor_id';
 
@@ -876,7 +876,114 @@
     let geminiApiKey = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY) || '';
     let aiQuizEnabled = localStorage.getItem('amaes_ai_quiz_enabled') !== 'false'; // default true
     let aiAutoSelect = localStorage.getItem('amaes_ai_auto_select') !== 'false'; // default true: auto-select AI suggestion
+    let aiRetryCount = parseInt(localStorage.getItem('amaes_ai_retry_count') || '2', 10);
+    if (isNaN(aiRetryCount) || aiRetryCount < 1) aiRetryCount = 2;
+    let aiAutoCopyOnFail = localStorage.getItem('amaes_ai_auto_copy_on_fail') !== 'false'; // default true: auto-copy on fail
+    const aiAnswerSessionCache = new Map(); // In-memory session cache for instant reuse
     let activeAiAbortController = null;
+
+    function getAiRetryCount() {
+        const val = parseInt(localStorage.getItem('amaes_ai_retry_count') || '2', 10);
+        return (isNaN(val) || val < 1) ? 2 : Math.min(5, val);
+    }
+
+    function setAiRetryCount(val) {
+        aiRetryCount = Math.max(1, Math.min(5, parseInt(val, 10) || 2));
+        localStorage.setItem('amaes_ai_retry_count', String(aiRetryCount));
+    }
+
+    function getAiAutoCopyOnFail() {
+        return localStorage.getItem('amaes_ai_auto_copy_on_fail') !== 'false';
+    }
+
+    function setAiAutoCopyOnFail(val) {
+        aiAutoCopyOnFail = Boolean(val);
+        localStorage.setItem('amaes_ai_auto_copy_on_fail', aiAutoCopyOnFail ? 'true' : 'false');
+    }
+
+    function getAiSessionCacheStorageKey() {
+        return `amaes_ai_session_cache_${getQuizSessionKey()}`;
+    }
+
+    function saveAiAnswerToCache(qData, matched) {
+        if (!qData || !matched) return;
+        const qKey = normalizeText(qData.qText || '');
+        if (!qKey) return;
+        const record = {
+            choiceIndex: matched.choiceIndex,
+            choiceText: matched.choiceText,
+            timestamp: Date.now()
+        };
+        aiAnswerSessionCache.set(qKey, record);
+        try {
+            const raw = sessionStorage.getItem(getAiSessionCacheStorageKey());
+            const cacheObj = raw ? JSON.parse(raw) : {};
+            cacheObj[qKey] = record;
+            sessionStorage.setItem(getAiSessionCacheStorageKey(), JSON.stringify(cacheObj));
+        } catch (_) {}
+    }
+
+    function getCachedAiAnswer(qData) {
+        if (!qData) return null;
+        const qKey = normalizeText(qData.qText || '');
+        if (!qKey) return null;
+        if (aiAnswerSessionCache.has(qKey)) {
+            return aiAnswerSessionCache.get(qKey);
+        }
+        try {
+            const raw = sessionStorage.getItem(getAiSessionCacheStorageKey());
+            if (raw) {
+                const cacheObj = JSON.parse(raw);
+                if (cacheObj && cacheObj[qKey]) {
+                    aiAnswerSessionCache.set(qKey, cacheObj[qKey]);
+                    return cacheObj[qKey];
+                }
+            }
+        } catch (_) {}
+        return null;
+    }
+
+    function isChoiceRowEliminated(row) {
+        if (!row) return false;
+        if (row.classList && row.classList.contains('amaes-eliminated-choice')) return true;
+        if (row.querySelector && row.querySelector('.amaes-eliminated-badge')) return true;
+        const label = row.querySelector ? (row.querySelector('label') || row) : row;
+        if (label && label.style && label.style.textDecoration && label.style.textDecoration.includes('line-through')) return true;
+        if (typeof hasChoiceCross === 'function' && (hasChoiceCross(row) || hasChoiceCross(label))) return true;
+        return false;
+    }
+
+    function getEliminatedChoicesForQuestion(que, qData, courseCode = '') {
+        const eliminatedTexts = new Set();
+        if (que) {
+            const choiceRows = que.querySelectorAll('.answer > div, .answer div.r0, .answer div.r1, .answer li, .answer tr, .answer label');
+            choiceRows.forEach(r => {
+                if (isChoiceRowEliminated(r)) {
+                    const lbl = r.querySelector('label') || r;
+                    const txt = normalizeChoice(cleanDOMToAI(lbl));
+                    if (txt) eliminatedTexts.add(txt);
+                }
+            });
+        }
+        if (courseCode) {
+            try {
+                const cached = getCachedAnswers(courseCode);
+                if (Array.isArray(cached) && qData && qData.qText) {
+                    const qNorm = normalizeText(qData.qText);
+                    const candidates = cached.filter(item => questionTextMatches(item.qNorm || item.qRaw || item.question, qNorm));
+                    candidates.forEach(cand => {
+                        if (Array.isArray(cand.wrongAnswers)) {
+                            cand.wrongAnswers.forEach(w => {
+                                const wNorm = typeof w === 'string' ? normalizeChoice(w) : (w.norm || normalizeChoice(w.text || ''));
+                                if (wNorm) eliminatedTexts.add(wNorm);
+                            });
+                        }
+                    });
+                }
+            } catch (_) {}
+        }
+        return eliminatedTexts;
+    }
 
     // ==========================================
     // Authentic ACLC Transparent PNG Logo
@@ -2868,7 +2975,7 @@
                 if (geminiApiKey && aiQuizEnabled && isEligibleChoice) {
                     const courseInfo = detectCourseInfo();
                     const courseCode = courseInfo.subjectCode || '';
-                    const promptText = buildGeminiCompactPrompt(qData, courseCode);
+                    const promptText = buildGeminiCompactPrompt(qData, courseCode, firstBlockedQue);
 
                     await handleGeminiQuestionInference({
                         que: firstBlockedQue,
@@ -4276,6 +4383,28 @@
                             candRow.appendChild(pHint);
                         }
                     });
+                }
+            }
+
+            // 4. Session AI Cache: Reapply previously AI-solved answer if returning to this question!
+            if (!foundMatchForQuestion && choiceRows.length >= 2) {
+                const qData = extractQuestionData(que);
+                const cachedAi = getCachedAiAnswer(qData);
+                if (cachedAi && cachedAi.choiceText) {
+                    const matchedAi = matchAiAnswerToChoice(cachedAi.choiceText, que, qData);
+                    if (matchedAi && matchedAi.row && !isChoiceRowEliminated(matchedAi.row)) {
+                        foundMatchForQuestion = true;
+                        applyAiChoiceHighlight(matchedAi.row);
+                        const canSelectAnswer = isManualSelect || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode));
+                        const anyRadioChecked = Boolean(que.querySelector('.answer input[type="radio"]:checked'));
+                        if (canSelectAnswer && matchedAi.input && !matchedAi.input.checked && (!anyRadioChecked || isManualSelect)) {
+                            matchedAi.input.checked = true;
+                            matchedAi.input.click();
+                            if (matchedAi.input.parentElement) matchedAi.input.parentElement.click();
+                            matchedAi.input.dispatchEvent(new Event('input', { bubbles: true }));
+                            matchedAi.input.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    }
                 }
             }
 
@@ -6218,18 +6347,37 @@
     }
 
     // Ultra-Compact Prompt Builder: 0 fluff, max token efficiency (~60-120 tokens total)
-    function buildGeminiCompactPrompt(qData, courseCode = '') {
+    function buildGeminiCompactPrompt(qData, courseCode = '', que = null) {
         const lines = [];
         if (courseCode) {
             lines.push(`[Course: ${courseCode}]`);
         }
         lines.push(`Question: ${qData.qText || ''}`);
         lines.push(`Choices:`);
+
+        const eliminatedSet = getEliminatedChoicesForQuestion(que, qData, courseCode);
+
         if (Array.isArray(qData.choices)) {
-            qData.choices.forEach(c => lines.push(c));
+            qData.choices.forEach((c, idx) => {
+                const normC = normalizeChoice(c);
+                let isElim = false;
+                if (eliminatedSet.has(normC) || eliminatedSet.has(unscriptDigits(normC))) {
+                    isElim = true;
+                } else if (que) {
+                    const choiceRows = que.querySelectorAll('.answer > div, .answer div.r0, .answer div.r1, .answer li, .answer tr, .answer label');
+                    if (choiceRows.length > idx && isChoiceRowEliminated(choiceRows[idx])) {
+                        isElim = true;
+                    }
+                }
+                if (isElim) {
+                    lines.push(`${c} [CONFIRMED WRONG - DO NOT SELECT]`);
+                } else {
+                    lines.push(c);
+                }
+            });
         }
         lines.push(``);
-        lines.push(`Reply with ONLY the correct option letter and exact text (e.g., "b. ROM"). No explanations.`);
+        lines.push(`Reply with ONLY the correct option letter and exact text (e.g., "b. ROM"). Do NOT choose options marked [CONFIRMED WRONG - DO NOT SELECT]. No explanations.`);
         return lines.join('\n');
     }
 
@@ -6650,9 +6798,24 @@
         }
     }
 
-    // Handles thinking indicator, watchdog timeout, 1 retry, and callbacks
+    // Handles thinking indicator, watchdog timeout, configurable retries, wrong choice elimination guard, session caching, and auto-copy on fail
     async function handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback }) {
         que.querySelectorAll('.amaes-ai-thinking-indicator, .amaes-ai-fallback-bar').forEach(el => el.remove());
+
+        // 0. Cache Check: If this question was already solved by AI in this session, reuse it with 0 API requests!
+        const cachedAns = getCachedAiAnswer(qData);
+        if (cachedAns && cachedAns.choiceText) {
+            const matched = matchAiAnswerToChoice(cachedAns.choiceText, que, qData);
+            if (matched && matched.row && !isChoiceRowEliminated(matched.row)) {
+                applyAiChoiceHighlight(matched.row);
+                setLog(`[AI Cache] Reusing previously solved answer for Question #${qData ? qData.qNum : ''} (0 API requests)`, "var(--accent-purple)");
+                showToast(`✦ Reused cached AI choice for #${qData ? qData.qNum : ''} (Instant)!`, 2000);
+                if (typeof onSuccess === 'function') {
+                    await onSuccess(matched);
+                }
+                return;
+            }
+        }
 
         const formulation = que.querySelector('.formulation, .content') || que;
         const thinkingEl = document.createElement('div');
@@ -6670,7 +6833,7 @@
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span class="amaes-ai-spin" style="display: inline-block; font-size: 14px; color: #9333ea;">✦</span>
-                    <span style="font-weight: 700; color: #7e22ce; font-size: 12px;">Gemini is analyzing Question #${qData ? qData.qNum : ''}...</span>
+                    <span class="amaes-ai-status-text" style="font-weight: 700; color: #7e22ce; font-size: 12px;">Gemini is analyzing Question #${qData ? qData.qNum : ''}...</span>
                 </div>
                 <button type="button" class="amaes-ai-cancel-btn" style="
                     background: #f3e8ff;
@@ -6717,11 +6880,19 @@
         let answerText = null;
         let attempt = 0;
         let lastError = null;
-        const maxAttempts = 2; // 1 initial request + 1 automatic retry
+        const retryAttempts = getAiRetryCount();
+        const maxAttempts = 1 + retryAttempts; // 1 initial request + configurable retries (default: 1 + 2 = 3)
 
         while (attempt < maxAttempts && !answerText && !isAborted && !timedOut) {
             attempt++;
             try {
+                if (attempt > 1) {
+                    const statusTextEl = thinkingEl.querySelector('.amaes-ai-status-text');
+                    if (statusTextEl) {
+                        statusTextEl.textContent = `Gemini is analyzing Question #${qData ? qData.qNum : ''}... (Attempt ${attempt}/${maxAttempts})`;
+                    }
+                    setLog(`[AI Assistant] Retrying Gemini (Attempt ${attempt}/${maxAttempts}) for Question #${qData ? qData.qNum : ''}...`, "var(--accent-purple)");
+                }
                 const res = await callGeminiApi({
                     apiKey: geminiApiKey,
                     prompt: promptText,
@@ -6745,7 +6916,7 @@
                     break;
                 }
                 if (attempt < maxAttempts) {
-                    await new Promise(r => setTimeout(r, 600));
+                    await new Promise(r => setTimeout(r, 800));
                 }
             }
         }
@@ -6758,6 +6929,48 @@
         if (answerText) {
             const matched = matchAiAnswerToChoice(answerText, que, qData);
             if (matched && matched.row) {
+                // Hard Safety Guard: Check if the AI returned a confirmed WRONG choice!
+                if (isChoiceRowEliminated(matched.row)) {
+                    logDebug(`Gemini suggested eliminated choice "${matched.choiceText}". Guard rejecting.`);
+                    // Deduction: Check if only 1 uneliminated choice remains!
+                    const choiceRows = Array.from(que.querySelectorAll('.answer > div, .answer div.r0, .answer div.r1, .answer li, .answer tr, .answer label'));
+                    const validRows = choiceRows.filter(r => !isChoiceRowEliminated(r));
+                    if (validRows.length === 1) {
+                        const deducedRow = validRows[0];
+                        const deducedInput = deducedRow.querySelector('input[type="radio"], input[type="checkbox"]');
+                        const deducedText = cleanDOMToAI(deducedRow.querySelector('label') || deducedRow);
+                        const deducedMatched = {
+                            choiceIndex: choiceRows.indexOf(deducedRow),
+                            choiceText: deducedText,
+                            row: deducedRow,
+                            input: deducedInput
+                        };
+                        applyAiChoiceHighlight(deducedRow);
+                        saveAiAnswerToCache(qData, deducedMatched);
+                        setLog(`[AI Deduction] AI suggested confirmed wrong choice "${escapeHtml(matched.choiceText)}". Deduced remaining valid choice: <b>${escapeHtml(deducedText)}</b>`, "var(--accent-purple)");
+                        showToast(`✦ AI corrected: Deduced remaining valid choice!`, 3000);
+                        if (typeof onSuccess === 'function') {
+                            await onSuccess(deducedMatched);
+                        }
+                        return;
+                    } else {
+                        // More than 1 uneliminated choices remain; do NOT select the wrong answer!
+                        const wrongReason = `AI suggested "${matched.choiceText}", but it is confirmed INCORRECT by database.`;
+                        if (getAiAutoCopyOnFail()) {
+                            copyToClipboard(promptText).catch(() => {});
+                        }
+                        showAiFallbackBar(que, qData, promptText, async () => {
+                            await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
+                        }, { reason: wrongReason, isAuthError: false });
+                        showToast(wrongReason, 4500);
+                        setLog(`[AI Wrong Answer Blocked] Question #${qData ? qData.qNum : ''}: ${wrongReason}`, "var(--accent-pink)");
+                        if (typeof onFallback === 'function') onFallback();
+                        return;
+                    }
+                }
+
+                // Valid answer that is NOT eliminated
+                saveAiAnswerToCache(qData, matched);
                 applyAiChoiceHighlight(matched.row);
                 if (typeof onSuccess === 'function') {
                     await onSuccess(matched);
@@ -6767,6 +6980,9 @@
                 logDebug(`Gemini returned "${answerText}" but could not be mapped to choices.`);
                 const cleanSnippet = answerText.trim().replace(/\s+/g, ' ').slice(0, 32);
                 const mismatchReason = `AI suggested "${cleanSnippet}", but it couldn't be matched to any option.`;
+                if (getAiAutoCopyOnFail()) {
+                    copyToClipboard(promptText).catch(() => {});
+                }
                 showAiFallbackBar(que, qData, promptText, async () => {
                     await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
                 }, { reason: mismatchReason, isAuthError: false });
@@ -6800,6 +7016,13 @@
             } else {
                 failureReason = `AI Error: ${errMsg.slice(0, 48)}`;
             }
+        }
+
+        // Auto-copy question to clipboard if enabled on failure
+        if (getAiAutoCopyOnFail()) {
+            copyToClipboard(promptText).then(() => {
+                showToast('✦ Question auto-copied to clipboard for external AI solving!', 3500);
+            }).catch(() => {});
         }
 
         // Failure or timeout: inject fallback bar with clear reason and direct configure button if auth error
@@ -9747,7 +9970,7 @@
                             <h3 style="margin: 0; font-size: 13.5px; color: #c084fc; display: flex; align-items: center; gap: 6px;">${ICONS.zap} Built-in Google Gemini AI</h3>
                             <span style="font-size: 9px; font-family: monospace; color: #d8b4fe; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.35); padding: 1px 6px; border-radius: 3px;">100% Free · Experimental</span>
                         </div>
-                        <p style="margin: 0 0 8px; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Direct in-quiz AI solving for uncertain Multiple Choice and True/False questions. Uses <b>0 tokens</b> on questions already in the verified database. Connect your free Google AI Studio key anytime in Course Tools.</p>
+                        <p style="margin: 0 0 8px; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Direct in-quiz AI solving for uncertain Multiple Choice and True/False questions. Features <b>in-session answer caching</b> (0 duplicate API requests), <b>elimination safety guards</b> against known wrong choices, <b>configurable retries</b>, and <b>auto-copy on failure</b>.</p>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <button id="welcome-btn-setup-ai" type="button" class="amaes-btn" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; font-size: 11px; padding: 4px 10px; border-radius: 5px; font-weight: 700; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 4px;">
                                 ✦ <span>${geminiApiKey ? 'Configure AI Key' : 'Setup Free AI Assistant'}</span>
@@ -10308,6 +10531,23 @@
                                 <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Automatically checks AI choice (if off, highlights in purple for manual review)</div>
                             </div>
                         </label>
+                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="When enabled, automatically copies unknown questions to clipboard if AI cannot solve or times out">
+                            <input id="chk-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
+                            <div>
+                                <span>Auto-Copy on AI Failure</span>
+                                <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Copies question to clipboard if AI fails or times out (Default: ON)</div>
+                            </div>
+                        </label>
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
+                            <span style="font-size: 10px; color: #e9d5ff; font-weight: 600;">Retry Attempts on Failure:</span>
+                            <select id="sel-ai-retry-count" style="background: rgba(0,0,0,0.35); border: 1px solid #a855f7; border-radius: 4px; color: #f3e8ff; font-size: 10px; padding: 2px 6px; cursor: pointer;">
+                                <option value="1" ${aiRetryCount === 1 ? 'selected' : ''}>1 retry</option>
+                                <option value="2" ${aiRetryCount === 2 ? 'selected' : ''}>2 retries (Default)</option>
+                                <option value="3" ${aiRetryCount === 3 ? 'selected' : ''}>3 retries</option>
+                                <option value="4" ${aiRetryCount === 4 ? 'selected' : ''}>4 retries</option>
+                                <option value="5" ${aiRetryCount === 5 ? 'selected' : ''}>5 retries</option>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- Collapsible Advanced Settings (Collapsed by default for clean UX) -->
@@ -10611,7 +10851,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 6px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border);">
                             <span style="color: var(--text-muted);">Status:</span>
                             <span id="gemini-status-badge" style="font-weight: 700; font-size: 10px; color: ${geminiApiKey ? 'var(--accent-green)' : 'var(--text-muted)'}; background: var(--surface); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border);">
-                                ${geminiApiKey ? '✔ Ready (Gemini 1.5 Flash)' : '● Not Configured'}
+                                ${geminiApiKey ? '✔ Ready (Gemini 2.5 / 2.0 Flash)' : '● Not Configured'}
                             </span>
                         </div>
 
@@ -10619,7 +10859,24 @@
                             Answers unknown multiple-choice & true/false questions automatically using your free Google AI Studio key. 0 tokens used on questions already in DB.
                         </p>
 
-                        <div style="display: flex; gap: 6px;">
+                        <div style="display: flex; flex-direction: column; gap: 5px; border-top: 1px solid var(--border-subtle); padding-top: 5px;">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically copy question to clipboard if AI inference fails or times out">
+                                <input id="chk-course-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Auto-Copy Question on AI Failure (Default: ON)</span>
+                            </label>
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="font-size: 10px; color: var(--text-secondary);">AI Retry Attempts:</span>
+                                <select id="sel-course-ai-retry-count" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 5px; cursor: pointer;">
+                                    <option value="1" ${aiRetryCount === 1 ? 'selected' : ''}>1 retry</option>
+                                    <option value="2" ${aiRetryCount === 2 ? 'selected' : ''}>2 retries (Default)</option>
+                                    <option value="3" ${aiRetryCount === 3 ? 'selected' : ''}>3 retries</option>
+                                    <option value="4" ${aiRetryCount === 4 ? 'selected' : ''}>4 retries</option>
+                                    <option value="5" ${aiRetryCount === 5 ? 'selected' : ''}>5 retries</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 6px; margin-top: 2px;">
                             <button id="btn-open-gemini-setup" type="button" class="amaes-btn" style="flex: 1; justify-content: center; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; border: none; font-weight: 700; cursor: pointer;">
                                 <span>${geminiApiKey ? '⚙ Configure AI Key' : '✦ Setup Free AI Assistant'}</span>
                             </button>
@@ -11482,6 +11739,46 @@
                 localStorage.setItem('amaes_ai_auto_select', aiAutoSelect);
                 showToast(`AI Auto-Select: ${aiAutoSelect ? 'Auto-Select ON' : 'Highlight Only'}`);
                 setLog(`AI Auto-Select Answers: <b>${aiAutoSelect ? 'ON (Auto-select AI answers)' : 'OFF (Highlight only)'}</b>`, aiAutoSelect ? "var(--accent-purple)" : "var(--accent-amber)");
+            };
+        }
+
+        const selAiRetryCount = document.getElementById('sel-ai-retry-count');
+        if (selAiRetryCount) {
+            selAiRetryCount.onchange = () => {
+                setAiRetryCount(selAiRetryCount.value);
+                const courseSel = document.getElementById('sel-course-ai-retry-count');
+                if (courseSel) courseSel.value = String(getAiRetryCount());
+                showToast(`AI Retry Attempts set to ${getAiRetryCount()}`);
+            };
+        }
+
+        const selCourseAiRetryCount = document.getElementById('sel-course-ai-retry-count');
+        if (selCourseAiRetryCount) {
+            selCourseAiRetryCount.onchange = () => {
+                setAiRetryCount(selCourseAiRetryCount.value);
+                const quizSel = document.getElementById('sel-ai-retry-count');
+                if (quizSel) quizSel.value = String(getAiRetryCount());
+                showToast(`AI Retry Attempts set to ${getAiRetryCount()}`);
+            };
+        }
+
+        const chkAiAutoCopyOnFail = document.getElementById('chk-ai-auto-copy-on-fail');
+        if (chkAiAutoCopyOnFail) {
+            chkAiAutoCopyOnFail.onchange = () => {
+                setAiAutoCopyOnFail(chkAiAutoCopyOnFail.checked);
+                const courseChk = document.getElementById('chk-course-ai-auto-copy-on-fail');
+                if (courseChk) courseChk.checked = getAiAutoCopyOnFail();
+                showToast(`Auto-Copy on AI Failure: ${getAiAutoCopyOnFail() ? 'ON' : 'OFF'}`);
+            };
+        }
+
+        const chkCourseAiAutoCopyOnFail = document.getElementById('chk-course-ai-auto-copy-on-fail');
+        if (chkCourseAiAutoCopyOnFail) {
+            chkCourseAiAutoCopyOnFail.onchange = () => {
+                setAiAutoCopyOnFail(chkCourseAiAutoCopyOnFail.checked);
+                const quizChk = document.getElementById('chk-ai-auto-copy-on-fail');
+                if (quizChk) quizChk.checked = getAiAutoCopyOnFail();
+                showToast(`Auto-Copy on AI Failure: ${getAiAutoCopyOnFail() ? 'ON' : 'OFF'}`);
             };
         }
 

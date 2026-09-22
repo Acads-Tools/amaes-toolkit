@@ -1,6 +1,6 @@
 # AMAES Toolkit
 
-[![Version](https://img.shields.io/badge/version-1.7.4-blue.svg)](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js)
+[![Version](https://img.shields.io/badge/version-1.7.5-blue.svg)](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js)
 [![Platform](https://img.shields.io/badge/platform-Violentmonkey%20%7C%20Tampermonkey-darkblue.svg)](https://acads-tools.github.io/amaes-toolkit/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -37,10 +37,14 @@
 * **Strict Zero-PII Guarantee:** Student names, student IDs, email addresses, passwords, grades, and Moodle session tokens are never collected, logged, or transmitted.
 
 ### 4. Built-in Google Gemini AI Assistant (Experimental) & Study Tools
-* **Native In-Quiz AI Solver:** Directly answers uncertain Multiple Choice and True/False questions in real time using Google Gemini 1.5 Flash via a free personal Google AI Studio API key.
-* **Token-Conservation Architecture:** Strictly triggers only on questions without confirmed answers in the database or online study guides, consuming **0 tokens** on known questions.
+* **Native In-Quiz AI Solver:** Directly answers uncertain Multiple Choice and True/False questions in real time using Google Gemini via a free personal Google AI Studio API key.
+* **Session Answer Caching:** Once an answer is suggested or selected by AI, it is cached for that question during the active quiz session. Navigating back and forth between questions instantly restores the choice with **0 API requests and 0 token cost**.
+* **Confirmed Wrong Answer Elimination Guard:** Choices confirmed as incorrect by the database or previous attempts are annotated in the AI prompt (`[CONFIRMED WRONG - DO NOT SELECT]`) and hard-blocked by solver guards. If only 1 valid alternative remains, the toolkit deduces it automatically.
+* **Configurable Retry Attempts:** Easily configure AI retry attempts (1 to 5, default: **2 retries**) directly from Quiz tab settings or Course Tools.
+* **Auto-Copy Question on AI Failure:** Toggleable option (default: **ON**) that automatically copies the formatted question to clipboard if AI times out or fails, enabling immediate `Ctrl+V` pasting into external AI models.
+* **Token-Conservation Architecture:** Strictly triggers only on questions without confirmed answers in the database, consuming **0 tokens** on known questions.
 * **Auto-Select or Suggestion Review:** Choose between automated choice selection or visual highlighting with a `✦ AI Suggestion (Gemini)` badge and purple outline for manual confirmation.
-* **Watchdog Timer & Safe Fallbacks:** 8-second timeout with 1 automatic retry, interactive cancel button, and an in-question fallback bar with `[ ↺ Retry AI ]` and `[ ✦ Copy for AI ]`. Complex formats (drag-and-drop, dropdown matching, short answers) automatically fall back to manual copy.
+* **Watchdog Timer & Safe Fallbacks:** 8-second timeout, interactive cancel button, and an in-question fallback bar with `[ ↺ Retry AI ]` and `[ ✦ Copy for AI ]`. Complex formats (drag-and-drop, dropdown matching, short answers) automatically fall back to manual copy.
 * **Instant Keystroke Shortcuts:**
   * `C`: Formats the active question, choices, and instructions ready for your preferred AI tool.
   * `V`: Automatically parses clipboard content and selects matching choices or fills text inputs in the browser.

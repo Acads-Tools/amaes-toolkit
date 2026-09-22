@@ -2829,8 +2829,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.7.4'), "Userscript header must specify v1.7.4");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.4";'), "Constant SCRIPT_VERSION must be v1.7.4");
+    assert.ok(script.includes('@version      1.7.5'), "Userscript header must specify v1.7.5");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.5";'), "Constant SCRIPT_VERSION must be v1.7.5");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3786,7 +3786,7 @@ test("Gemini AI: Compact Prompt Builder constructs ultra-concise token-efficient
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Script checks
-    assert.ok(script.includes("function buildGeminiCompactPrompt(qData, courseCode = '')"), "Must define buildGeminiCompactPrompt");
+    assert.ok(script.includes("function buildGeminiCompactPrompt(qData, courseCode = '', que = null)"), "Must define buildGeminiCompactPrompt");
     assert.ok(script.includes("Reply with ONLY the correct option letter and exact text"), "Prompt must instruct AI to return minimal letter and text");
     assert.ok(script.includes("No explanations"), "Prompt must strictly prohibit wordy explanations to save tokens");
 
@@ -3925,7 +3925,8 @@ test("Gemini AI: 8s Watchdog Timeout, Automatic Retry, Abort Handling, and Fallb
 
     // 3. Retry loop and fallback bar in handleGeminiQuestionInference
     assert.ok(script.includes("function handleGeminiQuestionInference("), "Must define handleGeminiQuestionInference");
-    assert.ok(script.includes("const maxAttempts = 2; // 1 initial request + 1 automatic retry"), "Must support exactly 1 automatic retry on failure");
+    assert.ok(script.includes("const retryAttempts = getAiRetryCount();"), "Must check configurable retry count");
+    assert.ok(script.includes("const maxAttempts = 1 + retryAttempts;"), "Must support configurable retries on failure");
     assert.ok(script.includes("function showAiFallbackBar(que, qData, promptText, onRetry"), "Must define showAiFallbackBar");
     assert.ok(script.includes("class=\"amaes-ai-retry-btn\""), "Fallback bar must include Retry AI button");
     assert.ok(script.includes("class=\"amaes-ai-copy-btn\""), "Fallback bar must include Copy for AI button");
@@ -3961,10 +3962,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.7.4-blue.svg"), "README badge must show v1.7.4");
+    assert.ok(readme.includes("version-1.7.5-blue.svg"), "README badge must show v1.7.5");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.7.4<"), "Website must display v1.7.4 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.7.5<"), "Website must display v1.7.5 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -3995,6 +3996,72 @@ test("Gemini AI: Granular Failure Diagnostics, Actionable Key Re-Authentication,
     assert.strictEqual(regex.test("Option B"), true, "Must match 'Option B'");
     assert.strictEqual(regex.test("(B)"), true, "Must match '(B)'");
     assert.strictEqual(regex.test("b. Executive Summary"), true, "Must match 'b. Executive Summary'");
+});
+
+// --------------------------------------------------
+// 94. Gemini AI v1.7.5: Session Caching, Elimination Safety Guard, Configurable Retries, and Auto-Copy on Failure
+// --------------------------------------------------
+test("Gemini AI v1.7.5: Session Caching, Elimination Safety Guard, Configurable Retries, and Auto-Copy on Failure", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Session Answer Caching Functions & Restoration
+    assert.ok(script.includes("function saveAiAnswerToCache(qData, matched)"), "Must define saveAiAnswerToCache");
+    assert.ok(script.includes("function getCachedAiAnswer(qData)"), "Must define getCachedAiAnswer");
+    assert.ok(script.includes("const aiAnswerSessionCache = new Map();"), "Must maintain fast in-memory session cache");
+    assert.ok(script.includes("getAiSessionCacheStorageKey()"), "Must persist session cache to sessionStorage across question page reloads");
+    assert.ok(script.includes("// 4. Session AI Cache: Reapply previously AI-solved answer"), "highlightQuizAnswers must restore cached AI answers on page navigation");
+
+    // 2. Confirmed Wrong Answer Elimination Safety Guard
+    assert.ok(script.includes("function isChoiceRowEliminated(row)"), "Must define isChoiceRowEliminated helper");
+    assert.ok(script.includes("function getEliminatedChoicesForQuestion(que, qData, courseCode = '')"), "Must define getEliminatedChoicesForQuestion");
+    assert.ok(script.includes("[CONFIRMED WRONG - DO NOT SELECT]"), "Compact prompt builder must annotate eliminated choices");
+    assert.ok(script.includes("Do NOT choose options marked [CONFIRMED WRONG - DO NOT SELECT]"), "Compact prompt must explicitly instruct model to avoid marked wrong options");
+    assert.ok(script.includes("isChoiceRowEliminated(matched.row)"), "handleGeminiQuestionInference must verify choice is NOT eliminated before selecting");
+    assert.ok(script.includes("[AI Deduction] AI suggested confirmed wrong choice"), "Must deduce remaining choice if only 1 valid alternative remains");
+    assert.ok(script.includes("[AI Wrong Answer Blocked]"), "Must block selecting eliminated choice if multiple alternatives remain");
+
+    // 3. Configurable Retry Count
+    assert.ok(script.includes("function getAiRetryCount()"), "Must define getAiRetryCount");
+    assert.ok(script.includes("function setAiRetryCount(val)"), "Must define setAiRetryCount");
+    assert.ok(script.includes("id=\"sel-ai-retry-count\""), "Quiz settings block must render retry selector");
+    assert.ok(script.includes("id=\"sel-course-ai-retry-count\""), "Course tools AI card must render retry selector");
+    assert.ok(script.includes("const retryAttempts = getAiRetryCount();"), "Inference must use configurable retry count");
+
+    // 4. Auto-Copy on Failure
+    assert.ok(script.includes("function getAiAutoCopyOnFail()"), "Must define getAiAutoCopyOnFail");
+    assert.ok(script.includes("function setAiAutoCopyOnFail(val)"), "Must define setAiAutoCopyOnFail");
+    assert.ok(script.includes("id=\"chk-ai-auto-copy-on-fail\""), "Quiz settings block must render auto-copy toggle");
+    assert.ok(script.includes("id=\"chk-course-ai-auto-copy-on-fail\""), "Course tools AI card must render auto-copy toggle");
+    assert.ok(script.includes("if (getAiAutoCopyOnFail())"), "handleGeminiQuestionInference must auto-copy prompt on failure or mismatch");
+
+    // 5. Unit logic simulation of wrong choice annotation
+    function mockBuildPromptWithElim(qData, courseCode, eliminatedSet) {
+        const lines = [];
+        if (courseCode) lines.push(`[Course: ${courseCode}]`);
+        lines.push(`Question: ${qData.qText || ''}`);
+        lines.push(`Choices:`);
+        qData.choices.forEach(c => {
+            const norm = c.toLowerCase().trim();
+            if (eliminatedSet.has(norm)) {
+                lines.push(`${c} [CONFIRMED WRONG - DO NOT SELECT]`);
+            } else {
+                lines.push(c);
+            }
+        });
+        lines.push(``);
+        lines.push(`Reply with ONLY the correct option letter and exact text (e.g., "b. ROM"). Do NOT choose options marked [CONFIRMED WRONG - DO NOT SELECT]. No explanations.`);
+        return lines.join('\n');
+    }
+
+    const testQ = {
+        qText: "Which of the following is not a primary component?",
+        choices: ["a. RAM", "b. ROM", "c. Business Strategy", "d. Cache"]
+    };
+    const elimSet = new Set(["c. business strategy"]);
+    const prompt = mockBuildPromptWithElim(testQ, "CS101", elimSet);
+    assert.ok(prompt.includes("c. Business Strategy [CONFIRMED WRONG - DO NOT SELECT]"), "Confirmed wrong choice must be annotated in prompt");
+    assert.ok(!prompt.includes("a. RAM [CONFIRMED WRONG"), "Valid choice must not be annotated as wrong");
 });
 
 console.log("\n==================================================");
