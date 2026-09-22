@@ -4115,7 +4115,12 @@ test("Gemini AI v1.7.5: Unverified AI Suggestion Safeguards, Copy Question Filte
     assert.ok(script.includes("isAiSuggestion: Boolean(q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini')))"), "Relay payload must tag isAiSuggestion explicitly");
     assert.ok(script.includes("evidenceType: q.evidenceType || (q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini')) ? 'ai_inference' : evidenceType)"), "Relay payload must tag evidenceType as ai_inference for AI sources");
 
-    // 8. Real Lifecycle Simulation: AI Suggestion -> Rejection/Wrong Choice -> Elimination & Deduction
+    // 8. Redundant Blockage HUD Suppression & Auto-Copy Indication
+    assert.ok(script.includes("firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());"), "Must clean up blockage HUD when AI starts solving or succeeds");
+    assert.ok(script.includes("if (firstBlockedQue.querySelector('.amaes-ai-suggested-choice')) {\n                        isSolverRunning = false;\n                        return;\n                    }"), "Must return immediately and suppress blockage HUD when AI solves question");
+    assert.ok(script.includes("(Prompt auto-copied 📋)"), "Status log must indicate prompt was auto-copied to clipboard");
+
+    // 9. Real Lifecycle Simulation: AI Suggestion -> Rejection/Wrong Choice -> Elimination & Deduction
     let mockExisting = [];
     function mockMerge(subCode, newQuestions, sourceLabel) {
         newQuestions.forEach(newItem => {

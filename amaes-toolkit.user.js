@@ -2974,11 +2974,20 @@
                 const isEligibleChoice = isEligibleForAiSolver(firstBlockedQue, qData);
                 const existingAiChoice = firstBlockedQue.querySelector('.amaes-ai-suggested-choice');
                 if (existingAiChoice && !isChoiceRowEliminated(existingAiChoice)) {
+                    // Clean up any stale blockage HUD if previously injected
+                    firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());
                     // Already solved by AI and highlighted! Keep paused for review without re-querying API.
-                    setLog(`[AI Suggestion] Question #${qData ? qData.qNum : ''} has an AI suggestion. Paused for review—press <b>N</b> or click Next page when ready.`, "var(--accent-purple)");
+                    setLog(`[AI Suggestion] Question #${qData ? qData.qNum : ''} has an AI suggestion. (Prompt auto-copied 📋) Paused for review—press <b>N</b> or click Next page when ready.`, "var(--accent-purple)");
+                    isSolverRunning = false;
                     return;
                 }
                 if (geminiApiKey && aiQuizEnabled && isEligibleChoice) {
+                    // Remove any manual blockage HUD so it does not conflict with active AI solving
+                    firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());
+
+                    // Auto-copy question prompt in background as seamless backup for the student
+                    copyToClipboard(aiPromptText).catch(() => {});
+
                     const courseInfo = detectCourseInfo();
                     const courseCode = courseInfo.subjectCode || '';
                     const promptText = buildGeminiCompactPrompt(qData, courseCode, firstBlockedQue);
@@ -2988,6 +2997,8 @@
                         qData: qData,
                         promptText: promptText,
                         onSuccess: async (matched) => {
+                            // Ensure blockage HUD is removed upon successful AI resolution
+                            firstBlockedQue.querySelectorAll('.amaes-blockage-hud, .amaes-unanswered-hint').forEach(el => el.remove());
                             if (aiAutoSelect && matched && matched.input) {
                                 const anyChecked = Boolean(firstBlockedQue.querySelector('.answer input[type="radio"]:checked, .answer input[type="checkbox"]:checked'));
                                 if (!anyChecked) {
@@ -2998,23 +3009,30 @@
                                     matched.input.dispatchEvent(new Event('change', { bubbles: true }));
                                 }
                                 showToast(`✦ Gemini selected choice for #${qData ? qData.qNum : ''}! (Paused for review)`, 3000);
-                                setLog(`[AI Suggestion] Gemini selected <b>${escapeHtml(matched.choiceText)}</b> for #${qData ? qData.qNum : ''}. Paused for review—press <b>N</b> or click Next page when ready.`, "var(--accent-purple)");
+                                setLog(`[AI Suggestion] Gemini selected <b>${escapeHtml(matched.choiceText)}</b> for #${qData ? qData.qNum : ''}. (Prompt auto-copied 📋) Paused for review—press <b>N</b> or click Next page when ready.`, "var(--accent-purple)");
                             } else {
                                 showToast(`✦ Gemini suggested answer for #${qData ? qData.qNum : ''} (Paused for review)`, 3000);
-                                setLog(`[AI Suggestion] Gemini suggested <b>${escapeHtml(matched ? matched.choiceText : '')}</b> for #${qData ? qData.qNum : ''}. Paused for review—click to select and proceed.`, "var(--accent-purple)");
+                                setLog(`[AI Suggestion] Gemini suggested <b>${escapeHtml(matched ? matched.choiceText : '')}</b> for #${qData ? qData.qNum : ''}. (Prompt auto-copied 📋) Paused for review—click to select and proceed.`, "var(--accent-purple)");
                             }
                         }
                     });
+
+                    // If AI successfully resolved and highlighted a choice, finish here without showing redundant blockage HUD!
+                    if (firstBlockedQue.querySelector('.amaes-ai-suggested-choice')) {
+                        isSolverRunning = false;
+                        return;
+                    }
                 } else {
                     // Copy question for AI helper
                     copyToClipboard(aiPromptText).then(() => {
-                        showToast(`Question #${qData ? qData.qNum : ''} not in database — ready for your answer!`);
+                        showToast(`📋 Question #${qData ? qData.qNum : ''} auto-copied to clipboard — ready to paste!`, 3000);
                     }).catch(() => {});
                 }
 
+                // If reaching here: either question is ineligible for AI (e.g. text/drag), AI is not enabled, or AI failed
                 setLog(
-                    `<b>Waiting for Answer:</b> Question #${qData ? qData.qNum : ''} has no saved answer yet. ` +
-                    `Select your answer, or paste from AI (press <b>V</b>), then press <b>N</b> or click <b>Next page</b> to proceed.`,
+                    `<b>Question #${qData ? qData.qNum : ''} Auto-Copied:</b> Prompt copied to clipboard. ` +
+                    `Paste from AI (press <b>V</b>) or select manually, then press <b>N</b> or click <b>Next page</b> to proceed.`,
                     "var(--accent-amber)"
                 );
 
@@ -3046,7 +3064,7 @@
                         <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 200px;">
                             <span style="background: #f59e0b; color: #ffffff; padding: 3px 8px; border-radius: 5px; font-weight: 800; font-size: 10px; letter-spacing: 0.5px; flex-shrink: 0;">WAITING FOR ANSWER</span>
                             <div>
-                                <div style="font-weight: 700; color: #92400e; font-size: 12px; margin-bottom: 2px;">Question #${qData ? qData.qNum : ''}: No saved answer yet</div>
+                                <div style="font-weight: 700; color: #92400e; font-size: 12px; margin-bottom: 2px;">Question #${qData ? qData.qNum : ''}: No saved answer yet (Auto-copied to clipboard)</div>
                                 <div style="color: #b45309; font-size: 11px; line-height: 1.45;">
                                     <div><strong>1. Answer:</strong> Pick a choice, or paste an AI answer (press <b>V</b> to paste)</div>
                                     <div><strong>2. Continue:</strong> Click <b>Next page</b> or press <b>N</b> to proceed</div>
