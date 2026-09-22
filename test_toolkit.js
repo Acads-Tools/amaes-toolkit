@@ -2829,8 +2829,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.6.7'), "Userscript header must specify v1.6.7");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.6.7";'), "Constant SCRIPT_VERSION must be v1.6.7");
+    assert.ok(script.includes('@version      1.7.0'), "Userscript header must specify v1.7.0");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.0";'), "Constant SCRIPT_VERSION must be v1.7.0");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3294,9 +3294,9 @@ test("Unified Verified DB: merges local reviews and community answers under Veri
 
     // 1. Grid structure: 3 columns
     assert.ok(script.includes('grid-template-columns: repeat(3, 1fr)'), "Source breakdown must use 3-column unified grid");
-    assert.ok(script.includes('>Verified DB</div>'), "Must feature prominent Verified DB card");
-    assert.ok(script.includes('>AMAUOED</div>'), "Must feature AMAUOED card");
-    assert.ok(script.includes('>Eliminated</div>'), "Must feature Eliminated card");
+    assert.ok(script.includes('>Verified Library</div>'), "Must feature prominent Verified Library card");
+    assert.ok(script.includes('>Study Guides</div>'), "Must feature Study Guides card");
+    assert.ok(script.includes('>Eliminated Wrong</div>'), "Must feature Eliminated Wrong card");
     assert.ok(!script.includes('>Community:</span>'), "Separate Community source row must not exist in breakdown");
 
     // 2. VerifiedCount logic unifies local and community
@@ -3326,7 +3326,7 @@ test("Web Scraper Answers: simplified accordion, auto-scrape, removed manual inp
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Accordion summary header renamed
-    assert.ok(script.includes("<span>Web Scraper Answers</span>"), "Accordion summary must be 'Web Scraper Answers'");
+    assert.ok(script.includes("<span>Online Study Guides (AMAUOED)</span>"), "Accordion summary must be 'Online Study Guides (AMAUOED)'");
     assert.ok(!script.includes("<span>AMAUOED Study Guide Scraper</span>"), "Legacy summary header must be removed");
 
     // 2. Manual URL input, Auto-Find button, and Scrape & Cache button removed

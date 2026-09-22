@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.6.9
+// @version      1.7.0
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -25,7 +25,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.6.9";
+    const SCRIPT_VERSION = "v1.7.0";
     const ANSWER_DB_SCHEMA_VERSION = 2;
     const CONTRIBUTOR_ID_STORAGE_KEY = 'amaes_anonymous_contributor_id';
 
@@ -880,7 +880,7 @@
 
     const ICONS = {
         home: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
-        debug: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6"/><path d="M12 19h8"/></svg>`,
+        debug: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>`,
         sun: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>`,
         moon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`,
         minimize: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
@@ -8593,32 +8593,32 @@
                     </div>
 
                     <div style="background: rgba(167, 139, 250, 0.1); border: 1px solid rgba(167, 139, 250, 0.2); border-radius: 8px; padding: 12px 14px;">
-                        <h3 style="margin: 0 0 4px; font-size: 13.5px; color: #c4b5fd; display: flex; align-items: center; gap: 6px;">${ICONS.search} Web-Scraping Rescue</h3>
-                        <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Autonomously searches AMAUOED study guides in the background to provide answers when verified question entries are missing.</p>
+                        <h3 style="margin: 0 0 4px; font-size: 13.5px; color: #c4b5fd; display: flex; align-items: center; gap: 6px;">${ICONS.search} Online Study Guide Rescue</h3>
+                        <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically checks online study guides (AMAUOED) in the background to provide answers when verified question entries are missing.</p>
                     </div>
 
                     <!-- Collect & Share Anonymously -->
                     <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 12px 14px;">
                         <h3 style="margin: 0 0 4px; font-size: 13.5px; color: #34d399; display: flex; align-items: center; gap: 6px;">${ICONS.upload} Collect & Share Anonymously</h3>
-                        <p style="margin: 0 0 6px; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Help classmates! Confirmed review answers are collected and shared to the community database <b>100% anonymously</b>. No student credentials or personal data are ever sent.</p>
+                        <p style="margin: 0 0 6px; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Help classmates! Confirmed review answers are collected and shared to the community library <b>100% anonymously</b>. No student credentials or personal data are ever sent.</p>
                         
                         <!-- Mini Toggles with Comfortable Touch Spacing -->
                         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px; background: rgba(0, 0, 0, 0.2); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05);">
                             <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #e2e8f0; cursor: pointer; padding: 1px 0;">
                                 <input id="welcome-chk-harvest" type="checkbox" ${typeof autoHarvestGrades !== 'undefined' && autoHarvestGrades ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px; accent-color: #10b981;" />
-                                <span>Auto-collect confirmed answers from past quizzes</span>
+                                <span>Automatically save confirmed answers from completed quizzes</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #e2e8f0; cursor: pointer; padding: 1px 0;">
                                 <input id="welcome-chk-sync" type="checkbox" ${autoCloudSync ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px; accent-color: #10b981;" />
-                                <span>Auto-sync verified questions on course open</span>
+                                <span>Automatically download verified answers on course open</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #e2e8f0; cursor: pointer; padding: 1px 0;">
                                 <input id="welcome-chk-scrape" type="checkbox" ${autoScrapeAmauoed ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px; accent-color: #10b981;" />
-                                <span>Auto-scrape AMAUOED when missing</span>
+                                <span>Auto-check online study guides when missing</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #e2e8f0; cursor: pointer; padding: 1px 0;">
                                 <input id="welcome-chk-share" type="checkbox" ${autoCommunityShare ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px; accent-color: #10b981;" />
-                                <span>Share verified review answers anonymously</span>
+                                <span>Share verified answers with classmates (100% anonymous)</span>
                             </label>
                         </div>
                     </div>
@@ -9001,7 +9001,7 @@
                     </button>
 
                     ${DEBUG_MODE ? `
-                    <button id="amaes-debug-btn" class="amaes-icon-btn amaes-debug-btn" title="Copy AI Diagnostic Report">
+                    <button id="amaes-debug-btn" class="amaes-icon-btn amaes-debug-btn" title="System Diagnostics & Report (Click to copy report)">
                         ${ICONS.debug}
                     </button>` : ''}
 
@@ -9050,13 +9050,13 @@
 
                 <!-- Categorized Persona Navigation Tabs -->
                 <div id="amaes-nav-tabs">
-                    <button class="amaes-tab-btn active" data-tab="quiz" title="Autonomous Quiz Solver, AI Prompts & In-Quiz Assistance">
+                    <button class="amaes-tab-btn active" data-tab="quiz" title="Automatic Quiz Solver, AI Prompts & In-Quiz Assistance">
                         ${ICONS.target} <span>Quiz</span>
                     </button>
-                    <button class="amaes-tab-btn" data-tab="db" title="Cloud Database Sync, Verification & Sharing">
-                        ${ICONS.database} <span>DB</span>
+                    <button class="amaes-tab-btn" data-tab="db" title="Saved Question Library, Verified Answers & Online Study Guides">
+                        ${ICONS.database} <span>Study Library</span>
                     </button>
-                    <button class="amaes-tab-btn" data-tab="course" title="Batch Lecture Auto-Marker, Highlighters & Search">
+                    <button class="amaes-tab-btn" data-tab="course" title="Course Tools, Lecture Auto-Marker & Study Helpers">
                         ${ICONS.tools} <span>Course Tools</span>
                     </button>
                 </div>
@@ -9098,10 +9098,10 @@
 
                     <!-- Primary Core Settings (The 3-Step Pipeline) -->
                     <div style="margin-top: 2px; border-top: 1px solid var(--border-subtle); padding-top: 6px; display: flex; flex-direction: column; gap: 5px;">
-                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: var(--accent-green); cursor: pointer; font-weight: 700;" title="Automatically highlight verified database and web scraper answers">
+                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: var(--accent-green); cursor: pointer; font-weight: 700;" title="Automatically highlight verified database and study guide answers">
                             <input id="chk-auto-hl-quiz" type="checkbox" ${autoHighlightQuiz ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
                             <div>
-                                <span>Highlight Answers (DB & Web Scraper)</span>
+                                <span>Highlight Answers (Library & Study Guides)</span>
                                 <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Color-coded verified answers, study guides & eliminated choices</div>
                             </div>
                         </label>
@@ -9162,9 +9162,9 @@
                                 <input id="chk-ai-prompt-hint" type="checkbox" ${aiPromptHint ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Strict AI prompt format (a, b, c, d only)</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Include database answer suggestion and confidence in copied prompt">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Include saved answer suggestion and confidence in copied prompt">
                                 <input id="chk-copy-confidence" type="checkbox" ${copyIncludeConfidence ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Include DB answer hint in copied prompt</span>
+                                <span>Include saved answer hint in copied prompt</span>
                             </label>
                         </div>
                     </details>
@@ -9175,7 +9175,7 @@
                     <!-- Course Selector for Dashboard / Non-Course Pages -->
                     ${!courseInfo.subjectCode && detectedCodes.length > 0 ? `
                         <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; background: var(--surface-subtle); padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border-subtle); font-size: 11px;">
-                            <span style="font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">${ICONS.book} Active Course:</span>
+                            <span style="font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">${ICONS.book} Current Subject:</span>
                             <select id="amaes-select-active-course" style="background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-weight: 700; font-size: 11px; cursor: pointer;">
                                 ${detectedCodes.map(c => `<option value="${c}" ${c === subCode ? 'selected' : ''}>${c} (${(allLocalDbs[c] || []).length} Qs)</option>`).join('')}
                                 <option value="_custom">+ Enter Custom Code...</option>
@@ -9188,25 +9188,25 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; padding-bottom: 3px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
                             <div style="display: flex; align-items: center; gap: 5px; min-width: 0;">
                                 <span style="display: inline-flex; color: var(--accent-blue);">${ICONS.database}</span>
-                                <span style="font-size: 10px; font-weight: 700; color: var(--text-primary); white-space: nowrap;">Course Coverage</span>
+                                <span style="font-size: 10px; font-weight: 700; color: var(--text-primary); white-space: nowrap;">Subject Questions</span>
                                 <span id="amaes-coverage-badge" style="font-size: 9px; font-weight: 700; color: #60a5fa; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); padding: 1px 5px; border-radius: 4px; white-space: nowrap;">${subCode || ''}</span>
                                 <span id="amaes-coverage-title" style="display: none;">Course Coverage (${subCode || 'General'}):</span>
                             </div>
                             <span id="amaes-term-summary" style="font-size: 9px; font-weight: 600; color: var(--accent-green); white-space: nowrap; text-align: right;">Loading...</span>
                         </div>
                         
-                        <!-- Unified Source Breakdown: Verified DB (Local + Community), AMAUOED, Eliminated -->
+                        <!-- Unified Source Breakdown: Verified Library, Study Guides, Eliminated Wrong -->
                         <div id="amaes-source-breakdown" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; font-size: 9.5px;">
-                            <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(52, 211, 153, 0.35); border-radius: 4px; padding: 4px 2px; text-align: center;" title="Moodle-verified answers confirmed by review grading key (includes your reviews & community contributions)">
-                                <div style="font-size: 8.5px; font-weight: 700; color: #34d399;">Verified DB</div>
+                            <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(52, 211, 153, 0.35); border-radius: 4px; padding: 4px 2px; text-align: center;" title="Verified answers confirmed by quiz grading keys (includes your completed quizzes & community contributions)">
+                                <div style="font-size: 8.5px; font-weight: 700; color: #34d399;">Verified Library</div>
                                 <div id="amaes-stat-verified" style="font-size: 11px; font-weight: 800; color: #6ee7b7;">0</div>
                             </div>
-                            <div style="background: rgba(168, 85, 247, 0.14); border: 1px solid rgba(192, 132, 252, 0.35); border-radius: 4px; padding: 4px 2px; text-align: center;" title="External study guide answers scraped from amauoed.com">
-                                <div style="font-size: 8.5px; font-weight: 700; color: #d8b4fe;">AMAUOED</div>
+                            <div style="background: rgba(168, 85, 247, 0.14); border: 1px solid rgba(192, 132, 252, 0.35); border-radius: 4px; padding: 4px 2px; text-align: center;" title="Online study guide answers found for this subject">
+                                <div style="font-size: 8.5px; font-weight: 700; color: #d8b4fe;">Study Guides</div>
                                 <div id="amaes-stat-amauoed" style="font-size: 11px; font-weight: 800; color: #f3e8ff;">0</div>
                             </div>
-                            <div style="background: rgba(239, 68, 68, 0.14); border: 1px solid rgba(248, 113, 113, 0.35); border-radius: 4px; padding: 4px 2px; text-align: center;" title="Choices officially confirmed incorrect during reviews">
-                                <div style="font-size: 8.5px; font-weight: 700; color: #fca5a5;">Eliminated</div>
+                            <div style="background: rgba(239, 68, 68, 0.14); border: 1px solid rgba(248, 113, 113, 0.35); border-radius: 4px; padding: 4px 2px; text-align: center;" title="Choices confirmed incorrect during reviews">
+                                <div style="font-size: 8.5px; font-weight: 700; color: #fca5a5;">Eliminated Wrong</div>
                                 <div id="amaes-stat-eliminated" style="font-size: 11px; font-weight: 800; color: #fee2e2;">0</div>
                             </div>
                         </div>
@@ -9219,25 +9219,25 @@
 
                     <!-- Primary 1-Click Actions: Pull & Share -->
                     <div style="display: flex; gap: 6px;">
-                        <button id="btn-cloud-sync" class="amaes-btn amaes-btn-blue" style="flex: 1; justify-content: center; padding: 7px; font-size: 11px; font-weight: 700;" title="Pull verified answers directly from free GitHub community database">
-                            ${ICONS.cloudDownload} <span>Cloud Sync</span>
+                        <button id="btn-cloud-sync" class="amaes-btn amaes-btn-blue" style="flex: 1; justify-content: center; padding: 7px; font-size: 11px; font-weight: 700;" title="Download verified answers from the shared community library">
+                            ${ICONS.cloudDownload} <span>Download Answers</span>
                         </button>
-                        <button id="btn-harvest-grades-db" class="amaes-btn amaes-btn-green" style="flex: 1; justify-content: center; padding: 7px; font-size: 11px; font-weight: 700;" title="Scan course Grade Report to collect verified correct answers and share them anonymously to the world">
+                        <button id="btn-harvest-grades-db" class="amaes-btn amaes-btn-green" style="flex: 1; justify-content: center; padding: 7px; font-size: 11px; font-weight: 700;" title="Collect answers from completed quizzes and share them anonymously to help classmates">
                             ${ICONS.download} <span>Collect & Share Answers</span>
                         </button>
                     </div>
 
 
-                    <!-- Web Scraper Answers -->
+                    <!-- Online Study Guides (AMAUOED) -->
                     <details style="border: 1px solid var(--border-subtle); border-radius: 6px; padding: 5px 7px; background: rgba(0,0,0,0.15);">
                         <summary style="font-size: 10px; font-weight: 700; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;">
-                            <span>Web Scraper Answers</span>
+                            <span>Online Study Guides (AMAUOED)</span>
                             <span style="font-size: 9px; color: var(--text-muted);">Expand</span>
                         </summary>
                         <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically scrape static AMAUOED answer keys if cloud database is empty (Default: ON)">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically check online study guides if questions are not yet in your library (Default: ON)">
                                 <input id="chk-auto-scrape-amauoed" type="checkbox" ${autoScrapeAmauoed ? 'checked' : ''} style="cursor: pointer;" />
-                                <span style="font-weight: 600; color: var(--accent-purple);">Auto-scrape AMAUOED when missing</span>
+                                <span style="font-weight: 600; color: var(--accent-purple);">Auto-check study guides when missing</span>
                             </label>
 
                             <div style="display: flex; gap: 6px; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 4px 6px;">
@@ -9265,9 +9265,9 @@
                             <input id="chk-auto-harvest-grades" type="checkbox" ${autoHarvestGrades ? 'checked' : ''} style="cursor: pointer;" />
                             <span style="font-weight: 600; color: var(--accent-green);">Auto-collect confirmed answers from past quizzes</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically pull and sync verified community answers when opening a course page">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically download verified community answers when opening a course page">
                             <input id="chk-auto-cloud-sync" type="checkbox" ${autoCloudSync ? 'checked' : ''} style="cursor: pointer;" />
-                            <span style="font-weight: 600; color: var(--text-primary);">Auto-sync verified questions on course open</span>
+                            <span style="font-weight: 600; color: var(--text-primary);">Automatically download verified answers on course open</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically & anonymously share verified correct answers to the community database on quiz review (Default: ON)">
                             <input id="chk-auto-community-share" type="checkbox" ${autoCommunityShare ? 'checked' : ''} style="cursor: pointer;" />
