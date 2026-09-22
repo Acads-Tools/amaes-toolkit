@@ -6189,9 +6189,7 @@
                 if (typeof dispatchCommunityContribution === 'function') {
                     clearTimeout(communityShareDebounceTimer);
                     communityShareDebounceTimer = setTimeout(() => {
-                        dispatchCommunityContribution(subCode, existing, { source: sourceLabel }).catch(err => {
-                            logDebug(`Community auto-share note: ${err.message}`);
-                        });
+                        queueCommunityContribution(subCode, existing, { source: sourceLabel });
                     }, 1500);
                 }
             }
@@ -6904,6 +6902,49 @@
         return out;
     }
 
+    // Batched & Debounced Community Contribution Queue
+    const pendingContributionBatches = {};
+    const pendingContributionTimers = {};
+
+    function queueCommunityContribution(subCode, questions, options = {}) {
+        if (!questions || questions.length === 0) return;
+        const validQuestions = questions.filter(q => Boolean(q.ansRaw || q.answer || q.correctAnswer));
+        if (validQuestions.length === 0) return;
+
+        if (!pendingContributionBatches[subCode]) {
+            pendingContributionBatches[subCode] = new Map();
+        }
+
+        validQuestions.forEach(q => {
+            const key = (typeof getQuestionIdentity === 'function' ? getQuestionIdentity(q) : null) ||
+                        normalizeText(q.qRaw || q.question || "");
+            if (key) {
+                pendingContributionBatches[subCode].set(key, q);
+            }
+        });
+
+        if (pendingContributionTimers[subCode]) {
+            clearTimeout(pendingContributionTimers[subCode]);
+        }
+
+        // 12-second debounce consolidates multi-page / multi-quiz discoveries into one single submission
+        pendingContributionTimers[subCode] = setTimeout(() => {
+            flushCommunityContributions(subCode, options);
+        }, 12000);
+    }
+
+    async function flushCommunityContributions(subCode, options = {}) {
+        if (pendingContributionTimers[subCode]) {
+            clearTimeout(pendingContributionTimers[subCode]);
+            delete pendingContributionTimers[subCode];
+        }
+        const batchMap = pendingContributionBatches[subCode];
+        if (!batchMap || batchMap.size === 0) return;
+        const questionsToFlush = Array.from(batchMap.values());
+        delete pendingContributionBatches[subCode];
+        return dispatchCommunityContribution(subCode, questionsToFlush, options);
+    }
+
     // Dispatch Community Contribution silently in background
     async function dispatchCommunityContribution(subCode, questions, options = {}) {
         if (!questions || questions.length === 0) return;
@@ -7173,6 +7214,7 @@
 
         if (allQuestions.length > 0) {
             mergeAnswersIntoCache(subCode, allQuestions, 'Grades-Harvester');
+            flushCommunityContributions(subCode, { source: 'grades_harvester' }).catch(() => {});
             return { success: true, count: totalHarvested, quizzes: completedQuizzes.length, subCode };
         }
 
@@ -7875,7 +7917,7 @@
                 localStorage.setItem(shareKey, JSON.stringify(Array.from(sharedSet)));
                 sessionStorage.setItem(shareKey, JSON.stringify(Array.from(sharedSet)));
                 setTimeout(() => {
-                    Promise.resolve(dispatchCommunityContribution(harvested.subjectCode, pendingQuestions, {
+                    Promise.resolve(queueCommunityContribution(harvested.subjectCode, pendingQuestions, {
                         source: 'review_screen',
                         evidenceType: 'moodle_review',
                         contributionId: `review-${processingKey}`
@@ -8263,6 +8305,13 @@
             const el = document.getElementById('amaes-dev-mesh-count');
             if (!el) return;
 
+            let cid = localStorage.getItem('amaes_anonymous_cid');
+            if (!cid) {
+                cid = 'c_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+                try { localStorage.setItem('amaes_anonymous_cid', cid); } catch (_) {}
+            }
+            const pulseUrl = `${DEFAULT_COMMUNITY_RELAY_URL}/active?cid=${encodeURIComponent(cid)}&v=${encodeURIComponent(SCRIPT_VERSION)}`;
+
             // Try to fetch real live count from relay if available
             try {
                 const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
@@ -8270,14 +8319,15 @@
                 if (gmReq) {
                     gmReq({
                         method: 'GET',
-                        url: `${DEFAULT_COMMUNITY_RELAY_URL}/active`,
-                        timeout: 3000,
+                        url: pulseUrl,
+                        timeout: 3500,
                         onload: (res) => {
                             try {
                                 const data = JSON.parse(res.responseText);
                                 if (data && typeof data.active === 'number') {
-                                    el.innerText = data.active;
-                                    sessionStorage.setItem('amaes_relay_active_users', String(data.active));
+                                    const safeCount = Math.max(1, data.active);
+                                    el.innerText = safeCount;
+                                    sessionStorage.setItem('amaes_relay_active_users', String(safeCount));
                                     return;
                                 }
                             } catch (_) {}
@@ -8293,9 +8343,7 @@
 
             function applyFallbackCount() {
                 const stored = sessionStorage.getItem('amaes_relay_active_users');
-                const base = stored ? parseInt(stored, 10) : 24;
-                const dynamicCount = Math.max(1, base + Math.floor((Math.random() * 5) - 2));
-                el.innerText = dynamicCount;
+                el.innerText = stored ? stored : '1';
             }
         };
         updateCount();
@@ -8397,12 +8445,60 @@
             }
         } else if (c === 'users') {
             addLine(`Querying Cloudflare telemetry mesh...`, 'var(--text-muted)');
-            startDevMeshTelemetry();
-            setTimeout(() => {
-                const count = document.getElementById('amaes-dev-mesh-count')?.innerText || '--';
-                addLine(`Active Peer Mesh: ${count} concurrent users online in this rolling window.`, 'var(--accent-purple)');
-                addLine(`Passive Pulse: Throttled at 10-minute intervals (zero CPU impact).`, 'var(--text-secondary)');
-            }, 300);
+            let cid = localStorage.getItem('amaes_anonymous_cid');
+            if (!cid) {
+                cid = 'c_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+                try { localStorage.setItem('amaes_anonymous_cid', cid); } catch (_) {}
+            }
+            const pulseUrl = `${DEFAULT_COMMUNITY_RELAY_URL}/ping?v=${encodeURIComponent(SCRIPT_VERSION)}&cid=${encodeURIComponent(cid)}`;
+
+            const renderUserCount = (activeCount, isLive) => {
+                const count = Math.max(1, activeCount);
+                const el = document.getElementById('amaes-dev-mesh-count');
+                if (el) el.innerText = count;
+                sessionStorage.setItem('amaes_relay_active_users', String(count));
+
+                if (isLive) {
+                    const peerDesc = count === 1 ? ' (You are the only active user in this rolling window)' : ` (${count - 1} other peer${count > 2 ? 's' : ''} + you)`;
+                    addLine(`Active Peer Mesh: ${count} concurrent user${count !== 1 ? 's' : ''} online${peerDesc}.`, 'var(--accent-purple)');
+                    addLine(`Telemetry Window: Rolling 10 minutes | Edge Relay: Connected`, 'var(--accent-green)');
+                } else {
+                    addLine(`Active Peer Mesh: 1 concurrent user (Self / Offline fallback)`, 'var(--accent-amber)');
+                    addLine(`Relay Note: Edge relay unreachable. Showing verified local session.`, 'var(--text-secondary)');
+                }
+            };
+
+            const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
+                          (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
+            if (gmReq) {
+                gmReq({
+                    method: 'GET',
+                    url: pulseUrl,
+                    timeout: 4500,
+                    onload: (res) => {
+                        try {
+                            const data = JSON.parse(res.responseText);
+                            if (data && typeof data.active === 'number') {
+                                renderUserCount(data.active, true);
+                                return;
+                            }
+                        } catch (_) {}
+                        renderUserCount(1, false);
+                    },
+                    onerror: () => renderUserCount(1, false)
+                });
+            } else {
+                fetch(pulseUrl)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data && typeof data.active === 'number') {
+                            renderUserCount(data.active, true);
+                        } else {
+                            renderUserCount(1, false);
+                        }
+                    })
+                    .catch(() => renderUserCount(1, false));
+            }
         } else if (c === 'cache') {
             let totalKeys = 0;
             let totalQuestions = 0;
