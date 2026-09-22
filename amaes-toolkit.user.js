@@ -8341,7 +8341,18 @@
     // Dispatch Community Contribution silently in background
     async function dispatchCommunityContribution(subCode, questions, options = {}) {
         if (!questions || questions.length === 0) return;
-        const validQuestions = questions.filter(q => Boolean(q.ansRaw || q.answer || q.correctAnswer));
+        const validQuestions = questions.filter(q => {
+            const raw = (q.ansRaw || q.answer || q.correctAnswer || '').trim();
+            if (!raw) return false;
+            // Proven Wrong Guard: If answer was confirmed wrong/eliminated, NEVER share it!
+            const norm = normalizeChoice(raw);
+            const wrongList = Array.isArray(q.wrongAnswers) ? q.wrongAnswers : [];
+            const isProvenWrong = wrongList.some(w => {
+                const wNorm = typeof w === 'string' ? normalizeChoice(w) : (w.norm || normalizeChoice(w.text || ''));
+                return wNorm === norm || unscriptDigits(wNorm) === unscriptDigits(norm);
+            });
+            return !isProvenWrong;
+        });
         if (validQuestions.length === 0) return;
         const contributionId = options.contributionId || `contribution-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const evidenceType = options.evidenceType || (options.source === 'review_screen' ? 'moodle_review' : 'community_report');
