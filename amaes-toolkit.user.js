@@ -901,6 +901,85 @@
         localStorage.setItem('amaes_ai_auto_copy_on_fail', aiAutoCopyOnFail ? 'true' : 'false');
     }
 
+    const GEMINI_FREE_RPM = 15; // 15 requests per minute limit on Google AI Studio Free Tier
+    let aiPlanTier = localStorage.getItem('amaes_ai_plan_tier') || 'free'; // 'free' or 'paid'
+    let aiRateLimitCooldownUntil = 0;
+    try {
+        const storedCooldown = parseInt(sessionStorage.getItem('amaes_ai_cooldown_until') || '0', 10);
+        if (storedCooldown > Date.now()) aiRateLimitCooldownUntil = storedCooldown;
+    } catch (_) {}
+    let activeRateLimitTimerInterval = null;
+
+    function getAiPlanTier() {
+        return localStorage.getItem('amaes_ai_plan_tier') || 'free';
+    }
+
+    function setAiPlanTier(tier) {
+        aiPlanTier = tier === 'paid' ? 'paid' : 'free';
+        localStorage.setItem('amaes_ai_plan_tier', aiPlanTier);
+    }
+
+    function getStoredRequestTimestamps() {
+        try {
+            const raw = sessionStorage.getItem('amaes_ai_req_timestamps');
+            if (raw) {
+                const arr = JSON.parse(raw);
+                if (Array.isArray(arr)) {
+                    const cutoff = Date.now() - 60000;
+                    return arr.filter(t => typeof t === 'number' && t > cutoff);
+                }
+            }
+        } catch (_) {}
+        return [];
+    }
+
+    function saveRequestTimestamps(arr) {
+        try {
+            sessionStorage.setItem('amaes_ai_req_timestamps', JSON.stringify(arr));
+        } catch (_) {}
+    }
+
+    function recordAiRequest() {
+        const now = Date.now();
+        const cutoff = now - 60000;
+        const current = getStoredRequestTimestamps().filter(t => t > cutoff);
+        current.push(now);
+        saveRequestTimestamps(current);
+    }
+
+    function triggerAiRateLimitCooldown(suggestedWaitSec = 20) {
+        const waitSec = Math.max(5, Math.min(60, suggestedWaitSec));
+        aiRateLimitCooldownUntil = Math.max(aiRateLimitCooldownUntil, Date.now() + (waitSec * 1000));
+        try {
+            sessionStorage.setItem('amaes_ai_cooldown_until', String(aiRateLimitCooldownUntil));
+        } catch (_) {}
+        return Math.ceil((aiRateLimitCooldownUntil - Date.now()) / 1000);
+    }
+
+    function getAiRateLimitStatus() {
+        const now = Date.now();
+        try {
+            const storedCooldown = parseInt(sessionStorage.getItem('amaes_ai_cooldown_until') || '0', 10);
+            if (storedCooldown > aiRateLimitCooldownUntil) aiRateLimitCooldownUntil = storedCooldown;
+        } catch (_) {}
+
+        if (aiRateLimitCooldownUntil > now) {
+            const remainingSec = Math.max(1, Math.ceil((aiRateLimitCooldownUntil - now) / 1000));
+            return { isLimited: true, remainingSec, reason: 'cooldown' };
+        }
+
+        if (getAiPlanTier() === 'free') {
+            const timestamps = getStoredRequestTimestamps();
+            if (timestamps.length >= GEMINI_FREE_RPM) {
+                const oldest = timestamps[0];
+                const remainingSec = Math.max(1, Math.ceil((oldest + 60000 - now) / 1000));
+                return { isLimited: true, remainingSec, reason: 'rpm_cap' };
+            }
+        }
+
+        return { isLimited: false, remainingSec: 0, reason: null };
+    }
+
     function getAiSessionCacheStorageKey() {
         return `amaes_ai_session_cache_${getQuizSessionKey()}`;
     }
@@ -2988,6 +3067,31 @@
                     return;
                 }
                 if (geminiApiKey && aiQuizEnabled && isEligibleChoice) {
+                    // Check if client-side or cooldown rate limit is currently active
+                    const rateLimitStatus = getAiRateLimitStatus();
+                    if (rateLimitStatus.isLimited) {
+                        firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());
+                        copyToClipboard(aiPromptText).catch(() => {});
+                        const rlReason = `AI Studio rate limit / quota exceeded. (Free Tier: 15 RPM). Next request available in ${rateLimitStatus.remainingSec}s.`;
+                        setLog(`[AI Rate Limit] Question #${qData ? qData.qNum : ''}: ${rlReason} (Prompt auto-copied 📋)`, "var(--accent-amber)");
+                        showToast(`⏳ AI Rate Limit: Available in ${rateLimitStatus.remainingSec}s`, 3500);
+
+                        showAiFallbackBar(firstBlockedQue, qData, aiPromptText, async () => {
+                            isSolverRunning = false;
+                            autoSolveQuizQuestion();
+                        }, {
+                            reason: rlReason,
+                            isRateLimit: true,
+                            waitSeconds: rateLimitStatus.remainingSec
+                        });
+
+                        firstBlockedQue.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        firstBlockedQue.style.outline = '2px solid #f97316';
+                        firstBlockedQue.style.borderRadius = '8px';
+                        isSolverRunning = false;
+                        return;
+                    }
+
                     // Remove any manual blockage HUD so it does not conflict with active AI solving
                     firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());
 
@@ -6590,6 +6694,7 @@
             }
 
             try {
+                recordAiRequest();
                 const res = await executeGeminiRequest({
                     apiKey,
                     prompt,
@@ -6616,6 +6721,17 @@
                 if (isModelUnavailable) {
                     logDebug(`Gemini model ${candidate.version}/${candidate.model} unavailable (${err.message}). Trying fallback candidate...`);
                     continue;
+                }
+
+                // If quota exhausted or rate limit, trigger cooldown and fast fail instead of burning other candidate endpoints
+                if (errLower.includes('quota') || 
+                    errLower.includes('429') || 
+                    errLower.includes('rate limit') || 
+                    errLower.includes('resource_exhausted')) {
+                    const delayMatch = (err.message || '').match(/retry\s*(?:in|delay)?\s*[:\s]*(\d+)\s*s/i) || (err.message || '').match(/(\d+)\s*seconds?/i);
+                    const waitSec = delayMatch ? parseInt(delayMatch[1], 10) : 20;
+                    triggerAiRateLimitCooldown(waitSec);
+                    throw err;
                 }
 
                 // If authentication is rejected (wrong key, blocked, or unauthenticated) or user aborted, fail fast
@@ -6808,16 +6924,21 @@
     }
 
     // Fallback bar with dynamic failure reason, [ ⚙ Configure Key ] (if auth error), [ ↺ Retry AI ], and [ ✦ Copy for AI ]
-    function showAiFallbackBar(que, qData, promptText, onRetry, { reason = '', isAuthError = false } = {}) {
+    function showAiFallbackBar(que, qData, promptText, onRetry, { reason = '', isAuthError = false, isRateLimit = false, waitSeconds = 0 } = {}) {
         que.querySelectorAll('.amaes-ai-fallback-bar').forEach(el => el.remove());
+        if (activeRateLimitTimerInterval) {
+            clearInterval(activeRateLimitTimerInterval);
+            activeRateLimitTimerInterval = null;
+        }
+
         const formulation = que.querySelector('.formulation, .content') || que;
         const bar = document.createElement('div');
         bar.className = 'amaes-ai-fallback-bar';
         bar.style.cssText = `
             margin-bottom: 12px;
             padding: 8px 12px;
-            background: #fdf4ff;
-            border: 1.5px solid #d946ef;
+            background: ${isRateLimit ? '#fff7ed' : '#fdf4ff'};
+            border: 1.5px solid ${isRateLimit ? '#f97316' : '#d946ef'};
             border-radius: 8px;
             display: flex;
             align-items: center;
@@ -6825,11 +6946,106 @@
             gap: 8px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 11px;
-            color: #86198f;
+            color: ${isRateLimit ? '#9a3412' : '#86198f'};
             box-sizing: border-box;
             flex-wrap: wrap;
         `;
         const displayReason = reason || 'AI took too long or was unavailable.';
+
+        if (isRateLimit && waitSeconds > 0) {
+            bar.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px;">
+                    <span style="font-size: 14px;">⏳</span>
+                    <div>
+                        <div style="font-weight: 700; color: #9a3412;">AI Studio Rate Limit (Free Tier: 15 req/min)</div>
+                        <div style="font-size: 10.5px; color: #c2410c;">
+                            Next request available in <strong id="amaes-ratelimit-countdown">${waitSeconds}s</strong>... (Prompt auto-copied 📋)
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                    <button type="button" class="amaes-ai-retry-btn" style="
+                        background: #ea580c;
+                        color: #ffffff;
+                        border: none;
+                        padding: 4px 10px;
+                        border-radius: 5px;
+                        font-size: 10.5px;
+                        font-weight: 700;
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 3px;
+                        transition: all 0.2s ease;
+                    ">↺ Retry in ${waitSeconds}s</button>
+                    <button type="button" class="amaes-ai-copy-btn" style="
+                        background: #ffedd5;
+                        color: #9a3412;
+                        border: 1px solid #fdba74;
+                        padding: 4px 10px;
+                        border-radius: 5px;
+                        font-size: 10.5px;
+                        font-weight: 700;
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 3px;
+                    ">✦ Copy for AI</button>
+                </div>
+            `;
+
+            formulation.insertBefore(bar, formulation.firstChild);
+
+            let secLeft = waitSeconds;
+            const timerEl = bar.querySelector('#amaes-ratelimit-countdown');
+            const retryBtn = bar.querySelector('.amaes-ai-retry-btn');
+            const copyBtn = bar.querySelector('.amaes-ai-copy-btn');
+
+            if (copyBtn) {
+                copyBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    copyToClipboard(promptText).then(() => {
+                        showToast('✦ Copied question for AI to clipboard!');
+                    }).catch(() => {});
+                };
+            }
+
+            activeRateLimitTimerInterval = setInterval(() => {
+                secLeft--;
+                if (secLeft > 0) {
+                    if (timerEl) timerEl.textContent = `${secLeft}s`;
+                    if (retryBtn) retryBtn.textContent = `↺ Retry in ${secLeft}s`;
+                } else {
+                    clearInterval(activeRateLimitTimerInterval);
+                    activeRateLimitTimerInterval = null;
+                    if (timerEl) timerEl.textContent = 'Ready!';
+                    if (retryBtn) {
+                        retryBtn.textContent = '↺ Retry AI Now';
+                        retryBtn.style.background = '#16a34a';
+                    }
+                    if (autoQuizMode && typeof onRetry === 'function') {
+                        showToast('✦ Rate limit cooldown finished. Retrying AI...', 2500);
+                        bar.remove();
+                        onRetry();
+                    }
+                }
+            }, 1000);
+
+            if (retryBtn) {
+                retryBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    clearInterval(activeRateLimitTimerInterval);
+                    activeRateLimitTimerInterval = null;
+                    bar.remove();
+                    if (typeof onRetry === 'function') onRetry();
+                };
+            }
+            return;
+        }
+
+        // Standard fallback bar
         bar.innerHTML = `
             <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px;">
                 <span style="font-size: 13px;">⚠️</span>
@@ -6944,6 +7160,28 @@
             }
         }
 
+        // 0.1 Rate Limit Guard: If user is on Free Tier and 15 RPM cap is reached or cooling down from 429:
+        const rateLimitStatus = getAiRateLimitStatus();
+        if (rateLimitStatus.isLimited) {
+            if (getAiAutoCopyOnFail()) {
+                copyToClipboard(promptText).catch(() => {});
+            }
+            const rlMsg = `AI Studio rate limit / quota exceeded. (Free Tier: 15 RPM). Available in ${rateLimitStatus.remainingSec}s.`;
+            setLog(`[AI Rate Limit] Question #${qData ? qData.qNum : ''}: ${rlMsg} (Prompt auto-copied 📋)`, "var(--accent-amber)");
+            showToast(`⏳ AI Rate Limit: Available in ${rateLimitStatus.remainingSec}s`, 3500);
+
+            showAiFallbackBar(que, qData, promptText, async () => {
+                await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
+            }, {
+                reason: rlMsg,
+                isRateLimit: true,
+                waitSeconds: rateLimitStatus.remainingSec
+            });
+
+            if (typeof onFallback === 'function') onFallback();
+            return;
+        }
+
         const formulation = que.querySelector('.formulation, .content') || que;
         const thinkingEl = document.createElement('div');
         thinkingEl.className = 'amaes-ai-thinking-indicator';
@@ -7035,11 +7273,15 @@
                 if (isAborted || timedOut) break;
                 logDebug(`Gemini attempt ${attempt} error: ${err.message}`);
                 const errLower = (err.message || '').toLowerCase();
-                // If authentication is rejected, fail fast instead of doing a pointless retry
+                // If authentication is rejected, quota exhausted, or rate limit hit, fail fast instead of doing a pointless retry
                 if (errLower.includes('api key not valid') || 
                     errLower.includes('unauthenticated') || 
                     errLower.includes('api_key_service_blocked') || 
-                    errLower.includes('access_token_type_unsupported')) {
+                    errLower.includes('access_token_type_unsupported') || 
+                    errLower.includes('quota') || 
+                    errLower.includes('429') || 
+                    errLower.includes('rate limit') || 
+                    errLower.includes('resource_exhausted')) {
                     break;
                 }
                 if (attempt < maxAttempts) {
@@ -7111,7 +7353,7 @@
                             qNorm: normalizeText(qData.qText),
                             ansRaw: rawAns,
                             ansNorm: normalizeChoice(rawAns),
-                            choices: qData.choices || [],
+                            choices: qData.choices,
                             verified: false,
                             isAiSuggestion: true,
                             source: 'Google Gemini AI'
@@ -7143,6 +7385,8 @@
         // Categorize the true failure reason for clear feedback
         let failureReason = 'AI was unavailable.';
         let isAuthError = false;
+        let isRateLimit = false;
+        let waitSeconds = 0;
 
         if (timedOut) {
             failureReason = 'AI took too long to respond (timed out after 8s).';
@@ -7156,8 +7400,11 @@
                 errLower.includes('access_token_type_unsupported')) {
                 failureReason = 'Google rejected API key. Check key in Course Tools.';
                 isAuthError = true;
-            } else if (errLower.includes('quota') || errLower.includes('429') || errLower.includes('rate limit')) {
-                failureReason = 'AI Studio rate limit / quota exceeded.';
+            } else if (errLower.includes('quota') || errLower.includes('429') || errLower.includes('rate limit') || errLower.includes('resource_exhausted')) {
+                isRateLimit = true;
+                const status = getAiRateLimitStatus();
+                waitSeconds = status.isLimited ? status.remainingSec : 20;
+                failureReason = `AI Studio rate limit / quota exceeded. (Available in ${waitSeconds}s)`;
             } else if (errLower.includes('not found') || errLower.includes('no available gemini model') || errLower.includes('404')) {
                 failureReason = 'Gemini model unavailable. Check key permissions.';
             } else {
@@ -7175,7 +7422,12 @@
         // Failure or timeout: inject fallback bar with clear reason and direct configure button if auth error
         showAiFallbackBar(que, qData, promptText, async () => {
             await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
-        }, { reason: failureReason, isAuthError: isAuthError });
+        }, {
+            reason: failureReason,
+            isAuthError: isAuthError,
+            isRateLimit: isRateLimit,
+            waitSeconds: waitSeconds
+        });
 
         showToast(failureReason, 4500);
         setLog(`[AI Fallback] Question #${qData ? qData.qNum : ''}: ${failureReason}`, "var(--accent-amber)");
@@ -7313,6 +7565,25 @@
                                 </div>
                             </div>
                         </div>
+
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: rgba(0,0,0,0.2); border-radius: 6px; border: 1px solid var(--border-subtle, #334155);">
+                            <div>
+                                <span style="font-weight: 600; color: #f8fafc; font-size: 11px;">API Plan Tier:</span>
+                                <div style="font-size: 9.5px; color: var(--text-muted, #94a3b8);">Free Google AI Studio keys allow 15 RPM. Cooldown timer auto-manages limits.</div>
+                            </div>
+                            <select id="amaes-gemini-plan-select" style="
+                                background: var(--surface, #1e293b);
+                                color: #f8fafc;
+                                border: 1px solid var(--border, #334155);
+                                padding: 4px 8px;
+                                border-radius: 5px;
+                                font-size: 10.5px;
+                                cursor: pointer;
+                            ">
+                                <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free Tier (15 RPM)</option>
+                                <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Pay-As-You-Go</option>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- Status Feedback -->
@@ -7411,6 +7682,14 @@
                     });
                     if (res && res.success) {
                         setGeminiApiKey(rawKey);
+                        const planSelect = modal.querySelector('#amaes-gemini-plan-select');
+                        if (planSelect) {
+                            setAiPlanTier(planSelect.value);
+                            const quizPlanSel = document.getElementById('sel-ai-plan-tier');
+                            if (quizPlanSel) quizPlanSel.value = getAiPlanTier();
+                            const coursePlanSel = document.getElementById('sel-course-ai-plan-tier');
+                            if (coursePlanSel) coursePlanSel.value = getAiPlanTier();
+                        }
                         const modelName = res.modelUsed || 'Gemini Flash';
                         feedback.style.background = 'rgba(16, 185, 129, 0.15)';
                         feedback.style.color = '#34d399';
@@ -10719,6 +10998,13 @@
                                 <option value="5" ${aiRetryCount === 5 ? 'selected' : ''}>5 retries</option>
                             </select>
                         </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
+                            <span style="font-size: 10px; color: #e9d5ff; font-weight: 600;">API Plan Tier:</span>
+                            <select id="sel-ai-plan-tier" style="background: rgba(0,0,0,0.35); border: 1px solid #a855f7; border-radius: 4px; color: #f3e8ff; font-size: 10px; padding: 2px 6px; cursor: pointer;">
+                                <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free Tier (15 RPM)</option>
+                                <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Pay-As-You-Go (Unlimited)</option>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- Collapsible Advanced Settings (Collapsed by default for clean UX) -->
@@ -11043,6 +11329,13 @@
                                     <option value="3" ${aiRetryCount === 3 ? 'selected' : ''}>3 retries</option>
                                     <option value="4" ${aiRetryCount === 4 ? 'selected' : ''}>4 retries</option>
                                     <option value="5" ${aiRetryCount === 5 ? 'selected' : ''}>5 retries</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="font-size: 10px; color: var(--text-secondary);">AI Plan Tier:</span>
+                                <select id="sel-course-ai-plan-tier" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 5px; cursor: pointer;">
+                                    <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free Tier (15 RPM)</option>
+                                    <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Pay-As-You-Go (Unlimited)</option>
                                 </select>
                             </div>
                         </div>
@@ -11934,6 +12227,26 @@
                 const quizSel = document.getElementById('sel-ai-retry-count');
                 if (quizSel) quizSel.value = String(getAiRetryCount());
                 showToast(`AI Retry Attempts set to ${getAiRetryCount()}`);
+            };
+        }
+
+        const selAiPlanTier = document.getElementById('sel-ai-plan-tier');
+        if (selAiPlanTier) {
+            selAiPlanTier.onchange = () => {
+                setAiPlanTier(selAiPlanTier.value);
+                const courseSel = document.getElementById('sel-course-ai-plan-tier');
+                if (courseSel) courseSel.value = getAiPlanTier();
+                showToast(`AI Plan Tier set to ${getAiPlanTier() === 'free' ? 'Free Tier (15 RPM)' : 'Pay-As-You-Go'}`);
+            };
+        }
+
+        const selCourseAiPlanTier = document.getElementById('sel-course-ai-plan-tier');
+        if (selCourseAiPlanTier) {
+            selCourseAiPlanTier.onchange = () => {
+                setAiPlanTier(selCourseAiPlanTier.value);
+                const quizSel = document.getElementById('sel-ai-plan-tier');
+                if (quizSel) quizSel.value = getAiPlanTier();
+                showToast(`AI Plan Tier set to ${getAiPlanTier() === 'free' ? 'Free Tier (15 RPM)' : 'Pay-As-You-Go'}`);
             };
         }
 

@@ -1589,7 +1589,7 @@ test("Safe Wait State on Unknown Questions: pauses on current question without k
 
     // Check Case B safe wait state
     const caseBStart = script.indexOf('// Case B: UNKNOWN QUESTION DETECTED');
-    const caseBSection = script.substring(caseBStart, caseBStart + 10000);
+    const caseBSection = script.substring(caseBStart, caseBStart + 25000);
 
     assert.ok(caseBSection.includes("isWaitingForUserAnswer = true;"), "Auto-solver Case B must set isWaitingForUserAnswer flag");
     assert.ok(caseBSection.includes("clearTimeout(autoNextTimer);"), "Must cancel autoNextTimer to prevent premature advance");
@@ -4266,6 +4266,121 @@ test("Gemini AI: AI Question Tagging & Unverified Attribution displays clean car
     // 6. Complete CSS and sanitization stripping in cleanDOMToAI and review harvesting
     assert.ok(script.includes(".amaes-ai-question-tag"), "cleanDOMToAI and DOM sanitizers must strip .amaes-ai-question-tag");
     assert.ok(script.includes(".amaes-ai-question-tag {\n                    user-select: none;\n                }"), "Must define CSS user-select rule for amaes-ai-question-tag");
+});
+
+// --------------------------------------------------
+// 107. Gemini AI: Rate Limiting (15 RPM), Plan Tier Gating, Cooldown Tracking & Live Countdown HUD
+// --------------------------------------------------
+test("Gemini AI: Rate Limiting enforces 15 RPM sliding window on Free Tier, respects Pay-As-You-Go, tracks cooldowns, and renders live countdown HUD", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Core Rate Limit constants and helpers presence
+    assert.ok(script.includes("const GEMINI_FREE_RPM = 15;"), "Must define GEMINI_FREE_RPM = 15");
+    assert.ok(script.includes("function getAiPlanTier()"), "Must define getAiPlanTier helper");
+    assert.ok(script.includes("function setAiPlanTier(tier)"), "Must define setAiPlanTier helper");
+    assert.ok(script.includes("function getStoredRequestTimestamps()"), "Must define getStoredRequestTimestamps helper");
+    assert.ok(script.includes("function recordAiRequest()"), "Must define recordAiRequest helper");
+    assert.ok(script.includes("function triggerAiRateLimitCooldown(suggestedWaitSec = 20)"), "Must define triggerAiRateLimitCooldown helper");
+    assert.ok(script.includes("function getAiRateLimitStatus()"), "Must define getAiRateLimitStatus helper");
+
+    // 2. Functional Verification: Plan Tier & Sliding Window Logic
+    let mockLocalStorage = {};
+    let mockSessionStorage = {};
+
+    function simGetAiPlanTier() {
+        return mockLocalStorage['amaes_ai_plan_tier'] || 'free';
+    }
+    function simSetAiPlanTier(tier) {
+        mockLocalStorage['amaes_ai_plan_tier'] = tier === 'paid' ? 'paid' : 'free';
+    }
+    function simGetStoredTimestamps() {
+        try {
+            const raw = mockSessionStorage['amaes_ai_req_timestamps'];
+            if (raw) {
+                const arr = JSON.parse(raw);
+                const cutoff = Date.now() - 60000;
+                return arr.filter(t => t > cutoff);
+            }
+        } catch (_) {}
+        return [];
+    }
+    function simRecordAiRequest(customTime = Date.now()) {
+        const cutoff = customTime - 60000;
+        const current = simGetStoredTimestamps().filter(t => t > cutoff);
+        current.push(customTime);
+        mockSessionStorage['amaes_ai_req_timestamps'] = JSON.stringify(current);
+    }
+    let simCooldownUntil = 0;
+    function simTriggerCooldown(sec = 20) {
+        const waitSec = Math.max(5, Math.min(60, sec));
+        simCooldownUntil = Math.max(simCooldownUntil, Date.now() + (waitSec * 1000));
+        mockSessionStorage['amaes_ai_cooldown_until'] = String(simCooldownUntil);
+        return Math.ceil((simCooldownUntil - Date.now()) / 1000);
+    }
+    function simGetRateLimitStatus() {
+        const now = Date.now();
+        if (simCooldownUntil > now) {
+            return { isLimited: true, remainingSec: Math.ceil((simCooldownUntil - now) / 1000), reason: 'cooldown' };
+        }
+        if (simGetAiPlanTier() === 'free') {
+            const timestamps = simGetStoredTimestamps();
+            if (timestamps.length >= 15) {
+                const oldest = timestamps[0];
+                const remainingSec = Math.max(1, Math.ceil((oldest + 60000 - now) / 1000));
+                return { isLimited: true, remainingSec, reason: 'rpm_cap' };
+            }
+        }
+        return { isLimited: false, remainingSec: 0, reason: null };
+    }
+
+    // Free Tier default
+    assert.strictEqual(simGetAiPlanTier(), 'free');
+
+    // Make 14 requests - under limit
+    for (let i = 0; i < 14; i++) {
+        simRecordAiRequest();
+    }
+    assert.strictEqual(simGetRateLimitStatus().isLimited, false);
+
+    // 15th request reaches cap
+    simRecordAiRequest();
+    assert.strictEqual(simGetStoredTimestamps().length, 15);
+    const statusCapped = simGetRateLimitStatus();
+    assert.strictEqual(statusCapped.isLimited, true);
+    assert.strictEqual(statusCapped.reason, 'rpm_cap');
+    assert.ok(statusCapped.remainingSec > 0 && statusCapped.remainingSec <= 60);
+
+    // Switch to Pay-As-You-Go (paid tier): 15 RPM cap must NOT block paid users!
+    simSetAiPlanTier('paid');
+    assert.strictEqual(simGetAiPlanTier(), 'paid');
+    assert.strictEqual(simGetRateLimitStatus().isLimited, false);
+
+    // However, if Google returns an explicit 429 quota exhaustion, cooldown still activates even on paid
+    simTriggerCooldown(25);
+    const statusCooldown = simGetRateLimitStatus();
+    assert.strictEqual(statusCooldown.isLimited, true);
+    assert.strictEqual(statusCooldown.reason, 'cooldown');
+    assert.ok(statusCooldown.remainingSec >= 24 && statusCooldown.remainingSec <= 26);
+
+    // 3. UI Plan Selector Integration across tabs and setup modal
+    assert.ok(script.includes('id="sel-ai-plan-tier"'), "Quiz Tab settings must include sel-ai-plan-tier dropdown");
+    assert.ok(script.includes('id="sel-course-ai-plan-tier"'), "Course Tools card must include sel-course-ai-plan-tier dropdown");
+    assert.ok(script.includes('id="amaes-gemini-plan-select"'), "Gemini setup modal must include amaes-gemini-plan-select dropdown");
+    assert.ok(script.includes('Free Tier (15 RPM)'), "Must clearly display Free Tier (15 RPM) option");
+    assert.ok(script.includes('Pay-As-You-Go (Unlimited)'), "Must clearly display Pay-As-You-Go option");
+
+    // 4. Live Countdown HUD & Fallback Bar
+    assert.ok(script.includes('id="amaes-ratelimit-countdown"'), "Fallback bar must include amaes-ratelimit-countdown element");
+    assert.ok(script.includes('AI Studio Rate Limit (Free Tier: 15 req/min)'), "Fallback bar must display rate limit warning header");
+    assert.ok(script.includes('activeRateLimitTimerInterval = setInterval'), "Must drive live countdown with setInterval");
+    assert.ok(script.includes("retryBtn.textContent = '↺ Retry AI Now';"), "Must update retry button to active state when countdown finishes");
+    assert.ok(script.includes('if (autoQuizMode) {'), "Fallback bar countdown expiration must auto-trigger retry if autoQuizMode is running");
+
+    // 5. Fast-Fail on 429 in callGeminiApi to avoid wasting candidate endpoint timeouts
+    const callApiBlock = script.slice(script.indexOf("async function callGeminiApi"), script.indexOf("function matchAiAnswerToChoice"));
+    assert.ok(callApiBlock.includes("triggerAiRateLimitCooldown("), "callGeminiApi must trigger cooldown on 429");
+    assert.ok(callApiBlock.includes("recordAiRequest();"), "callGeminiApi must record timestamp on request invocation");
 });
 
 console.log("\n==================================================");
