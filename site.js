@@ -72,7 +72,7 @@
     if (statusCard) statusCard.dataset.state = 'found';
     if (statusTitle) statusTitle.textContent = 'AMAES Toolkit detected';
     if (statusCopy) statusCopy.textContent = 'Version ' + detectedVersion + ' is active on this page.';
-    checkResult.textContent = '✓ Toolkit detected';
+    checkResult.textContent = 'Toolkit detected';
     renderVersionStatus();
   }
 
@@ -108,13 +108,13 @@
       : 'Get Violentmonkey ↗';
     if (allowScriptsText) {
       if (browser === 'chrome') {
-        allowScriptsText.innerHTML = '<strong>Important for Chrome &amp; Brave:</strong> Open <code>chrome://extensions</code> or click the 🧩 puzzle piece icon → turn <strong>Developer mode</strong> ON (top right), then toggle ON <strong>Allow access to user scripts</strong> on Violentmonkey.';
+        allowScriptsText.innerHTML = '<strong>Chrome &amp; Brave:</strong> Open <code>chrome://extensions</code> or click the Extensions icon in your toolbar, turn <strong>Developer mode</strong> ON (top right), then toggle ON <strong>Allow access to user scripts</strong> for Violentmonkey.';
       } else if (browser === 'edge') {
-        allowScriptsText.innerHTML = '<strong>Important for Edge:</strong> Open <code>edge://extensions</code> → toggle <strong>Developer mode</strong> ON to allow Violentmonkey to run scripts.';
+        allowScriptsText.innerHTML = '<strong>Edge:</strong> Open <code>edge://extensions</code>, toggle <strong>Developer mode</strong> ON, and ensure user scripts are allowed.';
       } else if (browser === 'firefox') {
-        allowScriptsText.innerHTML = '<strong>Firefox:</strong> Just click <strong>Add to Firefox</strong>! Scripts run automatically with no extra developer mode needed.';
+        allowScriptsText.innerHTML = '<strong>Firefox:</strong> Click <strong>Add to Firefox</strong>. Once added, click the Violentmonkey extension icon in your toolbar and ensure user scripts are enabled and allowed to run.';
       } else {
-        allowScriptsText.innerHTML = 'In your browser extension settings, make sure <strong>Developer mode</strong> or <strong>Allow user scripts</strong> is turned <strong>ON</strong>.';
+        allowScriptsText.innerHTML = 'In your browser extension settings, ensure <strong>Developer mode</strong> or <strong>Allow user scripts</strong> is turned <strong>ON</strong>.';
       }
     }
   }
@@ -135,7 +135,7 @@
         checkResult.style.color = '#fbbf24';
       }, 250);
     } else {
-      checkResult.textContent = '✓ Toolkit detected and active!';
+      checkResult.textContent = 'Toolkit detected and active!';
     }
     renderVersionStatus();
   });
