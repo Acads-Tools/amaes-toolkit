@@ -15,3 +15,5 @@ npm-debug.log
 # Sensitive / Local configs
 *.local
 .env
+.wrangler/
+.dev.vars
