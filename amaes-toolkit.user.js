@@ -29,7 +29,6 @@
     const SCRIPT_VERSION = "v1.7.5";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
-    const CLIENT_POLICY_URL = `${COMMUNITY_RELAY_URL}/version`;
     const ANSWER_DB_SCHEMA_VERSION = 2;
     const CONTRIBUTOR_ID_STORAGE_KEY = 'amaes_anonymous_contributor_id';
 
@@ -89,7 +88,7 @@
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 5000);
         try {
-            const response = await fetch(CLIENT_POLICY_URL, {
+            const response = await fetch(`${communityRelayUrl}/version`, {
                 method: 'GET',
                 cache: 'no-store',
                 signal: controller.signal
