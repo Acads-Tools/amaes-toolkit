@@ -109,6 +109,30 @@ will explain what happened and let you retry or add another personal key.
 Disable **Use shared AI help if my key is temporarily busy** if you do not
 want this fallback.
 
+### Where your Gemini key is stored
+
+Your personal Gemini key is saved in your browser only by default. It is sent
+to Google when you ask Gemini for help, but it is not uploaded to the AMAES
+Cloudflare relay.
+
+The setup option **Share my key when I am inactive (optional)** is separate
+from shared AI fallback:
+
+* **Sharing unchecked:** your key stays local and is used only for your
+  requests.
+* **Sharing checked:** you explicitly opt in to contributor sharing. The relay
+  encrypts the key before storing it in Cloudflare D1. It remains reserved for
+  you while you are active and may help another user only after the inactive
+  grace period.
+* **Sharing disabled later:** the toolkit requests deletion of the encrypted
+  contributor copy. Your local personal key can remain available until you
+  remove it.
+
+**Use shared AI help if my key is temporarily busy** does not upload or share
+your key. It only lets your installation request limited help from the
+already-encrypted contributor pool. You can review the full contributor-key
+rules in the [relay documentation](https://github.com/Acads-Tools/database/blob/main/relay/README.md#contributor-key-sharing).
+
 ---
 
 <a id="keyboard-shortcuts"></a>
