@@ -2953,6 +2953,41 @@
         return true;
     }
 
+    function isQuestionAnswered(que) {
+        if (!que) return false;
+        const radios = que.querySelectorAll('.answer input[type="radio"]');
+        if (radios.length > 0) return Array.from(radios).some(input => input.checked);
+
+        const checkboxes = que.querySelectorAll('.answer input[type="checkbox"]');
+        if (checkboxes.length > 0) {
+            const highlighted = que.querySelectorAll('.amaes-highlighted-choice input[type="checkbox"]');
+            return highlighted.length > 0
+                ? Array.from(highlighted).every(input => input.checked)
+                : Array.from(checkboxes).some(input => input.checked);
+        }
+
+        const selects = que.querySelectorAll('select');
+        if (selects.length > 0) {
+            return Array.from(selects).every(select => select.value && select.value !== '0');
+        }
+
+        const textInputs = que.querySelectorAll(
+            'input[type="text"].form-control, input.form-control, textarea'
+        );
+        if (textInputs.length > 0) {
+            return Array.from(textInputs).every(input => input.value && input.value.trim());
+        }
+
+        const placeInputs = que.querySelectorAll('input.placeinput, input[type="hidden"][name*="_p"]');
+        const dropZones = que.querySelectorAll('.drop, .dropzone, span.droptarget, .droppable');
+        if (placeInputs.length > 0 || dropZones.length > 0) {
+            return placeInputs.length > 0 &&
+                Array.from(placeInputs).every(input => input.value && input.value !== '0' && input.value.trim());
+        }
+
+        return que.classList.contains('answered') || que.classList.contains('complete');
+    }
+
     // Schedule automatic advancement to next page (or summary) after question(s) on current page are answered
     function scheduleAutoNextAfterAnswer(delayMs = 800, isManualAnswer = false) {
         if (!autoQuizMode) return;
@@ -3147,6 +3182,9 @@
             // 2. Identify questions verified by the database vs unverified/unknown questions
             const unverifiedQuestions = [];
             queContainers.forEach(que => {
+                // A student's manual answer is not an unknown question. Do not
+                // replace it with an AI warning on one-page quizzes.
+                if (isQuestionAnswered(que)) return;
                 const hasVerifiedBadge = que.querySelector('.amaes-verified-badge');
                 const hasShortAnsHint = que.querySelector('.amaes-shortans-hint');
                 const hasSelectHint = que.querySelector('.amaes-select-hint');
@@ -3292,7 +3330,8 @@
                     isSolverRunning = false;
                     return;
                 }
-                if (geminiApiKey && aiQuizEnabled && isEligibleChoice) {
+                const activeGeminiKey = getAvailableGeminiKey();
+                if (activeGeminiKey && aiQuizEnabled && isEligibleChoice) {
                     // Check if client-side or cooldown rate limit is currently active
                     const rateLimitStatus = getAiRateLimitStatus();
                     if (rateLimitStatus.isLimited) {
@@ -7514,7 +7553,7 @@
                     setLog(`[AI Assistant] Retrying Gemini (Attempt ${attempt}/${maxAttempts}) for Question #${qData ? qData.qNum : ''}...`, "var(--accent-purple)");
                 }
                 const res = await callGeminiApi({
-                    apiKey: geminiApiKey,
+                    apiKey: getAvailableGeminiKey(),
                     prompt: promptText,
                     maxOutputTokens: 64,
                     signal: abortCtrl.signal
@@ -7537,7 +7576,7 @@
                     errLower.includes('429') || 
                     errLower.includes('rate limit') || 
                     errLower.includes('resource_exhausted')) {
-                    break;
+                    if (getGeminiApiKeys().length <= 1) break;
                 }
                 if (attempt < maxAttempts) {
                     await new Promise(r => setTimeout(r, 800));
@@ -9967,7 +10006,21 @@
         // Always inject visual markers for questions on review page
         injectReviewQuestionMarkers(harvested);
 
-        if (!harvested || !harvested.success || (harvested.harvestedCount === 0 && (harvested.eliminatedCount || 0) === 0)) return;
+        if (!harvested || !harvested.success ||
+            (harvested.harvestedCount === 0 && (harvested.eliminatedCount || 0) === 0)) {
+            const retryKey = `amaes_review_retry_${attemptId}`;
+            const retryCount = Number(sessionStorage.getItem(retryKey) || '0');
+            if (retryCount < 5) {
+                sessionStorage.setItem(retryKey, String(retryCount + 1));
+                setTimeout(() => {
+                    if (checkIsReviewPage()) handleQuizReviewPageLoad();
+                }, 700);
+            } else {
+                sessionStorage.removeItem(retryKey);
+            }
+            return;
+        }
+        sessionStorage.removeItem(`amaes_review_retry_${attemptId}`);
 
         if (lastProcessedReviewAttempt === processingKey) return;
         lastProcessedReviewAttempt = processingKey;
