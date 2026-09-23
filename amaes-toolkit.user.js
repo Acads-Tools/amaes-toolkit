@@ -27,6 +27,9 @@
     'use strict';
 
     const SCRIPT_VERSION = "v1.7.5";
+    const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
+    const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
+    const CLIENT_POLICY_URL = `${COMMUNITY_RELAY_URL}/version`;
     const ANSWER_DB_SCHEMA_VERSION = 2;
     const CONTRIBUTOR_ID_STORAGE_KEY = 'amaes_anonymous_contributor_id';
 
@@ -46,6 +49,67 @@
     // STRICT DOMAIN LOCK: Ensure execution ONLY on semestral.amaes.com
     if (window.location.hostname !== 'semestral.amaes.com') {
         return;
+    }
+
+    function compareVersions(left, right) {
+        const a = String(left || '').replace(/^v/i, '').split('.').map(Number);
+        const b = String(right || '').replace(/^v/i, '').split('.').map(Number);
+        if (a.length !== 3 || b.length !== 3 || a.some(Number.isNaN) || b.some(Number.isNaN)) return null;
+        for (let i = 0; i < 3; i += 1) {
+            if (a[i] !== b[i]) return a[i] > b[i] ? 1 : -1;
+        }
+        return 0;
+    }
+
+    function showCompatibilityBlock(reason, minimumVersion = null) {
+        const required = minimumVersion || 'the latest supported version';
+        const message = reason === 'network'
+            ? 'The compatibility policy could not be verified. Connect to the internet and try again.'
+            : `This version is no longer supported. Update to v${required} before using AMAES Toolkit.`;
+        document.documentElement.innerHTML = `
+            <head><title>AMAES Toolkit update required</title></head>
+            <body style="margin:0;background:#0f172a;color:#e2e8f0;font:16px system-ui,sans-serif">
+                <main style="box-sizing:border-box;max-width:560px;margin:15vh auto;padding:32px;border:1px solid #334155;border-radius:16px;background:#1e293b;text-align:center">
+                    <h1 style="margin-top:0;color:#fbbf24">AMAES Toolkit update required</h1>
+                    <p>${message}</p>
+                    <p style="font-size:13px;color:#94a3b8">Installed version: ${CLIENT_VERSION}</p>
+                    <a href="${SCRIPT_RAW_URL}" target="_blank" rel="noopener noreferrer"
+                       style="display:inline-block;padding:12px 18px;border-radius:8px;background:#2563eb;color:white;text-decoration:none;font-weight:700">
+                       Install official update
+                    </a>
+                    <button id="amaes-compat-retry" style="display:block;margin:16px auto 0;padding:8px 14px;background:transparent;color:#93c5fd;border:1px solid #475569;border-radius:8px;cursor:pointer">
+                        Check again
+                    </button>
+                </main>
+            </body>`;
+        document.getElementById('amaes-compat-retry')?.addEventListener('click', () => window.location.reload());
+    }
+
+    async function verifyClientCompatibility() {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        try {
+            const response = await fetch(CLIENT_POLICY_URL, {
+                method: 'GET',
+                cache: 'no-store',
+                signal: controller.signal
+            });
+            if (!response.ok) throw new Error(`Compatibility endpoint returned ${response.status}`);
+            const policy = await response.json();
+            const minimum = policy.minimumVersion;
+            const comparison = compareVersions(CLIENT_VERSION, minimum);
+            if (comparison === null || comparison < 0) {
+                showCompatibilityBlock('version', minimum);
+                return false;
+            }
+            return true;
+        } catch (error) {
+            logDebug(`Client compatibility check failed: ${error.message}`);
+            showCompatibilityBlock('network');
+            return false;
+        } finally {
+            clearTimeout(timeout);
+        }
     }
 
     const SCRIPT_RAW_URL = "https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js";
@@ -842,7 +906,7 @@
     let cloudDbBaseUrl = storedCloudDbUrl || 'https://raw.githubusercontent.com/Acads-Tools/database/main/data/verified/';
     const CLOUD_DB_FALLBACK_URL = 'https://raw.githubusercontent.com/Acads-Tools/database/main/data/';
     const CLOUD_DB_AMAUOED_URL = 'https://raw.githubusercontent.com/Acads-Tools/database/main/data/amauoed/';
-    const DEFAULT_COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
+    const DEFAULT_COMMUNITY_RELAY_URL = COMMUNITY_RELAY_URL;
     let storedRelayUrl = localStorage.getItem('amaes_community_relay_url');
     if (storedRelayUrl && (!storedRelayUrl.includes('acads-tools.workers.dev') || storedRelayUrl === 'https://amaes-community-relay.workers.dev')) {
         localStorage.removeItem('amaes_community_relay_url');
@@ -13548,7 +13612,8 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
         // Quiz Automation will be initialized once when document is ready
     }
 
-    function initializeToolkit() {
+    async function initializeToolkit() {
+        if (!(await verifyClientCompatibility())) return;
         if (!isUserLoggedIn()) {
             logDebug("User not logged in; skipping UI mounting.");
             return;
