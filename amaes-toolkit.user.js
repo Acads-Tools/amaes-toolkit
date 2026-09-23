@@ -9019,7 +9019,10 @@
                     gmReq({
                         method: 'POST',
                         url: communityRelayUrl,
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-AMAES-Client-Version': SCRIPT_VERSION.replace(/^v/i, '')
+                        },
                         data: JSON.stringify(payload),
                         onload: (res) => {
                             if (res.status >= 200 && res.status < 300) {
@@ -9041,10 +9044,17 @@
                 try {
                     const resp = await fetch(communityRelayUrl, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-AMAES-Client-Version': SCRIPT_VERSION.replace(/^v/i, '')
+                        },
                         body: JSON.stringify(payload)
                     });
-                    if (resp.ok) {
+                    if (resp.status === 426) {
+                        const update = await resp.json().catch(() => ({}));
+                        showToast(`Update AMAES Toolkit to v${update.minimumVersion || 'the latest version'} to share answers.`, 7000);
+                        setLog(`Toolkit update required before community sharing. <a href="${SCRIPT_RAW_URL}" target="_blank">Install update</a>.`, "var(--accent-amber)");
+                    } else if (resp.ok) {
                         showToast(`Auto-shared ${validQuestions.length} verified answers to Global Database!`);
                         setLog(`Shared <b>${validQuestions.length}</b> evidence records to Global Database via relay.`, "var(--accent-green)");
                         return { success: true, mode: 'relay', count: validQuestions.length };
@@ -10310,42 +10320,7 @@
 
     // Ultra-lightweight anonymous presence pulse (throttled to max 1 pulse per 10 mins)
     function sendPassiveTelemetryPulse() {
-        try {
-            const now = Date.now();
-            const lastPulse = parseInt(localStorage.getItem('amaes_last_pulse_ts') || '0', 10);
-            if (now - lastPulse < 600000) return; // 10-minute cooldown
-            localStorage.setItem('amaes_last_pulse_ts', String(now));
-
-            let cid = localStorage.getItem('amaes_anonymous_cid');
-            if (!cid) {
-                cid = 'c_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-                try { localStorage.setItem('amaes_anonymous_cid', cid); } catch (_) {}
-            }
-
-            const url = `${DEFAULT_COMMUNITY_RELAY_URL}/ping?v=${encodeURIComponent(SCRIPT_VERSION)}&cid=${encodeURIComponent(cid)}`;
-            const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
-                          (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
-
-            if (gmReq) {
-                gmReq({
-                    method: 'GET',
-                    url: url,
-                    timeout: 4000,
-                    onload: (res) => {
-                        try {
-                            const data = JSON.parse(res.responseText);
-                            if (data && typeof data.active === 'number') {
-                                sessionStorage.setItem('amaes_relay_active_users', String(data.active));
-                                const el = document.getElementById('amaes-dev-mesh-count');
-                                if (el) el.innerText = data.active;
-                            }
-                        } catch (_) {}
-                    }
-                });
-            } else if (typeof fetch === 'function') {
-                fetch(url, { method: 'GET', mode: 'no-cors', keepalive: true }).catch(() => {});
-            }
-        } catch (_) {}
+        // Deliberately disabled: the relay does not collect presence or identity telemetry.
     }
 
     function unlockDevTab() {
@@ -10367,46 +10342,7 @@
             const el = document.getElementById('amaes-dev-mesh-count');
             if (!el) return;
 
-            let cid = localStorage.getItem('amaes_anonymous_cid');
-            if (!cid) {
-                cid = 'c_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-                try { localStorage.setItem('amaes_anonymous_cid', cid); } catch (_) {}
-            }
-            const pulseUrl = `${DEFAULT_COMMUNITY_RELAY_URL}/active?cid=${encodeURIComponent(cid)}&v=${encodeURIComponent(SCRIPT_VERSION)}`;
-
-            // Try to fetch real live count from relay if available
-            try {
-                const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
-                              (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
-                if (gmReq) {
-                    gmReq({
-                        method: 'GET',
-                        url: pulseUrl,
-                        timeout: 3500,
-                        onload: (res) => {
-                            try {
-                                const data = JSON.parse(res.responseText);
-                                if (data && typeof data.active === 'number') {
-                                    const safeCount = Math.max(1, data.active);
-                                    el.innerText = safeCount;
-                                    sessionStorage.setItem('amaes_relay_active_users', String(safeCount));
-                                    return;
-                                }
-                            } catch (_) {}
-                            applyFallbackCount();
-                        },
-                        onerror: applyFallbackCount
-                    });
-                    return;
-                }
-            } catch (_) {}
-
-            applyFallbackCount();
-
-            function applyFallbackCount() {
-                const stored = sessionStorage.getItem('amaes_relay_active_users');
-                el.innerText = stored ? stored : '1';
-            }
+            el.innerText = 'disabled';
         };
         updateCount();
         devMeshInterval = setInterval(updateCount, 15000);
@@ -10506,61 +10442,7 @@
                     });
             }
         } else if (c === 'users') {
-            addLine(`Querying Cloudflare telemetry mesh...`, 'var(--text-muted)');
-            let cid = localStorage.getItem('amaes_anonymous_cid');
-            if (!cid) {
-                cid = 'c_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-                try { localStorage.setItem('amaes_anonymous_cid', cid); } catch (_) {}
-            }
-            const pulseUrl = `${DEFAULT_COMMUNITY_RELAY_URL}/ping?v=${encodeURIComponent(SCRIPT_VERSION)}&cid=${encodeURIComponent(cid)}`;
-
-            const renderUserCount = (activeCount, isLive) => {
-                const count = Math.max(1, activeCount);
-                const el = document.getElementById('amaes-dev-mesh-count');
-                if (el) el.innerText = count;
-                sessionStorage.setItem('amaes_relay_active_users', String(count));
-
-                if (isLive) {
-                    const peerDesc = count === 1 ? ' (You are the only active user in this rolling window)' : ` (${count - 1} other peer${count > 2 ? 's' : ''} + you)`;
-                    addLine(`Active Peer Mesh: ${count} concurrent user${count !== 1 ? 's' : ''} online${peerDesc}.`, 'var(--accent-purple)');
-                    addLine(`Telemetry Window: Rolling 10 minutes | Edge Relay: Connected`, 'var(--accent-green)');
-                } else {
-                    addLine(`Active Peer Mesh: 1 concurrent user (Self / Offline fallback)`, 'var(--accent-amber)');
-                    addLine(`Relay Note: Edge relay unreachable. Showing verified local session.`, 'var(--text-secondary)');
-                }
-            };
-
-            const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
-                          (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
-            if (gmReq) {
-                gmReq({
-                    method: 'GET',
-                    url: pulseUrl,
-                    timeout: 4500,
-                    onload: (res) => {
-                        try {
-                            const data = JSON.parse(res.responseText);
-                            if (data && typeof data.active === 'number') {
-                                renderUserCount(data.active, true);
-                                return;
-                            }
-                        } catch (_) {}
-                        renderUserCount(1, false);
-                    },
-                    onerror: () => renderUserCount(1, false)
-                });
-            } else {
-                fetch(pulseUrl)
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data && typeof data.active === 'number') {
-                            renderUserCount(data.active, true);
-                        } else {
-                            renderUserCount(1, false);
-                        }
-                    })
-                    .catch(() => renderUserCount(1, false));
-            }
+            addLine(`Active-user telemetry is disabled for privacy.`, 'var(--accent-green)');
         } else if (c === 'cache') {
             let totalKeys = 0;
             let totalQuestions = 0;
@@ -10598,7 +10480,7 @@
             addLine('Admin Command Suite:', 'var(--accent-purple)');
             addLine('• status - System health, active course context & relay status', 'var(--text-secondary)');
             addLine('• ping   - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
-            addLine('• users  - Real-time active concurrent users & telemetry mesh', 'var(--text-secondary)');
+            addLine('• users  - Shows privacy status (active-user telemetry disabled)', 'var(--text-secondary)');
             addLine('• cache  - Question bank statistics and stored course codes', 'var(--text-secondary)');
             addLine('• logs   - Dumps recent audit events directly in console', 'var(--text-secondary)');
             addLine('• clear  - Clears terminal output screen buffer', 'var(--text-secondary)');
@@ -13690,7 +13572,6 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
         injectDashboardGuideBanner();
         checkForScriptUpdates(false);
         sendPassiveTelemetryPulse();
-        setInterval(sendPassiveTelemetryPulse, 600000); // 10-minute recurring telemetry pulse
 
         // Auto-Harvest past quizzes: scan Grade Report once per session per course or all courses on dashboard
         if (autoHarvestGrades) {
