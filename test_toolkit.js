@@ -1890,7 +1890,7 @@ test("Dropdown Option Elimination: marks confirmed wrong options with (❌ Elimi
     const fs = require('fs');
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
     assert.ok(script.includes("amaes-select-elim-hint"), "Must inject amaes-select-elim-hint on eliminated options");
-    assert.ok(script.includes("(❌ Eliminated)"), "Must label eliminated options with (❌ Eliminated)");
+    assert.ok(script.includes("(Eliminated)"), "Must label eliminated options with a plain-text status");
     assert.ok(script.includes("isDeducedSelect"), "Must support deduction on dropdowns");
 });
 
@@ -3904,7 +3904,7 @@ test("Gemini AI: Interface Integration, Course Tools card, Setup modal, Quiz tab
     // 4. Visual suggestion styling & badge
     assert.ok(script.includes("amaes-ai-suggested-choice"), "Must define amaes-ai-suggested-choice CSS class");
     assert.ok(script.includes("amaes-ai-suggested-badge"), "Must define amaes-ai-suggested-badge CSS class");
-    assert.ok(script.includes("✦ <span>AI Suggestion (Gemini)</span>"), "Must inject purple AI Suggestion badge for student clarity");
+    assert.ok(script.includes("<span>AI Suggestion (Gemini)</span>"), "Must inject purple AI Suggestion badge for student clarity");
     assert.ok(script.includes("function applyAiChoiceHighlight(targetRow)"), "Must define applyAiChoiceHighlight");
 });
 
@@ -4091,7 +4091,7 @@ test("Gemini AI v1.7.5: Unverified AI Suggestion Safeguards, Copy Question Filte
     assert.strictEqual(filtered[0].answer, "a. RAM", "Must retain verified database answer");
 
     // 2. Auto-Quiz Pause on AI Suggestion: No automatic advance timer
-    assert.ok(script.includes("showToast(`✦ Gemini selected choice for #${qData ? qData.qNum : ''}! (Paused for review)`, 3000);"), "Toast must notify student that AI choice was selected and paused for review");
+    assert.ok(script.includes("showToast(`Gemini selected a choice for #${qData ? qData.qNum : ''}. (Paused for review)`, 3000);"), "Toast must notify student that AI choice was selected and paused for review");
     assert.ok(script.includes("Paused for review—press <b>N</b> or click Next page when ready."), "Status log must confirm pause for student review");
 
     // 3. AI Suggestion Caching: Saved to local course bank as unverified AI suggestion
@@ -4118,7 +4118,7 @@ test("Gemini AI v1.7.5: Unverified AI Suggestion Safeguards, Copy Question Filte
     // 8. Redundant Blockage HUD Suppression & Auto-Copy Indication
     assert.ok(script.includes("firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());"), "Must clean up blockage HUD when AI starts solving or succeeds");
     assert.ok(script.includes("if (firstBlockedQue.querySelector('.amaes-ai-suggested-choice')) {\n                        isSolverRunning = false;\n                        return;\n                    }"), "Must return immediately and suppress blockage HUD when AI solves question");
-    assert.ok(script.includes("(Prompt auto-copied 📋)"), "Status log must indicate prompt was auto-copied to clipboard");
+    assert.ok(script.includes("(Prompt copied)"), "Status log must indicate prompt was copied to clipboard");
 
     // 9. Real Lifecycle Simulation: AI Suggestion -> Rejection/Wrong Choice -> Elimination & Deduction
     let mockExisting = [];
@@ -4249,7 +4249,7 @@ test("Gemini AI: AI Question Tagging & Unverified Attribution displays clean car
 
     // 2. Class name and content of card-level AI question tag
     assert.ok(script.includes("tag.className = 'amaes-ai-question-tag';"), "Must create amaes-ai-question-tag");
-    assert.ok(script.includes("✦ AI-SOLVED"), "Must display ✦ AI-SOLVED badge in card header");
+    assert.ok(script.includes("AI-SOLVED"), "Must display AI-SOLVED badge in card header");
     assert.ok(script.includes("Answered by Google Gemini AI"), "Must prominently attribute solver to Google Gemini AI");
     assert.ok(script.includes("Unverified Suggestion — Review before submitting"), "Must clearly designate suggestion as unverified for user review");
 
@@ -4378,7 +4378,7 @@ test("Gemini AI: Rate Limiting enforces 15 RPM sliding window on Free Tier, resp
     assert.ok(script.includes('id="amaes-ratelimit-countdown"'), "Fallback bar must include amaes-ratelimit-countdown element");
     assert.ok(script.includes('Google AI is temporarily busy'), "Fallback bar must display a plain-language rate limit warning");
     assert.ok(script.includes('activeRateLimitTimerInterval = setInterval'), "Must drive live countdown with setInterval");
-    assert.ok(script.includes("retryBtn.textContent = '↺ Retry AI Now';"), "Must update retry button to active state when countdown finishes");
+    assert.ok(script.includes("retryBtn.textContent = 'Retry AI now';"), "Must update retry button to active state when countdown finishes");
     assert.ok(script.includes('if (autoQuizMode) {'), "Fallback bar countdown expiration must auto-trigger retry if autoQuizMode is running");
 
     // 5. Fast-Fail on 429 in callGeminiApi to avoid wasting candidate endpoint timeouts

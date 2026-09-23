@@ -48,8 +48,8 @@
 * **Configurable Retry Attempts:** Easily configure AI retry attempts (1 to 5, default: **2 retries**) directly from Quiz tab settings or Course Tools.
 * **Auto-Copy Question on AI Failure:** Toggleable option (default: **ON**) that automatically copies the formatted question to clipboard if AI times out or fails, enabling immediate `Ctrl+V` pasting into external AI models.
 * **Token-Conservation Architecture:** Strictly triggers only on questions without confirmed answers in the database, consuming **0 tokens** on known questions.
-* **Auto-Select or Suggestion Review:** Choose between automated choice selection or visual highlighting with a `✦ AI Suggestion (Gemini)` badge and purple outline for manual confirmation.
-* **Watchdog Timer & Safe Fallbacks:** 8-second timeout, interactive cancel button, and an in-question fallback bar with `[ ↺ Retry AI ]` and `[ ✦ Copy for AI ]`. Complex formats (drag-and-drop, dropdown matching, short answers) automatically fall back to manual copy.
+* **Auto-Select or Suggestion Review:** Choose between automated choice selection or visual highlighting with an `AI Suggestion (Gemini)` badge and purple outline for manual confirmation.
+* **Watchdog Timer & Safe Fallbacks:** 8-second timeout, interactive cancel button, and an in-question fallback bar with `Retry AI` and `Copy for AI`. Complex formats (drag-and-drop, dropdown matching, short answers) automatically fall back to manual copy.
 * **Instant Keystroke Shortcuts:**
   * `C`: Formats the active question, choices, and instructions ready for your preferred AI tool.
   * `V`: Automatically parses clipboard content and selects matching choices or fills text inputs in the browser.

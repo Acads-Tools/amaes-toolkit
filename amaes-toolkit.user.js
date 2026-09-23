@@ -3543,7 +3543,7 @@
                         font-size: 11px; color: #9a3412; font-family: -apple-system, sans-serif;
                     `;
                     errHud.innerHTML = `
-                        <span style="font-size: 16px;">⚠️</span>
+                        <span style="font-weight: 700;">Warning</span>
                         <div>
                             <div style="font-weight: 700;">Moodle Server Glitch Detected</div>
                             <div style="font-size: 10px; color: #c2410c;">Question content failed to load from Moodle database. Try refreshing the page.</div>
@@ -3553,7 +3553,7 @@
                     const formEl = firstBlockedQue.querySelector('.formulation, .content') || firstBlockedQue;
                     formEl.insertBefore(errHud, formEl.firstChild);
                     setLog('[Server Error] Moodle database glitch detected. Question content is empty — cannot solve. Try refreshing.', 'var(--accent-amber)');
-                    showToast('⚠️ Moodle server glitch: Question failed to load.', 4000);
+                    showToast('Moodle server glitch: Question failed to load.', 4000);
                     isSolverRunning = false;
                     return;
                 }
@@ -3574,7 +3574,7 @@
                     firstBlockedQue.style.borderRadius = '8px';
                     setQuestionAiTag(firstBlockedQue, true);
                     // Already solved by AI and highlighted! Keep paused for review without re-querying API.
-                    setLog(`[AI Suggestion] Question #${qData ? qData.qNum : ''} has an AI suggestion. (Prompt auto-copied 📋) Paused for review—press <b>N</b> or click Next page when ready.`, "var(--accent-purple)");
+                    setLog(`[AI Suggestion] Question #${qData ? qData.qNum : ''} has an AI suggestion. (Prompt copied) Paused for review—press <b>N</b> or click Next page when ready.`, "var(--accent-purple)");
                     isSolverRunning = false;
                     return;
                 }
@@ -3586,8 +3586,8 @@
                         firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());
                         copyToClipboard(aiPromptText).catch(() => {});
                         const rlReason = `Google is temporarily limiting AI requests. Try again in ${rateLimitStatus.remainingSec} seconds.`;
-                        setLog(`[AI Rate Limit] Question #${qData ? qData.qNum : ''}: ${rlReason} (Prompt auto-copied 📋)`, "var(--accent-amber)");
-                        showToast(`⏳ AI Rate Limit: Available in ${rateLimitStatus.remainingSec}s`, 3500);
+                        setLog(`[AI Rate Limit] Question #${qData ? qData.qNum : ''}: ${rlReason} (Prompt copied)`, "var(--accent-amber)");
+                        showToast(`AI rate limit: available in ${rateLimitStatus.remainingSec}s`, 3500);
 
                         showAiFallbackBar(firstBlockedQue, qData, aiPromptText, async () => {
                             isSolverRunning = false;
@@ -3640,11 +3640,11 @@
                                     matched.input.dispatchEvent(new Event('input', { bubbles: true }));
                                     matched.input.dispatchEvent(new Event('change', { bubbles: true }));
                                 }
-                                showToast(`✦ Gemini selected choice for #${qData ? qData.qNum : ''}! (Paused for review)`, 3000);
-                                setLog(`[AI Suggestion] Gemini selected <b>${escapeHtml(matched.choiceText)}</b> for #${qData ? qData.qNum : ''}. (Prompt auto-copied 📋) Paused for review—press <b>N</b> or click Next page when ready.`, "var(--accent-purple)");
+                                showToast(`Gemini selected a choice for #${qData ? qData.qNum : ''}. (Paused for review)`, 3000);
+                                setLog(`[AI Suggestion] Gemini selected <b>${escapeHtml(matched.choiceText)}</b> for #${qData ? qData.qNum : ''}. (Prompt copied) Paused for review—press <b>N</b> or click Next page when ready.`, "var(--accent-purple)");
                             } else {
-                                showToast(`✦ Gemini suggested answer for #${qData ? qData.qNum : ''} (Paused for review)`, 3000);
-                                setLog(`[AI Suggestion] Gemini suggested <b>${escapeHtml(matched ? matched.choiceText : '')}</b> for #${qData ? qData.qNum : ''}. (Prompt auto-copied 📋) Paused for review—click to select and proceed.`, "var(--accent-purple)");
+                                showToast(`Gemini suggested an answer for #${qData ? qData.qNum : ''} (Paused for review)`, 3000);
+                                setLog(`[AI Suggestion] Gemini suggested <b>${escapeHtml(matched ? matched.choiceText : '')}</b> for #${qData ? qData.qNum : ''}. (Prompt copied) Paused for review—click to select and proceed.`, "var(--accent-purple)");
                             }
                             // Feature 2: Auto-Advance after AI answer if setting is enabled
                             if (aiAutoNextOnAiAnswer || autoNextVerified) {
@@ -3661,7 +3661,7 @@
                 } else {
                     // Copy question for AI helper
                     copyToClipboard(aiPromptText).then(() => {
-                        showToast(`📋 Question #${qData ? qData.qNum : ''} auto-copied to clipboard — ready to paste!`, 3000);
+                        showToast(`Question #${qData ? qData.qNum : ''} copied to clipboard — ready to paste!`, 3000);
                     }).catch(() => {});
                 }
 
@@ -4859,7 +4859,7 @@
                             badge = document.createElement(isAmauoed && !hasVerifiedSource ? 'a' : 'span');
                             badge.className = hasAiSource ? 'amaes-ai-suggested-badge' : `amaes-verified-badge ${hasAmauoedSource ? 'amaes-badge-amauoed' : 'amaes-badge-db'}`;
                             badge.innerHTML = sourceLabels.map(label => {
-                                const icon = label.startsWith('AI Suggestion') ? '✦' : ((label.startsWith('Web Study Guide') || label.startsWith('AMAUOED')) ? ICONS.external : (isDeduced ? ICONS.lightbulb : ICONS.checkCircle));
+                                const icon = label.startsWith('AI Suggestion') ? '' : ((label.startsWith('Web Study Guide') || label.startsWith('AMAUOED')) ? ICONS.external : (isDeduced ? ICONS.lightbulb : ICONS.checkCircle));
                                 return `${icon} <span>${label}</span>`;
                             }).join('<span style="opacity:.55"> + </span>');
                             const courseInfo = detectCourseInfo();
@@ -5253,12 +5253,12 @@
                         const eliminatedOptions = [];
                         options.forEach(opt => {
                             if (!opt.value || opt.value === '0' || opt.text.toLowerCase().includes('choose')) return;
-                            const optClean = opt.text.replace(/\s*\(❌ Eliminated\)/g, '').trim();
+                            const optClean = opt.text.replace(/\s*\(Eliminated\)/g, '').trim();
                             const optNorm = normalizeChoice(optClean);
                             const isWrong = allWrongList.some(w => w.norm === optNorm || unscriptDigits(w.norm) === unscriptDigits(optNorm));
                             if (isWrong) {
-                                if (!opt.text.includes('❌ Eliminated')) {
-                                    opt.text = `${optClean} (❌ Eliminated)`;
+                                if (!opt.text.includes('(Eliminated)')) {
+                                    opt.text = `${optClean} (Eliminated)`;
                                 }
                                 opt.style.color = '#ef4444';
                                 opt.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
@@ -5285,7 +5285,7 @@
                         // 2. Find matching option excluding eliminated ones
                         let matchedOption = options.find(opt => {
                             if (!opt.value || opt.value === '0' || opt.text.toLowerCase().includes('choose')) return false;
-                            const optClean = opt.text.replace(/\s*\(❌ Eliminated\)/g, '').trim();
+                            const optClean = opt.text.replace(/\s*\(Eliminated\)/g, '').trim();
                             const normOpt = normalizeChoice(optClean);
                             if (allWrongList.some(w => w.norm === normOpt || unscriptDigits(w.norm) === unscriptDigits(normOpt))) return false;
                             return normOpt === normTarget || (normTarget.length > 2 && normOpt.includes(normTarget)) || (normOpt.length > 2 && targetAns.length > 2 && normTarget.includes(normOpt));
@@ -5295,7 +5295,7 @@
                         if (!matchedOption && candAnswers.length > 0) {
                             matchedOption = options.find(opt => {
                                 if (!opt.value || opt.value === '0' || opt.text.toLowerCase().includes('choose')) return false;
-                                const optClean = opt.text.replace(/\s*\(❌ Eliminated\)/g, '').trim();
+                                const optClean = opt.text.replace(/\s*\(Eliminated\)/g, '').trim();
                                 const normOpt = normalizeChoice(optClean);
                                 if (allWrongList.some(w => w.norm === normOpt || unscriptDigits(w.norm) === unscriptDigits(normOpt))) return false;
                                 return candAnswers.some(ca => {
@@ -5308,7 +5308,7 @@
                         // 3. Deduction by elimination: if all options except 1 are eliminated, pick remaining
                         const validOptions = options.filter(opt => {
                             if (!opt.value || opt.value === '0' || opt.text.toLowerCase().includes('choose')) return false;
-                            const optClean = opt.text.replace(/\s*\(❌ Eliminated\)/g, '').trim();
+                            const optClean = opt.text.replace(/\s*\(Eliminated\)/g, '').trim();
                             const optNorm = normalizeChoice(optClean);
                             return !allWrongList.some(w => w.norm === optNorm || unscriptDigits(w.norm) === unscriptDigits(normOpt));
                         });
@@ -5331,7 +5331,7 @@
                                 hint.className = 'amaes-select-hint';
                                 hint.setAttribute('data-select-idx', String(idx));
                                 const displayTitle = isDeducedSelect ? 'Deduced Answer:' : sourceTitle;
-                                const cleanText = matchedOption.text.replace(/\s*\(❌ Eliminated\)/g, '').trim();
+                                const cleanText = matchedOption.text.replace(/\s*\(Eliminated\)/g, '').trim();
                                 const activeColor = isDeducedSelect ? '#f59e0b' : sourceColor;
                                 hint.innerHTML = `
                                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
@@ -5890,7 +5890,7 @@
 
                     const badge = document.createElement('span');
                     badge.className = 'amaes-type-badge';
-                    badge.innerText = '⚠️ UNATTEMPTED';
+                    badge.innerText = 'UNATTEMPTED';
                     badge.style.cssText = `
                         background: #f59e0b;
                         color: #000;
@@ -5931,7 +5931,7 @@
 
                     const badge = document.createElement('span');
                     badge.className = 'amaes-type-badge';
-                    badge.innerText = '⚠️ MISSING / PENDING';
+                    badge.innerText = 'MISSING / PENDING';
                     badge.style.cssText = `
                         position: absolute;
                         top: 6px;
@@ -6085,7 +6085,7 @@
         capabilityTipsInterval = setInterval(() => {
             const tip = CAPABILITY_TIPS[capabilityTipIndex % CAPABILITY_TIPS.length];
             capabilityTipIndex += 1;
-            showToast(`💡 ${tip}`, 7500);
+            showToast(tip, 7500);
         }, 15000);
     }
 
@@ -7075,8 +7075,8 @@
             badge.style.color = isConfigured ? 'var(--accent-green)' : 'var(--text-muted)';
             if (isConfigured) {
                 badge.innerHTML = keys.length > 1
-                    ? `✔ Ready (${keys.length} Keys · ${keys.length * 15} RPM)`
-                    : `✔ Ready (${activeModel})`;
+                    ? `Ready (${keys.length} keys)`
+                    : `Ready (${activeModel})`;
             } else {
                 badge.innerHTML = '● Not Configured';
             }
@@ -7084,7 +7084,7 @@
 
         const setupBtn = document.getElementById('btn-open-gemini-setup');
         if (setupBtn) {
-            setupBtn.innerHTML = `<span>${isConfigured ? (keys.length > 1 ? `⚙ Configure AI Keys (${keys.length})` : '⚙ Configure AI Key') : '✦ Setup Free AI Assistant'}</span>`;
+            setupBtn.innerHTML = `<span>            ${isConfigured ? (keys.length > 1 ? `Configure AI keys (${keys.length})` : 'Configure AI key') : 'Setup Free AI Assistant'}</span>`;
         }
 
         const quizAiBlock = document.getElementById('amaes-ai-quiz-settings-block');
@@ -7489,7 +7489,7 @@
         tag.innerHTML = `
             <div style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                 <span class="amaes-ai-tag-pill" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: #ffffff !important; padding: 2px 7px; border-radius: 4px; font-weight: 800; font-size: 9.5px; letter-spacing: 0.4px; display: inline-flex; align-items: center; gap: 3px;">
-                    ✦ AI-SOLVED
+                    AI-SOLVED
                 </span>
                 <span style="color: #6d28d9; font-weight: 700; font-size: 11px;">
                     Answered by Google Gemini AI
@@ -7513,7 +7513,7 @@
         }
     }
 
-    // Apply purple outline and ✦ AI Suggestion (Gemini) badge
+    // Apply purple outline and AI Suggestion (Gemini) badge
     function applyAiChoiceHighlight(targetRow) {
         if (!targetRow) return;
         targetRow.classList.add('amaes-ai-suggested-choice');
@@ -7527,7 +7527,7 @@
         if (!badge) {
             badge = document.createElement('span');
             badge.className = 'amaes-ai-suggested-badge';
-            badge.innerHTML = `✦ <span>AI Suggestion (Gemini)</span>`;
+            badge.innerHTML = `<span>AI Suggestion (Gemini)</span>`;
             badge.style.cssText = `
                 background: #7c3aed;
                 color: #ffffff !important;
@@ -7552,7 +7552,7 @@
         }
     }
 
-    // Fallback bar with dynamic failure reason, [ ⚙ Configure Key ] (if auth error), [ ↺ Retry AI ], and [ ✦ Copy for AI ]
+    // Fallback bar with dynamic failure reason, Configure Key (if auth error), Retry AI, and Copy for AI
     function showAiFallbackBar(que, qData, promptText, onRetry, { reason = '', isAuthError = false, isRateLimit = false, waitSeconds = 0 } = {}) {
         que.querySelectorAll('.amaes-ai-fallback-bar').forEach(el => el.remove());
         if (activeRateLimitTimerInterval) {
@@ -7584,11 +7584,11 @@
         if (isRateLimit && waitSeconds > 0) {
             bar.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px;">
-                    <span style="font-size: 14px;">⏳</span>
+                    <span style="font-weight: 700;">Status</span>
                     <div>
                         <div style="font-weight: 700; color: #9a3412;">Google AI is temporarily busy</div>
                         <div style="font-size: 10.5px; color: #c2410c;">
-                            Next request available in <strong id="amaes-ratelimit-countdown">${waitSeconds}s</strong>... (Prompt auto-copied 📋)
+                            Next request available in <strong id="amaes-ratelimit-countdown">${waitSeconds}s</strong>... (Prompt copied)
                         </div>
                     </div>
                 </div>
@@ -7606,7 +7606,7 @@
                         align-items: center;
                         gap: 3px;
                         transition: all 0.2s ease;
-                    ">↺ Retry in ${waitSeconds}s</button>
+                    ">Retry in ${waitSeconds}s</button>
                     <button type="button" class="amaes-ai-copy-btn" style="
                         background: #ffedd5;
                         color: #9a3412;
@@ -7619,7 +7619,7 @@
                         display: inline-flex;
                         align-items: center;
                         gap: 3px;
-                    ">✦ Copy for AI</button>
+                    ">Copy for AI</button>
                 </div>
             `;
 
@@ -7635,7 +7635,7 @@
                     e.preventDefault();
                     e.stopPropagation();
                     copyToClipboard(promptText).then(() => {
-                        showToast('✦ Copied question for AI to clipboard!');
+                        showToast('Question copied for AI.');
                     }).catch(() => {});
                 };
             }
@@ -7644,17 +7644,17 @@
                 secLeft--;
                 if (secLeft > 0) {
                     if (timerEl) timerEl.textContent = `${secLeft}s`;
-                    if (retryBtn) retryBtn.textContent = `↺ Retry in ${secLeft}s`;
+                    if (retryBtn) retryBtn.textContent = `Retry in ${secLeft}s`;
                 } else {
                     clearInterval(activeRateLimitTimerInterval);
                     activeRateLimitTimerInterval = null;
                     if (timerEl) timerEl.textContent = 'Ready!';
                     if (retryBtn) {
-                        retryBtn.textContent = '↺ Retry AI Now';
+                        retryBtn.textContent = 'Retry AI now';
                         retryBtn.style.background = '#16a34a';
                     }
                     if (autoQuizMode && typeof onRetry === 'function') {
-                        showToast('✦ Rate limit cooldown finished. Retrying AI...', 2500);
+                        showToast('Rate limit wait finished. Retrying AI...', 2500);
                         bar.remove();
                         onRetry();
                     }
@@ -7677,7 +7677,7 @@
         // Standard fallback bar
         bar.innerHTML = `
             <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px;">
-                <span style="font-size: 13px;">⚠️</span>
+                <span style="font-weight: 700;">Warning</span>
                 <span style="font-weight: 600;">${displayReason}</span>
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
@@ -7708,7 +7708,7 @@
                     display: inline-flex;
                     align-items: center;
                     gap: 3px;
-                ">↺ Retry AI</button>
+                ">Retry AI</button>
                 <button type="button" class="amaes-ai-copy-btn" style="
                     background: #fae8ff;
                     color: #86198f;
@@ -7721,7 +7721,7 @@
                     display: inline-flex;
                     align-items: center;
                     gap: 3px;
-                ">✦ Copy for AI</button>
+                ">Copy for AI</button>
             </div>
         `;
 
@@ -7752,7 +7752,7 @@
                 e.preventDefault();
                 e.stopPropagation();
                 copyToClipboard(promptText).then(() => {
-                    showToast('✦ Copied question for AI to clipboard!');
+                    showToast('Question copied for AI.');
                 }).catch(() => {});
             };
         }
@@ -7789,7 +7789,7 @@
             if (matched && matched.row && !isChoiceRowEliminated(matched.row)) {
                 applyAiChoiceHighlight(matched.row);
                 setLog(`[AI Cache] Reusing previously solved answer for Question #${qData ? qData.qNum : ''} (0 API requests)`, "var(--accent-purple)");
-                showToast(`✦ Reused cached AI choice for #${qData ? qData.qNum : ''} (Instant)!`, 2000);
+                showToast(`Reused cached AI choice for #${qData ? qData.qNum : ''}.`, 2000);
                 if (typeof onSuccess === 'function') {
                     await onSuccess(matched);
                 }
@@ -7804,8 +7804,8 @@
                 copyToClipboard(promptText).catch(() => {});
             }
             const rlMsg = `Google is temporarily limiting AI requests. Available again in about ${rateLimitStatus.remainingSec} seconds.`;
-            setLog(`[AI Rate Limit] Question #${qData ? qData.qNum : ''}: ${rlMsg} (Prompt auto-copied 📋)`, "var(--accent-amber)");
-            showToast(`⏳ AI Rate Limit: Available in ${rateLimitStatus.remainingSec}s`, 3500);
+            setLog(`[AI Rate Limit] Question #${qData ? qData.qNum : ''}: ${rlMsg} (Prompt copied)`, "var(--accent-amber)");
+            showToast(`AI rate limit: available in ${rateLimitStatus.remainingSec}s`, 3500);
 
             showAiFallbackBar(que, qData, promptText, async () => {
                 await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
@@ -7834,7 +7834,7 @@
         thinkingEl.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="amaes-ai-spin" style="display: inline-block; font-size: 14px; color: #9333ea;">✦</span>
+                    <span class="amaes-ai-spin" style="display: inline-block; width: 14px; height: 14px; color: #9333ea;"></span>
                     <span class="amaes-ai-status-text" style="font-weight: 700; color: #7e22ce; font-size: 12px;">Gemini is analyzing Question #${qData ? qData.qNum : ''}...</span>
                 </div>
                 <button type="button" class="amaes-ai-cancel-btn" style="
@@ -7988,7 +7988,7 @@
                         applyAiChoiceHighlight(deducedRow);
                         saveAiAnswerToCache(qData, deducedMatched);
                         setLog(`[AI Deduction] AI suggested confirmed wrong choice "${escapeHtml(matched.choiceText)}". Deduced remaining valid choice: <b>${escapeHtml(deducedText)}</b>`, "var(--accent-purple)");
-                        showToast(`✦ AI corrected: Deduced remaining valid choice!`, 3000);
+                        showToast('AI correction applied: one valid choice remained.', 3000);
                         if (typeof onSuccess === 'function') {
                             await onSuccess(deducedMatched);
                         }
@@ -8086,7 +8086,7 @@
         // Auto-copy question to clipboard if enabled on failure
         if (getAiAutoCopyOnFail()) {
             copyToClipboard(promptText).then(() => {
-                showToast('✦ Question auto-copied to clipboard for external AI solving!', 3500);
+                showToast('Question copied to clipboard for external AI solving.', 3500);
             }).catch(() => {});
         }
 
@@ -8154,7 +8154,7 @@
                     justify-content: space-between;
                 ">
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 16px; color: #c084fc;">✦</span>
+                        <span style="font-weight: 700; color: #c084fc;">AI</span>
                         <span style="font-weight: 800; font-size: 13.5px; color: #f8fafc;">Setup Free Google Gemini AI</span>
                     </div>
                     <button id="amaes-gemini-modal-close" type="button" style="
@@ -8220,7 +8220,7 @@
                                 <span style="font-weight: 600; color: #f8fafc;">Paste your key(s) here:</span>
                                 <!-- Speed explanation box -->
                                 <div id="amaes-multikey-explain" style="margin: 6px 0; padding: 7px 10px; background: rgba(124,58,237,0.10); border: 1px solid rgba(168,85,247,0.35); border-radius: 6px; font-size: 10px; color: #c4b5fd; line-height: 1.5;">
-                                    <b style="color:#e9d5ff;">💡 Optional backup key</b><br>
+                                    <b style="color:#e9d5ff;">Optional backup key</b><br>
                                     You normally need only one key. Add another key that you own if Google temporarily limits the first one. The toolkit tries keys one at a time and respects Google's limits; adding keys is optional and does not bypass Google's rules.
                                 </div>
                                 <!-- Dynamic key rows rendered by JS -->
@@ -8327,7 +8327,7 @@
         const keyRowsContainer = modal.querySelector('#amaes-gemini-key-rows');
         const addKeyBtn = modal.querySelector('#amaes-gemini-btn-add-key');
 
-        const KEY_LABELS = ['Key #1 (Primary)', 'Key #2 (Backup · +15 RPM)', 'Key #3 (Turbo ⚡ · +15 RPM)', 'Key #4', 'Key #5'];
+        const KEY_LABELS = ['Key #1 (Primary)', 'Key #2 (Backup)', 'Key #3 (Backup)', 'Key #4', 'Key #5'];
         const MAX_KEYS = 5;
 
         function renderKeyRowsWithVals(vals) {
@@ -8449,11 +8449,11 @@
                         feedback.style.background = 'rgba(16, 185, 129, 0.15)';
                         feedback.style.color = '#34d399';
                         feedback.style.border = '1px solid rgba(16, 185, 129, 0.3)';
-                        feedback.innerHTML = `✔ API Key Verified & Saved! Connected via ${modelName}.` +
+                        feedback.innerHTML = `API key verified and saved. Connected via ${modelName}.` +
                             (isContributorSharingEnabled()
                                 ? ` <a href="https://github.com/Acads-Tools/database/blob/main/relay/README.md#contributor-key-sharing" target="_blank" rel="noopener noreferrer" style="color:#a7f3d0; text-decoration:underline;">Manage sharing</a>`
                                 : '');
-                        showToast(`✔ Google Gemini Connected (${modelName})!`);
+                        showToast(`Google Gemini connected (${modelName}).`);
                         updateAiAssistantUI();
                         setTimeout(closeModal, 1200);
                     }
@@ -11114,7 +11114,7 @@
                         <p style="margin: 0 0 8px; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Direct in-quiz AI solving for uncertain Multiple Choice and True/False questions. Features <b>in-session answer caching</b> (0 duplicate API requests), <b>elimination safety guards</b> against known wrong choices, <b>configurable retries</b>, and <b>auto-copy on failure</b>.</p>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <button id="welcome-btn-setup-ai" type="button" class="amaes-btn" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; font-size: 11px; padding: 4px 10px; border-radius: 5px; font-weight: 700; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 4px;">
-                                ✦ <span>${geminiApiKey ? 'Configure AI Key' : 'Setup Free AI Assistant'}</span>
+                                <span>${geminiApiKey ? 'Configure AI key' : 'Setup Free AI Assistant'}</span>
                             </button>
                         </div>
                     </div>
@@ -11654,7 +11654,7 @@
                     <div id="amaes-ai-quiz-settings-block" style="display: ${geminiApiKey ? 'flex' : 'none'}; flex-direction: column; gap: 5px; margin-top: 2px; border-top: 1px solid var(--border-subtle); padding-top: 6px;">
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <span style="font-size: 9.5px; font-weight: 700; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
-                                ✦ <span>Google Gemini AI (Experimental)</span>
+                                <span>Google Gemini AI (Experimental)</span>
                             </span>
                             <span id="amaes-ai-quiz-status-pill" style="font-size: 8.5px; font-weight: 700; color: #34d399; background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.3); border-radius: 3px; padding: 1px 5px;">Active</span>
                         </div>
@@ -11995,7 +11995,7 @@
                 <div id="mod-ai-card" class="amaes-card">
                     <div id="mod-ai-header" class="amaes-card-header">
                         <div style="display: flex; align-items: center; gap: 6px;">
-                            <span style="color: #a855f7;">✦</span>
+                            <span style="font-weight: 700; color: #a855f7;">AI</span>
                             <span class="header-label">Smart AI Assistant</span>
                             <span style="font-size: 8.5px; font-weight: 800; background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); padding: 1px 5px; border-radius: 4px;">EXPERIMENTAL</span>
                         </div>
@@ -12006,7 +12006,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 6px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border);">
                             <span style="color: var(--text-muted);">Status:</span>
                             <span id="gemini-status-badge" style="font-weight: 700; font-size: 10px; color: ${geminiApiKey ? 'var(--accent-green)' : 'var(--text-muted)'}; background: var(--surface); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border);">
-                                ${geminiApiKey ? '✔ Ready (Gemini 2.5 / 2.0 Flash)' : '● Not Configured'}
+                                ${geminiApiKey ? 'Ready (Gemini 2.5 / 2.0 Flash)' : 'Not configured'}
                             </span>
                         </div>
 
@@ -12044,7 +12044,7 @@
 
                         <div style="display: flex; gap: 6px; margin-top: 2px;">
                             <button id="btn-open-gemini-setup" type="button" class="amaes-btn" style="flex: 1; justify-content: center; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; border: none; font-weight: 700; cursor: pointer;">
-                                <span>${geminiApiKey ? '⚙ Configure AI Key' : '✦ Setup Free AI Assistant'}</span>
+                                <span>${geminiApiKey ? 'Configure AI key' : 'Setup Free AI Assistant'}</span>
                             </button>
                         </div>
                     </div>
