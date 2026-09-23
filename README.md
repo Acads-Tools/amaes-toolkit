@@ -4,6 +4,11 @@
 [![Platform](https://img.shields.io/badge/platform-Violentmonkey%20%7C%20Tampermonkey-darkblue.svg)](https://acads-tools.github.io/amaes-toolkit/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+> **Compatibility:** Version **1.7.5** is currently supported. Older clients
+> are blocked at startup and must be updated from the [official userscript
+> link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js).
+> See [CLIENT-COMPATIBILITY.md](CLIENT-COMPATIBILITY.md) for the policy.
+
 > An assistive study enhancement and question repository client for AMA Education System and ACLC College students on Moodle (`semestral.amaes.com`). Provides real-time answer verification, autonomous study assistance, and zero-PII community question consensus.
 
 <p align="center">
