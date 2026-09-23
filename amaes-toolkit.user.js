@@ -8449,6 +8449,14 @@
                         msgLower.includes('unauthenticated') || 
                         msgLower.includes('access_token_type_unsupported')) {
                         feedback.innerText = `Validation Failed: Key was rejected by Google. In Google AI Studio, ensure you click "Create API key in new project" so the Generative Language API is automatically enabled.`;
+                    } else if (msgLower.includes('quota') || msgLower.includes('429') || msgLower.includes('rate limit') || msgLower.includes('resource_exhausted')) {
+                        setGeminiApiKeys(allKeyVals);
+                        feedback.style.background = 'rgba(245, 158, 11, 0.15)';
+                        feedback.style.color = '#fbbf24';
+                        feedback.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+                        feedback.innerText = `Key saved locally, but Google is temporarily out of free-tier quota. Retry after the cooldown or check your AI Studio limits.`;
+                        showToast('Gemini key saved; free-tier quota is temporarily exhausted.', 4500);
+                        updateAiAssistantUI();
                     } else {
                         feedback.innerText = `Validation Failed: ${msg}`;
                     }
