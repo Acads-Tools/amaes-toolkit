@@ -2564,9 +2564,9 @@ test("Unanswered Question Reassurance: displays 'be the first to answer and shar
 });
 
 // --------------------------------------------------
-// 75. Non-Clunky Auto-Quiz State & Manual Advance Gate
+// 75. Non-Clunky Auto-Quiz State & Manual Progression
 // --------------------------------------------------
-test("Non-Clunky Auto-Quiz Progression: preserves autoQuizMode on unknown questions and prevents auto-next on manual typing by default", () => {
+test("Non-Clunky Auto-Quiz Progression: preserves autoQuizMode and advances past completed manual answers", () => {
     const fs = require('fs');
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
@@ -2577,12 +2577,13 @@ test("Non-Clunky Auto-Quiz Progression: preserves autoQuizMode on unknown questi
     assert.ok(!caseBSection.includes("localStorage.setItem('amaes_auto_quiz_mode', 'false');"), "Case B must NOT overwrite localStorage auto_quiz_mode to false");
     assert.ok(caseBSection.includes("isWaitingForUserAnswer = true;"), "Case B must use isWaitingForUserAnswer flag for current question");
 
-    // 2. Verify manual answers do NOT auto-advance by default
+    // 2. Manual answers in active Auto-Quiz mode move to the next unanswered target.
     assert.ok(script.includes("scheduleAutoNextAfterAnswer(delayMs = 800, isManualAnswer = false)"), "scheduleAutoNextAfterAnswer must support isManualAnswer parameter");
-    assert.ok(script.includes("if (isManualAnswer && !autoNextQuiz) return;"), "Must strictly block auto-advance on manual answers when autoNextQuiz is false");
+    assert.ok(script.includes("scheduleAutoNextAfterAnswer(800, true, firstBlockedQue);"), "Manual answers must advance from the completed blocked question");
+    assert.ok(script.includes("if (autoQuizMode) {\n                    scheduleAutoNextAfterAnswer"), "Active Auto-Quiz must schedule progression after a manual answer");
 
-    // 3. Verify onUserPickedChoice displays review guidance and stays on page by default
-    assert.ok(caseBSection.includes("Answer entered! Press <b>N</b> or click <b>Next page</b> below to proceed"), "Must instruct student to proceed when ready instead of auto-advancing");
+    // 3. Manual answers remain recorded and are not mistaken for unknown questions.
+    assert.ok(script.includes("if (isQuestionAnswered(que)) return;"), "Answered questions must be excluded from unknown-question processing");
 
     // 4. Verify verified auto-next default is enabled
     assert.ok(script.includes("autoNextVerified = localStorage.getItem('amaes_auto_next_verified') !== 'false';"), "Auto-next on verified answers must default to true");
@@ -2829,8 +2830,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.7.6'), "Userscript header must specify v1.7.6");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.6";'), "Constant SCRIPT_VERSION must be v1.7.6");
+    assert.ok(script.includes('@version      1.7.7'), "Userscript header must specify v1.7.7");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.7";'), "Constant SCRIPT_VERSION must be v1.7.7");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3959,10 +3960,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.7.6-blue.svg"), "README badge must show v1.7.6");
+    assert.ok(readme.includes("version-1.7.7-blue.svg"), "README badge must show v1.7.7");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.7.6<"), "Website must display v1.7.6 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.7.7<"), "Website must display v1.7.7 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
