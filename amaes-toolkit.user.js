@@ -7757,6 +7757,14 @@
     async function handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback }) {
         que.querySelectorAll('.amaes-ai-thinking-indicator, .amaes-ai-fallback-bar').forEach(el => el.remove());
 
+        // A retry button or cooldown callback can outlive the question's
+        // fallback UI. Never spend another request after the student answered.
+        const existingAiChoiceBeforeRequest = que.querySelector('.amaes-ai-suggested-choice');
+        if (isQuestionAnswered(que) && !existingAiChoiceBeforeRequest) {
+            setLog(`[AI Guard] Question #${qData ? qData.qNum : ''} already has an answer; no request sent.`, "var(--accent-green)");
+            return;
+        }
+
         // 0. Cache Check: If this question was already solved by AI in this session or on-screen, reuse it with 0 API requests!
         const existingAiChoice = que.querySelector('.amaes-ai-suggested-choice');
         if (existingAiChoice && !isChoiceRowEliminated(existingAiChoice)) {
@@ -7874,6 +7882,10 @@
         let sharedFallbackAttempted = false;
 
         while (attempt < maxAttempts && !answerText && !isAborted && !timedOut) {
+            if (isQuestionAnswered(que) && !que.querySelector('.amaes-ai-suggested-choice')) {
+                abortCtrl.abort();
+                break;
+            }
             attempt++;
             try {
                 if (attempt > 1) {
@@ -7933,7 +7945,10 @@
                             setLog('[AI Assistant] Shared AI help is currently full or unavailable. No charge was made by this fallback.', "var(--accent-amber)");
                         }
                     }
-                    if (getGeminiApiKeys().length <= 1) break;
+                    // Authentication, quota, and rate-limit errors are not
+                    // fixed by immediately repeating the same request. The
+                    // shared fallback above is the only alternate path.
+                    break;
                 }
                 if (attempt < maxAttempts) {
                     await new Promise(r => setTimeout(r, 800));

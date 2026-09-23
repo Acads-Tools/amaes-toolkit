@@ -4381,6 +4381,12 @@ test("Gemini AI: Rate Limiting enforces 15 RPM sliding window on Free Tier, resp
     const callApiBlock = script.slice(script.indexOf("async function callGeminiApi"), script.indexOf("function matchAiAnswerToChoice"));
     assert.ok(callApiBlock.includes("triggerAiRateLimitCooldown("), "callGeminiApi must trigger cooldown on 429");
     assert.ok(callApiBlock.includes("recordAiRequest(apiKey);"), "callGeminiApi must record timestamp on request invocation");
+
+    // 6. Do not spend requests after the student has already answered, and do
+    // not retry deterministic quota/auth failures across multiple saved keys.
+    const inferenceBlock = script.slice(script.indexOf("async function handleGeminiQuestionInference"), script.indexOf("// Non-tech student setup modal"));
+    assert.ok(inferenceBlock.includes("already has an answer; no request sent"), "AI inference must stop when the question was answered before a retry");
+    assert.ok(inferenceBlock.includes("Authentication, quota, and rate-limit errors are not"), "Deterministic AI failures must fail fast instead of retrying across keys");
 });
 
 console.log("\n==================================================");
