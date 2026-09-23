@@ -904,6 +904,7 @@
         localStorage.setItem('amaes_cloud_db_url', storedCloudDbUrl);
     }
     let cloudDbBaseUrl = storedCloudDbUrl || 'https://raw.githubusercontent.com/Acads-Tools/database/main/data/verified/';
+    const communityDbBaseUrl = 'https://raw.githubusercontent.com/Acads-Tools/database/main/data/community/';
     const CLOUD_DB_FALLBACK_URL = 'https://raw.githubusercontent.com/Acads-Tools/database/main/data/';
     const CLOUD_DB_AMAUOED_URL = 'https://raw.githubusercontent.com/Acads-Tools/database/main/data/amauoed/';
     const DEFAULT_COMMUNITY_RELAY_URL = COMMUNITY_RELAY_URL;
@@ -3132,6 +3133,72 @@
         return ordered.find(que => !isQuestionAnswered(que)) || null;
     }
 
+    function getAttemptEvidenceKey() {
+        const params = new URLSearchParams(window.location.search);
+        return `amaes_attempt_evidence_${params.get('quiz') || params.get('cmid') || window.location.pathname}`;
+    }
+
+    function recordAttemptAnswerEvidence(que, answer, source = 'manual_selection') {
+        if (!que || !answer) return;
+        const qData = extractQuestionData(que);
+        if (!qData || !qData.qText) return;
+        try {
+            const key = getAttemptEvidenceKey();
+            const current = JSON.parse(sessionStorage.getItem(key) || '[]');
+            const entry = {
+                qRaw: qData.qText,
+                qNorm: normalizeText(qData.qText),
+                ansRaw: String(answer).trim(),
+                ansNorm: normalizeChoice(answer),
+                choices: qData.choices || [],
+                source,
+                isAiSuggestion: source === 'ai_inference',
+                recordedAt: Date.now()
+            };
+            const next = current.filter(item => item.qNorm !== entry.qNorm);
+            next.push(entry);
+            sessionStorage.setItem(key, JSON.stringify(next.slice(-100)));
+        } catch (err) {
+            logDebug(`Attempt evidence storage note: ${err.message}`);
+        }
+    }
+
+    function promoteAttemptEvidenceFromScore() {
+        if (!checkIsQuizSummaryPage()) return;
+        const bodyText = document.body ? (document.body.innerText || '') : '';
+        const scoreMatch = bodyText.match(/(?:Highest grade|Grade|Marks)[^0-9]{0,80}([0-9]+(?:\.[0-9]+)?)\s*\/\s*([0-9]+(?:\.[0-9]+)?)/i);
+        if (!scoreMatch) return;
+        const earned = Number(scoreMatch[1]);
+        const maximum = Number(scoreMatch[2]);
+        if (!Number.isFinite(earned) || !Number.isFinite(maximum) || maximum <= 0) return;
+        let evidence = [];
+        try {
+            evidence = JSON.parse(sessionStorage.getItem(getAttemptEvidenceKey()) || '[]');
+        } catch (_) {}
+        if (!Array.isArray(evidence) || evidence.length === 0) return;
+        if (earned < maximum) {
+            setLog(`Score evidence saved (${earned}/${maximum}). Individual answers were not promoted because a partial score cannot identify which choices were correct.`, 'var(--accent-amber)');
+            return;
+        }
+        const courseInfo = detectCourseInfo();
+        const subCode = courseInfo.subjectCode || 'GENERAL';
+        const promoted = evidence.map(item => ({
+            ...item,
+            verified: true,
+            isAiSuggestion: false,
+            source: 'moodle_100_percent',
+            evidenceType: 'moodle_100_percent'
+        }));
+        mergeAnswersIntoCache(subCode, promoted, 'moodle_100_percent');
+        queueCommunityContribution(subCode, promoted, {
+            source: 'moodle_100_percent',
+            evidenceType: 'moodle_100_percent'
+        });
+        setLog(`100% score confirmed <b>${promoted.length}</b> recorded answers and queued them for the verified database.`, 'var(--accent-green)');
+        showToast(`100% confirmed: ${promoted.length} answers saved to the study database.`, 4000);
+        sessionStorage.removeItem(getAttemptEvidenceKey());
+    }
+
     // Schedule automatic advancement to the next target on a one-page quiz,
     // or to the next Moodle page after all questions on this page are answered.
     function scheduleAutoNextAfterAnswer(delayMs = 800, isManualAnswer = false) {
@@ -3536,6 +3603,9 @@
                         qData: qData,
                         promptText: promptText,
                         onSuccess: async (matched) => {
+                            if (matched && matched.choiceText) {
+                                recordAttemptAnswerEvidence(firstBlockedQue, matched.choiceText, 'ai_inference');
+                            }
                             // Ensure blockage HUD is removed upon successful AI resolution
                             firstBlockedQue.querySelectorAll('.amaes-blockage-hud, .amaes-unanswered-hint').forEach(el => el.remove());
                             firstBlockedQue.querySelectorAll('.amaes-que-top-toolbar').forEach(toolbar => {
@@ -3657,6 +3727,17 @@
                 // Listen for user selecting or typing a choice: show visual confirmation, DO NOT auto-next by default
                 const inputElements = firstBlockedQue.querySelectorAll('input[type="radio"], input[type="checkbox"], input[type="text"], select, .draghome, .drop, input.placeinput');
                 const onUserPickedChoice = () => {
+                    const selectedInput = firstBlockedQue.querySelector('.answer input[type="radio"]:checked, .answer input[type="checkbox"]:checked');
+                    const selectedLabel = selectedInput && (selectedInput.closest('label') || selectedInput.parentElement);
+                    const selectedText = selectedLabel ? cleanDOMToAI(selectedLabel).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim() : '';
+                    const textInput = firstBlockedQue.querySelector('input[type="text"].form-control, input.form-control, textarea');
+                    const selectInput = firstBlockedQue.querySelector('select');
+                    const selectedOption = selectInput && selectInput.options[selectInput.selectedIndex];
+                    recordAttemptAnswerEvidence(
+                        firstBlockedQue,
+                        selectedText || (textInput && textInput.value) || (selectedOption && selectedOption.text) || '',
+                        'manual_selection'
+                    );
                     firstBlockedQue.style.outline = '2px solid #10b981';
                     const hud = firstBlockedQue.querySelector('.amaes-blockage-hud');
                     const allAnswered = areAllPageQuestionsAnswered();
@@ -3726,6 +3807,7 @@
     // Auto-Mark as Done / Submit Handler for Quiz Summary Page (/mod/quiz/summary.php)
     function handleQuizSummaryAutoSubmit() {
         if (!checkIsQuizSummaryPage()) return;
+        promoteAttemptEvidenceFromScore();
         logDebug("Quiz Summary reached. Student reviews at their own pace (Auto-submit disabled by design).");
     }
 
@@ -8847,6 +8929,7 @@
         }
 
         let verifiedCount = 0;
+        let communityCount = 0;
         let amauoedCount = 0;
 
         // 1. Fetch Verified Tier (Audited Gold Standard)
@@ -8876,7 +8959,25 @@
             }
         }
 
-        // 2. Fetch AMAUOED Tier (Study Guide Catalog)
+        // 2. Fetch community tier, including unverified AI suggestions.
+        // These entries are displayed as suggestions but never auto-selected
+        // unless later promoted by review evidence or a 100% score.
+        try {
+            const communityUrl = `${communityDbBaseUrl}${cleanSubCode}.json`;
+            const communityData = await fetchJsonUrl(communityUrl);
+            const parsedCommunity = parseIncomingAnswerPayload(communityData, cleanSubCode).map(q => ({
+                ...q,
+                source: q.source || 'community_cache',
+                verified: Boolean(q.verified),
+                isAiSuggestion: Boolean(q.isAiSuggestion || q.evidenceType === 'ai_inference')
+            }));
+            mergeAnswersIntoCache(cleanSubCode, parsedCommunity, 'Cloud-Community');
+            communityCount = parsedCommunity.length;
+        } catch (e) {
+            logDebug(`Community cache tier note for ${cleanSubCode}: ${e.message}`);
+        }
+
+        // 3. Fetch AMAUOED Tier (Study Guide Catalog)
         try {
             const amaUrl = `${CLOUD_DB_AMAUOED_URL}${cleanSubCode}.json`;
             logDebug(`Syncing amauoed catalog from: ${amaUrl}`);
@@ -8891,7 +8992,7 @@
             logDebug(`AMAUOED tier note for ${cleanSubCode}: ${e.message}`);
         }
 
-        const totalSynced = verifiedCount + amauoedCount;
+        const totalSynced = verifiedCount + communityCount + amauoedCount;
         if (totalSynced === 0) {
             throw new Error(`No answer databases found for ${cleanSubCode}`);
         }
@@ -8900,6 +9001,7 @@
             success: true,
             count: totalSynced,
             verifiedCount,
+            communityCount,
             amauoedCount
         };
     }
@@ -8965,6 +9067,9 @@
             ansNorm: normalizeChoice(q.answer || q.ansRaw),
             choices: q.choices || [],
             verified: q.verified !== false,
+            isAiSuggestion: Boolean(q.isAiSuggestion || q.evidenceType === 'ai_inference'),
+            evidenceType: q.evidenceType || '',
+            confirmations: Number(q.confirmations) || 1,
             source: q.source || 'db'
         }));
     }
