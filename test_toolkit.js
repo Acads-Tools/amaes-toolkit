@@ -4380,6 +4380,8 @@ test("Gemini AI: Rate Limiting enforces 15 RPM sliding window on Free Tier, resp
     assert.ok(script.includes('activeRateLimitTimerInterval = setInterval'), "Must drive live countdown with setInterval");
     assert.ok(script.includes("retryBtn.textContent = 'Retry AI now';"), "Must update retry button to active state when countdown finishes");
     assert.ok(script.includes('if (autoQuizMode) {'), "Fallback bar countdown expiration must auto-trigger retry if autoQuizMode is running");
+    assert.ok(script.includes("Most supported answer ("), "Score-only consensus must be visibly distinguished from review evidence");
+    assert.ok(script.includes("reviewAvailable: false"), "Perfect-score evidence must record that review was unavailable");
 
     // 5. Fast-Fail on 429 in callGeminiApi to avoid wasting candidate endpoint timeouts
     const callApiBlock = script.slice(script.indexOf("async function callGeminiApi"), script.indexOf("function matchAiAnswerToChoice"));

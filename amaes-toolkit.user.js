@@ -3203,7 +3203,10 @@
             verified: true,
             isAiSuggestion: false,
             source: 'moodle_100_percent',
-            evidenceType: 'moodle_100_percent'
+            evidenceType: 'moodle_100_percent',
+            reviewAvailable: false,
+            scoreEarned: earned,
+            scoreMaximum: maximum
         }));
         mergeAnswersIntoCache(subCode, promoted, 'moodle_100_percent');
         queueCommunityContribution(subCode, promoted, {
@@ -4786,6 +4789,9 @@
                         });
                         const sourceCandidates = matchingSources.length > 0 ? matchingSources : [cand];
                         const hasVerifiedSource = sourceCandidates.some(candidate => candidate.verified === true || candidate.deduced === true);
+                        const hasScoreOnlySource = sourceCandidates.some(candidate =>
+                            candidate.evidenceType === 'moodle_100_percent' && candidate.reviewAvailable === false
+                        );
                         const hasAmauoedSource = sourceCandidates.some(candidate =>
                             Boolean((candidate.source || '').toLowerCase().includes('amauoed') ||
                             (Array.isArray(candidate.sources) && candidate.sources.some(source => String(source).toLowerCase().includes('amauoed'))))
@@ -4807,7 +4813,14 @@
                         }
                         const sourceLabels = [];
                         if (hasVerifiedSource) {
-                            sourceLabels.push(isDeduced ? 'Deduced Answer' : 'Verified Answer');
+                            if (hasScoreOnlySource && !sourceCandidates.some(candidate =>
+                                candidate.evidenceType === 'moodle_review' || candidate.evidenceType === 'official_review'
+                            )) {
+                                const confirmations = Math.max(...sourceCandidates.map(candidate => Number(candidate.confirmations) || 1));
+                                sourceLabels.push(`Most supported answer (${confirmations} perfect-score confirmation${confirmations === 1 ? '' : 's'})`);
+                            } else {
+                                sourceLabels.push(isDeduced ? 'Deduced Answer' : 'Verified Answer');
+                            }
                         }
                         if (hasAmauoedSource && !hasAiSource) sourceLabels.push('Web Study Guide');
                         if (hasAiSource) sourceLabels.push('AI Suggestion (Gemini)');
@@ -9554,7 +9567,9 @@
                 verified: Boolean(q.verified),
                 isAiSuggestion: Boolean(q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini'))),
                 source: q.source || options.source || "auto_harvester",
-                evidenceType: q.evidenceType || (q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini')) ? 'ai_inference' : evidenceType)
+                evidenceType: q.evidenceType || (q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini')) ? 'ai_inference' : evidenceType),
+                reviewAvailable: q.reviewAvailable,
+                contributorId: getAnonymousContributorId()
             }))
         };
 
