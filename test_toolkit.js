@@ -2829,8 +2829,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.7.5'), "Userscript header must specify v1.7.5");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.5";'), "Constant SCRIPT_VERSION must be v1.7.5");
+    assert.ok(script.includes('@version      1.7.6'), "Userscript header must specify v1.7.6");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.6";'), "Constant SCRIPT_VERSION must be v1.7.6");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3595,23 +3595,20 @@ test("Background Execution: notifies users that Auto-Quiz runs hands-free in bac
     assert.ok(dashHtml.includes('Background Execution Capable'), "Dashboard status panel must indicate background execution capability");
 });
 // --------------------------------------------------
-// 105. 10-Minute Continuous Heartbeat & Telemetry Tracking
+// 105. Privacy-safe relay health and telemetry policy
 // --------------------------------------------------
-test("Telemetry: 10-minute continuous recurring pulse with anonymous token and relay support", () => {
+test("Telemetry: presence tracking remains disabled while relay health endpoints remain available", () => {
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
     const workerScript = fs.readFileSync('../database/relay/worker.js', 'utf8');
 
-    // 1. Client-side recurring pulse & anonymous token
-    assert.ok(script.includes('setInterval(sendPassiveTelemetryPulse, 600000)'), "Must schedule recurring pulse every 10 minutes");
-    assert.ok(script.includes('amaes_anonymous_cid'), "Must generate and use anonymous client token");
-    assert.ok(script.includes('cid='), "Must append anonymous cid parameter to ping URL");
-    assert.ok(script.includes('600000'), "Must enforce 10-minute cooldown");
+    // 1. Client-side presence tracking is intentionally disabled for privacy.
+    assert.ok(script.includes('Deliberately disabled: the relay does not collect presence or identity telemetry.'), "Presence telemetry must remain disabled");
+    assert.ok(script.includes('Active-user telemetry is disabled for privacy.'), "The UI must explain the telemetry policy");
 
-    // 2. Server-side Cloudflare Worker endpoints & 10-minute rolling tracking
+    // 2. Server-side health endpoints remain stateless.
     assert.ok(workerScript.includes('path === "/ping"'), "Worker must handle /ping endpoint");
     assert.ok(workerScript.includes('path === "/active"'), "Worker must handle /active endpoint");
-    assert.ok(workerScript.includes('600000'), "Worker must enforce 10-minute window for active peers");
-    assert.ok(workerScript.includes('pruneAndCountActivePeers'), "Worker must prune peers older than 10 minutes");
+    assert.ok(workerScript.includes('privacy: "No IP, client identifier, or active-user telemetry is collected."'), "Worker must document the privacy policy");
 });
 
 test("Review Question Markers: Debunk failed choices on zero marks and deduce True/False correctly", () => {
@@ -3962,10 +3959,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.7.5-blue.svg"), "README badge must show v1.7.5");
+    assert.ok(readme.includes("version-1.7.6-blue.svg"), "README badge must show v1.7.6");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.7.5<"), "Website must display v1.7.5 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.7.6<"), "Website must display v1.7.6 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -4380,7 +4377,7 @@ test("Gemini AI: Rate Limiting enforces 15 RPM sliding window on Free Tier, resp
     // 5. Fast-Fail on 429 in callGeminiApi to avoid wasting candidate endpoint timeouts
     const callApiBlock = script.slice(script.indexOf("async function callGeminiApi"), script.indexOf("function matchAiAnswerToChoice"));
     assert.ok(callApiBlock.includes("triggerAiRateLimitCooldown("), "callGeminiApi must trigger cooldown on 429");
-    assert.ok(callApiBlock.includes("recordAiRequest();"), "callGeminiApi must record timestamp on request invocation");
+    assert.ok(callApiBlock.includes("recordAiRequest(apiKey);"), "callGeminiApi must record timestamp on request invocation");
 });
 
 console.log("\n==================================================");
