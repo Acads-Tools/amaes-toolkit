@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.7.6
+// @version      1.7.7
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -27,7 +27,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.7.6";
+    const SCRIPT_VERSION = "v1.7.7";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -3138,7 +3138,9 @@
         const sourceQue = arguments[2] || null;
         const allowAiAutoNext = arguments[3] === true;
         if (!autoQuizMode) return;
-        if (isManualAnswer && !autoNextQuiz) return;
+        // While Auto-Quiz is running, manual answers are completed targets too.
+        // Continue to the next unanswered question instead of leaving the user
+        // on the question that was just answered.
         if (!isManualAnswer && !autoNextVerified && !allowAiAutoNext) return;
         if (!checkIsQuizAttemptPage()) return;
 
@@ -3191,7 +3193,7 @@
             if (inp.dataset.amaesAutoNextBound) return;
             inp.dataset.amaesAutoNextBound = 'true';
             inp.addEventListener('change', () => {
-                if (autoNextQuiz && autoQuizMode) {
+                if (autoQuizMode) {
                     scheduleAutoNextAfterAnswer(inp.type === 'checkbox' ? 1200 : 800, true, inp.closest('.que'));
                 }
             });
@@ -3204,7 +3206,7 @@
             if (inp.dataset.amaesAutoNextBound) return;
             inp.dataset.amaesAutoNextBound = 'true';
             inp.addEventListener('blur', () => {
-                if (autoNextQuiz && autoQuizMode && inp.value && inp.value.trim().length > 0) {
+                if (autoQuizMode && inp.value && inp.value.trim().length > 0) {
                     scheduleAutoNextAfterAnswer(1000, true, inp.closest('.que'));
                 }
             });
@@ -3687,7 +3689,9 @@
                         `;
                     }
 
-                    if (!allAnswered && isMultiQuestionPage) {
+                    if (!allAnswered && isMultiQuestionPage && autoQuizMode) {
+                        scheduleAutoNextAfterAnswer(800, true, firstBlockedQue);
+                    } else if (!allAnswered && isMultiQuestionPage) {
                         showToast("Answer recorded! Continue with next questions below.", 2200);
                         setLog(`Answer recorded for <b>Question #${qData ? qData.qNum : ''}</b>! Continue answering remaining questions below.`, "var(--accent-green)");
                     } else if (autoNextQuiz && autoQuizMode) {
@@ -5949,6 +5953,30 @@
             toast.style.opacity = '0';
             toast.style.transform = 'translateY(-8px)';
         }, duration);
+    }
+
+    let capabilityTipsInterval = null;
+    let capabilityTipIndex = 0;
+    const CAPABILITY_TIPS = [
+        'Tip: Auto-Quiz can scan every question on a page and move to the next unanswered one.',
+        'Tip: Verified community answers are highlighted before any AI request is made.',
+        'Tip: Gemini is used as a fallback for unknown multiple-choice and true/false questions.',
+        'Tip: Copy AI prepares a clean prompt with the question and choices for any AI assistant.',
+        'Tip: Paste AI matches an answer to the Moodle choice without changing your sharing format.',
+        'Tip: One-page quizzes are not advanced until every question on that page has an answer.',
+        'Tip: Complex questions such as essays, dropdowns, and drag-and-drop stay available for manual review.',
+        'Tip: Cloud Sync keeps your local answer database updated with community contributions.',
+        'Tip: Use the floating toolkit pill to pause automation, open settings, or review the current status.',
+        'Tip: Personal Gemini keys stay in your browser; contributor sharing is optional and encrypted.'
+    ];
+
+    function startCapabilityTips() {
+        if (capabilityTipsInterval || CAPABILITY_TIPS.length === 0) return;
+        capabilityTipsInterval = setInterval(() => {
+            const tip = CAPABILITY_TIPS[capabilityTipIndex % CAPABILITY_TIPS.length];
+            capabilityTipIndex += 1;
+            showToast(`💡 ${tip}`, 7500);
+        }, 15000);
     }
 
     // Character Maps for Mathematical / Circuit Superscripts & Subscripts
@@ -13949,6 +13977,7 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
 
         fetchAndCacheAclcLogo();
         createPanel();
+        startCapabilityTips();
         setupQuizAutomation();
         setupQuizKeyboardShortcuts();
         showWelcomeOnboardingModal(false);
