@@ -3224,6 +3224,7 @@
         // While Auto-Quiz is running, manual answers are completed targets too.
         // Continue to the next unanswered question instead of leaving the user
         // on the question that was just answered.
+        if (isManualAnswer && !autoNextQuiz) return;
         if (!isManualAnswer && !autoNextVerified && !allowAiAutoNext) return;
         if (!checkIsQuizAttemptPage()) return;
 
@@ -3786,7 +3787,7 @@
                         `;
                     }
 
-                    if (!allAnswered && isMultiQuestionPage && autoQuizMode) {
+                    if (!allAnswered && isMultiQuestionPage && autoQuizMode && autoNextQuiz) {
                         scheduleAutoNextAfterAnswer(800, true, firstBlockedQue);
                     } else if (!allAnswered && isMultiQuestionPage) {
                         showToast("Answer recorded! Continue with next questions below.", 2200);

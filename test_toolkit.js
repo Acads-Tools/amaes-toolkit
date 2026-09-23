@@ -2581,6 +2581,8 @@ test("Non-Clunky Auto-Quiz Progression: preserves autoQuizMode and advances past
     assert.ok(script.includes("scheduleAutoNextAfterAnswer(delayMs = 800, isManualAnswer = false)"), "scheduleAutoNextAfterAnswer must support isManualAnswer parameter");
     assert.ok(script.includes("scheduleAutoNextAfterAnswer(800, true, firstBlockedQue);"), "Manual answers must advance from the completed blocked question");
     assert.ok(script.includes("if (autoQuizMode) {\n                    scheduleAutoNextAfterAnswer"), "Active Auto-Quiz must schedule progression after a manual answer");
+    assert.ok(script.includes("if (isManualAnswer && !autoNextQuiz) return;"), "Manual auto-next must require the Auto-Next setting");
+    assert.ok(script.includes("isMultiQuestionPage && autoQuizMode && autoNextQuiz"), "Multi-question manual progression must require Auto-Next");
 
     // 3. Manual answers remain recorded and are not mistaken for unknown questions.
     assert.ok(script.includes("if (isQuestionAnswered(que)) return;"), "Answered questions must be excluded from unknown-question processing");
