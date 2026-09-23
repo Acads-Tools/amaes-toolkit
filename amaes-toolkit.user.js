@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.7.5
+// @version      1.7.6
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -27,7 +27,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.7.5";
+    const SCRIPT_VERSION = "v1.7.6";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -1152,7 +1152,8 @@
         return key.length > 8 ? key.slice(-8) : key;
     }
 
-    function getStoredRequestTimestamps(key = null) {
+    function getStoredRequestTimestamps() {
+        const key = arguments[0] || null;
         try {
             const storageKey = key ? `amaes_ai_req_timestamps_${getAiKeyId(key)}` : 'amaes_ai_req_timestamps';
             const raw = sessionStorage.getItem(storageKey);
@@ -1174,7 +1175,8 @@
         } catch (_) {}
     }
 
-    function recordAiRequest(key = null) {
+    function recordAiRequest() {
+        const key = arguments[0] || null;
         const now = Date.now();
         const cutoff = now - 60000;
         
@@ -1191,7 +1193,8 @@
         }
     }
 
-    function triggerAiRateLimitCooldown(suggestedWaitSec = 20, key = null) {
+    function triggerAiRateLimitCooldown(suggestedWaitSec = 20) {
+        const key = arguments[1] || null;
         const waitSec = Math.max(5, Math.min(60, suggestedWaitSec));
         const cooldownUntil = Date.now() + (waitSec * 1000);
         aiRateLimitCooldownUntil = Math.max(aiRateLimitCooldownUntil, cooldownUntil);
@@ -3133,9 +3136,10 @@
     // or to the next Moodle page after all questions on this page are answered.
     function scheduleAutoNextAfterAnswer(delayMs = 800, isManualAnswer = false) {
         const sourceQue = arguments[2] || null;
+        const allowAiAutoNext = arguments[3] === true;
         if (!autoQuizMode) return;
         if (isManualAnswer && !autoNextQuiz) return;
-        if (!isManualAnswer && !autoNextVerified) return;
+        if (!isManualAnswer && !autoNextVerified && !allowAiAutoNext) return;
         if (!checkIsQuizAttemptPage()) return;
 
         const nextOnPage = findNextUnansweredOnCurrentPage(sourceQue);
@@ -3554,15 +3558,8 @@
                                 setLog(`[AI Suggestion] Gemini suggested <b>${escapeHtml(matched ? matched.choiceText : '')}</b> for #${qData ? qData.qNum : ''}. (Prompt auto-copied 📋) Paused for review—click to select and proceed.`, "var(--accent-purple)");
                             }
                             // Feature 2: Auto-Advance after AI answer if setting is enabled
-                            if (aiAutoNextOnAiAnswer) {
-                                const nextBtn = document.querySelector('input[type="submit"][name="next"], input[type="submit"][value*="Next"], button[name="next"]');
-                                if (nextBtn) {
-                                    showToast('AI answered ✦ Auto-advancing...', 1200);
-                                    setTimeout(() => nextBtn.click(), 1500);
-                                }
-                            }
-                            if (autoNextVerified && !aiAutoNextOnAiAnswer) {
-                                scheduleAutoNextAfterAnswer(800, false, firstBlockedQue);
+                            if (aiAutoNextOnAiAnswer || autoNextVerified) {
+                                scheduleAutoNextAfterAnswer(800, false, firstBlockedQue, aiAutoNextOnAiAnswer);
                             }
                         }
                     });
