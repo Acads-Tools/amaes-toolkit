@@ -6073,7 +6073,11 @@
         'Tip: Use Course Tools > Highlight Missing Quizzes to find unanswered or unattempted quizzes on a Grades or Course page.',
         'Tip: Course Tools > Search Helper copies a subject-aware search phrase and opens Google for study-guide lookup.',
         'Tip: In the AI Assistant card, Auto-Copy Question on AI Failure puts a clean fallback prompt on your clipboard.',
-        'Tip: In the AI Assistant card, Auto-Advance After AI Answer is off by default so you can review each AI suggestion first.'
+        'Tip: In the AI Assistant card, Auto-Advance After AI Answer is off by default so you can review each AI suggestion first.',
+        'Tip: Click inside a quiz question and press C to copy the question and choices, ready to paste into another AI tool.',
+        'Tip: After another AI tool gives you an answer, click the question and press V to paste it back and match the choice.',
+        'Tip: Click inside a question and press N when you are ready to continue to the next question or page.',
+        'Tip: Press P to pause or resume automatic quiz help while you review a question.'
     ];
 
     function startCapabilityTips() {

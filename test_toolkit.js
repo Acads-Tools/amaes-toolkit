@@ -4371,6 +4371,8 @@ test("Gemini AI: Rate Limiting enforces 15 RPM sliding window on Free Tier, resp
     assert.ok(script.includes('Paid plan'), "Must clearly display the plain-language paid plan option");
     assert.ok(script.includes('If checked, saving this key is your consent'), "Contributor sharing must explain that checking the option is consent");
     assert.ok(script.includes('database/blob/main/relay/README.md#contributor-key-sharing'), "Contributor sharing must link to its management details");
+    assert.ok(script.includes('Click inside a quiz question and press C to copy the question and choices'), "Tips must explain the C shortcut in plain language");
+    assert.ok(script.includes('click the question and press V to paste it back'), "Tips must explain the V shortcut in plain language");
 
     // 4. Live Countdown HUD & Fallback Bar
     assert.ok(script.includes('id="amaes-ratelimit-countdown"'), "Fallback bar must include amaes-ratelimit-countdown element");
