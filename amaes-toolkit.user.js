@@ -6065,7 +6065,14 @@
         'Tip: Complex questions such as essays, dropdowns, and drag-and-drop stay available for manual review.',
         'Tip: Cloud Sync keeps your local answer database updated with community contributions.',
         'Tip: Use the floating toolkit pill to pause automation, open settings, or review the current status.',
-        'Tip: Personal Gemini keys stay in your browser; contributor sharing is optional and encrypted.'
+        'Tip: Personal Gemini keys stay in your browser; contributor sharing is optional and encrypted.',
+        'Tip: Course Tools > Activity Auto-Marker > Mark Lectures & Vids marks unfinished lecture and video activities complete.',
+        'Tip: Course Tools > Activity Auto-Marker > Mark Quizzes / Exams Only targets quiz activities without changing lecture progress.',
+        'Tip: Course Tools > Activity Auto-Marker > Mark ALL as Done processes every unfinished activity found on the current course page.',
+        'Tip: Use Course Tools > Highlight Missing Quizzes to find unanswered or unattempted quizzes on a Grades or Course page.',
+        'Tip: Course Tools > Search Helper copies a subject-aware search phrase and opens Google for study-guide lookup.',
+        'Tip: In the AI Assistant card, Auto-Copy Question on AI Failure puts a clean fallback prompt on your clipboard.',
+        'Tip: In the AI Assistant card, Auto-Advance After AI Answer is off by default so you can review each AI suggestion first.'
     ];
 
     function startCapabilityTips() {
@@ -8243,7 +8250,8 @@
                             <input id="amaes-contributor-sharing" type="checkbox" ${isContributorSharingEnabled() ? 'checked' : ''} style="margin-top:2px; accent-color:#f59e0b;">
                             <span style="font-size:10.5px; color:#fef3c7; line-height:1.5;">
                                 <b style="color:#fbbf24;">Share my key when I am inactive (optional)</b><br>
-                                Your key is encrypted before it is stored. It stays reserved for you while you are using AMAES, may help another user only after your short inactive grace period, and is automatically deleted after 30 days without activity. You can turn this off and delete it anytime.
+                                If checked, saving this key is your consent to encrypted contributor sharing. It stays reserved for you while you are using AMAES, may help another user only after your short inactive grace period, and is automatically deleted after 30 days without activity. You can turn this off and delete it anytime.
+                                <a href="https://github.com/Acads-Tools/database/blob/main/relay/README.md#contributor-key-sharing" target="_blank" rel="noopener noreferrer" style="color:#fcd34d; text-decoration:underline; margin-left:3px;">Read sharing details</a>
                             </span>
                         </label>
                     </div>
@@ -8404,15 +8412,6 @@
                                 await deleteContributorKey();
                             }
                             if (wantsContributorSharing && !isContributorSharingEnabled()) {
-                                wantsContributorSharing = window.confirm(
-                                    'Share your primary Gemini key with the AMAES relay?\n\n' +
-                                    'The key will be encrypted before storage. It will stay reserved for you while you are active, ' +
-                                    'may help another user only after the inactive grace period, and will be deleted after 30 days without activity.\n\n' +
-                                    'Choose OK to share, or Cancel to keep this key private.'
-                                );
-                                contributorSharingCheckbox.checked = wantsContributorSharing;
-                            }
-                            if (wantsContributorSharing && !isContributorSharingEnabled()) {
                                 await registerContributorKey(rawKey);
                             } else if (!wantsContributorSharing && isContributorSharingEnabled()) {
                                 await deleteContributorKey();
@@ -8430,7 +8429,10 @@
                         feedback.style.background = 'rgba(16, 185, 129, 0.15)';
                         feedback.style.color = '#34d399';
                         feedback.style.border = '1px solid rgba(16, 185, 129, 0.3)';
-                        feedback.innerText = `✔ API Key Verified & Saved! Connected via ${modelName}.`;
+                        feedback.innerHTML = `✔ API Key Verified & Saved! Connected via ${modelName}.` +
+                            (isContributorSharingEnabled()
+                                ? ` <a href="https://github.com/Acads-Tools/database/blob/main/relay/README.md#contributor-key-sharing" target="_blank" rel="noopener noreferrer" style="color:#a7f3d0; text-decoration:underline;">Manage sharing</a>`
+                                : '');
                         showToast(`✔ Google Gemini Connected (${modelName})!`);
                         updateAiAssistantUI();
                         setTimeout(closeModal, 1200);
