@@ -2830,8 +2830,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.7.7'), "Userscript header must specify v1.7.7");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.7";'), "Constant SCRIPT_VERSION must be v1.7.7");
+    assert.ok(script.includes('@version      1.7.8'), "Userscript header must specify v1.7.8");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.7.8";'), "Constant SCRIPT_VERSION must be v1.7.8");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3960,10 +3960,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.7.7-blue.svg"), "README badge must show v1.7.7");
+    assert.ok(readme.includes("version-1.7.8-blue.svg"), "README badge must show v1.7.8");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.7.7<"), "Website must display v1.7.7 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.7.8<"), "Website must display v1.7.8 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -3976,7 +3976,7 @@ test("Gemini AI: Granular Failure Diagnostics, Actionable Key Re-Authentication,
 
     // 1. Dynamic failure reasons instead of misleading generic timeout message
     assert.ok(script.includes("Google rejected API key. Check key in Course Tools."), "Must diagnose authentication and key block failures specifically");
-    assert.ok(script.includes("AI Studio rate limit / quota exceeded."), "Must diagnose rate limit and quota failures");
+    assert.ok(script.includes("Google is temporarily limiting AI requests."), "Must diagnose rate limit and quota failures");
     assert.ok(script.includes("Gemini model unavailable. Check key permissions."), "Must diagnose missing model permissions");
     assert.ok(script.includes("AI took too long to respond (timed out after 8s)."), "Must only state took too long when timedOut is actually true");
 
@@ -4365,12 +4365,12 @@ test("Gemini AI: Rate Limiting enforces 15 RPM sliding window on Free Tier, resp
     assert.ok(script.includes('id="sel-ai-plan-tier"'), "Quiz Tab settings must include sel-ai-plan-tier dropdown");
     assert.ok(script.includes('id="sel-course-ai-plan-tier"'), "Course Tools card must include sel-course-ai-plan-tier dropdown");
     assert.ok(script.includes('id="amaes-gemini-plan-select"'), "Gemini setup modal must include amaes-gemini-plan-select dropdown");
-    assert.ok(script.includes('Free Tier (15 RPM)'), "Must clearly display Free Tier (15 RPM) option");
-    assert.ok(script.includes('Pay-As-You-Go (Unlimited)'), "Must clearly display Pay-As-You-Go option");
+    assert.ok(script.includes('Free plan'), "Must clearly display the plain-language free plan option");
+    assert.ok(script.includes('Paid plan'), "Must clearly display the plain-language paid plan option");
 
     // 4. Live Countdown HUD & Fallback Bar
     assert.ok(script.includes('id="amaes-ratelimit-countdown"'), "Fallback bar must include amaes-ratelimit-countdown element");
-    assert.ok(script.includes('AI Studio Rate Limit (Free Tier: 15 req/min)'), "Fallback bar must display rate limit warning header");
+    assert.ok(script.includes('Google AI is temporarily busy'), "Fallback bar must display a plain-language rate limit warning");
     assert.ok(script.includes('activeRateLimitTimerInterval = setInterval'), "Must drive live countdown with setInterval");
     assert.ok(script.includes("retryBtn.textContent = '↺ Retry AI Now';"), "Must update retry button to active state when countdown finishes");
     assert.ok(script.includes('if (autoQuizMode) {'), "Fallback bar countdown expiration must auto-trigger retry if autoQuizMode is running");

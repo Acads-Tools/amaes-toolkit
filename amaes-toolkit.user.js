@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.7.7
+// @version      1.7.8
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -27,7 +27,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.7.7";
+    const SCRIPT_VERSION = "v1.7.8";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -3135,7 +3135,7 @@
 
     function getAttemptEvidenceKey() {
         const params = new URLSearchParams(window.location.search);
-        return `amaes_attempt_evidence_${params.get('quiz') || params.get('cmid') || window.location.pathname}`;
+        return `amaes_attempt_evidence_${params.get('attempt') || params.get('quiz') || params.get('cmid') || window.location.pathname}`;
     }
 
     function recordAttemptAnswerEvidence(que, answer, source = 'manual_selection') {
@@ -3584,7 +3584,7 @@
                     if (rateLimitStatus.isLimited) {
                         firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());
                         copyToClipboard(aiPromptText).catch(() => {});
-                        const rlReason = `AI Studio rate limit / quota exceeded. (Free Tier: 15 RPM). Next request available in ${rateLimitStatus.remainingSec}s.`;
+                        const rlReason = `Google is temporarily limiting AI requests. Try again in ${rateLimitStatus.remainingSec} seconds.`;
                         setLog(`[AI Rate Limit] Question #${qData ? qData.qNum : ''}: ${rlReason} (Prompt auto-copied 📋)`, "var(--accent-amber)");
                         showToast(`⏳ AI Rate Limit: Available in ${rateLimitStatus.remainingSec}s`, 3500);
 
@@ -7574,7 +7574,7 @@
                 <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px;">
                     <span style="font-size: 14px;">⏳</span>
                     <div>
-                        <div style="font-weight: 700; color: #9a3412;">AI Studio Rate Limit (Free Tier: 15 req/min)</div>
+                        <div style="font-weight: 700; color: #9a3412;">Google AI is temporarily busy</div>
                         <div style="font-size: 10.5px; color: #c2410c;">
                             Next request available in <strong id="amaes-ratelimit-countdown">${waitSeconds}s</strong>... (Prompt auto-copied 📋)
                         </div>
@@ -7783,7 +7783,7 @@
             if (getAiAutoCopyOnFail()) {
                 copyToClipboard(promptText).catch(() => {});
             }
-            const rlMsg = `AI Studio rate limit / quota exceeded. (Free Tier: 15 RPM). Available in ${rateLimitStatus.remainingSec}s.`;
+            const rlMsg = `Google is temporarily limiting AI requests. Available again in about ${rateLimitStatus.remainingSec} seconds.`;
             setLog(`[AI Rate Limit] Question #${qData ? qData.qNum : ''}: ${rlMsg} (Prompt auto-copied 📋)`, "var(--accent-amber)");
             showToast(`⏳ AI Rate Limit: Available in ${rateLimitStatus.remainingSec}s`, 3500);
 
@@ -8193,10 +8193,8 @@
                                 <span style="font-weight: 600; color: #f8fafc;">Paste your key(s) here:</span>
                                 <!-- Speed explanation box -->
                                 <div id="amaes-multikey-explain" style="margin: 6px 0; padding: 7px 10px; background: rgba(124,58,237,0.10); border: 1px solid rgba(168,85,247,0.35); border-radius: 6px; font-size: 10px; color: #c4b5fd; line-height: 1.5;">
-                                    <b style="color:#e9d5ff;">⚡ Why add multiple keys? (Faster answering, zero waiting)</b><br>
-                                    Google AI Studio is free but limits each key to <b>15 questions/min</b>. On long quizzes you may need to wait. Adding extra keys (from different Google/Gmail accounts) lets the toolkit rotate between them automatically:<br>
-                                    <span style="color:#a78bfa;">• 1 Key: 15 q/min &nbsp;|&nbsp; 2 Keys: 30 q/min &nbsp;|&nbsp; 3 Keys: 45 q/min (Turbo ⚡)</span><br>
-                                    <span style="font-size:9.5px; color:#94a3b8;">💡 Tip: Use your school email + personal Gmail to get 2 free keys in 2 minutes.</span>
+                                    <b style="color:#e9d5ff;">💡 Optional backup key</b><br>
+                                    You normally need only one key. Add another key that you own if Google temporarily limits the first one. The toolkit tries keys one at a time and respects Google's limits; adding keys is optional and does not bypass Google's rules.
                                 </div>
                                 <!-- Dynamic key rows rendered by JS -->
                                 <div id="amaes-gemini-key-rows" style="display: flex; flex-direction: column; gap: 5px; margin-top: 4px;"></div>
@@ -8211,14 +8209,14 @@
                                     padding: 4px 10px;
                                     cursor: pointer;
                                     width: 100%;
-                                ">+ Add Another Key (for faster answering)</button>
+                                ">+ Add Optional Backup Key</button>
                             </div>
                         </div>
 
                         <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: rgba(0,0,0,0.2); border-radius: 6px; border: 1px solid var(--border-subtle, #334155);">
                             <div>
-                                <span style="font-weight: 600; color: #f8fafc; font-size: 11px;">API Plan Tier:</span>
-                                <div style="font-size: 9.5px; color: var(--text-muted, #94a3b8);">Free Google AI Studio keys allow 15 RPM. Cooldown timer auto-manages limits.</div>
+                                <span style="font-weight: 600; color: #f8fafc; font-size: 11px;">Google AI plan:</span>
+                                <div style="font-size: 9.5px; color: var(--text-muted, #94a3b8);">Choose the plan that matches your Google AI Studio account. The toolkit handles waiting automatically.</div>
                             </div>
                             <select id="amaes-gemini-plan-select" style="
                                 background: var(--surface, #1e293b);
@@ -8229,8 +8227,8 @@
                                 font-size: 10.5px;
                                 cursor: pointer;
                             ">
-                                <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free Tier (15 RPM)</option>
-                                <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Pay-As-You-Go</option>
+                                <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
+                                <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
                             </select>
                         </div>
 
@@ -8451,14 +8449,18 @@
                         feedback.innerText = `Validation Failed: Key was rejected by Google. In Google AI Studio, ensure you click "Create API key in new project" so the Generative Language API is automatically enabled.`;
                     } else if (msgLower.includes('quota') || msgLower.includes('429') || msgLower.includes('rate limit') || msgLower.includes('resource_exhausted')) {
                         setGeminiApiKeys(allKeyVals);
+                        logDebug(`Gemini validation quota response: ${msg}`);
                         feedback.style.background = 'rgba(245, 158, 11, 0.15)';
                         feedback.style.color = '#fbbf24';
                         feedback.style.border = '1px solid rgba(245, 158, 11, 0.3)';
-                        feedback.innerText = `Key saved locally, but Google is temporarily out of free-tier quota. Retry after the cooldown or check your AI Studio limits.`;
+                        const retryMatch = msg.match(/retry in\s+([0-9]+(?:\.[0-9]+)?)s/i);
+                        const retryText = retryMatch ? ` Try again in about ${Math.ceil(Number(retryMatch[1]))} seconds.` : '';
+                        feedback.innerText = `Your key was saved. Google is temporarily limiting AI requests.${retryText} You can continue using verified database answers while waiting.`;
                         showToast('Gemini key saved; free-tier quota is temporarily exhausted.', 4500);
                         updateAiAssistantUI();
                     } else {
-                        feedback.innerText = `Validation Failed: ${msg}`;
+                        logDebug(`Gemini validation failed: ${msg}`);
+                        feedback.innerText = `We could not connect to Google with this key. Check that it was copied correctly, then try again.`;
                     }
                 }
             };
@@ -11675,8 +11677,8 @@
                         <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
                             <span style="font-size: 10px; color: #e9d5ff; font-weight: 600;">API Plan Tier:</span>
                             <select id="sel-ai-plan-tier" style="background: rgba(0,0,0,0.35); border: 1px solid #a855f7; border-radius: 4px; color: #f3e8ff; font-size: 10px; padding: 2px 6px; cursor: pointer;">
-                                <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free Tier (15 RPM)</option>
-                                <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Pay-As-You-Go (Unlimited)</option>
+                                <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
+                                <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
                             </select>
                         </div>
                     </div>
@@ -12012,8 +12014,8 @@
                             <div style="display: flex; align-items: center; justify-content: space-between;">
                                 <span style="font-size: 10px; color: var(--text-secondary);">AI Plan Tier:</span>
                                 <select id="sel-course-ai-plan-tier" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 5px; cursor: pointer;">
-                                    <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free Tier (15 RPM)</option>
-                                    <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Pay-As-You-Go (Unlimited)</option>
+                                    <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
+                                    <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
                                 </select>
                             </div>
                         </div>
@@ -12914,7 +12916,7 @@
                 setAiPlanTier(selAiPlanTier.value);
                 const courseSel = document.getElementById('sel-course-ai-plan-tier');
                 if (courseSel) courseSel.value = getAiPlanTier();
-                showToast(`AI Plan Tier set to ${getAiPlanTier() === 'free' ? 'Free Tier (15 RPM)' : 'Pay-As-You-Go'}`);
+                showToast(`AI plan set to ${getAiPlanTier() === 'free' ? 'Free plan' : 'Paid plan'}`);
             };
         }
 
@@ -12924,7 +12926,7 @@
                 setAiPlanTier(selCourseAiPlanTier.value);
                 const quizSel = document.getElementById('sel-ai-plan-tier');
                 if (quizSel) quizSel.value = getAiPlanTier();
-                showToast(`AI Plan Tier set to ${getAiPlanTier() === 'free' ? 'Free Tier (15 RPM)' : 'Pay-As-You-Go'}`);
+                showToast(`AI plan set to ${getAiPlanTier() === 'free' ? 'Free plan' : 'Paid plan'}`);
             };
         }
 
