@@ -3165,11 +3165,27 @@
 
     function promoteAttemptEvidenceFromScore() {
         if (!checkIsQuizSummaryPage()) return;
-        const bodyText = document.body ? (document.body.innerText || '') : '';
-        const scoreMatch = bodyText.match(/(?:Highest grade|Grade|Marks)[^0-9]{0,80}([0-9]+(?:\.[0-9]+)?)\s*\/\s*([0-9]+(?:\.[0-9]+)?)/i);
-        if (!scoreMatch) return;
-        const earned = Number(scoreMatch[1]);
-        const maximum = Number(scoreMatch[2]);
+        let earned = null;
+        let maximum = null;
+        document.querySelectorAll('table').forEach(table => {
+            if (earned !== null) return;
+            const rows = Array.from(table.querySelectorAll('tr'));
+            const headerRow = rows.find(row => Array.from(row.children).some(cell => /grade/i.test(cell.innerText || '')));
+            if (!headerRow) return;
+            const headers = Array.from(headerRow.children);
+            const gradeIndex = headers.findIndex(cell => /grade/i.test(cell.innerText || ''));
+            if (gradeIndex < 0) return;
+            const headerMax = (headers[gradeIndex].innerText || '').match(/\/\s*([0-9]+(?:\.[0-9]+)?)/);
+            const attemptRows = rows.filter(row => /finished/i.test(row.innerText || ''));
+            const latest = attemptRows[attemptRows.length - 1];
+            const gradeCell = latest && latest.children[gradeIndex];
+            const gradeValue = gradeCell && (gradeCell.innerText || '').match(/([0-9]+(?:\.[0-9]+)?)/);
+            if (gradeValue && headerMax) {
+                earned = Number(gradeValue[1]);
+                maximum = Number(headerMax[1]);
+            }
+        });
+        if (earned === null || maximum === null) return;
         if (!Number.isFinite(earned) || !Number.isFinite(maximum) || maximum <= 0) return;
         let evidence = [];
         try {
