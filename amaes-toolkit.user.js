@@ -12,6 +12,7 @@
 // @grant        GM_setClipboard
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @grant        GM_deleteValue
 // @connect      raw.githubusercontent.com
 // @connect      api.github.com
 // @connect      amauoed.com
@@ -937,6 +938,125 @@
     const GEMINI_MODEL = 'gemini-1.5-flash';
     const GEMINI_TIMEOUT_MS = 8000;
     const SHARED_AI_FALLBACK_STORAGE_KEY = 'amaes_shared_ai_fallback_enabled';
+    const CONTRIBUTOR_KEY_ID_STORAGE_KEY = 'amaes_contributor_key_id';
+    const CONTRIBUTOR_OWNER_TOKEN_STORAGE_KEY = 'amaes_contributor_owner_token';
+    const CONTRIBUTOR_MODE_STORAGE_KEY = 'amaes_contributor_mode';
+    const CONTRIBUTOR_KEY_FINGERPRINT_STORAGE_KEY = 'amaes_contributor_key_fingerprint';
+    const CONTRIBUTOR_ACTIVITY_SENT_STORAGE_KEY = 'amaes_contributor_activity_sent';
+
+    function getContributorValue(key) {
+        try {
+            if (typeof GM_getValue === 'function') return GM_getValue(key, '');
+        } catch (_) {}
+        return localStorage.getItem(key) || '';
+    }
+
+    function setContributorValue(key, value) {
+        try {
+            if (typeof GM_setValue === 'function') {
+                GM_setValue(key, value);
+                return;
+            }
+        } catch (_) {}
+        localStorage.setItem(key, value);
+    }
+
+    function removeContributorValue(key) {
+        try {
+            if (typeof GM_deleteValue === 'function') {
+                GM_deleteValue(key);
+                return;
+            }
+        } catch (_) {}
+        localStorage.removeItem(key);
+    }
+
+    function isContributorSharingEnabled() {
+        return getContributorValue(CONTRIBUTOR_MODE_STORAGE_KEY) === 'contributor' &&
+            Boolean(getContributorValue(CONTRIBUTOR_KEY_ID_STORAGE_KEY)) &&
+            Boolean(getContributorValue(CONTRIBUTOR_OWNER_TOKEN_STORAGE_KEY));
+    }
+
+    function createContributorOwnerToken() {
+        const bytes = crypto.getRandomValues(new Uint8Array(32));
+        return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function contributorKeyFingerprint(value) {
+        const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+        return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function deleteContributorKey() {
+        const keyId = getContributorValue(CONTRIBUTOR_KEY_ID_STORAGE_KEY);
+        const ownerToken = getContributorValue(CONTRIBUTOR_OWNER_TOKEN_STORAGE_KEY);
+        if (!keyId || !ownerToken) return;
+        try {
+            await fetch(`${communityRelayUrl}/keys/delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-AMAES-Client-Version': CLIENT_VERSION,
+                    'X-AMAES-Owner-Token': ownerToken
+                },
+                body: JSON.stringify({ keyId })
+            });
+        } catch (_) {
+            // Local removal still prevents this installation from using the credential.
+        }
+        [CONTRIBUTOR_KEY_ID_STORAGE_KEY, CONTRIBUTOR_OWNER_TOKEN_STORAGE_KEY,
+            CONTRIBUTOR_MODE_STORAGE_KEY, CONTRIBUTOR_KEY_FINGERPRINT_STORAGE_KEY,
+            CONTRIBUTOR_ACTIVITY_SENT_STORAGE_KEY]
+            .forEach(removeContributorValue);
+    }
+
+    async function registerContributorKey(geminiKey) {
+        const ownerToken = createContributorOwnerToken();
+        const response = await fetch(`${communityRelayUrl}/keys/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-AMAES-Client-Version': CLIENT_VERSION
+            },
+            body: JSON.stringify({
+                geminiKey,
+                ownerToken,
+                consent: true,
+                mode: 'contributor'
+            })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.keyId) {
+            throw new Error(data.error || `Contributor registration failed (${response.status})`);
+        }
+        setContributorValue(CONTRIBUTOR_KEY_ID_STORAGE_KEY, data.keyId);
+        setContributorValue(CONTRIBUTOR_OWNER_TOKEN_STORAGE_KEY, ownerToken);
+        setContributorValue(CONTRIBUTOR_MODE_STORAGE_KEY, 'contributor');
+        setContributorValue(CONTRIBUTOR_KEY_FINGERPRINT_STORAGE_KEY, await contributorKeyFingerprint(geminiKey));
+        return data;
+    }
+
+    async function noteContributorActivity() {
+        if (!isContributorSharingEnabled()) return;
+        const lastSent = Number(getContributorValue(CONTRIBUTOR_ACTIVITY_SENT_STORAGE_KEY) || 0);
+        if (Date.now() - lastSent < 10 * 60 * 1000) return;
+        const keyId = getContributorValue(CONTRIBUTOR_KEY_ID_STORAGE_KEY);
+        const ownerToken = getContributorValue(CONTRIBUTOR_OWNER_TOKEN_STORAGE_KEY);
+        try {
+            const response = await fetch(`${communityRelayUrl}/keys/activity`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-AMAES-Client-Version': CLIENT_VERSION,
+                    'X-AMAES-Owner-Token': ownerToken
+                },
+                body: JSON.stringify({ keyId })
+            });
+            if (response.ok) setContributorValue(CONTRIBUTOR_ACTIVITY_SENT_STORAGE_KEY, String(Date.now()));
+        } catch (_) {
+            // A failed activity update never affects the local personal-key request.
+        }
+    }
 
     function isSharedAiFallbackEnabled() {
         return localStorage.getItem(SHARED_AI_FALLBACK_STORAGE_KEY) !== 'false';
@@ -1485,6 +1605,7 @@
 
     // Remove toolkit-owned state without touching Moodle or other site data.
     function resetToolkitInstallation() {
+        deleteContributorKey().catch(() => {});
         const removeOwnedState = (storage) => {
             if (!storage) return;
             const keys = [];
@@ -2997,12 +3118,40 @@
         return que.classList.contains('answered') || que.classList.contains('complete');
     }
 
-    // Schedule automatic advancement to next page (or summary) after question(s) on current page are answered
+    function findNextUnansweredOnCurrentPage(sourceQue) {
+        const questions = Array.from(document.querySelectorAll('.que'));
+        if (questions.length < 2) return null;
+
+        const startIndex = sourceQue ? questions.indexOf(sourceQue) : -1;
+        const ordered = startIndex >= 0
+            ? questions.slice(startIndex + 1).concat(questions.slice(0, startIndex))
+            : questions;
+        return ordered.find(que => !isQuestionAnswered(que)) || null;
+    }
+
+    // Schedule automatic advancement to the next target on a one-page quiz,
+    // or to the next Moodle page after all questions on this page are answered.
     function scheduleAutoNextAfterAnswer(delayMs = 800, isManualAnswer = false) {
+        const sourceQue = arguments[2] || null;
         if (!autoQuizMode) return;
         if (isManualAnswer && !autoNextQuiz) return;
         if (!isManualAnswer && !autoNextVerified) return;
         if (!checkIsQuizAttemptPage()) return;
+
+        const nextOnPage = findNextUnansweredOnCurrentPage(sourceQue);
+        if (nextOnPage) {
+            clearTimeout(autoNextTimer);
+            setLog("<b>Question Answered:</b> Moving to the next unanswered question in <b>0.8s</b>...", "var(--accent-blue)");
+            showToast("Answer recorded! Moving to the next question...", 1200);
+            autoNextTimer = setTimeout(() => {
+                if (!autoQuizMode) return;
+                setActiveQuestion(nextOnPage, false);
+                nextOnPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                runAutoQuizSolver();
+            }, delayMs);
+            return;
+        }
+
         if (!areAllPageQuestionsAnswered()) return;
 
         const nextBtn = findQuizNextButton();
@@ -3039,7 +3188,7 @@
             inp.dataset.amaesAutoNextBound = 'true';
             inp.addEventListener('change', () => {
                 if (autoNextQuiz && autoQuizMode) {
-                    scheduleAutoNextAfterAnswer(inp.type === 'checkbox' ? 1200 : 800, true);
+                    scheduleAutoNextAfterAnswer(inp.type === 'checkbox' ? 1200 : 800, true, inp.closest('.que'));
                 }
             });
         });
@@ -3052,7 +3201,7 @@
             inp.dataset.amaesAutoNextBound = 'true';
             inp.addEventListener('blur', () => {
                 if (autoNextQuiz && autoQuizMode && inp.value && inp.value.trim().length > 0) {
-                    scheduleAutoNextAfterAnswer(1000, true);
+                    scheduleAutoNextAfterAnswer(1000, true, inp.closest('.que'));
                 }
             });
         });
@@ -3411,6 +3560,9 @@
                                     showToast('AI answered ✦ Auto-advancing...', 1200);
                                     setTimeout(() => nextBtn.click(), 1500);
                                 }
+                            }
+                            if (autoNextVerified && !aiAutoNextOnAiAnswer) {
+                                scheduleAutoNextAfterAnswer(800, false, firstBlockedQue);
                             }
                         }
                     });
@@ -7012,6 +7164,7 @@
                     localStorage.setItem('amaes_gemini_working_endpoint', JSON.stringify(candidate));
                 } catch (_) {}
 
+                noteContributorActivity().catch(() => {});
                 return res;
             } catch (err) {
                 lastError = err;
@@ -7055,21 +7208,38 @@
         if (!isSharedAiFallbackEnabled()) {
             throw new Error('Shared AI fallback is disabled');
         }
-        const response = await fetch(`${communityRelayUrl}/ai`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-AMAES-Client-Version': CLIENT_VERSION,
-                'X-AMAES-Installation': getAnonymousContributorId()
-            },
-            body: JSON.stringify({ prompt, maxOutputTokens }),
-            signal
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            throw new Error(data.error || `Shared AI HTTP ${response.status}`);
+        const installationHeaders = {
+            'Content-Type': 'application/json',
+            'X-AMAES-Client-Version': CLIENT_VERSION,
+            'X-AMAES-Installation': getAnonymousContributorId()
+        };
+        const requestFallback = async (mode, owner = false) => {
+            const headers = { ...installationHeaders };
+            const keyId = getContributorValue(CONTRIBUTOR_KEY_ID_STORAGE_KEY);
+            const ownerToken = getContributorValue(CONTRIBUTOR_OWNER_TOKEN_STORAGE_KEY);
+            if (owner && keyId && ownerToken) {
+                headers['X-AMAES-Owner-Token'] = ownerToken;
+            }
+            const response = await fetch(`${communityRelayUrl}/ai`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ prompt, maxOutputTokens, mode, ...(owner ? { keyId } : {}) }),
+                signal
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || `Shared AI HTTP ${response.status}`);
+            return data;
+        };
+
+        if (isContributorSharingEnabled()) {
+            try {
+                return await requestFallback('contributor', true);
+            } catch (ownerError) {
+                logDebug(`Contributor fallback unavailable: ${ownerError.message}`);
+            }
         }
-        return data;
+
+        return requestFallback('community');
     }
 
     // Match AI answer text to the correct choice option in the question
@@ -7948,6 +8118,13 @@
                                 This is turned on by default. If Google temporarily limits your personal key, the toolkit may try a small, project-managed shared pool so you do not have to wait. This does <b>not</b> upload or share your personal key. Shared capacity is limited, so it may still be unavailable. Your personal key is always tried first. Turn this off if you do not want shared AI fallback.
                             </span>
                         </label>
+                        <label style="display:flex; gap:9px; align-items:flex-start; padding:9px 10px; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.35); border-radius:6px; cursor:pointer;">
+                            <input id="amaes-contributor-sharing" type="checkbox" ${isContributorSharingEnabled() ? 'checked' : ''} style="margin-top:2px; accent-color:#f59e0b;">
+                            <span style="font-size:10.5px; color:#fef3c7; line-height:1.5;">
+                                <b style="color:#fbbf24;">Share my key when I am inactive (optional)</b><br>
+                                Your key is encrypted before it is stored. It stays reserved for you while you are using AMAES, may help another user only after your short inactive grace period, and is automatically deleted after 30 days without activity. You can turn this off and delete it anytime.
+                            </span>
+                        </label>
                     </div>
 
                     <!-- Status Feedback -->
@@ -7994,6 +8171,7 @@
         const testSaveBtn = modal.querySelector('#amaes-gemini-btn-test-save');
         const removeBtn = modal.querySelector('#amaes-gemini-btn-remove');
         const sharedFallbackCheckbox = modal.querySelector('#amaes-shared-ai-fallback');
+        const contributorSharingCheckbox = modal.querySelector('#amaes-contributor-sharing');
 
         // Feature 3: Multi-key UI
         const existingKeys = getGeminiApiKeys();
@@ -8056,6 +8234,7 @@
 
         if (removeBtn) {
             removeBtn.onclick = () => {
+                deleteContributorKey().catch(() => {});
                 setGeminiApiKeys([]);
                 showToast('Gemini API key removed.');
                 closeModal();
@@ -8095,6 +8274,28 @@
                         setGeminiApiKeys(allKeyVals);
                         if (sharedFallbackCheckbox) {
                             setSharedAiFallbackEnabled(sharedFallbackCheckbox.checked);
+                        }
+                        if (contributorSharingCheckbox) {
+                            let wantsContributorSharing = contributorSharingCheckbox.checked;
+                            const currentFingerprint = await contributorKeyFingerprint(rawKey);
+                            const registeredFingerprint = getContributorValue(CONTRIBUTOR_KEY_FINGERPRINT_STORAGE_KEY);
+                            if (wantsContributorSharing && isContributorSharingEnabled() && currentFingerprint !== registeredFingerprint) {
+                                await deleteContributorKey();
+                            }
+                            if (wantsContributorSharing && !isContributorSharingEnabled()) {
+                                wantsContributorSharing = window.confirm(
+                                    'Share your primary Gemini key with the AMAES relay?\n\n' +
+                                    'The key will be encrypted before storage. It will stay reserved for you while you are active, ' +
+                                    'may help another user only after the inactive grace period, and will be deleted after 30 days without activity.\n\n' +
+                                    'Choose OK to share, or Cancel to keep this key private.'
+                                );
+                                contributorSharingCheckbox.checked = wantsContributorSharing;
+                            }
+                            if (wantsContributorSharing && !isContributorSharingEnabled()) {
+                                await registerContributorKey(rawKey);
+                            } else if (!wantsContributorSharing && isContributorSharingEnabled()) {
+                                await deleteContributorKey();
+                            }
                         }
                         const planSelect = modal.querySelector('#amaes-gemini-plan-select');
                         if (planSelect) {
