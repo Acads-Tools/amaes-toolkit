@@ -936,6 +936,15 @@
     const GEMINI_API_KEYS_STORAGE_KEY = 'amaes_gemini_api_keys';
     const GEMINI_MODEL = 'gemini-1.5-flash';
     const GEMINI_TIMEOUT_MS = 8000;
+    const SHARED_AI_FALLBACK_STORAGE_KEY = 'amaes_shared_ai_fallback_enabled';
+
+    function isSharedAiFallbackEnabled() {
+        return localStorage.getItem(SHARED_AI_FALLBACK_STORAGE_KEY) !== 'false';
+    }
+
+    function setSharedAiFallbackEnabled(enabled) {
+        localStorage.setItem(SHARED_AI_FALLBACK_STORAGE_KEY, enabled ? 'true' : 'false');
+    }
 
     function getGeminiApiKeys() {
         try {
@@ -7042,6 +7051,27 @@
         throw lastError || new Error('No available Gemini model found for this key.');
     }
 
+    async function callSharedAiFallback({ prompt, maxOutputTokens = 64, signal }) {
+        if (!isSharedAiFallbackEnabled()) {
+            throw new Error('Shared AI fallback is disabled');
+        }
+        const response = await fetch(`${communityRelayUrl}/ai`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-AMAES-Client-Version': CLIENT_VERSION,
+                'X-AMAES-Installation': getAnonymousContributorId()
+            },
+            body: JSON.stringify({ prompt, maxOutputTokens }),
+            signal
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(data.error || `Shared AI HTTP ${response.status}`);
+        }
+        return data;
+    }
+
     // Match AI answer text to the correct choice option in the question
     function matchAiAnswerToChoice(aiResponseText, que, qData) {
         if (!aiResponseText || !que || !qData || !qData.choices) return null;
@@ -7541,6 +7571,7 @@
         let lastError = null;
         const retryAttempts = getAiRetryCount();
         const maxAttempts = 1 + retryAttempts; // 1 initial request + configurable retries (default: 1 + 2 = 3)
+        let sharedFallbackAttempted = false;
 
         while (attempt < maxAttempts && !answerText && !isAborted && !timedOut) {
             attempt++;
@@ -7576,6 +7607,32 @@
                     errLower.includes('429') || 
                     errLower.includes('rate limit') || 
                     errLower.includes('resource_exhausted')) {
+                    if (!sharedFallbackAttempted && isSharedAiFallbackEnabled()) {
+                        sharedFallbackAttempted = true;
+                        const sharedStatusTextEl = thinkingEl.querySelector('.amaes-ai-status-text');
+                        if (sharedStatusTextEl) {
+                            sharedStatusTextEl.textContent = 'Your personal key is temporarily busy. Checking limited shared AI help...';
+                        }
+                        setLog('[AI Assistant] Your personal key is temporarily busy. Checking limited shared AI help; this may take a few seconds.', "var(--accent-blue)");
+                        try {
+                            const sharedResult = await callSharedAiFallback({
+                                prompt: promptText,
+                                maxOutputTokens: 64,
+                                signal: abortCtrl.signal
+                            });
+                            if (sharedResult && sharedResult.text) {
+                                answerText = sharedResult.text;
+                                setLog('[AI Assistant] Shared AI help responded. The answer is still a suggestion—please review it.', "var(--accent-blue)");
+                                break;
+                            }
+                        } catch (sharedError) {
+                            logDebug(`Shared AI fallback unavailable: ${sharedError.message}`);
+                            if (sharedStatusTextEl) {
+                                sharedStatusTextEl.textContent = 'Shared AI help is currently full. Returning to your personal-key options...';
+                            }
+                            setLog('[AI Assistant] Shared AI help is currently full or unavailable. No charge was made by this fallback.', "var(--accent-amber)");
+                        }
+                    }
                     if (getGeminiApiKeys().length <= 1) break;
                 }
                 if (attempt < maxAttempts) {
@@ -7883,6 +7940,14 @@
                                 <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Pay-As-You-Go</option>
                             </select>
                         </div>
+
+                        <label style="display:flex; gap:9px; align-items:flex-start; padding:9px 10px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:6px; cursor:pointer;">
+                            <input id="amaes-shared-ai-fallback" type="checkbox" ${isSharedAiFallbackEnabled() ? 'checked' : ''} style="margin-top:2px; accent-color:#10b981;">
+                            <span style="font-size:10.5px; color:#d1fae5; line-height:1.5;">
+                                <b style="color:#6ee7b7;">Use shared AI help if my key is temporarily busy</b><br>
+                                This is turned on by default. If Google temporarily limits your personal key, the toolkit may try a small, project-managed shared pool so you do not have to wait. This does <b>not</b> upload or share your personal key. Shared capacity is limited, so it may still be unavailable. Your personal key is always tried first. Turn this off if you do not want shared AI fallback.
+                            </span>
+                        </label>
                     </div>
 
                     <!-- Status Feedback -->
@@ -7928,6 +7993,7 @@
         const feedback = modal.querySelector('#amaes-gemini-status-feedback');
         const testSaveBtn = modal.querySelector('#amaes-gemini-btn-test-save');
         const removeBtn = modal.querySelector('#amaes-gemini-btn-remove');
+        const sharedFallbackCheckbox = modal.querySelector('#amaes-shared-ai-fallback');
 
         // Feature 3: Multi-key UI
         const existingKeys = getGeminiApiKeys();
@@ -8027,6 +8093,9 @@
                     });
                     if (res && res.success) {
                         setGeminiApiKeys(allKeyVals);
+                        if (sharedFallbackCheckbox) {
+                            setSharedAiFallbackEnabled(sharedFallbackCheckbox.checked);
+                        }
                         const planSelect = modal.querySelector('#amaes-gemini-plan-select');
                         if (planSelect) {
                             setAiPlanTier(planSelect.value);

@@ -101,6 +101,14 @@ Install the **[Violentmonkey](https://violentmonkey.github.io/)** extension for 
 3. Follow the 4-step guide to get your free personal API key from [Google AI Studio](https://aistudio.google.com/app/apikey) (100% free with any standard Google account).
 4. Paste your key and click **Test & Save Key**. The toolkit is now ready to assist with uncertain quiz questions automatically!
 
+Shared AI fallback is enabled by default in the setup window. If Google
+temporarily rate-limits your personal key, the toolkit may try a small,
+project-managed pool so you do not have to wait. Your personal key is never
+uploaded to that pool. Shared capacity is limited; if it is full, the toolkit
+will explain what happened and let you retry or add another personal key.
+Disable **Use shared AI help if my key is temporarily busy** if you do not
+want this fallback.
+
 ---
 
 <a id="keyboard-shortcuts"></a>
