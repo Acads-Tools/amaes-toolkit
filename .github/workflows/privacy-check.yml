@@ -23,7 +23,7 @@ jobs:
           else
             before="${{ github.event.before }}"
             if [ "$before" = "0000000000000000000000000000000000000000" ]; then
-              commit_range="HEAD"
+              commit_range="$(git merge-base origin/main HEAD)..HEAD"
             else
               commit_range="$before..HEAD"
             fi
