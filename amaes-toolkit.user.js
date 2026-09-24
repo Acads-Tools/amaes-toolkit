@@ -52,8 +52,8 @@
     }
 
     function compareVersions(left, right) {
-        const a = String(left || '').replace(/^v/i, '').split('.').map(Number);
-        const b = String(right || '').replace(/^v/i, '').split('.').map(Number);
+        const a = String(left || '').trim().replace(/^v/i, '').split('.').map(Number);
+        const b = String(right || '').trim().replace(/^v/i, '').split('.').map(Number);
         if (a.length !== 3 || b.length !== 3 || a.some(Number.isNaN) || b.some(Number.isNaN)) return null;
         for (let i = 0; i < 3; i += 1) {
             if (a[i] !== b[i]) return a[i] > b[i] ? 1 : -1;
@@ -63,22 +63,25 @@
 
     function showCompatibilityBlock(reason, minimumVersion = null) {
         const required = minimumVersion || 'the latest supported version';
-        const message = reason === 'network'
+        const isNetwork = reason === 'network';
+        const titleText = isNetwork ? 'AMAES Toolkit connection issue' : 'AMAES Toolkit update required';
+        const message = isNetwork
             ? 'The compatibility policy could not be verified. Connect to the internet and try again.'
             : `This version is no longer supported. Update to v${required} before using AMAES Toolkit.`;
         document.documentElement.innerHTML = `
-            <head><title>AMAES Toolkit update required</title></head>
+            <head><title>${titleText}</title></head>
             <body style="margin:0;background:#0f172a;color:#e2e8f0;font:16px system-ui,sans-serif">
                 <main style="box-sizing:border-box;max-width:560px;margin:15vh auto;padding:32px;border:1px solid #334155;border-radius:16px;background:#1e293b;text-align:center">
-                    <h1 style="margin-top:0;color:#fbbf24">AMAES Toolkit update required</h1>
+                    <h1 style="margin-top:0;color:#fbbf24">${titleText}</h1>
                     <p>${message}</p>
                     <p style="font-size:13px;color:#94a3b8">Installed version: ${CLIENT_VERSION}</p>
+                    ${isNetwork ? '' : `
                     <a href="${SCRIPT_RAW_URL}" target="_blank" rel="noopener noreferrer"
                        style="display:inline-block;padding:12px 18px;border-radius:8px;background:#2563eb;color:white;text-decoration:none;font-weight:700">
                        Install official update
-                    </a>
+                    </a>`}
                     <button id="amaes-compat-retry" style="display:block;margin:16px auto 0;padding:8px 14px;background:transparent;color:#93c5fd;border:1px solid #475569;border-radius:8px;cursor:pointer">
-                        Check again
+                        ${isNetwork ? 'Retry connection' : 'Check again'}
                     </button>
                 </main>
             </body>`;
@@ -87,9 +90,10 @@
 
     async function verifyClientCompatibility() {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
+        const timeout = setTimeout(() => controller.abort(), 12000);
         try {
-            const response = await fetch(`${communityRelayUrl}/version`, {
+            const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
+            const response = await fetch(`${relayUrl}/version`, {
                 method: 'GET',
                 cache: 'no-store',
                 signal: controller.signal
@@ -97,16 +101,36 @@
             if (!response.ok) throw new Error(`Compatibility endpoint returned ${response.status}`);
             const policy = await response.json();
             const minimum = policy.minimumVersion;
+            if (minimum) {
+                try {
+                    localStorage.setItem('amaes_cached_min_version', String(minimum).trim());
+                    if (policy.latestVersion) {
+                        localStorage.setItem('amaes_cached_latest_version', String(policy.latestVersion).trim());
+                    }
+                } catch (_) {}
+            }
             const comparison = compareVersions(CLIENT_VERSION, minimum);
-            if (comparison === null || comparison < 0) {
+            // ONLY block if comparison succeeded and client is strictly below minimum
+            if (comparison !== null && comparison < 0) {
                 showCompatibilityBlock('version', minimum);
                 return false;
             }
             return true;
         } catch (error) {
             logDebug(`Client compatibility check failed: ${error.message}`);
-            showCompatibilityBlock('network');
-            return false;
+            try {
+                const cachedMin = localStorage.getItem('amaes_cached_min_version');
+                if (cachedMin) {
+                    const cachedComparison = compareVersions(CLIENT_VERSION, cachedMin);
+                    if (cachedComparison !== null && cachedComparison < 0) {
+                        showCompatibilityBlock('version', cachedMin);
+                        return false;
+                    }
+                }
+            } catch (_) {}
+            // Temporary network interruptions, worker cold starts, or timeouts
+            // must never lock out or wipe the screen of an active student session.
+            return true;
         } finally {
             clearTimeout(timeout);
         }
@@ -725,9 +749,9 @@
                 return;
             }
             remoteVer = validRemoteVersion;
-            localStorage.setItem('amaes_latest_version_seen', remoteVer);
 
             if (isNewerVersion(remoteVer, SCRIPT_VERSION)) {
+                localStorage.setItem('amaes_latest_version_seen', remoteVer);
                 renderUpdateNotice(remoteVer);
                 setLog(`Update found: <b>v${remoteVer}</b> is available! Opening installer...`, 'var(--accent-green)');
                 showToast(`Update found: v${remoteVer} is available!`, 4000);
@@ -736,6 +760,12 @@
                 }
                 if (callback) callback({ status: 'update_available', version: remoteVer });
             } else {
+                localStorage.removeItem('amaes_latest_version_seen');
+                localStorage.removeItem('amaes_pending_update_install');
+                localStorage.removeItem('amaes_pending_update_time');
+                localStorage.removeItem('amaes_update_in_progress');
+                document.getElementById('amaes-topnav-update-item')?.remove();
+                document.getElementById('amaes-update-banner')?.remove();
                 if (manual) {
                     setLog(`Toolkit is up to date (<b>${SCRIPT_VERSION}</b>).`, 'var(--accent-green)');
                     showToast(`Toolkit is up to date (${SCRIPT_VERSION})`);
@@ -14126,6 +14156,9 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
         const cachedLatest = localStorage.getItem('amaes_latest_version_seen');
         if (cachedLatest && isNewerVersion(cachedLatest, SCRIPT_VERSION)) {
             injectTopNavUpdateNotification(cachedLatest);
+        } else {
+            localStorage.removeItem('amaes_latest_version_seen');
+            document.getElementById('amaes-topnav-update-item')?.remove();
         }
 
         fetchAndCacheAclcLogo();

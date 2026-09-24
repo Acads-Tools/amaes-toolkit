@@ -4393,6 +4393,22 @@ test("Gemini AI: Rate Limiting enforces 15 RPM sliding window on Free Tier, resp
     assert.ok(inferenceBlock.includes("Authentication, quota, and rate-limit errors are not"), "Deterministic AI failures must fail fast instead of retrying across keys");
 });
 
+test("Client Compatibility & Update Check Robustness", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Verify verifyClientCompatibility does not lock out on network timeout/errors
+    assert.ok(script.includes("amaes_cached_min_version"), "Must cache minimum version policy");
+    assert.ok(script.includes("comparison !== null && comparison < 0"), "Must strictly check comparison is valid and < 0 before blocking");
+    assert.ok(script.includes("Temporary network interruptions"), "Must document network error resilience in compatibility check");
+
+    // 2. Clean up stale update state when up to date
+    assert.ok(script.includes("localStorage.removeItem('amaes_latest_version_seen');"), "Must clear cached latest version when current script is up to date");
+    assert.ok(script.includes("document.getElementById('amaes-topnav-update-item')?.remove();"), "Must remove topnav update item when up to date");
+
+    // 3. Network connection issue title distinction
+    assert.ok(script.includes("AMAES Toolkit connection issue"), "Must show connection issue title rather than update required on network failures");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);
