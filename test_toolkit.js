@@ -4405,8 +4405,10 @@ test("Client Compatibility & Update Check Robustness", () => {
     assert.ok(script.includes("localStorage.removeItem('amaes_latest_version_seen');"), "Must clear cached latest version when current script is up to date");
     assert.ok(script.includes("document.getElementById('amaes-topnav-update-item')?.remove();"), "Must remove topnav update item when up to date");
 
-    // 3. Network connection issue title distinction
-    assert.ok(script.includes("AMAES Toolkit connection issue"), "Must show connection issue title rather than update required on network failures");
+    // 3. Direct top banner without full-page lockdown
+    assert.ok(script.includes("amaes-compat-banner"), "Must use non-intrusive top banner instead of locking out entire page");
+    assert.ok(script.includes("Update to v${required} to use the tool"), "Must directly prompt user to update to use the tool");
+    assert.ok(!script.includes("document.documentElement.innerHTML"), "Must never wipe or replace the host Moodle LMS page");
 });
 
 console.log("\n==================================================");

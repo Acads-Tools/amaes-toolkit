@@ -63,34 +63,41 @@
 
     function showCompatibilityBlock(reason, minimumVersion = null) {
         const required = minimumVersion || 'the latest supported version';
-        const isNetwork = reason === 'network';
-        const titleText = isNetwork ? 'AMAES Toolkit connection issue' : 'AMAES Toolkit update required';
-        const message = isNetwork
-            ? 'The compatibility policy could not be verified. Connect to the internet and try again.'
-            : `This version is no longer supported. Update to v${required} before using AMAES Toolkit.`;
-        document.documentElement.innerHTML = `
-            <head><title>${titleText}</title></head>
-            <body style="margin:0;background:#0f172a;color:#e2e8f0;font:16px system-ui,sans-serif">
-                <main style="box-sizing:border-box;max-width:560px;margin:15vh auto;padding:32px;border:1px solid #334155;border-radius:16px;background:#1e293b;text-align:center">
-                    <h1 style="margin-top:0;color:#fbbf24">${titleText}</h1>
-                    <p>${message}</p>
-                    <p style="font-size:13px;color:#94a3b8">Installed version: ${CLIENT_VERSION}</p>
-                    ${isNetwork ? '' : `
-                    <a href="${SCRIPT_RAW_URL}" target="_blank" rel="noopener noreferrer"
-                       style="display:inline-block;padding:12px 18px;border-radius:8px;background:#2563eb;color:white;text-decoration:none;font-weight:700">
-                       Install official update
-                    </a>`}
-                    <button id="amaes-compat-retry" style="display:block;margin:16px auto 0;padding:8px 14px;background:transparent;color:#93c5fd;border:1px solid #475569;border-radius:8px;cursor:pointer">
-                        ${isNetwork ? 'Retry connection' : 'Check again'}
-                    </button>
-                </main>
-            </body>`;
-        document.getElementById('amaes-compat-retry')?.addEventListener('click', () => window.location.reload());
+        document.getElementById('amaes-compat-banner')?.remove();
+        const banner = document.createElement('div');
+        banner.id = 'amaes-compat-banner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999999;background:#0f172a;border-bottom:2px solid #ef4444;color:#f8fafc;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;font-size:14px;';
+        banner.innerHTML = `
+            <div style="display:flex;align-items:center;gap:10px">
+                <span style="font-size:16px">⚠️</span>
+                <span>Update to v${required} to use the tool</span>
+            </div>
+            <a href="${SCRIPT_RAW_URL}" target="_blank" rel="noopener noreferrer"
+               style="padding:6px 14px;background:#2563eb;color:#ffffff;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px;white-space:nowrap">
+               Update Now
+            </a>
+        `;
+        if (document.body) {
+            document.body.prepend(banner);
+        } else {
+            document.addEventListener('DOMContentLoaded', () => document.body?.prepend(banner));
+        }
     }
 
     async function verifyClientCompatibility() {
+        try {
+            const cachedMin = localStorage.getItem('amaes_cached_min_version');
+            if (cachedMin) {
+                const cachedComparison = compareVersions(CLIENT_VERSION, cachedMin);
+                if (cachedComparison !== null && cachedComparison < 0) {
+                    showCompatibilityBlock('version', cachedMin);
+                    return false;
+                }
+            }
+        } catch (_) {}
+
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 12000);
+        const timeout = setTimeout(() => controller.abort(), 6000);
         try {
             const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
             const response = await fetch(`${relayUrl}/version`, {
@@ -118,17 +125,7 @@
             return true;
         } catch (error) {
             logDebug(`Client compatibility check failed: ${error.message}`);
-            try {
-                const cachedMin = localStorage.getItem('amaes_cached_min_version');
-                if (cachedMin) {
-                    const cachedComparison = compareVersions(CLIENT_VERSION, cachedMin);
-                    if (cachedComparison !== null && cachedComparison < 0) {
-                        showCompatibilityBlock('version', cachedMin);
-                        return false;
-                    }
-                }
-            } catch (_) {}
-            // Temporary network interruptions, worker cold starts, or timeouts
+            // Temporary network interruptions, worker cold starts, slow latency, or timeouts
             // must never lock out or wipe the screen of an active student session.
             return true;
         } finally {
