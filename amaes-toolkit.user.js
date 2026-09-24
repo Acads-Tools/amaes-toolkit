@@ -122,9 +122,11 @@
                 showCompatibilityBlock('version', minimum);
                 return false;
             }
+            document.getElementById('amaes-compat-banner')?.remove();
             return true;
         } catch (error) {
             logDebug(`Client compatibility check failed: ${error.message}`);
+            document.getElementById('amaes-compat-banner')?.remove();
             // Temporary network interruptions, worker cold starts, slow latency, or timeouts
             // must never lock out or wipe the screen of an active student session.
             return true;
