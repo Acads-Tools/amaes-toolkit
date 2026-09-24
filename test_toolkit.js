@@ -4409,6 +4409,7 @@ test("Client Compatibility & Update Check Robustness", () => {
     assert.ok(script.includes("amaes-compat-banner"), "Must use non-intrusive top banner instead of locking out entire page");
     assert.ok(script.includes("Update to v${required} to use the tool"), "Must directly prompt user to update to use the tool");
     assert.ok(!script.includes("document.documentElement.innerHTML"), "Must never wipe or replace the host Moodle LMS page");
+    assert.ok(script.includes("toolkitSelectors.forEach"), "Must purge open panels, quick info modals, and settings on lockout");
 });
 
 console.log("\n==================================================");

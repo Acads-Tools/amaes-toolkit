@@ -64,6 +64,23 @@
     function showCompatibilityBlock(reason, minimumVersion = null) {
         const required = minimumVersion || 'the latest supported version';
         document.getElementById('amaes-compat-banner')?.remove();
+
+        // Close and remove any open toolkit panels, modals, quick info, settings, and HUDs
+        const toolkitSelectors = [
+            '#amaes-panel',
+            '#amaes-welcome-modal',
+            '#amaes-gemini-modal',
+            '#amaes-contribute-modal',
+            '#amaes-dev-modal',
+            '#amaes-quiz-hud',
+            '#amaes-capability-tip',
+            '#amaes-full-qr-modal',
+            '.amaes-blockage-hud'
+        ];
+        toolkitSelectors.forEach(sel => {
+            document.querySelectorAll(sel).forEach(el => el.remove());
+        });
+
         const banner = document.createElement('div');
         banner.id = 'amaes-compat-banner';
         banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999999;background:#0f172a;border-bottom:2px solid #ef4444;color:#f8fafc;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;font-size:14px;';
