@@ -6131,7 +6131,198 @@
         return { type: 'lecture', reason: 'default-non-quiz', color: 'var(--accent-blue)', badge: 'Lecture' };
     }
 
-    function findButtons(goal = 'mark_done', category = 'lecture') {
+    // ==========================================
+    // Quiz Passable Grade (≥80%) Safety Evaluator
+    // ==========================================
+
+    async function fetchCourseGradesMap() {
+        if (!checkIsCoursePage()) return {};
+
+        // In-memory cache valid for 60s
+        if (typeof window !== 'undefined' && window.__amaesCourseGradesCache && window.__amaesCourseGradesCacheTime && (Date.now() - window.__amaesCourseGradesCacheTime < 60000)) {
+            return window.__amaesCourseGradesCache;
+        }
+
+        let gradesUrl = null;
+        if (typeof document !== 'undefined') {
+            const gradesLink = document.querySelector('a[href*="/grade/report/user/index.php"]');
+            if (gradesLink && gradesLink.href) {
+                gradesUrl = gradesLink.href;
+            } else if (typeof detectCourseInfo === 'function') {
+                const courseInfo = detectCourseInfo();
+                if (courseInfo && courseInfo.courseId) {
+                    const semPath = typeof getSemesterBasePath === 'function' ? getSemesterBasePath() : '/';
+                    gradesUrl = `${window.location.origin}${semPath}grade/report/user/index.php?id=${courseInfo.courseId}`;
+                }
+            }
+        }
+
+        if (!gradesUrl) return {};
+
+        try {
+            const resp = await fetch(gradesUrl);
+            if (!resp.ok) return {};
+            const html = await resp.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const map = {};
+
+            const rows = Array.from(doc.querySelectorAll('.user-grade tr, .generaltable tr, table.table tr, tr'));
+            rows.forEach(r => {
+                const quizLink = r.querySelector('a[href*="/mod/quiz/"], a[href*="quiz"], a.gradeitemheader')
+                              || r.querySelector('.column-itemname a, th a, td:first-child a');
+                if (!quizLink) return;
+
+                const href = quizLink.getAttribute('href') || quizLink.href || '';
+                const rawTitle = quizLink.innerText.trim();
+                if (!rawTitle) return;
+
+                const gradeCell = r.querySelector('.column-grade, [headers*="grade"], td.grade');
+                const pctCell = r.querySelector('.column-percentage, [headers*="percentage"]');
+
+                let pct = null;
+                let hasGrade = false;
+                let gradeStr = '';
+
+                if (pctCell) {
+                    const pText = pctCell.innerText.trim();
+                    const mPct = pText.match(/(\d+(?:\.\d+)?)\s*%/);
+                    if (mPct) {
+                        pct = parseFloat(mPct[1]);
+                        hasGrade = true;
+                        gradeStr = `${pct}%`;
+                    }
+                }
+
+                if (gradeCell) {
+                    const gText = gradeCell.innerText.trim();
+                    if (gText && gText !== '-' && gText !== '–' && /\d/.test(gText)) {
+                        hasGrade = true;
+                        if (!gradeStr) gradeStr = gText;
+                        if (pct === null) {
+                            const mFrac = gText.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
+                            if (mFrac) {
+                                const earned = parseFloat(mFrac[1]);
+                                const max = parseFloat(mFrac[2]);
+                                if (max > 0) pct = Math.round((earned / max) * 100);
+                            } else {
+                                const mNum = gText.match(/(\d+(?:\.\d+)?)/);
+                                if (mNum && parseFloat(mNum[1]) <= 100) {
+                                    pct = parseFloat(mNum[1]);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                const mCmid = href.match(/[?&]id=(\d+)/);
+                const cmid = mCmid ? mCmid[1] : null;
+                const normTitle = rawTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+                const entry = {
+                    title: rawTitle,
+                    normTitle: normTitle,
+                    href: href,
+                    cmid: cmid,
+                    hasGrade: hasGrade,
+                    percentage: pct,
+                    gradeStr: gradeStr,
+                    isPassable: Boolean(hasGrade && pct !== null && pct >= 80)
+                };
+
+                map[normTitle] = entry;
+                if (cmid) map[`cmid_${cmid}`] = entry;
+            });
+
+            if (typeof window !== 'undefined') {
+                window.__amaesCourseGradesCache = map;
+                window.__amaesCourseGradesCacheTime = Date.now();
+            }
+            return map;
+        } catch (e) {
+            console.warn('Failed to fetch course grades map:', e);
+            return {};
+        }
+    }
+
+    function evaluateQuizPassableGrade(container, title = '', gradesMap = null) {
+        // 1. Check gradesMap if provided or cached
+        const map = gradesMap || (typeof window !== 'undefined' ? window.__amaesCourseGradesCache : null);
+        if (map && Object.keys(map).length > 0) {
+            // Check by container cmid if available (id="module-123" or data-id="123")
+            const moduleId = (container.id || '').replace(/^module-/, '') || container.dataset.id || '';
+            if (moduleId && map[`cmid_${moduleId}`]) {
+                const entry = map[`cmid_${moduleId}`];
+                return {
+                    isPassable: entry.isPassable,
+                    hasGrade: entry.hasGrade,
+                    percentage: entry.percentage,
+                    source: 'grades-report'
+                };
+            }
+
+            // Check by normalized title
+            const normTitle = (title || container.innerText.split('\n')[0] || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (map[normTitle]) {
+                const entry = map[normTitle];
+                return {
+                    isPassable: entry.isPassable,
+                    hasGrade: entry.hasGrade,
+                    percentage: entry.percentage,
+                    source: 'grades-report'
+                };
+            }
+
+            // Fuzzy match title
+            for (const k in map) {
+                if (k.startsWith('cmid_')) continue;
+                if (k.length > 5 && (normTitle.includes(k) || k.includes(normTitle))) {
+                    const entry = map[k];
+                    return {
+                        isPassable: entry.isPassable,
+                        hasGrade: entry.hasGrade,
+                        percentage: entry.percentage,
+                        source: 'grades-report-fuzzy'
+                    };
+                }
+            }
+        }
+
+        // 2. Fallback: Parse container text for explicit grade or pass/fail markers
+        const text = (container.innerText || '').toLowerCase();
+
+        // Check for explicit fail markers
+        if (/did not achieve pass grade|failed to pass|\bfailed\b/i.test(text)) {
+            return { isPassable: false, hasGrade: true, percentage: 0, source: 'container-fail' };
+        }
+
+        // Check for explicit pass markers
+        if (/achieved pass grade|pass grade achieved|\bpassed\b/i.test(text)) {
+            return { isPassable: true, hasGrade: true, percentage: 100, source: 'container-pass' };
+        }
+
+        // Check for explicit percentage in container
+        const mPct = text.match(/(\d+(?:\.\d+)?)\s*%/);
+        if (mPct) {
+            const val = parseFloat(mPct[1]);
+            return { isPassable: val >= 80, hasGrade: true, percentage: val, source: 'container-pct' };
+        }
+
+        // Check for fractions e.g. "8/10" or "80/100" or "Grade: 9 out of 10"
+        const mFrac = text.match(/(\d+(?:\.\d+)?)\s*(?:\/|out of)\s*(\d+(?:\.\d+)?)/i);
+        if (mFrac) {
+            const earned = parseFloat(mFrac[1]);
+            const max = parseFloat(mFrac[2]);
+            if (max > 0) {
+                const val = Math.round((earned / max) * 100);
+                return { isPassable: val >= 80, hasGrade: true, percentage: val, source: 'container-fraction' };
+            }
+        }
+
+        // 3. No grade recorded or unattempted: MUST NOT TOUCH!
+        return { isPassable: false, hasGrade: false, percentage: null, source: 'no-grade' };
+    }
+
+    function findButtons(goal = 'mark_done', category = 'lecture', gradesMap = null) {
         const results = [];
         const activityElements = document.querySelectorAll(
             'li.activity, .activity-item, .course-section .activity, div[data-region="activity-card"]'
@@ -6181,13 +6372,29 @@
                     const titleElem = container.querySelector('.instancename, .activityname, a.aal_link, .activity-title');
                     const title = titleElem ? titleElem.innerText.trim() : (container.innerText.split('\n')[0] || 'Activity');
 
+                    let gradeInfo = null;
+                    // Safety Guard: For quizzes when marking done, ONLY mark if they have a passable grade (>= 80%)!
+                    if (goal === 'mark_done' && classification.type === 'quiz') {
+                        gradeInfo = evaluateQuizPassableGrade(container, title, gradesMap);
+                        if (!gradeInfo.isPassable) {
+                            // Leave untouched!
+                            continue;
+                        }
+                    }
+
                     let matchesCategory = false;
                     if (category === 'all') matchesCategory = true;
                     else if (category === 'lecture' && (classification.type === 'lecture' || classification.type === 'video')) matchesCategory = true;
                     else if (category === 'quiz' && classification.type === 'quiz') matchesCategory = true;
 
                     if (matchesCategory) {
-                        results.push({ button: btn, container, title, classification });
+                        results.push({
+                            button: btn,
+                            container,
+                            title,
+                            classification,
+                            gradePct: gradeInfo ? gradeInfo.percentage : null
+                        });
                     }
                 }
             }
@@ -13608,7 +13815,7 @@
                                 <button id="btn-mark-lec" class="amaes-btn amaes-btn-blue">
                                     ${ICONS.book} <span>Mark Lectures & Vids</span>
                                 </button>
-                                <button id="btn-mark-quiz" class="amaes-btn amaes-btn-pink">
+                                <button id="btn-mark-quiz" class="amaes-btn amaes-btn-pink" title="Mark quizzes & exams with a passable grade (≥80%) as done (skips unattempted or failed quizzes)">
                                     ${ICONS.edit} <span>Mark Quizzes / Exams Only</span>
                                 </button>
                                 <button id="btn-mark-all" class="amaes-btn amaes-btn-gray">
@@ -16055,13 +16262,26 @@
             shouldStop = false;
             stopBtn.style.display = 'flex';
 
+            let gradesMap = null;
+            if (goal === 'mark_done' && (category === 'quiz' || category === 'all')) {
+                setLog("Verifying course grades: Only quizzes with a passable grade (≥80%) will be marked...", "var(--accent-blue)");
+                if (typeof fetchCourseGradesMap === 'function') {
+                    gradesMap = await fetchCourseGradesMap();
+                }
+            }
+
             const actionLabel = goal === 'mark_done' ? 'Marking' : 'Undoing';
             setLog(`Searching for ${category} items to ${goal === 'mark_done' ? 'complete' : 'undo'}...`);
 
-            const items = findButtons(goal, category);
+            const items = findButtons(goal, category, gradesMap);
             if (items.length === 0) {
-                showToast(`No uncompleted ${category} items found to ${goal === 'mark_done' ? 'mark' : 'undo'}!`);
-                setLog(`No matching items found for: <b>${category}</b> (${goal})!`, "var(--accent-green)");
+                if (goal === 'mark_done' && category === 'quiz') {
+                    showToast("No quizzes with passable grade (≥80%) found to mark.");
+                    setLog("<b>Zero Matching Quizzes:</b> Only quizzes with a passing grade (≥80%) are marked. Incomplete or failing quizzes were left untouched.", "var(--accent-amber)");
+                } else {
+                    showToast(`No uncompleted ${category} items found to ${goal === 'mark_done' ? 'mark' : 'undo'}!`);
+                    setLog(`No matching items found for: <b>${category}</b> (${goal})!`, "var(--accent-green)");
+                }
                 finish();
                 return;
             }
@@ -16078,7 +16298,8 @@
                 }
 
                 const item = items[i];
-                setLog(`[${i + 1}/${items.length}] ${actionLabel}: <b>${item.title.substring(0, 22)}...</b>`);
+                const gradeSuffix = item.gradePct !== null && item.gradePct !== undefined ? ` [${item.gradePct}%]` : '';
+                setLog(`[${i + 1}/${items.length}] ${actionLabel}: <b>${item.title.substring(0, 22)}...</b>${gradeSuffix}`);
 
                 item.button.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 item.button.click();
@@ -16089,7 +16310,11 @@
 
             if (!shouldStop) {
                 showToast(`Finished ${actionLabel.toLowerCase()} ${processedCount} items!`);
-                setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items!`, "var(--accent-green)");
+                if (goal === 'mark_done' && (category === 'quiz' || category === 'all')) {
+                    setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items! Any quizzes without a passable grade (≥80%) remained untouched.`, "var(--accent-green)");
+                } else {
+                    setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items!`, "var(--accent-green)");
+                }
             }
 
             finish();

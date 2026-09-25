@@ -1312,13 +1312,26 @@
             shouldStop = false;
             stopBtn.style.display = 'flex';
 
+            let gradesMap = null;
+            if (goal === 'mark_done' && (category === 'quiz' || category === 'all')) {
+                setLog("Verifying course grades: Only quizzes with a passable grade (≥80%) will be marked...", "var(--accent-blue)");
+                if (typeof fetchCourseGradesMap === 'function') {
+                    gradesMap = await fetchCourseGradesMap();
+                }
+            }
+
             const actionLabel = goal === 'mark_done' ? 'Marking' : 'Undoing';
             setLog(`Searching for ${category} items to ${goal === 'mark_done' ? 'complete' : 'undo'}...`);
 
-            const items = findButtons(goal, category);
+            const items = findButtons(goal, category, gradesMap);
             if (items.length === 0) {
-                showToast(`No uncompleted ${category} items found to ${goal === 'mark_done' ? 'mark' : 'undo'}!`);
-                setLog(`No matching items found for: <b>${category}</b> (${goal})!`, "var(--accent-green)");
+                if (goal === 'mark_done' && category === 'quiz') {
+                    showToast("No quizzes with passable grade (≥80%) found to mark.");
+                    setLog("<b>Zero Matching Quizzes:</b> Only quizzes with a passing grade (≥80%) are marked. Incomplete or failing quizzes were left untouched.", "var(--accent-amber)");
+                } else {
+                    showToast(`No uncompleted ${category} items found to ${goal === 'mark_done' ? 'mark' : 'undo'}!`);
+                    setLog(`No matching items found for: <b>${category}</b> (${goal})!`, "var(--accent-green)");
+                }
                 finish();
                 return;
             }
@@ -1335,7 +1348,8 @@
                 }
 
                 const item = items[i];
-                setLog(`[${i + 1}/${items.length}] ${actionLabel}: <b>${item.title.substring(0, 22)}...</b>`);
+                const gradeSuffix = item.gradePct !== null && item.gradePct !== undefined ? ` [${item.gradePct}%]` : '';
+                setLog(`[${i + 1}/${items.length}] ${actionLabel}: <b>${item.title.substring(0, 22)}...</b>${gradeSuffix}`);
 
                 item.button.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 item.button.click();
@@ -1346,7 +1360,11 @@
 
             if (!shouldStop) {
                 showToast(`Finished ${actionLabel.toLowerCase()} ${processedCount} items!`);
-                setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items!`, "var(--accent-green)");
+                if (goal === 'mark_done' && (category === 'quiz' || category === 'all')) {
+                    setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items! Any quizzes without a passable grade (≥80%) remained untouched.`, "var(--accent-green)");
+                } else {
+                    setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items!`, "var(--accent-green)");
+                }
             }
 
             finish();

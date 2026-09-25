@@ -426,7 +426,7 @@
                                 <button id="btn-mark-lec" class="amaes-btn amaes-btn-blue">
                                     ${ICONS.book} <span>Mark Lectures & Vids</span>
                                 </button>
-                                <button id="btn-mark-quiz" class="amaes-btn amaes-btn-pink">
+                                <button id="btn-mark-quiz" class="amaes-btn amaes-btn-pink" title="Mark quizzes & exams with a passable grade (≥80%) as done (skips unattempted or failed quizzes)">
                                     ${ICONS.edit} <span>Mark Quizzes / Exams Only</span>
                                 </button>
                                 <button id="btn-mark-all" class="amaes-btn amaes-btn-gray">

@@ -4653,6 +4653,32 @@ test("Reinstall Toolkit Button & Auto-Refresh Lifecycle: provides 1-click reinst
     assert.ok(script.includes("was not installed yet. Click Update Now to try again"), "Must alert student and restore Update Now if installation was skipped");
 });
 
+// --------------------------------------------------
+// 147. Quiz Passable Grade Safety Guard (≥80%) & Under Construction CLI
+// --------------------------------------------------
+test("Quiz Passable Grade Safety Guard (≥80%) & Under Construction CLI: only marks quizzes with passable grade (≥80%) leaving incomplete/failing untouched", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Grade Evaluation & Threshold Enforcement
+    assert.ok(script.includes("function evaluateQuizPassableGrade(container"), "Must define evaluateQuizPassableGrade function");
+    assert.ok(script.includes("function fetchCourseGradesMap()"), "Must define fetchCourseGradesMap function");
+    assert.ok(script.includes("pct >= 80"), "Must strictly enforce >= 80% threshold for passable quiz grade");
+    assert.ok(script.includes("isPassable: val >= 80") || script.includes("pct >= 80"), "Container percentage and fraction must be evaluated against 80%");
+    assert.ok(script.includes("isPassable: false, hasGrade: false"), "Unattempted quizzes with no grade must not be passable");
+
+    // 2. Integration with Batch Execution and Auto-Marker
+    assert.ok(script.includes("const items = findButtons(goal, category, gradesMap);"), "findButtons must receive gradesMap for quiz evaluation");
+    assert.ok(script.includes("if (!gradeInfo.isPassable)"), "findButtons must skip non-passable quizzes when marking done");
+    assert.ok(script.includes("Only quizzes with a passing grade (≥80%) are marked"), "User must be informed that only >=80% quizzes are marked");
+
+    // 3. Under Construction / Maintenance script verification
+    assert.ok(fs.existsSync('scripts/under-construction'), "scripts/under-construction must exist");
+    const ucScript = fs.readFileSync('scripts/under-construction', 'utf8');
+    assert.ok(ucScript.includes("Under Construction & Maintenance CLI"), "Must use Under Construction & Maintenance header");
+    assert.ok(!ucScript.includes("Emergency Stealth Mode"), "Must remove stealth mode wording");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

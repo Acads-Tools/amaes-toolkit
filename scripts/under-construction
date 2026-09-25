@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# AMAES Toolkit & Database - Emergency Stealth Mode CLI
+# AMAES Toolkit & Database - Under Construction & Maintenance CLI
 # ==============================================================================
-# Toggles repositories and web services between Public and Private "Ghost" mode.
-# When Stealth is ON:
-#   - Repositories return 404 to the public.
+# Toggles repositories and web services between Public and "Under Construction" mode.
+# When Under Construction is ON:
+#   - Repositories return 404 to the public while undergoing maintenance.
 #   - GitHub Pages return 404.
-#   - Workflows and issue submissions are paused.
+#   - Workflows and issue submissions are paused for maintenance.
 #   - Existing users continue using their offline browser cache on Moodle.
-# When Stealth is OFF:
+# When Under Construction is OFF:
 #   - Repositories return to Public.
 #   - Web installer and GitHub Pages restored.
 #   - Workflows and community contributions resume.
@@ -49,7 +49,7 @@ function get_visibility() {
 
 function show_status() {
     check_gh
-    echo -e "\n${BOLD}${CYAN}=== AMAES TOOLKIT & DATABASE SECURITY STATUS ===${NC}\n"
+    echo -e "\n${BOLD}${CYAN}=== AMAES TOOLKIT & DATABASE MAINTENANCE STATUS ===${NC}\n"
     
     local tk_vis
     local db_vis
@@ -58,7 +58,7 @@ function show_status() {
     
     echo -n "  • Toolkit Repository ($TOOLKIT_REPO): "
     if [[ "$tk_vis" == "PRIVATE" ]]; then
-        echo -e "${RED}${BOLD}PRIVATE (STEALTH / GHOST MODE)${NC}"
+        echo -e "${RED}${BOLD}PRIVATE (UNDER CONSTRUCTION / MAINTENANCE)${NC}"
     elif [[ "$tk_vis" == "PUBLIC" ]]; then
         echo -e "${GREEN}${BOLD}PUBLIC (ACTIVE)${NC}"
     else
@@ -67,7 +67,7 @@ function show_status() {
 
     echo -n "  • Database Repository ($DATABASE_REPO): "
     if [[ "$db_vis" == "PRIVATE" ]]; then
-        echo -e "${RED}${BOLD}PRIVATE (STEALTH / GHOST MODE)${NC}"
+        echo -e "${RED}${BOLD}PRIVATE (UNDER CONSTRUCTION / MAINTENANCE)${NC}"
     elif [[ "$db_vis" == "PUBLIC" ]]; then
         echo -e "${GREEN}${BOLD}PUBLIC (ACTIVE)${NC}"
     else
@@ -79,7 +79,7 @@ function show_status() {
     local http_code
     http_code=$(curl -s -o /dev/null -w "%{http_code}" "$PAGES_URL" || echo "000")
     if [[ "$http_code" == "404" ]]; then
-        echo -e "${RED}404 Not Found (Hidden from public)${NC}"
+        echo -e "${RED}404 Not Found (Under Maintenance)${NC}"
     elif [[ "$http_code" == "200" ]]; then
         echo -e "${GREEN}200 OK (Publicly accessible)${NC}"
     else
@@ -89,10 +89,10 @@ function show_status() {
     echo -e "\n  • Greasy Fork Admin: ${BLUE}${GREASYFORK_ADMIN_URL}${NC}\n"
 }
 
-function enable_stealth() {
+function enable_maintenance() {
     check_gh
-    echo -e "\n${BOLD}${YELLOW}[!] ACTIVATING EMERGENCY STEALTH MODE...${NC}"
-    echo -e "This will set both repositories to PRIVATE so external observers see only 404.\n"
+    echo -e "\n${BOLD}${YELLOW}[!] ACTIVATING UNDER CONSTRUCTION / MAINTENANCE MODE...${NC}"
+    echo -e "This will set both repositories to PRIVATE while undergoing scheduled maintenance.\n"
 
     echo -e "${CYAN}--> Setting $TOOLKIT_REPO to PRIVATE...${NC}"
     gh repo edit "$TOOLKIT_REPO" --visibility private --yes
@@ -103,18 +103,18 @@ function enable_stealth() {
     echo -e "${CYAN}--> Pausing community auto-merge workflow...${NC}"
     gh workflow disable auto-merge-contributions.yml --repo "$DATABASE_REPO" 2>/dev/null || true
 
-    echo -e "\n${GREEN}${BOLD}✓ STEALTH MODE ACTIVATED!${NC}"
+    echo -e "\n${GREEN}${BOLD}✓ UNDER CONSTRUCTION MODE ACTIVATED!${NC}"
     echo -e "--------------------------------------------------"
     echo -e "1. ${BOLD}GitHub Visibility:${NC} Repositories and GitHub Pages now return ${RED}404 Not Found${NC} to outside visitors."
-    echo -e "2. ${BOLD}Deterrent Effect:${NC} Attackers or curious users will perceive the project as deleted or abandoned."
+    echo -e "2. ${BOLD}Maintenance Status:${NC} Public visitors see maintenance / under construction."
     echo -e "3. ${BOLD}Active User Impact:${NC} Existing students using the toolkit on Moodle will continue using their ${GREEN}local browser cache${NC} without disruption."
-    echo -e "4. ${BOLD}Greasy Fork (Optional):${NC} If you also want Greasy Fork to appear deleted, visit:"
+    echo -e "4. ${BOLD}Greasy Fork (Optional):${NC} If you also want Greasy Fork paused, visit:"
     echo -e "   👉 ${BLUE}${GREASYFORK_ADMIN_URL}${NC}"
-    echo -e "   and click '${YELLOW}Delete this script${NC}' or turn off syncing."
+    echo -e "   and turn off syncing or pause distribution."
     echo -e "--------------------------------------------------\n"
 }
 
-function disable_stealth() {
+function disable_maintenance() {
     check_gh
     echo -e "\n${BOLD}${CYAN}[*] RESTORING PUBLIC VISIBILITY & SERVICES...${NC}\n"
 
@@ -136,26 +136,26 @@ function disable_stealth() {
 }
 
 case "${1:-status}" in
-    on|stealth|hide|dark|kill)
-        enable_stealth
+    on|construction|maintenance|stealth|hide)
+        enable_maintenance
         ;;
     off|public|restore|live)
-        disable_stealth
+        disable_maintenance
         ;;
     status)
         show_status
         ;;
     help|-h|--help)
-        echo -e "${BOLD}Usage:${NC} amaes-stealth {on|off|status}"
-        echo -e "  • ${BOLD}on${NC}     : Activate stealth mode (set repos to PRIVATE, pause workflows, hide from public)"
-        echo -e "  • ${BOLD}off${NC}    : Deactivate stealth mode (set repos to PUBLIC, restore all services)"
+        echo -e "${BOLD}Usage:${NC} under-construction {on|off|status}"
+        echo -e "  • ${BOLD}on${NC}     : Activate under construction mode (set repos to PRIVATE, pause workflows)"
+        echo -e "  • ${BOLD}off${NC}    : Deactivate under construction mode (set repos to PUBLIC, restore all services)"
         echo -e "  • ${BOLD}status${NC} : Check current visibility and endpoints status"
         exit 0
         ;;
     *)
-        echo -e "${BOLD}Usage:${NC} amaes-stealth {on|off|status}"
-        echo -e "  • ${BOLD}on${NC}     : Activate stealth mode (set repos to PRIVATE, pause workflows, hide from public)"
-        echo -e "  • ${BOLD}off${NC}    : Deactivate stealth mode (set repos to PUBLIC, restore all services)"
+        echo -e "${BOLD}Usage:${NC} under-construction {on|off|status}"
+        echo -e "  • ${BOLD}on${NC}     : Activate under construction mode (set repos to PRIVATE, pause workflows)"
+        echo -e "  • ${BOLD}off${NC}    : Deactivate under construction mode (set repos to PUBLIC, restore all services)"
         echo -e "  • ${BOLD}status${NC} : Check current visibility and endpoints status"
         exit 1
         ;;
