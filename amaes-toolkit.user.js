@@ -945,11 +945,9 @@
     let currentTheme = localStorage.getItem('amaes_toolkit_theme') || 'dark';
     if (!THEMES[currentTheme]) currentTheme = 'dark';
 
-    let autoCopyKeyword = localStorage.getItem('amaes_auto_copy_search') !== 'false'; // default true
     let autoHighlightQuiz = localStorage.getItem('amaes_auto_highlight_quiz') !== 'false'; // default true
     let autoCopyQuizForAI = localStorage.getItem('amaes_auto_copy_ai') !== 'false'; // default true
     let autoQuizMode = localStorage.getItem('amaes_auto_quiz_mode') === 'true'; // default false (Master autonomous switch)
-    let quizPersonality = 'passive'; // Default safe Co-Pilot
     let autoPickQuiz = localStorage.getItem('amaes_auto_pick_quiz') !== 'false'; // default true: auto-select verified answers
     let autoNextVerified = localStorage.getItem('amaes_auto_next_verified') !== 'false'; // default true: auto-advance when solver answers verified question
     let autoNextQuiz = localStorage.getItem('amaes_auto_next_quiz') === 'true'; // default false: manual answers do NOT auto-advance by default (safe review)
@@ -1655,7 +1653,6 @@
         localStorage.setItem('amaes_ai_auto_select', 'true');
 
         autoQuizMode = false;
-        quizPersonality = 'passive';
         autoPickQuiz = true;
         autoNextVerified = true;
         autoNextQuiz = false;
@@ -1665,7 +1662,6 @@
         copyIncludeConfidence = true;
         autoScrapeAmauoed = true;
         autoCopyQuizForAI = true;
-        autoCopyKeyword = true;
         autoCloudSync = true;
         autoHarvestGrades = true;
         showInQuestionAiBtns = true;
@@ -7103,16 +7099,18 @@
                         };
                     });
 
-                    // 4. Active Toolkit Settings & Preferences
+                    // 4. Active Toolkit Settings & Preferences (Real live settings)
                     settings = {
                         autoQuizMode: typeof autoQuizMode !== 'undefined' ? autoQuizMode : false,
-                        quizPersonality: typeof quizPersonality !== 'undefined' ? quizPersonality : 'careful',
-                        autoNextQuiz: typeof autoNextQuiz !== 'undefined' ? autoNextQuiz : true,
-                        autoDelay: typeof autoDelaySeconds !== 'undefined' ? `${autoDelaySeconds}s` : '3s',
-                        highlightOnly: localStorage.getItem('amaes_highlight_only') === 'true',
-                        cloudSync: localStorage.getItem('amaes_auto_cloud_sync') !== 'false',
-                        aiAssisted: localStorage.getItem('amaes_ai_assisted') === 'true',
+                        autoPickQuiz: typeof autoPickQuiz !== 'undefined' ? autoPickQuiz : true,
+                        autoNextVerified: typeof autoNextVerified !== 'undefined' ? autoNextVerified : true,
+                        autoNextQuiz: typeof autoNextQuiz !== 'undefined' ? autoNextQuiz : false,
+                        autoHighlightQuiz: typeof autoHighlightQuiz !== 'undefined' ? autoHighlightQuiz : true,
+                        smartSkipQuiz: typeof smartSkipQuiz !== 'undefined' ? smartSkipQuiz : false,
+                        aiQuizEnabled: typeof aiQuizEnabled !== 'undefined' ? aiQuizEnabled : false,
+                        aiAutoSelect: typeof aiAutoSelect !== 'undefined' ? aiAutoSelect : false,
                         hasGeminiKey: !!localStorage.getItem('amaes_gemini_api_key'),
+                        cloudSync: localStorage.getItem('amaes_auto_cloud_sync') !== 'false',
                         cachedAnswersCount: (typeof getCachedAnswers === 'function' && activeSubCode) ? (getCachedAnswers(activeSubCode) || []).length : 0,
                         unknownTypesCount: (typeof getUnknownQuestionTypes === 'function') ? getUnknownQuestionTypes().length : 0
                     };
@@ -15404,7 +15402,7 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
                     `User Agent: ${userAgent}`,
                     `Platform: ${platform}`,
                     `Screen: ${screenSize}`,
-                    `Active Mode: ${autoQuizMode ? 'Auto-Quiz' : 'Passive'} (Personality: ${quizPersonality})`,
+                    `Active Mode: ${autoQuizMode ? 'Auto-Quiz' : 'Passive'} | Auto-Pick: ${autoPickQuiz} | Smart-Next: ${autoNextVerified}`,
                     `Cloud Sync: ${localStorage.getItem('amaes_auto_cloud_sync') !== 'false'}`,
                     `Cached DB Questions: ${cachedCount}`,
                     `Recorded Unknown Question Types: ${unknownTypes.length}`,
