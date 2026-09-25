@@ -4644,6 +4644,10 @@ test("Reinstall Toolkit Button & Auto-Refresh Lifecycle: provides 1-click reinst
     assert.ok(script.includes("localStorage.setItem('amaes_pending_reinstall', '1')"), "Must track pending reinstall in localStorage");
     assert.ok(script.includes("sessionStorage.setItem('amaes_reinstall_confirmed', '1')"), "Must set reinstall confirmed flag before reload");
     assert.ok(script.includes("Toolkit successfully reinstalled"), "Must display success message after reload from reinstall");
+
+    // 3. Uninstalled update retry recovery: if reload happens without actual installation, reset pending and restore Update Now button
+    assert.ok(script.includes("sessionStorage.getItem('amaes_update_attempted_reload')"), "Must track attempted reload for update");
+    assert.ok(script.includes("was not installed yet. Click Update Now to try again"), "Must alert student and restore Update Now if installation was skipped");
 });
 
 console.log("\n==================================================");

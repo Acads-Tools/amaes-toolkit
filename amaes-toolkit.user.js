@@ -412,6 +412,7 @@
         setTimeout(() => {
             const pending = localStorage.getItem('amaes_pending_update_install');
             if (pending && isNewerVersion(pending, SCRIPT_VERSION) && document.visibilityState === 'visible') {
+                sessionStorage.setItem('amaes_update_attempted_reload', '1');
                 showToast(`Update v${ver} detected! Refreshing page to apply...`, 2000);
                 setTimeout(() => {
                     window.location.reload();
@@ -552,6 +553,7 @@
                 localStorage.removeItem('amaes_pending_update_install');
                 localStorage.removeItem('amaes_pending_update_time');
                 localStorage.removeItem('amaes_update_in_progress');
+                sessionStorage.removeItem('amaes_update_attempted_reload');
 
                 const cachedLatest = localStorage.getItem('amaes_latest_version_seen');
                 if (cachedLatest && !isNewerVersion(cachedLatest, SCRIPT_VERSION)) {
@@ -562,6 +564,22 @@
                     showToast(`Toolkit successfully updated to ${SCRIPT_VERSION}!`, 5000);
                     setLog(`Toolkit successfully updated to <b>${SCRIPT_VERSION}</b>. All features active.`, "var(--accent-green)");
                 }, 600);
+            } else if (pending && isNewerVersion(pending, SCRIPT_VERSION)) {
+                const reloadAttempted = sessionStorage.getItem('amaes_update_attempted_reload');
+                const updateTime = Number(localStorage.getItem('amaes_pending_update_time') || 0);
+                const expired = updateTime && (Date.now() - updateTime > 90000);
+
+                if (reloadAttempted || expired) {
+                    sessionStorage.removeItem('amaes_update_attempted_reload');
+                    localStorage.removeItem('amaes_pending_update_install');
+                    localStorage.removeItem('amaes_pending_update_time');
+                    localStorage.removeItem('amaes_update_in_progress');
+                    if (reloadAttempted) {
+                        setTimeout(() => {
+                            showToast(`Update v${pending} was not installed yet. Click Update Now to try again.`, 5000);
+                        }, 600);
+                    }
+                }
             } else if (lastSeen && isNewerVersion(SCRIPT_VERSION, lastSeen)) {
                 const cachedLatest = localStorage.getItem('amaes_latest_version_seen');
                 if (cachedLatest && !isNewerVersion(cachedLatest, SCRIPT_VERSION)) {
@@ -640,6 +658,7 @@
                 // Auto-refresh when student returns from confirming in Violentmonkey / script manager
                 if (elapsed >= 1000) {
                     isReloading = true;
+                    sessionStorage.setItem('amaes_update_attempted_reload', '1');
                     showToast(`Update detected! Refreshing page to apply v${pending}...`, 2500);
                     setTimeout(() => {
                         window.location.reload();
@@ -687,7 +706,10 @@
                 versionPill.title = `Update ${targetPending} is waiting for confirmation in Violentmonkey`;
                 versionPill.style.borderColor = '#f59e0b';
                 versionPill.style.color = '#f59e0b';
-                versionPill.onclick = () => window.location.reload();
+                versionPill.onclick = () => {
+                    sessionStorage.setItem('amaes_update_attempted_reload', '1');
+                    window.location.reload();
+                };
             } else {
                 versionPill.innerHTML = `${SCRIPT_VERSION} <span style="display: inline-flex; align-items: center; background: #10b981; color: #fff; padding: 0 4px; border-radius: 3px; font-size: 8px; margin-left: 2px; font-weight: 800; letter-spacing: 0; white-space: nowrap;">→ ${targetVer}</span>`;
                 versionPill.title = `Update available: ${targetVer}. Click to install`;
@@ -731,7 +753,10 @@
                 `;
                 const bEl = document.getElementById('amaes-update-banner');
                 if (bEl) {
-                    bEl.onclick = () => window.location.reload();
+                    bEl.onclick = () => {
+                        sessionStorage.setItem('amaes_update_attempted_reload', '1');
+                        window.location.reload();
+                    };
                 }
             } else {
                 container.innerHTML = `
