@@ -6416,7 +6416,7 @@
         const clone = rootNode.cloneNode(true);
 
         // Strip non-content scripts, toolkit buttons, injected UI badges & Moodle feedback icons/accessibility text
-        clone.querySelectorAll('script, style, noscript, .amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-card-btn-container, .amaes-copy-ai-card-btn, .amaes-ask-ai-card-btn, .amaes-copy-img-card-btn, .amaes-paste-ai-card-btn, .amaes-web-ai-row, .amaes-web-ai-pill, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-thinking-indicator, .amaes-ai-fallback-bar, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, .accesshide, .sr-only').forEach(el => el.remove());
+        clone.querySelectorAll('script, style, noscript, .amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-card-btn-container, .amaes-copy-ai-card-btn, .amaes-ask-ai-card-btn, .amaes-copy-img-card-btn, .amaes-paste-ai-card-btn, .amaes-web-ai-container, .amaes-web-ai-btn, .amaes-web-ai-menu, .amaes-web-ai-item, .amaes-web-ai-row, .amaes-web-ai-pill, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-thinking-indicator, .amaes-ai-fallback-bar, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, .accesshide, .sr-only').forEach(el => el.remove());
 
         // Convert Superscripts (e.g. 2^3 -> 2³, x^2 -> x², or ^{complex})
         clone.querySelectorAll('sup').forEach(sup => {
@@ -7771,48 +7771,59 @@
                 };
                 btnContainer.appendChild(btnAskAi);
 
-                // 1d. Multi-Web AI Launchers Row (ChatGPT, Perplexity, Gemini)
-                const webAiRow = document.createElement('div');
-                webAiRow.className = 'amaes-web-ai-row';
-                webAiRow.title = 'Send question directly to Web AI';
+                // 1d. Multi-Web AI Launcher Dropdown (Phone & Mobile Friendly - No Truncation)
+                const webAiContainer = document.createElement('div');
+                webAiContainer.className = 'amaes-web-ai-container';
+                webAiContainer.title = 'Send question directly to Web AI';
 
-                const btnGpt = document.createElement('button');
-                btnGpt.type = 'button';
-                btnGpt.className = 'amaes-web-ai-pill amaes-pill-chatgpt';
-                btnGpt.title = 'Ask ChatGPT (Opens ChatGPT with question pre-filled)';
-                btnGpt.textContent = 'ChatGPT';
-                btnGpt.onclick = (e) => {
+                const btnWebAi = document.createElement('button');
+                btnWebAi.type = 'button';
+                btnWebAi.className = 'amaes-copy-ai-card-btn amaes-web-ai-btn';
+                btnWebAi.title = 'Open question in external AI (ChatGPT, Perplexity, Gemini)';
+                btnWebAi.innerHTML = `<span>🌐 Web AI ▾</span>`;
+
+                const menu = document.createElement('div');
+                menu.className = 'amaes-web-ai-menu';
+                menu.style.display = 'none';
+
+                menu.innerHTML = `
+                    <button type="button" class="amaes-web-ai-item amaes-pill-chatgpt" title="Opens ChatGPT with question pre-filled">
+                        <span class="amaes-ai-icon">💬</span>
+                        <span class="amaes-ai-label">ChatGPT <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Auto-fill)</small></span>
+                    </button>
+                    <button type="button" class="amaes-web-ai-item amaes-pill-perplexity" title="Searches question in Perplexity">
+                        <span class="amaes-ai-icon">⚡</span>
+                        <span class="amaes-ai-label">Perplexity <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Auto-search)</small></span>
+                    </button>
+                    <button type="button" class="amaes-web-ai-item amaes-pill-gemini" title="Copies prompt and opens Google Gemini">
+                        <span class="amaes-ai-icon">✦</span>
+                        <span class="amaes-ai-label">Google Gemini <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Copy & Go)</small></span>
+                    </button>
+                `;
+
+                btnWebAi.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    openExternalAi('chatgpt', que);
+                    document.querySelectorAll('.amaes-web-ai-menu').forEach(m => {
+                        if (m !== menu) m.style.display = 'none';
+                    });
+                    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
                 };
 
-                const btnPerp = document.createElement('button');
-                btnPerp.type = 'button';
-                btnPerp.className = 'amaes-web-ai-pill amaes-pill-perplexity';
-                btnPerp.title = 'Ask Perplexity (Opens Perplexity with question pre-filled)';
-                btnPerp.textContent = 'Perplexity';
-                btnPerp.onclick = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openExternalAi('perplexity', que);
-                };
+                menu.querySelectorAll('.amaes-web-ai-item').forEach(item => {
+                    item.onclick = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        menu.style.display = 'none';
+                        if (item.classList.contains('amaes-pill-chatgpt')) openExternalAi('chatgpt', que);
+                        else if (item.classList.contains('amaes-pill-perplexity')) openExternalAi('perplexity', que);
+                        else if (item.classList.contains('amaes-pill-gemini')) openExternalAi('gemini', que);
+                    };
+                });
 
-                const btnGem = document.createElement('button');
-                btnGem.type = 'button';
-                btnGem.className = 'amaes-web-ai-pill amaes-pill-gemini';
-                btnGem.title = 'Ask Google Gemini (Copies prompt & opens Gemini tab)';
-                btnGem.textContent = 'Gemini';
-                btnGem.onclick = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openExternalAi('gemini', que);
-                };
-
-                webAiRow.appendChild(btnGpt);
-                webAiRow.appendChild(btnPerp);
-                webAiRow.appendChild(btnGem);
-                btnContainer.appendChild(webAiRow);
+                webAiContainer.appendChild(btnWebAi);
+                webAiContainer.appendChild(menu);
+                btnContainer.appendChild(webAiContainer);
             }
 
             // 2. Copy Image Button (if question has diagram/circuits)
@@ -7883,6 +7894,16 @@
         // Initialize active focus on first page load
         if (!userSelectedActiveQuestion && queElements.length > 0) {
             getActiveViewportQuestion();
+        }
+
+        // Auto-dismiss Web AI dropdown on click/tap outside
+        if (!window.__amaesWebAiMenuBound) {
+            window.__amaesWebAiMenuBound = true;
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.amaes-web-ai-container')) {
+                    document.querySelectorAll('.amaes-web-ai-menu').forEach(m => { m.style.display = 'none'; });
+                }
+            });
         }
     }
 
@@ -13783,55 +13804,100 @@
                     flex-shrink: 0 !important;
                 }
 
-                .amaes-web-ai-row {
-                    display: flex !important;
-                    gap: 3px !important;
+                .amaes-web-ai-container {
+                    position: relative !important;
                     width: 100% !important;
                     box-sizing: border-box !important;
                     margin-top: 3px !important;
                 }
 
-                .amaes-web-ai-pill {
-                    flex: 1 !important;
-                    min-width: 0 !important;
-                    padding: 3px 2px !important;
-                    font-size: 8.5px !important;
-                    font-weight: 700 !important;
-                    border-radius: 4px !important;
+                .amaes-web-ai-btn {
+                    background: #f0fdf4 !important;
+                    color: #15803d !important;
+                    border: 1px solid #bbf7d0 !important;
+                    margin-top: 0 !important;
+                }
+
+                .amaes-web-ai-btn:hover {
+                    background: #dcfce7 !important;
+                    border-color: #86efac !important;
+                    color: #166534 !important;
+                }
+
+                .amaes-web-ai-menu {
+                    position: absolute !important;
+                    top: calc(100% + 4px) !important;
+                    left: 0 !important;
+                    z-index: 99999 !important;
+                    width: max-content !important;
+                    min-width: 180px !important;
+                    max-width: min(240px, 92vw) !important;
+                    background: #ffffff !important;
                     border: 1px solid #cbd5e1 !important;
-                    background: #f8fafc !important;
-                    color: #475569 !important;
-                    cursor: pointer !important;
-                    text-align: center !important;
-                    transition: all 0.15s ease !important;
-                    white-space: nowrap !important;
-                    overflow: hidden !important;
-                    text-overflow: ellipsis !important;
-                    user-select: none !important;
+                    border-radius: 8px !important;
+                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+                    padding: 5px !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    gap: 3px !important;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
                     box-sizing: border-box !important;
                 }
 
-                .amaes-web-ai-pill:hover {
-                    transform: translateY(-1px) !important;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+                .amaes-web-ai-item {
+                    display: flex !important;
+                    align-items: center !important;
+                    gap: 8px !important;
+                    width: 100% !important;
+                    min-height: 34px !important;
+                    padding: 6px 10px !important;
+                    border-radius: 6px !important;
+                    border: 1px solid transparent !important;
+                    background: transparent !important;
+                    color: #1e293b !important;
+                    font-size: 11px !important;
+                    font-weight: 600 !important;
+                    cursor: pointer !important;
+                    text-align: left !important;
+                    transition: all 0.15s ease !important;
+                    box-sizing: border-box !important;
+                    touch-action: manipulation !important;
                 }
 
-                .amaes-pill-chatgpt:hover {
+                .amaes-web-ai-item:hover,
+                .amaes-web-ai-item:active {
+                    background: #f1f5f9 !important;
+                }
+
+                .amaes-web-ai-item.amaes-pill-chatgpt:hover,
+                .amaes-web-ai-item.amaes-pill-chatgpt:active {
                     background: #ecfdf5 !important;
                     color: #065f46 !important;
-                    border-color: #10b981 !important;
+                    border-color: #a7f3d0 !important;
                 }
 
-                .amaes-pill-perplexity:hover {
+                .amaes-web-ai-item.amaes-pill-perplexity:hover,
+                .amaes-web-ai-item.amaes-pill-perplexity:active {
                     background: #f0fdfa !important;
                     color: #115e59 !important;
-                    border-color: #14b8a6 !important;
+                    border-color: #99f6e4 !important;
                 }
 
-                .amaes-pill-gemini:hover {
+                .amaes-web-ai-item.amaes-pill-gemini:hover,
+                .amaes-web-ai-item.amaes-pill-gemini:active {
                     background: #faf5ff !important;
                     color: #7e22ce !important;
-                    border-color: #a855f7 !important;
+                    border-color: #e9d5ff !important;
+                }
+
+                .amaes-web-ai-item .amaes-ai-icon {
+                    font-size: 13px !important;
+                    flex-shrink: 0 !important;
+                }
+
+                .amaes-web-ai-item .amaes-ai-label {
+                    flex: 1 !important;
+                    white-space: nowrap !important;
                 }
 
                 /* Active / Focused Question Card Highlight */

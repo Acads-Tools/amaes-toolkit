@@ -888,55 +888,100 @@
                     flex-shrink: 0 !important;
                 }
 
-                .amaes-web-ai-row {
-                    display: flex !important;
-                    gap: 3px !important;
+                .amaes-web-ai-container {
+                    position: relative !important;
                     width: 100% !important;
                     box-sizing: border-box !important;
                     margin-top: 3px !important;
                 }
 
-                .amaes-web-ai-pill {
-                    flex: 1 !important;
-                    min-width: 0 !important;
-                    padding: 3px 2px !important;
-                    font-size: 8.5px !important;
-                    font-weight: 700 !important;
-                    border-radius: 4px !important;
+                .amaes-web-ai-btn {
+                    background: #f0fdf4 !important;
+                    color: #15803d !important;
+                    border: 1px solid #bbf7d0 !important;
+                    margin-top: 0 !important;
+                }
+
+                .amaes-web-ai-btn:hover {
+                    background: #dcfce7 !important;
+                    border-color: #86efac !important;
+                    color: #166534 !important;
+                }
+
+                .amaes-web-ai-menu {
+                    position: absolute !important;
+                    top: calc(100% + 4px) !important;
+                    left: 0 !important;
+                    z-index: 99999 !important;
+                    width: max-content !important;
+                    min-width: 180px !important;
+                    max-width: min(240px, 92vw) !important;
+                    background: #ffffff !important;
                     border: 1px solid #cbd5e1 !important;
-                    background: #f8fafc !important;
-                    color: #475569 !important;
-                    cursor: pointer !important;
-                    text-align: center !important;
-                    transition: all 0.15s ease !important;
-                    white-space: nowrap !important;
-                    overflow: hidden !important;
-                    text-overflow: ellipsis !important;
-                    user-select: none !important;
+                    border-radius: 8px !important;
+                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+                    padding: 5px !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    gap: 3px !important;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
                     box-sizing: border-box !important;
                 }
 
-                .amaes-web-ai-pill:hover {
-                    transform: translateY(-1px) !important;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+                .amaes-web-ai-item {
+                    display: flex !important;
+                    align-items: center !important;
+                    gap: 8px !important;
+                    width: 100% !important;
+                    min-height: 34px !important;
+                    padding: 6px 10px !important;
+                    border-radius: 6px !important;
+                    border: 1px solid transparent !important;
+                    background: transparent !important;
+                    color: #1e293b !important;
+                    font-size: 11px !important;
+                    font-weight: 600 !important;
+                    cursor: pointer !important;
+                    text-align: left !important;
+                    transition: all 0.15s ease !important;
+                    box-sizing: border-box !important;
+                    touch-action: manipulation !important;
                 }
 
-                .amaes-pill-chatgpt:hover {
+                .amaes-web-ai-item:hover,
+                .amaes-web-ai-item:active {
+                    background: #f1f5f9 !important;
+                }
+
+                .amaes-web-ai-item.amaes-pill-chatgpt:hover,
+                .amaes-web-ai-item.amaes-pill-chatgpt:active {
                     background: #ecfdf5 !important;
                     color: #065f46 !important;
-                    border-color: #10b981 !important;
+                    border-color: #a7f3d0 !important;
                 }
 
-                .amaes-pill-perplexity:hover {
+                .amaes-web-ai-item.amaes-pill-perplexity:hover,
+                .amaes-web-ai-item.amaes-pill-perplexity:active {
                     background: #f0fdfa !important;
                     color: #115e59 !important;
-                    border-color: #14b8a6 !important;
+                    border-color: #99f6e4 !important;
                 }
 
-                .amaes-pill-gemini:hover {
+                .amaes-web-ai-item.amaes-pill-gemini:hover,
+                .amaes-web-ai-item.amaes-pill-gemini:active {
                     background: #faf5ff !important;
                     color: #7e22ce !important;
-                    border-color: #a855f7 !important;
+                    border-color: #e9d5ff !important;
+                }
+
+                .amaes-web-ai-item .amaes-ai-icon {
+                    font-size: 13px !important;
+                    flex-shrink: 0 !important;
+                }
+
+                .amaes-web-ai-item .amaes-ai-label {
+                    flex: 1 !important;
+                    white-space: nowrap !important;
                 }
 
                 /* Active / Focused Question Card Highlight */

@@ -409,48 +409,59 @@
                 };
                 btnContainer.appendChild(btnAskAi);
 
-                // 1d. Multi-Web AI Launchers Row (ChatGPT, Perplexity, Gemini)
-                const webAiRow = document.createElement('div');
-                webAiRow.className = 'amaes-web-ai-row';
-                webAiRow.title = 'Send question directly to Web AI';
+                // 1d. Multi-Web AI Launcher Dropdown (Phone & Mobile Friendly - No Truncation)
+                const webAiContainer = document.createElement('div');
+                webAiContainer.className = 'amaes-web-ai-container';
+                webAiContainer.title = 'Send question directly to Web AI';
 
-                const btnGpt = document.createElement('button');
-                btnGpt.type = 'button';
-                btnGpt.className = 'amaes-web-ai-pill amaes-pill-chatgpt';
-                btnGpt.title = 'Ask ChatGPT (Opens ChatGPT with question pre-filled)';
-                btnGpt.textContent = 'ChatGPT';
-                btnGpt.onclick = (e) => {
+                const btnWebAi = document.createElement('button');
+                btnWebAi.type = 'button';
+                btnWebAi.className = 'amaes-copy-ai-card-btn amaes-web-ai-btn';
+                btnWebAi.title = 'Open question in external AI (ChatGPT, Perplexity, Gemini)';
+                btnWebAi.innerHTML = `<span>🌐 Web AI ▾</span>`;
+
+                const menu = document.createElement('div');
+                menu.className = 'amaes-web-ai-menu';
+                menu.style.display = 'none';
+
+                menu.innerHTML = `
+                    <button type="button" class="amaes-web-ai-item amaes-pill-chatgpt" title="Opens ChatGPT with question pre-filled">
+                        <span class="amaes-ai-icon">💬</span>
+                        <span class="amaes-ai-label">ChatGPT <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Auto-fill)</small></span>
+                    </button>
+                    <button type="button" class="amaes-web-ai-item amaes-pill-perplexity" title="Searches question in Perplexity">
+                        <span class="amaes-ai-icon">⚡</span>
+                        <span class="amaes-ai-label">Perplexity <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Auto-search)</small></span>
+                    </button>
+                    <button type="button" class="amaes-web-ai-item amaes-pill-gemini" title="Copies prompt and opens Google Gemini">
+                        <span class="amaes-ai-icon">✦</span>
+                        <span class="amaes-ai-label">Google Gemini <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Copy & Go)</small></span>
+                    </button>
+                `;
+
+                btnWebAi.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    openExternalAi('chatgpt', que);
+                    document.querySelectorAll('.amaes-web-ai-menu').forEach(m => {
+                        if (m !== menu) m.style.display = 'none';
+                    });
+                    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
                 };
 
-                const btnPerp = document.createElement('button');
-                btnPerp.type = 'button';
-                btnPerp.className = 'amaes-web-ai-pill amaes-pill-perplexity';
-                btnPerp.title = 'Ask Perplexity (Opens Perplexity with question pre-filled)';
-                btnPerp.textContent = 'Perplexity';
-                btnPerp.onclick = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openExternalAi('perplexity', que);
-                };
+                menu.querySelectorAll('.amaes-web-ai-item').forEach(item => {
+                    item.onclick = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        menu.style.display = 'none';
+                        if (item.classList.contains('amaes-pill-chatgpt')) openExternalAi('chatgpt', que);
+                        else if (item.classList.contains('amaes-pill-perplexity')) openExternalAi('perplexity', que);
+                        else if (item.classList.contains('amaes-pill-gemini')) openExternalAi('gemini', que);
+                    };
+                });
 
-                const btnGem = document.createElement('button');
-                btnGem.type = 'button';
-                btnGem.className = 'amaes-web-ai-pill amaes-pill-gemini';
-                btnGem.title = 'Ask Google Gemini (Copies prompt & opens Gemini tab)';
-                btnGem.textContent = 'Gemini';
-                btnGem.onclick = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openExternalAi('gemini', que);
-                };
-
-                webAiRow.appendChild(btnGpt);
-                webAiRow.appendChild(btnPerp);
-                webAiRow.appendChild(btnGem);
-                btnContainer.appendChild(webAiRow);
+                webAiContainer.appendChild(btnWebAi);
+                webAiContainer.appendChild(menu);
+                btnContainer.appendChild(webAiContainer);
             }
 
             // 2. Copy Image Button (if question has diagram/circuits)
@@ -521,6 +532,16 @@
         // Initialize active focus on first page load
         if (!userSelectedActiveQuestion && queElements.length > 0) {
             getActiveViewportQuestion();
+        }
+
+        // Auto-dismiss Web AI dropdown on click/tap outside
+        if (!window.__amaesWebAiMenuBound) {
+            window.__amaesWebAiMenuBound = true;
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.amaes-web-ai-container')) {
+                    document.querySelectorAll('.amaes-web-ai-menu').forEach(m => { m.style.display = 'none'; });
+                }
+            });
         }
     }
 
