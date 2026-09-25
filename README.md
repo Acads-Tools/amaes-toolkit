@@ -30,14 +30,33 @@
 ---
 
 ## Table of Contents
+* [Prerequisites & Supported Environment](#prerequisites--supported-environment)
 * [Key Features](#features)
-* [Multi-Course Grades Harvester (Batch Scanner)](#multi-course-grades-harvester-batch-scanner)
+* [Usage & Features Deep-Dive](#usage--features-deep-dive)
+  * [4-Tier Answer Intelligence](#4-tier-answer-intelligence)
+  * [Multi-Course Grades Harvester](#multi-course-grades-harvester-batch-scanner)
+  * [Autonomous Solver vs Companion Mode](#autonomous-solver-vs-companion-mode)
 * [Installation & Setup](#installation--setup)
 * [Keyboard Shortcuts](#keyboard-shortcuts)
 * [Developer & Contributing Guide](#developer--contributing-guide)
 * [Zero Telemetry & Privacy Architecture](#zero-telemetry--privacy-architecture)
 * [Frequently Asked Questions](#frequently-asked-questions)
 * [Academic Integrity & Liability Disclaimer](#academic-integrity--liability-disclaimer)
+
+---
+
+<a id="prerequisites--supported-environment"></a>
+
+## Prerequisites & Supported Environment
+
+Before installing, ensure your environment meets the following specifications:
+
+| Requirement | Supported Specifications | Notes |
+| :--- | :--- | :--- |
+| **Supported Browsers** | Google Chrome (v110+), Brave, Microsoft Edge, Mozilla Firefox, Opera | Chromium browsers require "Developer mode" enabled in extensions. |
+| **Userscript Manager** | **[Violentmonkey](https://violentmonkey.github.io/)** (Strongly Recommended) or Tampermonkey | Violentmonkey provides the cleanest User Scripts API compatibility. |
+| **Target Moodle Portal** | `https://semestral.amaes.com/*` | Supports root domains and specific term subpaths (e.g., `/2612/`). |
+| **Network Access** | Unrestricted access to `semestral.amaes.com` and GitHub raw content | Institutional firewall restrictions may block userscript auto-updates. |
 
 ---
 
@@ -86,22 +105,46 @@
 
 ---
 
-## Multi-Course Grades Harvester (Batch Scanner)
+<a id="usage--features-deep-dive"></a>
 
-The Grades Harvester allows you to quickly build an answer library for all your current subjects by scanning past graded quizzes in seconds.
+## Usage & Features Deep-Dive
 
-### How it Works
-1. When you complete a quiz, Moodle provides a review screen with full marks and checkmarks showing exactly which answers were correct.
-2. Rather than visiting every quiz individually, the Harvester accesses Moodle's built-in User Grade Report (`/grade/report/user/index.php`).
-3. It parses all finished quizzes that scored 100% or full marks on specific questions, extracts the verified ground truth, and stores them in your browser's offline `localStorage`.
+### 4-Tier Answer Intelligence
+The toolkit evaluates every question through a 4-tier verification hierarchy to maximize accuracy and safety:
 
-### How to Trigger
-* **Automatic Mode (Default):** Whenever you navigate to your Moodle Dashboard (`/my/`) or open a course homepage, the Harvester runs quietly once per session in the background.
-* **Manual Trigger:**
-  1. Open the toolkit sidebar by clicking the floating icon in the bottom-right corner.
-  2. Navigate to the **Database** tab.
-  3. Click **Sync & Scan Past Quizzes**.
-  4. The status log will show the number of newly discovered verified answers cataloged into your library.
+```mermaid
+flowchart TD
+    Q["Quiz Question Detected"] --> T1{"Tier 1: Local Review Key"}
+    T1 -- Found Full Mark Ground Truth --> V1["Highlight Green Verified<br>(Confidence: 100%)"]
+    T1 -- Not in Local Cache --> T2{"Tier 2: Community Consensus Bank"}
+    T2 -- Found in Cloud Database --> V2["Highlight Blue Verified<br>(Confidence: 95%+)"]
+    T2 -- Not in Community DB --> T3{"Tier 3: Online Study Scraper (AMAUOED)"}
+    T3 -- Found in Web Guide --> V3["Highlight Amber Warning<br>(Scraped from Student Guide)"]
+    T3 -- No Online Match --> T4{"Tier 4: Google Gemini AI"}
+    T4 -- AI Key Configured --> V4["Highlight Purple AI Suggestion<br>(or Auto-Pick if Enabled)"]
+    T4 -- AI Disabled / Failed --> S["Safety Gate: Pause for Manual Review<br>(Press C to Copy for AI)"]
+```
+
+1. **Tier 1 (Local Verified Review Key - 100% Ground Truth):** Scraped directly from your own graded quizzes scoring 1.00/1.00. Marked with a green checkmark pill.
+2. **Tier 2 (Community Verified Consensus Bank):** Merged from anonymous peer review keys via [`Acads-Tools/database`](https://github.com/Acads-Tools/database).
+3. **Tier 3 (Online Study Guide Scraper - AMAUOED):** Scrapes student study guides when the local library has no match. Marked with an amber warning badge.
+4. **Tier 4 (Google Gemini AI Engine):** Solves remaining Multiple Choice or True/False questions on-the-fly. Marked with an `AI Suggestion` purple pill.
+
+### Multi-Course Grades Harvester (Batch Scanner)
+The Grades Harvester allows you to quickly build an answer library for all your enrolled subjects by scanning past graded quizzes in seconds.
+
+* **How it Works:** Rather than manually opening every quiz, the Harvester visits Moodle's User Grade Report (`/grade/report/user/index.php`), inspects all completed attempts that scored full marks, and saves confirmed answers into your offline `localStorage`.
+* **How to Trigger:**
+  * **Automatic:** Runs silently once per session when viewing your Moodle Dashboard (`/my/`) or course homepages.
+  * **Manual Trigger:** Open the toolkit panel > **Database** tab > click **Sync & Scan Past Quizzes**.
+
+### Autonomous Solver vs Companion Mode
+The toolkit offers two distinct operational modes depending on your preference:
+
+* **Companion Mode (Default):** Highlights verified choices visually on screen but **never clicks or advances automatically**. You retain 100% control of every choice and button click.
+* **Autonomous Auto-Quiz Solver:** Selects verified answers and clicks "Next page" automatically.
+  * **How to Enable:** In the **Quiz** tab, toggle **Auto-Quiz Mode: ON** (or press keyboard shortcut `P`).
+  * **Safety Gate:** If a question has no confirmed answer, the solver pauses automatically, brings up the in-question toolbar, and sounds an intervention chime.
 
 ---
 
@@ -168,8 +211,15 @@ Shared AI fallback is enabled by default in the setup window. If Google temporar
 
 Contributions, bug reports, and pull requests from students and developers are warmly welcomed.
 
+### Technology Stack
+* **Core Language:** Vanilla JavaScript (ES2022+ / Standard DOM APIs).
+* **Architecture:** Modular component architecture in `src/` with zero runtime dependencies.
+* **Styling & UI:** Pure CSS3 Variables, CSS Grid / Flexbox, SVG Vector Icons.
+* **Serverless Relay:** Cloudflare Workers, Cloudflare D1 SQL database.
+* **Automated Testing:** Node.js VM test harness (`tests/test_toolkit.js`, 143 test cases).
+
 ### Reporting Bugs & Feature Requests
-* **In-App 1-Click Bug Reporter:** While on Moodle, click the **Bug icon** (`#amaes-bug-btn`) in the toolkit header. You can describe the issue, inspect attached diagnostic logs (sanitized of all personal data), and submit directly to create a tracking issue.
+* **In-App 1-Click Bug Reporter:** While on Moodle, click the **Bug icon** (`#amaes-bug-btn`) in the toolkit header. Describe the issue, review attached sanitized logs, and submit directly to create a tracking issue.
 * **GitHub Issues:** Open an issue via the [GitHub Issue Tracker](https://github.com/Acads-Tools/amaes-toolkit/issues).
 
 ### Modular Source Architecture & Building from Source
@@ -188,7 +238,7 @@ src/
 └── dev/                 # Diagnostics log exporter & secret developer console
 ```
 
-#### Build Commands
+#### Build & Test Commands
 Prerequisites: Node.js 18+.
 
 ```bash
@@ -266,9 +316,9 @@ Recent versions of Chromium (Google Chrome and Brave) require users to enable "D
 > ### Important Institutional & Academic Integrity Notice
 > AMAES Toolkit is developed and distributed solely as an assistive study companion, accessibility aid, and personal revision question repository.
 > 
-> * **Educational Purpose Only:** This tool is intended for self-testing, concept review, and studying. It is not intended to circumvent legitimate academic assessments or institutional evaluation.
-> * **Institutional Compliance:** Users are solely responsible for ensuring that their use of this software complies with their school's Student Handbook, Academic Honesty Policies, assessment instructions, and Moodle Terms of Service.
-> * **No Liability:** The authors, contributors, and maintainers accept **zero liability** for any academic sanctions, disciplinary actions, grade invalidations, account suspensions, or administrative penalties resulting from the use or misuse of this tool.
+> * **The tool is provided "as is" for educational and accessibility purposes.** It is intended for concept revision, self-testing, and assistive navigation.
+> * **The authors and contributors are not responsible for any academic penalties, account suspensions, or violations of institutional Terms of Service.** Users are solely responsible for ensuring that their use complies with their school's Student Handbook, Academic Honesty Policies, assessment guidelines, and Moodle portal rules.
+> * **Users assume all risks associated with deploying automated scripts on institutional platforms.** The authors accept zero liability for any grade invalidations, academic sanctions, or disciplinary actions.
 > * **No Institutional Affiliation:** AMAES Toolkit is an independent, unofficial open-source project. It is **not affiliated with, endorsed by, sponsored by, or operated by** AMA Education System (AMAES), AMA University, Moodle Pty Ltd, Violentmonkey, Tampermonkey, or any browser vendor.
 > 
 > The software is provided **"AS IS" and "AS AVAILABLE"** under the [MIT License](LICENSE), without warranty of any kind, express or implied. By installing or using this software, you assume all responsibility and risk associated with its use. Review the complete [Terms of Use](docs/TERMS.md) before installing.
