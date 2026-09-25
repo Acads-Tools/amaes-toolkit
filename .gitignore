@@ -17,3 +17,7 @@ npm-debug.log
 .env
 .wrangler/
 .dev.vars
+
+# Ephemeral build artifacts generated into public/ for Pages deployment
+public/assets/
+public/amaes-toolkit.user.js

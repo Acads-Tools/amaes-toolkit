@@ -17,7 +17,7 @@
   <a href=".github/workflows/privacy-check.yml"><img src="https://img.shields.io/badge/privacy--audit-passing-brightgreen.svg" alt="Privacy Check Passed"></a>
 </p>
 
-> **Compatibility Notice:** Version **1.8.0** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
+> **Compatibility Notice:** Version **1.8.0** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](docs/CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
 
 ---
 
@@ -271,8 +271,8 @@ Recent versions of Chromium (Google Chrome and Brave) require users to enable "D
 > * **No Liability:** The authors, contributors, and maintainers accept **zero liability** for any academic sanctions, disciplinary actions, grade invalidations, account suspensions, or administrative penalties resulting from the use or misuse of this tool.
 > * **No Institutional Affiliation:** AMAES Toolkit is an independent, unofficial open-source project. It is **not affiliated with, endorsed by, sponsored by, or operated by** AMA Education System (AMAES), AMA University, Moodle Pty Ltd, Violentmonkey, Tampermonkey, or any browser vendor.
 > 
-> The software is provided **"AS IS" and "AS AVAILABLE"** under the [MIT License](LICENSE), without warranty of any kind, express or implied. By installing or using this software, you assume all responsibility and risk associated with its use. Review the complete [Terms of Use](TERMS.md) before installing.
+> The software is provided **"AS IS" and "AS AVAILABLE"** under the [MIT License](LICENSE), without warranty of any kind, express or implied. By installing or using this software, you assume all responsibility and risk associated with its use. Review the complete [Terms of Use](docs/TERMS.md) before installing.
 
 ---
 
-**Links:** [GitHub Repository](https://github.com/Acads-Tools/amaes-toolkit) • [Quick Install Site](https://acads-tools.github.io/amaes-toolkit/) • [Question Database](https://github.com/Acads-Tools/database) • [Terms of Use](TERMS.md) • [Security Policy](SECURITY.md) • [Greasy Fork](https://greasyfork.org/en/scripts/594744-amaes-toolkit) • [Report a Bug / Request Feature](https://github.com/Acads-Tools/amaes-toolkit/issues)
+**Links:** [GitHub Repository](https://github.com/Acads-Tools/amaes-toolkit) • [Quick Install Site](https://acads-tools.github.io/amaes-toolkit/) • [Question Database](https://github.com/Acads-Tools/database) • [Terms of Use](docs/TERMS.md) • [Security Policy](SECURITY.md) • [Greasy Fork](https://greasyfork.org/en/scripts/594744-amaes-toolkit) • [Report a Bug / Request Feature](https://github.com/Acads-Tools/amaes-toolkit/issues)

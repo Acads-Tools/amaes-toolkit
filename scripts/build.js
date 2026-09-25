@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /**
  * Build Script for AMAES Toolkit
- * Bundles modular src/ components into distribution file: amaes-toolkit.user.js
+ * Bundles modular src/ components into distribution files:
+ *  - amaes-toolkit.user.js (repository root for userscript managers & raw URLs)
+ *  - dist/amaes-toolkit.user.js (compiled artifact directory)
+ *  - public/amaes-toolkit.user.js (installer web portal)
  */
 
 const fs = require('fs');
@@ -10,7 +13,11 @@ const { execSync } = require('child_process');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const SRC_DIR = path.join(ROOT_DIR, 'src');
+const DIST_DIR = path.join(ROOT_DIR, 'dist');
+const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
 const OUTPUT_FILE = path.join(ROOT_DIR, 'amaes-toolkit.user.js');
+const DIST_FILE = path.join(DIST_DIR, 'amaes-toolkit.user.js');
+const PUBLIC_FILE = path.join(PUBLIC_DIR, 'amaes-toolkit.user.js');
 const PARENT_OUTPUT = path.join(ROOT_DIR, '..', 'amaes-toolkit.user.js');
 
 /**
@@ -39,6 +46,9 @@ const BUILD_MANIFEST = [
 
 console.log('Building AMAES Toolkit from src/ modules...');
 
+if (!fs.existsSync(DIST_DIR)) fs.mkdirSync(DIST_DIR, { recursive: true });
+if (!fs.existsSync(PUBLIC_DIR)) fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+
 let bundled = '';
 for (const relPath of BUILD_MANIFEST) {
     const fullPath = path.join(SRC_DIR, relPath);
@@ -51,10 +61,24 @@ for (const relPath of BUILD_MANIFEST) {
     console.log(`  + Bundled ${relPath} (${content.split('\n').length} lines)`);
 }
 
+// Write to distribution targets
 fs.writeFileSync(OUTPUT_FILE, bundled, 'utf8');
-console.log(`\nSuccessfully built: ${OUTPUT_FILE}`);
+fs.writeFileSync(DIST_FILE, bundled, 'utf8');
+fs.writeFileSync(PUBLIC_FILE, bundled, 'utf8');
+
+// Copy assets/ to public/assets for GitHub Pages deployment
+const ASSETS_SRC = path.join(ROOT_DIR, 'assets');
+const ASSETS_DST = path.join(PUBLIC_DIR, 'assets');
+if (fs.existsSync(ASSETS_SRC)) {
+    fs.cpSync(ASSETS_SRC, ASSETS_DST, { recursive: true });
+}
+
+console.log(`\nSuccessfully built:`);
+console.log(`  • Root Distribution:   ${OUTPUT_FILE}`);
+console.log(`  • Compiled Artifact:   ${DIST_FILE}`);
+console.log(`  • Web Deployment:      ${PUBLIC_FILE}`);
 console.log(`Total Lines: ${bundled.split('\n').length}`);
-console.log(`File Size: ${(Buffer.byteLength(bundled, 'utf8') / 1024).toFixed(1)} KB`);
+console.log(`File Size:   ${(Buffer.byteLength(bundled, 'utf8') / 1024).toFixed(1)} KB`);
 
 // Sync to parent workspace if present
 if (fs.existsSync(path.dirname(PARENT_OUTPUT))) {

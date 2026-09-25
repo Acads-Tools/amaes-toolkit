@@ -5,7 +5,7 @@
   "main": "amaes-toolkit.user.js",
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "node scripts/build.js && node test_toolkit.js",
+    "test": "node scripts/build.js && node tests/test_toolkit.js",
     "syntax": "node -c amaes-toolkit.user.js"
   },
   "keywords": [

@@ -3,8 +3,39 @@
  */
 
 const fs = require('fs');
+const path = require('path');
 const assert = require('assert');
 
+const ROOT_DIR = path.resolve(__dirname, '..');
+const originalReadFileSync = fs.readFileSync;
+const originalExistsSync = fs.existsSync;
+
+function resolveToolkitPath(targetPath) {
+    if (typeof targetPath !== 'string') return targetPath;
+    const basename = path.basename(targetPath);
+    if (['index.html', 'dashboard.html', 'site.css', 'site.js'].includes(basename)) {
+        const publicPath = path.join(ROOT_DIR, 'public', basename);
+        if (originalExistsSync(publicPath)) return publicPath;
+    }
+    if (basename === 'amaes-toolkit.user.js') {
+        const rootPath = path.join(ROOT_DIR, basename);
+        if (originalExistsSync(rootPath)) return rootPath;
+    }
+    if (!path.isAbsolute(targetPath)) {
+        const resolvedPath = path.resolve(ROOT_DIR, targetPath);
+        if (originalExistsSync(resolvedPath)) return resolvedPath;
+    }
+    return targetPath;
+}
+
+fs.readFileSync = function(targetPath, options) {
+    return originalReadFileSync(resolveToolkitPath(targetPath), options);
+};
+
+fs.existsSync = function(targetPath) {
+    const resolved = resolveToolkitPath(targetPath);
+    return originalExistsSync(resolved);
+};
 console.log("==================================================");
 console.log("RUNNING COMPREHENSIVE TEST SUITE FOR AMAES TOOLKIT");
 console.log("==================================================\n");
