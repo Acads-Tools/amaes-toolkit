@@ -4513,6 +4513,40 @@ test("Unknown Question Non-Intrusive Handling & Automatic Database Push: script 
     assert.ok(script.includes("Recorded Unknown Question Types:"), "Diagnostic export log must retain unknown question telemetry for maintainer");
 });
 
+// --------------------------------------------------
+// 104. 1-Click In-App Bug Reporting & Relay Issue Submission
+// --------------------------------------------------
+test("1-Click In-App Bug Reporting: header button triggers clean modal, validates input, attaches logs, and submits via relay endpoint /report-bug", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Icon & Header Button
+    assert.ok(script.includes("bug: `<svg"), "ICONS dictionary must define 'bug' icon");
+    assert.ok(script.includes("id=\"amaes-bug-btn\""), "Toolkit panel header must include #amaes-bug-btn");
+    assert.ok(script.includes("bugBtn.onclick = () => {\n                showBugReportModal();"), "amaes-bug-btn must wire click event to showBugReportModal");
+
+    // 2. Global Escape key handling
+    assert.ok(script.includes("const bugModal = document.getElementById('amaes-bug-modal');"), "Global Escape handler must check for #amaes-bug-modal");
+    assert.ok(script.includes("if (bugModal) bugModal.remove();"), "Global Escape handler must cleanly close #amaes-bug-modal");
+
+    // 3. Relay Bug Submission Function
+    assert.ok(script.includes("function submitBugReportToRelay(reportData)"), "Must define submitBugReportToRelay");
+    assert.ok(script.includes("`${relayUrl}/report-bug`"), "submitBugReportToRelay must target /report-bug endpoint on community relay");
+    assert.ok(script.includes("payload = {"), "Must construct payload for bug report");
+    assert.ok(script.includes("description: reportData.description"), "Payload must include user description");
+    assert.ok(script.includes("subjectCode: reportData.subjectCode"), "Payload must include subjectCode");
+    assert.ok(script.includes("pageType: reportData.pageType"), "Payload must include pageType");
+    assert.ok(script.includes("logs: Array.isArray(reportData.logs)"), "Payload must include diagnostic logs array");
+
+    // 4. Bug Report Modal UI & Validation
+    assert.ok(script.includes("function showBugReportModal()"), "Must define showBugReportModal");
+    assert.ok(script.includes("'amaes-bug-modal'"), "Modal must use 'amaes-bug-modal' identifier");
+    assert.ok(script.includes("id=\"amaes-bug-description\""), "Modal must provide #amaes-bug-description textarea");
+    assert.ok(script.includes("id=\"amaes-bug-include-logs\""), "Modal must provide #amaes-bug-include-logs checkbox");
+    assert.ok(script.includes("desc.length < 10"), "Must validate description length is at least 10 characters");
+    assert.ok(script.includes("Issue #${res.issueNumber} Opened!"), "Modal must display created GitHub issue number upon success");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

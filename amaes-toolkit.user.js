@@ -1507,6 +1507,7 @@
         volume: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`,
         trash: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>`,
         terminal: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`,
+        bug: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg>`,
     };
 
     // Web Audio API Procedural Sound Engine (Zero external dependencies)
@@ -4545,13 +4546,15 @@
                 const contributeModal = document.getElementById('amaes-contribute-modal');
                 const devModal = document.getElementById('amaes-dev-unlock-modal');
                 const geminiModal = document.getElementById('amaes-gemini-modal');
-                if (welcomeModal || contributeModal || devModal || geminiModal) {
+                const bugModal = document.getElementById('amaes-bug-modal');
+                if (welcomeModal || contributeModal || devModal || geminiModal || bugModal) {
                     e.preventDefault();
                     if (active && typeof active.blur === 'function') active.blur();
                     if (welcomeModal) welcomeModal.remove();
                     if (contributeModal) contributeModal.remove();
                     if (devModal) devModal.remove();
                     if (geminiModal) geminiModal.remove();
+                    if (bugModal) bugModal.remove();
                     showToast("Closed Modal (Esc)");
                     setLog("Modal closed via <b>Esc</b> shortcut.", "var(--accent-blue)");
                     return;
@@ -6729,6 +6732,331 @@
     function exportUnknownQuestionTypesJson() {
         const types = getUnknownQuestionTypes();
         return JSON.stringify(types, null, 2);
+    }
+
+    // Community Bug Reporting (Direct to GitHub Issues via Cloudflare Relay)
+    function submitBugReportToRelay(reportData) {
+        return new Promise((resolve, reject) => {
+            try {
+                const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
+                if (!relayUrl) {
+                    return reject(new Error('Community relay URL is not configured.'));
+                }
+
+                const payload = {
+                    description: reportData.description || '',
+                    subjectCode: reportData.subjectCode || 'GENERAL',
+                    clientVersion: SCRIPT_VERSION.replace(/^v/i, ''),
+                    pageType: reportData.pageType || 'unknown',
+                    environment: reportData.environment || `${(typeof navigator !== 'undefined' && navigator.userAgent) || 'Unknown'} (Screen: ${(typeof window !== 'undefined' && window.innerWidth) || 0}x${(typeof window !== 'undefined' && window.innerHeight) || 0})`,
+                    logs: Array.isArray(reportData.logs) ? reportData.logs : [],
+                    contributorId: (typeof getAnonymousContributorId === 'function') ? getAnonymousContributorId() : 'anon'
+                };
+
+                const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
+                              (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
+
+                if (gmReq) {
+                    gmReq({
+                        method: 'POST',
+                        url: `${relayUrl}/report-bug`,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-AMAES-Client-Version': SCRIPT_VERSION.replace(/^v/i, '')
+                        },
+                        data: JSON.stringify(payload),
+                        onload: (res) => {
+                            try {
+                                const data = JSON.parse(res.responseText || '{}');
+                                if (res.status >= 200 && res.status < 300 && data.success) {
+                                    resolve(data);
+                                } else {
+                                    reject(new Error(data.error || `HTTP ${res.status}`));
+                                }
+                            } catch (err) {
+                                reject(new Error(`Server returned unexpected response (status ${res.status})`));
+                            }
+                        },
+                        onerror: (err) => {
+                            reject(new Error(err && err.statusText ? err.statusText : 'Network error communicating with bug relay'));
+                        }
+                    });
+                } else if (typeof fetch !== 'undefined') {
+                    fetch(`${relayUrl}/report-bug`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-AMAES-Client-Version': SCRIPT_VERSION.replace(/^v/i, '')
+                        },
+                        body: JSON.stringify(payload)
+                    }).then(async res => {
+                        const data = await res.json().catch(() => ({}));
+                        if (res.ok && data.success) {
+                            resolve(data);
+                        } else {
+                            reject(new Error(data.error || `HTTP ${res.status}`));
+                        }
+                    }).catch(err => {
+                        reject(err);
+                    });
+                } else {
+                    reject(new Error('No HTTP transport available.'));
+                }
+            } catch (e) {
+                reject(e);
+            }
+        });
+    }
+
+    function showBugReportModal() {
+        const existing = document.getElementById('amaes-bug-modal');
+        if (existing) {
+            existing.querySelector('textarea')?.focus();
+            return;
+        }
+
+        const courseInfo = (typeof detectCourseInfo === 'function') ? detectCourseInfo() : {};
+        const activeSubCode = courseInfo.subjectCode || (typeof subCode !== 'undefined' ? subCode : 'GENERAL');
+        const activePageType = (typeof checkIsQuizPage === 'function' && checkIsQuizPage()) ? 'quiz_attempt'
+            : ((typeof checkIsReviewPage === 'function' && checkIsReviewPage()) ? 'quiz_review'
+            : ((typeof checkIsCoursePage === 'function' && checkIsCoursePage()) ? 'course_view' : 'dashboard'));
+
+        const modal = document.createElement('div');
+        modal.id = 'amaes-bug-modal';
+        modal.style.cssText = `
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(4px);
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            animation: amaesFadeIn 0.15s ease-out;
+        `;
+
+        modal.innerHTML = `
+            <div style="
+                background: var(--surface, #1e293b);
+                border: 1px solid var(--border, #334155);
+                border-radius: 12px;
+                width: 90%;
+                max-width: 480px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+                overflow: hidden;
+                color: var(--text-primary, #f8fafc);
+                font-size: 12px;
+            ">
+                <!-- Header -->
+                <div style="
+                    padding: 14px 18px;
+                    background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(249, 115, 22, 0.18));
+                    border-bottom: 1px solid var(--border, #334155);
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                ">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="color: #f87171; display: flex; align-items: center;">${ICONS.bug || ICONS.alertTriangle}</span>
+                        <span style="font-weight: 800; font-size: 13.5px; color: #f8fafc;">Report a Problem / Bug</span>
+                    </div>
+                    <button id="amaes-bug-modal-close" type="button" style="
+                        background: transparent;
+                        border: none;
+                        color: var(--text-muted, #94a3b8);
+                        font-size: 18px;
+                        cursor: pointer;
+                        line-height: 1;
+                        padding: 4px;
+                    ">&times;</button>
+                </div>
+
+                <!-- Body -->
+                <div id="amaes-bug-modal-body" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;">
+                    <div style="color: var(--text-secondary, #cbd5e1); line-height: 1.45;">
+                        Found a bug, broken question, or unexpected behavior? Submit details below to immediately open a tracked GitHub issue for the maintainers. No GitHub account needed.
+                    </div>
+
+                    <!-- Context Pills -->
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <span style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 4px; padding: 2px 7px; font-size: 11px; font-weight: 600;">
+                            Subject: ${activeSubCode}
+                        </span>
+                        <span style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 4px; padding: 2px 7px; font-size: 11px; font-weight: 600;">
+                            Context: ${activePageType}
+                        </span>
+                        <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 4px; padding: 2px 7px; font-size: 11px; font-weight: 600;">
+                            Version: ${SCRIPT_VERSION}
+                        </span>
+                    </div>
+
+                    <!-- Input Box -->
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <label for="amaes-bug-description" style="font-weight: 600; color: var(--text-primary, #f8fafc);">
+                            Description of the problem:
+                        </label>
+                        <textarea id="amaes-bug-description" rows="4" placeholder="e.g. Question 3 failed to auto-select, or the database answers did not match this quiz question format..." style="
+                            width: 100%;
+                            box-sizing: border-box;
+                            padding: 8px 10px;
+                            background: rgba(15, 23, 42, 0.6);
+                            border: 1px solid var(--border, #334155);
+                            border-radius: 6px;
+                            color: var(--text-primary, #f8fafc);
+                            font-size: 12px;
+                            font-family: inherit;
+                            resize: vertical;
+                            min-height: 80px;
+                        "></textarea>
+                        <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted, #94a3b8); margin-top: 2px;">
+                            <span id="amaes-bug-char-count">0 / 10 min characters</span>
+                            <span id="amaes-bug-status-hint"></span>
+                        </div>
+                    </div>
+
+                    <!-- Logs Option -->
+                    <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; user-select: none; font-size: 11.5px; color: var(--text-secondary, #cbd5e1);">
+                        <input type="checkbox" id="amaes-bug-include-logs" checked style="accent-color: #6366f1; margin-top: 2px;">
+                        <span>Attach recent anonymous session activity logs (redacts sensitive tokens, names, and passwords)</span>
+                    </label>
+
+                    <div id="amaes-bug-error-msg" style="display: none; padding: 8px 10px; border-radius: 6px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171; font-size: 11.5px;"></div>
+
+                    <!-- Action Buttons -->
+                    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+                        <button id="amaes-bug-btn-cancel" type="button" style="
+                            padding: 6px 14px;
+                            background: transparent;
+                            border: 1px solid var(--border, #334155);
+                            color: var(--text-secondary, #cbd5e1);
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-weight: 600;
+                            font-size: 12px;
+                        ">Cancel</button>
+                        <button id="amaes-bug-btn-submit" type="button" style="
+                            padding: 6px 16px;
+                            background: #ef4444;
+                            color: #ffffff;
+                            border: none;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-weight: 700;
+                            font-size: 12px;
+                            transition: background 0.15s ease;
+                        ">Submit Report</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const closeModal = () => modal.remove();
+        modal.querySelector('#amaes-bug-modal-close').onclick = closeModal;
+        modal.querySelector('#amaes-bug-btn-cancel').onclick = closeModal;
+        modal.onclick = (e) => {
+            if (e.target === modal) closeModal();
+        };
+
+        const textarea = modal.querySelector('#amaes-bug-description');
+        const charCount = modal.querySelector('#amaes-bug-char-count');
+        const submitBtn = modal.querySelector('#amaes-bug-btn-submit');
+        const errorMsg = modal.querySelector('#amaes-bug-error-msg');
+        const logsCheckbox = modal.querySelector('#amaes-bug-include-logs');
+        const modalBody = modal.querySelector('#amaes-bug-modal-body');
+
+        textarea.focus();
+
+        textarea.oninput = () => {
+            const len = textarea.value.trim().length;
+            charCount.innerText = `${len} / 10 min characters`;
+            if (len >= 10) {
+                charCount.style.color = '#34d399';
+            } else {
+                charCount.style.color = 'var(--text-muted, #94a3b8)';
+            }
+            errorMsg.style.display = 'none';
+        };
+
+        submitBtn.onclick = async () => {
+            const desc = textarea.value.trim();
+            if (desc.length < 10) {
+                errorMsg.innerText = 'Please provide at least 10 characters describing the issue.';
+                errorMsg.style.display = 'block';
+                textarea.focus();
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.style.opacity = '0.6';
+            submitBtn.innerText = 'Submitting...';
+            errorMsg.style.display = 'none';
+
+            let logs = [];
+            if (logsCheckbox && logsCheckbox.checked) {
+                try {
+                    logs = (typeof activityHistory !== 'undefined' && Array.isArray(activityHistory))
+                        ? activityHistory.slice(0, 20).map(item => `[${item.time}] ${(item.text || '').replace(/<[^>]+>/g, '')}`)
+                        : [];
+                } catch (_) {}
+            }
+
+            try {
+                const res = await submitBugReportToRelay({
+                    description: desc,
+                    subjectCode: activeSubCode,
+                    pageType: activePageType,
+                    logs: logs
+                });
+
+                modalBody.innerHTML = `
+                    <div style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 12px 0;">
+                        <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); display: flex; align-items: center; justify-content: center; color: #34d399;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        </div>
+                        <div style="font-weight: 800; font-size: 14px; color: #f8fafc;">
+                            Issue #${res.issueNumber} Opened!
+                        </div>
+                        <div style="color: var(--text-secondary, #cbd5e1); font-size: 12px; line-height: 1.45;">
+                            Thank you! Your bug report has been forwarded directly to the developers on GitHub.
+                        </div>
+                        ${res.issueUrl ? `
+                        <a href="${res.issueUrl}" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; font-size: 11.5px; text-decoration: underline; margin-top: 4px;">
+                            View Issue #${res.issueNumber} on GitHub &rarr;
+                        </a>` : ''}
+                        <button id="amaes-bug-done-btn" type="button" style="
+                            margin-top: 10px;
+                            padding: 6px 20px;
+                            background: #6366f1;
+                            color: white;
+                            border: none;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-weight: 700;
+                            font-size: 12px;
+                        ">Done</button>
+                    </div>
+                `;
+
+                const doneBtn = modal.querySelector('#amaes-bug-done-btn');
+                if (doneBtn) doneBtn.onclick = closeModal;
+
+                if (typeof showToast === 'function') {
+                    showToast(`Bug report submitted (#${res.issueNumber})!`);
+                }
+                if (typeof setLog === 'function') {
+                    setLog(`Reported bug to GitHub (Issue <b>#${res.issueNumber}</b>).`, "var(--accent-green)");
+                }
+            } catch (err) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.innerText = 'Submit Report';
+                errorMsg.innerText = err.message || 'Failed to submit bug report. Please try again later.';
+                errorMsg.style.display = 'block';
+            }
+        };
     }
 
     // Extract Question & Choices cleanly from a Moodle .que element
@@ -12431,6 +12759,10 @@
                         ${currentTheme === 'dark' ? ICONS.sun : ICONS.moon}
                     </button>
 
+                    <button id="amaes-bug-btn" class="amaes-icon-btn" title="Report a Problem / Bug to Maintainers">
+                        ${ICONS.bug || ICONS.alertTriangle}
+                    </button>
+
                     ${DEBUG_MODE ? `
                     <button id="amaes-debug-btn" class="amaes-icon-btn amaes-debug-btn" title="System Diagnostics & Report (Click to copy report)">
                         ${ICONS.debug}
@@ -14868,6 +15200,13 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
         if (helpBtn) {
             if (helpBtn) helpBtn.onclick = () => {
                 showWelcomeOnboardingModal(true);
+            };
+        }
+
+        const bugBtn = document.getElementById('amaes-bug-btn');
+        if (bugBtn) {
+            bugBtn.onclick = () => {
+                showBugReportModal();
             };
         }
 
