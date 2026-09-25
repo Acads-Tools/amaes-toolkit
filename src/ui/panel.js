@@ -218,7 +218,7 @@
                             <input id="chk-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
                             <div>
                                 <span>Auto-Advance After AI Answer</span>
-                                <subtitle>Automatically moves to next page 1.5s after AI selects a choice (Default: OFF)</subtitle>
+                                <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Automatically moves to next page 1.5s after AI selects a choice (Default: ON)</div>
                             </div>
                         </label>
                         <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
@@ -560,7 +560,7 @@
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically moves to next page 1.5s after AI selects a choice">
                                 <input id="chk-course-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Auto-Advance After AI Answer (Default: OFF)</span>
+                                <span>Auto-Advance After AI Answer (Default: ON)</span>
                             </label>
                             <div style="display: flex; align-items: center; justify-content: space-between;">
                                 <span style="font-size: 10px; color: var(--text-secondary);">AI Retry Attempts:</span>

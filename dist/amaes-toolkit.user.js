@@ -1179,8 +1179,8 @@
         localStorage.setItem('amaes_ai_auto_copy_on_fail', aiAutoCopyOnFail ? 'true' : 'false');
     }
 
-    let aiAutoNextOnAiAnswer = localStorage.getItem('amaes_ai_auto_next_on_ai') === 'true'; // default false
-    function getAiAutoNextOnAiAnswer() { return localStorage.getItem('amaes_ai_auto_next_on_ai') === 'true'; }
+    let aiAutoNextOnAiAnswer = localStorage.getItem('amaes_ai_auto_next_on_ai') !== 'false'; // default true
+    function getAiAutoNextOnAiAnswer() { return localStorage.getItem('amaes_ai_auto_next_on_ai') !== 'false'; }
     function setAiAutoNextOnAiAnswer(val) { aiAutoNextOnAiAnswer = Boolean(val); localStorage.setItem('amaes_ai_auto_next_on_ai', aiAutoNextOnAiAnswer ? 'true' : 'false'); }
 
     const GEMINI_FREE_RPM = 15; // 15 requests per minute limit on Google AI Studio Free Tier
@@ -6390,7 +6390,7 @@
         'Tip: Use Course Tools > Highlight Missing Quizzes to find unanswered or unattempted quizzes on a Grades or Course page.',
         'Tip: Course Tools > Search Helper copies a subject-aware search phrase and opens Google for study-guide lookup.',
         'Tip: In the AI Assistant card, Auto-Copy Question on AI Failure puts a clean fallback prompt on your clipboard.',
-        'Tip: In the AI Assistant card, Auto-Advance After AI Answer is off by default so you can review each AI suggestion first.',
+        'Tip: In the AI Assistant card, Auto-Advance After AI Answer automatically proceeds to the next page after an AI choice is made (Default: ON).',
         'Tip: Click inside a quiz question and press C to copy the question and choices, ready to paste into another AI tool.',
         'Tip: After another AI tool gives you an answer, click the question and press V to paste it back and match the choice.',
         'Tip: Click inside a question and press N when you are ready to continue to the next question or page.',
@@ -12977,7 +12977,7 @@
                             <input id="chk-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
                             <div>
                                 <span>Auto-Advance After AI Answer</span>
-                                <subtitle>Automatically moves to next page 1.5s after AI selects a choice (Default: OFF)</subtitle>
+                                <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Automatically moves to next page 1.5s after AI selects a choice (Default: ON)</div>
                             </div>
                         </label>
                         <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
@@ -13319,7 +13319,7 @@
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically moves to next page 1.5s after AI selects a choice">
                                 <input id="chk-course-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Auto-Advance After AI Answer (Default: OFF)</span>
+                                <span>Auto-Advance After AI Answer (Default: ON)</span>
                             </label>
                             <div style="display: flex; align-items: center; justify-content: space-between;">
                                 <span style="font-size: 10px; color: var(--text-secondary);">AI Retry Attempts:</span>

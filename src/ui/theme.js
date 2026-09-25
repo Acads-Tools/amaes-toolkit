@@ -295,8 +295,8 @@
         localStorage.setItem('amaes_ai_auto_copy_on_fail', aiAutoCopyOnFail ? 'true' : 'false');
     }
 
-    let aiAutoNextOnAiAnswer = localStorage.getItem('amaes_ai_auto_next_on_ai') === 'true'; // default false
-    function getAiAutoNextOnAiAnswer() { return localStorage.getItem('amaes_ai_auto_next_on_ai') === 'true'; }
+    let aiAutoNextOnAiAnswer = localStorage.getItem('amaes_ai_auto_next_on_ai') !== 'false'; // default true
+    function getAiAutoNextOnAiAnswer() { return localStorage.getItem('amaes_ai_auto_next_on_ai') !== 'false'; }
     function setAiAutoNextOnAiAnswer(val) { aiAutoNextOnAiAnswer = Boolean(val); localStorage.setItem('amaes_ai_auto_next_on_ai', aiAutoNextOnAiAnswer ? 'true' : 'false'); }
 
     const GEMINI_FREE_RPM = 15; // 15 requests per minute limit on Google AI Studio Free Tier
