@@ -885,9 +885,12 @@
                             <input type="checkbox" id="amaes-bug-include-logs" checked style="accent-color: #10b981; margin-top: 2px;">
                             <span>Attach diagnostic log (action timeline, quiz structure & error logs)</span>
                         </label>
-                        <div style="font-size: 10.5px; color: #94a3b8; line-height: 1.45; padding-left: 22px;">
-                            🛡️ <b>Strict Privacy Guarantee:</b> No personal student data, IDs, names, passwords, or session tokens are ever collected or leaked.
-                            <a href="https://github.com/Acads-Tools/amaes-toolkit/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline; margin-left: 4px; font-weight: 600;">Read SECURITY.md</a>
+                        <div style="font-size: 10.5px; color: #94a3b8; line-height: 1.45; padding-left: 22px; display: flex; align-items: flex-start; gap: 6px;">
+                            <span style="color: #34d399; display: inline-flex; align-items: center; margin-top: 1px; flex-shrink: 0;">${ICONS.shieldCheck || ICONS.shield}</span>
+                            <span>
+                                <strong style="color: #f1f5f9;">Strict Privacy Guarantee:</strong> No personal student data, IDs, names, passwords, or session tokens are ever collected or leaked.
+                                <a href="https://github.com/Acads-Tools/amaes-toolkit/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline; margin-left: 4px; font-weight: 600;">Read SECURITY.md</a>
+                            </span>
                         </div>
                     </div>
 

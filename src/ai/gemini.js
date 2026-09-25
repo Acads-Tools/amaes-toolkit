@@ -1533,7 +1533,7 @@
                 <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px; max-height: 75vh; overflow-y: auto;">
                     ${initialNotice ? `
                     <div id="amaes-gemini-modal-notice" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; padding: 10px 12px; border-radius: 8px; font-size: 11.5px; line-height: 1.45; display: flex; align-items: flex-start; gap: 8px;">
-                        <span style="font-size: 14px; line-height: 1;">⚠️</span>
+                        <span style="display: inline-flex; align-items: center; color: #f87171; flex-shrink: 0; margin-top: 1px;">${ICONS.alertTriangle}</span>
                         <div>${escapeHtml(initialNotice)}</div>
                     </div>
                     ` : ''}
