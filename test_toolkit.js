@@ -4481,30 +4481,36 @@ test("Gapselect / Dropdown Pick Support, Unknown Question Type JSON Store, and R
 });
 
 // --------------------------------------------------
-// 103. Question Card Type Badges & Database Tab Unknown Telemetry Widget
+// 103. Unknown Question Non-Intrusive Handling & Automatic Database Push
 // --------------------------------------------------
-test("Question Card Type Badges & Database Tab Unknown Telemetry Widget: renders visible question type badge on card toolbar, and interactive telemetry accordion in Database tab with 1-click JSON copy and clear", () => {
+test("Unknown Question Non-Intrusive Handling & Automatic Database Push: script leaves unknown question untouched, notifies user gently, auto-pushes telemetry to database relay, and keeps user database panel clean", () => {
     const fs = require('fs');
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
-    // 1. Question card type pill
+    // 1. Question card type pill for recognized types
     assert.ok(script.includes("amaes-que-type-pill"), "Question toolbar must render amaes-que-type-pill");
     assert.ok(script.includes("Dropdown Pick"), "Type pill must map gapselect to 'Dropdown Pick'");
     assert.ok(script.includes("Short Answer"), "Type pill must map shortanswer to 'Short Answer'");
     assert.ok(script.includes("Multiple Choice"), "Type pill must map multichoice to 'Multiple Choice'");
     assert.ok(script.includes("True / False"), "Type pill must map truefalse to 'True / False'");
-    assert.ok(script.includes("⚠️ Unknown Type (Logged)"), "Type pill must map unknown to '⚠️ Unknown Type (Logged)'");
 
-    // 2. Database Tab Accordion & Actions
-    assert.ok(script.includes("id=\"amaes-unknown-types-accordion\""), "Database tab must include amaes-unknown-types-accordion");
-    assert.ok(script.includes("id=\"amaes-unknown-count-badge\""), "Database tab must include amaes-unknown-count-badge");
-    assert.ok(script.includes("id=\"amaes-unknown-types-list\""), "Database tab must include amaes-unknown-types-list");
-    assert.ok(script.includes("id=\"btn-copy-unknown-json\""), "Database tab must include btn-copy-unknown-json");
-    assert.ok(script.includes("id=\"btn-clear-unknown-json\""), "Database tab must include btn-clear-unknown-json");
+    // 2. Non-intrusive guard for unknown questions (do not alter DOM or inject pills/HUD)
+    assert.ok(script.includes("qData.questionType === 'unknown'"), "Auto solver must check if question type is unknown");
+    assert.ok(script.includes("recordUnknownQuestionType(firstBlockedQue, qData)"), "Auto solver must record unknown question and push to relay");
+    assert.ok(script.includes("New question type detected — reported to maintainer."), "Must notify user gently when unknown question is detected");
 
-    // 3. Event-driven telemetry updates
-    assert.ok(script.includes("amaes-unknown-question-recorded"), "Must dispatch and listen to amaes-unknown-question-recorded custom event");
-    assert.ok(script.includes("function updateUnknownTypesUI()"), "Must define updateUnknownTypesUI to populate telemetry accordion");
+    // 3. Automatic push to database relay
+    assert.ok(script.includes("function pushUnknownQuestionToRelay(entry,"), "Must define pushUnknownQuestionToRelay");
+    assert.ok(script.includes("pushedUnknownSignatures"), "Must deduplicate pushed unknown question signatures");
+    assert.ok(script.includes("/unknown-question"), "Must push to /unknown-question endpoint on relay");
+
+    // 4. Clean user UI: bulky telemetry accordion removed from user-facing Database tab
+    assert.ok(!script.includes("id=\"amaes-unknown-types-accordion\""), "Bulky unknown telemetry accordion must be removed from user-facing Database tab");
+    assert.ok(!script.includes("id=\"btn-copy-unknown-json\""), "Copy button must be removed from user-facing Database tab");
+
+    // 5. Developer inspection retained in diagnostic console and logs
+    assert.ok(script.includes("c === 'unknown' || c === 'unknowns'"), "Developer console must support 'unknown' command for maintainer inspection");
+    assert.ok(script.includes("Recorded Unknown Question Types:"), "Diagnostic export log must retain unknown question telemetry for maintainer");
 });
 
 console.log("\n==================================================");

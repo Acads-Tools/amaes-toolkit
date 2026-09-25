@@ -3656,7 +3656,7 @@
 
                 // Feature 1: Instant Auto-Copy — copy prompt immediately on unknown question detection,
                 // before AI is invoked or any condition is checked (aiAutoCopyOnFail guard respected).
-                if (aiAutoCopyOnFail) {
+                if (aiAutoCopyOnFail && qData && qData.questionType !== 'unknown') {
                     copyToClipboard(aiPromptText).catch(() => {});
                 }
 
@@ -3667,6 +3667,16 @@
                 firstBlockedQue.querySelectorAll('.amaes-que-top-toolbar').forEach(toolbar => {
                     toolbar.style.display = 'none';
                 });
+
+                // If question type is unknown / unrecognized:
+                // Do not alter or interfere with the question card at all ("dont do anythibg but notify").
+                // It is already reported and pushed to database by recordUnknownQuestionType.
+                if (qData && qData.questionType === 'unknown') {
+                    recordUnknownQuestionType(firstBlockedQue, qData);
+                    firstBlockedQue.style.outline = '';
+                    isSolverRunning = false;
+                    return;
+                }
 
                 // Feature 4: Moodle Server Error Guard — detect empty/failed question load
                 if (detectMoodleServerError(firstBlockedQue)) {
@@ -4736,6 +4746,11 @@
         }
 
         queContainers.forEach(que => {
+            if (identifyQuestionType(que) === 'unknown') {
+                recordUnknownQuestionType(que);
+                return;
+            }
+
             const qtextElem = que.querySelector('.qtext, .formulation .qtext');
             if (!qtextElem) return;
 
@@ -6595,6 +6610,25 @@
             if (list.length > 25) list.splice(0, list.length - 25);
             localStorage.setItem('amaes_unknown_question_types', JSON.stringify(list));
             logDebug(`Recorded unknown question type signature: ${signature}`);
+
+            // Automatically push unknown question telemetry to the community database relay
+            try {
+                const courseInfo = (typeof detectCourseInfo === 'function') ? detectCourseInfo() : {};
+                const currentSubCode = courseInfo.subjectCode || (typeof subCode !== 'undefined' ? subCode : 'GENERAL');
+                pushUnknownQuestionToRelay(entry, currentSubCode);
+            } catch (_) {}
+
+            // Reassure user with a gentle notice without altering the question DOM or interrupting
+            if (!hasNotifiedUnknownQuestion && (typeof checkIsQuizPage === 'function' ? checkIsQuizPage() : true)) {
+                hasNotifiedUnknownQuestion = true;
+                if (typeof showToast === 'function') {
+                    showToast("New question type detected — reported to maintainer.", 4000);
+                }
+                if (typeof setLog === 'function') {
+                    setLog("New question format detected. Reported to database for developer review.", "var(--accent-amber)");
+                }
+            }
+
             if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
                 try {
                     window.dispatchEvent(new CustomEvent('amaes-unknown-question-recorded', { detail: entry }));
@@ -6602,6 +6636,69 @@
             }
         } catch (e) {
             logDebug('Failed to record unknown question type:', e && e.message);
+        }
+    }
+
+    const pushedUnknownSignatures = new Set();
+    let hasNotifiedUnknownQuestion = false;
+
+    function pushUnknownQuestionToRelay(entry, subjectCode = 'GENERAL') {
+        try {
+            if (!entry || !entry.signature) return;
+            if (pushedUnknownSignatures.has(entry.signature)) return;
+            pushedUnknownSignatures.add(entry.signature);
+
+            const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
+            if (!relayUrl) return;
+
+            const payload = {
+                subjectCode: subjectCode || 'GENERAL',
+                clientVersion: SCRIPT_VERSION.replace(/^v/i, ''),
+                contributorId: (typeof getAnonymousContributorId === 'function') ? getAnonymousContributorId() : 'anon',
+                signature: entry.signature,
+                classes: entry.classes || [],
+                inputCount: entry.inputCount || 0,
+                inputsSummary: entry.inputsSummary || [],
+                snippet: entry.snippet || '',
+                htmlSample: entry.htmlSample || '',
+                submittedAt: entry.timestamp || new Date().toISOString()
+            };
+
+            const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
+                          (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
+
+            if (gmReq) {
+                gmReq({
+                    method: 'POST',
+                    url: `${relayUrl}/unknown-question`,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-AMAES-Client-Version': SCRIPT_VERSION.replace(/^v/i, '')
+                    },
+                    data: JSON.stringify(payload),
+                    onload: (res) => {
+                        logDebug(`Pushed unknown question telemetry to database relay (status: ${res.status})`);
+                    },
+                    onerror: (err) => {
+                        logDebug('Failed to push unknown question telemetry:', err);
+                    }
+                });
+            } else if (typeof fetch !== 'undefined') {
+                fetch(`${relayUrl}/unknown-question`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-AMAES-Client-Version': SCRIPT_VERSION.replace(/^v/i, '')
+                    },
+                    body: JSON.stringify(payload)
+                }).then(res => {
+                    logDebug(`Pushed unknown question telemetry via fetch (status: ${res.status})`);
+                }).catch(err => {
+                    logDebug('Failed to push unknown question telemetry via fetch:', err);
+                });
+            }
+        } catch (e) {
+            logDebug('Exception in pushUnknownQuestionToRelay:', e && e.message);
         }
     }
 
@@ -7294,6 +7391,10 @@
             `;
 
             const qType = identifyQuestionType(que);
+            if (qType === 'unknown') {
+                return;
+            }
+
             const typePill = document.createElement('span');
             typePill.className = 'amaes-que-type-pill';
             let typeLabel = 'Question';
@@ -7336,11 +7437,6 @@
                 typeBg = 'rgba(148, 163, 184, 0.12)';
                 typeColor = '#cbd5e1';
                 typeBorder = 'rgba(148, 163, 184, 0.3)';
-            } else if (qType === 'unknown') {
-                typeLabel = '⚠️ Unknown Type (Logged)';
-                typeBg = 'rgba(239, 68, 68, 0.15)';
-                typeColor = '#f87171';
-                typeBorder = 'rgba(239, 68, 68, 0.35)';
             }
 
             typePill.style.cssText = `
@@ -12657,33 +12753,6 @@
                             <span style="font-weight: 600; color: var(--accent-green);">Share verified review answers anonymously</span>
                         </label>
                     </div>
-
-                    <!-- Unknown Question Telemetry Accordion -->
-                    <details id="amaes-unknown-types-accordion" style="border: 1px solid var(--border-subtle); border-radius: 6px; padding: 5px 7px; background: rgba(0,0,0,0.15);">
-                        <summary style="font-size: 10px; font-weight: 700; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;">
-                            <span style="display: flex; align-items: center; gap: 5px;">
-                                ${ICONS.terminal} <span>Unknown Question Telemetry</span>
-                                <span id="amaes-unknown-count-badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; font-size: 9px; padding: 1px 5px; border-radius: 4px; font-weight: 800;">0</span>
-                            </span>
-                            <span style="font-size: 9px; color: var(--text-muted);">Expand</span>
-                        </summary>
-                        <div id="amaes-unknown-types-content" style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px; font-size: 10px;">
-                            <div style="font-size: 9px; color: var(--text-muted); line-height: 1.35;">
-                                Unhandled or non-standard question DOM structures are auto-logged here without interrupting quizzes. Copy and report them to support new question formats!
-                            </div>
-                            <div id="amaes-unknown-types-list" style="max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; font-family: monospace; font-size: 9px; color: var(--text-muted);">
-                                <!-- Populated dynamically -->
-                            </div>
-                            <div style="display: flex; gap: 4px;">
-                                <button id="btn-copy-unknown-json" type="button" class="amaes-btn amaes-btn-outline" style="flex: 1; padding: 4px; font-size: 9.5px; font-weight: 600; justify-content: center; gap: 4px;" title="Copy recorded unknown question signatures to clipboard">
-                                    ${ICONS.copy} <span>Copy Telemetry JSON</span>
-                                </button>
-                                <button id="btn-clear-unknown-json" type="button" class="amaes-btn amaes-btn-outline" style="padding: 4px 8px; font-size: 9.5px; font-weight: 600; justify-content: center; color: var(--accent-red);" title="Clear recorded unknown question signatures">
-                                    ${ICONS.trash} <span>Clear</span>
-                                </button>
-                            </div>
-                        </div>
-                    </details>
                 </div>
 
                 <!-- TAB PANE 3: Course Automation Tools -->
@@ -14498,88 +14567,7 @@
             chkAutoScrapeAmauoedQuiz.onchange = (e) => handleAutoScrapeToggle(e.target.checked);
         }
 
-        // Unknown Question Telemetry UI & handlers
-        function updateUnknownTypesUI() {
-            const listEl = document.getElementById('amaes-unknown-types-list');
-            const countBadge = document.getElementById('amaes-unknown-count-badge');
-            const unkList = getUnknownQuestionTypes();
-            if (countBadge) {
-                countBadge.textContent = unkList.length;
-                if (unkList.length > 0) {
-                    countBadge.style.background = 'rgba(239, 68, 68, 0.2)';
-                    countBadge.style.color = '#f87171';
-                } else {
-                    countBadge.style.background = 'rgba(245, 158, 11, 0.2)';
-                    countBadge.style.color = '#fbbf24';
-                }
-            }
-            if (listEl) {
-                if (unkList.length === 0) {
-                    listEl.innerHTML = '<div style="color: var(--text-muted); font-style: italic; padding: 4px 0;">No unknown question types recorded. All questions recognized!</div>';
-                } else {
-                    listEl.innerHTML = unkList.map((item, idx) => `
-                        <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 4px 6px; margin-bottom: 2px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; color: var(--accent-amber); font-weight: 700;">
-                                <span>#${idx + 1} [${item.classes ? item.classes.join(' ') : 'que'}]</span>
-                                <span style="font-size: 8px; color: var(--text-muted);">${item.timestamp ? item.timestamp.split('T')[0] : ''}</span>
-                            </div>
-                            <div style="color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;" title="${escapeHtml(item.snippet || '')}">
-                                ${escapeHtml(item.snippet || 'No text snippet')}
-                            </div>
-                            <div style="font-size: 8px; color: var(--text-muted); margin-top: 2px;">
-                                Inputs: ${item.inputCount || 0} (${escapeHtml((item.inputsSummary || []).join(', '))})
-                            </div>
-                        </div>
-                    `).join('');
-                }
-            }
-        }
 
-        updateUnknownTypesUI();
-
-        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-            window.addEventListener('amaes-unknown-question-recorded', () => {
-                updateUnknownTypesUI();
-            });
-        }
-
-        const unkAccordion = document.getElementById('amaes-unknown-types-accordion');
-        if (unkAccordion) {
-            unkAccordion.addEventListener('toggle', () => {
-                if (unkAccordion.open) {
-                    updateUnknownTypesUI();
-                }
-            });
-        }
-
-        const btnCopyUnknownJson = document.getElementById('btn-copy-unknown-json');
-        if (btnCopyUnknownJson) {
-            btnCopyUnknownJson.onclick = async () => {
-                const unkList = getUnknownQuestionTypes();
-                if (unkList.length === 0) {
-                    showToast("No unknown questions recorded yet.");
-                    return;
-                }
-                const json = exportUnknownQuestionTypesJson();
-                const success = await copyToClipboard(json);
-                if (success) {
-                    showToast(`Copied ${unkList.length} unknown question signatures to clipboard!`);
-                    setLog(`Copied <b>${unkList.length}</b> unknown question signatures to clipboard.`, "var(--accent-green)");
-                } else {
-                    showToast("Failed to copy unknown question types.");
-                }
-            };
-        }
-
-        const btnClearUnknownJson = document.getElementById('btn-clear-unknown-json');
-        if (btnClearUnknownJson) {
-            btnClearUnknownJson.onclick = () => {
-                clearUnknownQuestionTypes();
-                updateUnknownTypesUI();
-                showToast("Cleared unknown question telemetry store.");
-                setLog("Cleared unknown question types JSON store.", "var(--text-muted)");
-            };
-        }
 
 
 
