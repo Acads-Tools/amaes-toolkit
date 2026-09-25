@@ -279,6 +279,28 @@
     // --------------------------------------------------
     // Multi-Web AI Launchers (ChatGPT, Perplexity, Gemini)
     // --------------------------------------------------
+    const WEB_AI_PROVIDERS = {
+        chatgpt: { id: 'chatgpt', name: 'ChatGPT', icon: '💬', badge: '(Auto-fill)' },
+        perplexity: { id: 'perplexity', name: 'Perplexity', icon: '⚡', badge: '(Auto-search)' },
+        gemini: { id: 'gemini', name: 'Gemini', icon: '✦', badge: '(Copy & Go)' }
+    };
+
+    function getPreferredWebAi() {
+        const saved = localStorage.getItem('amaes_preferred_web_ai');
+        return (saved && WEB_AI_PROVIDERS[saved]) ? saved : 'chatgpt';
+    }
+
+    function setPreferredWebAi(providerId) {
+        if (WEB_AI_PROVIDERS[providerId]) {
+            localStorage.setItem('amaes_preferred_web_ai', providerId);
+            const info = WEB_AI_PROVIDERS[providerId];
+            document.querySelectorAll('.amaes-web-ai-main-action').forEach(btn => {
+                btn.innerHTML = `<span class="amaes-web-ai-icon">${info.icon}</span> <span>${info.name}</span>`;
+                btn.title = `Ask ${info.name}: Click to solve question in ${info.name}`;
+            });
+        }
+    }
+
     function openExternalAi(provider, que) {
         if (!que) que = getActiveQuestion() || document.querySelector('.que');
         if (!que) {
@@ -409,37 +431,54 @@
                 };
                 btnContainer.appendChild(btnAskAi);
 
-                // 1d. Multi-Web AI Launcher Dropdown (Phone & Mobile Friendly - No Truncation)
+                // 1d. Multi-Web AI Smart 1-Tap Launcher with Dropdown
                 const webAiContainer = document.createElement('div');
                 webAiContainer.className = 'amaes-web-ai-container';
-                webAiContainer.title = 'Send question directly to Web AI';
+                webAiContainer.title = 'Open question directly in Web AI';
 
-                const btnWebAi = document.createElement('button');
-                btnWebAi.type = 'button';
-                btnWebAi.className = 'amaes-copy-ai-card-btn amaes-web-ai-btn';
-                btnWebAi.title = 'Open question in external AI (ChatGPT, Perplexity, Gemini)';
-                btnWebAi.innerHTML = `<span>🌐 Web AI ▾</span>`;
+                const splitBtn = document.createElement('div');
+                splitBtn.className = 'amaes-web-ai-split-btn';
+
+                const prefAi = getPreferredWebAi();
+                const prefInfo = WEB_AI_PROVIDERS[prefAi];
+
+                const mainAction = document.createElement('button');
+                mainAction.type = 'button';
+                mainAction.className = 'amaes-web-ai-main-action';
+                mainAction.title = `Ask ${prefInfo.name}: Click to solve question in ${prefInfo.name}`;
+                mainAction.innerHTML = `<span class="amaes-web-ai-icon">${prefInfo.icon}</span> <span>${prefInfo.name}</span>`;
+                mainAction.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openExternalAi(getPreferredWebAi(), que);
+                };
+
+                const arrowBtn = document.createElement('button');
+                arrowBtn.type = 'button';
+                arrowBtn.className = 'amaes-web-ai-arrow-btn';
+                arrowBtn.title = 'Switch Web AI (ChatGPT, Perplexity, Gemini)';
+                arrowBtn.innerHTML = `<span>▾</span>`;
 
                 const menu = document.createElement('div');
                 menu.className = 'amaes-web-ai-menu';
                 menu.style.display = 'none';
 
                 menu.innerHTML = `
-                    <button type="button" class="amaes-web-ai-item amaes-pill-chatgpt" title="Opens ChatGPT with question pre-filled">
+                    <button type="button" class="amaes-web-ai-item amaes-pill-chatgpt" data-provider="chatgpt" title="Opens ChatGPT with question pre-filled">
                         <span class="amaes-ai-icon">💬</span>
                         <span class="amaes-ai-label">ChatGPT <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Auto-fill)</small></span>
                     </button>
-                    <button type="button" class="amaes-web-ai-item amaes-pill-perplexity" title="Searches question in Perplexity">
+                    <button type="button" class="amaes-web-ai-item amaes-pill-perplexity" data-provider="perplexity" title="Searches question in Perplexity">
                         <span class="amaes-ai-icon">⚡</span>
                         <span class="amaes-ai-label">Perplexity <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Auto-search)</small></span>
                     </button>
-                    <button type="button" class="amaes-web-ai-item amaes-pill-gemini" title="Copies prompt and opens Google Gemini">
+                    <button type="button" class="amaes-web-ai-item amaes-pill-gemini" data-provider="gemini" title="Copies prompt and opens Google Gemini">
                         <span class="amaes-ai-icon">✦</span>
                         <span class="amaes-ai-label">Google Gemini <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Copy & Go)</small></span>
                     </button>
                 `;
 
-                btnWebAi.onclick = (e) => {
+                arrowBtn.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     document.querySelectorAll('.amaes-web-ai-menu').forEach(m => {
@@ -453,13 +492,15 @@
                         e.preventDefault();
                         e.stopPropagation();
                         menu.style.display = 'none';
-                        if (item.classList.contains('amaes-pill-chatgpt')) openExternalAi('chatgpt', que);
-                        else if (item.classList.contains('amaes-pill-perplexity')) openExternalAi('perplexity', que);
-                        else if (item.classList.contains('amaes-pill-gemini')) openExternalAi('gemini', que);
+                        const selectedProvider = item.dataset.provider;
+                        setPreferredWebAi(selectedProvider);
+                        openExternalAi(selectedProvider, que);
                     };
                 });
 
-                webAiContainer.appendChild(btnWebAi);
+                splitBtn.appendChild(mainAction);
+                splitBtn.appendChild(arrowBtn);
+                webAiContainer.appendChild(splitBtn);
                 webAiContainer.appendChild(menu);
                 btnContainer.appendChild(webAiContainer);
             }

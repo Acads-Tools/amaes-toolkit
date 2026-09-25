@@ -1799,60 +1799,91 @@
                     return cleanDOMToAI(re).replace(/^The correct answers? (is|are):?\s*['"]/i, '').replace(/['"]?\s*$/i, '').trim();
                 })();
 
-                const outcomeBox = que.querySelector('.outcome');
-                if (outcomeBox || isEmptyAnswer) {
-                    let targetBox = outcomeBox;
-                    if (!targetBox) {
-                        const formulationBox = que.querySelector('.formulation, .content');
-                        if (formulationBox) {
-                            targetBox = document.createElement('div');
-                            targetBox.className = 'outcome clearfix';
-                            formulationBox.appendChild(targetBox);
-                        }
+                let outcomeBox = que.querySelector('.outcome');
+                if (!outcomeBox) {
+                    const formulationBox = que.querySelector('.formulation, .content');
+                    if (formulationBox) {
+                        outcomeBox = document.createElement('div');
+                        outcomeBox.className = 'outcome clearfix';
+                        formulationBox.appendChild(outcomeBox);
                     }
-                    if (targetBox) {
-                        let banner = targetBox.querySelector('.amaes-review-outcome-banner');
-                        if (!banner) {
-                            banner = document.createElement('div');
-                            banner.className = 'amaes-review-outcome-banner';
-                            targetBox.appendChild(banner);
-                        }
-                        banner.style.cssText = `
-                            display: flex;
-                            align-items: center;
-                            justify-content: space-between;
-                            gap: 8px;
-                            margin-top: 8px;
-                            padding: 6px 12px;
-                            border-radius: 6px;
-                            font-size: 11.5px;
-                            font-weight: 600;
-                            background: rgba(239, 68, 68, 0.12);
-                            border: 1px solid rgba(239, 68, 68, 0.35);
-                            color: #991b1b;
+                }
+                if (outcomeBox) {
+                    let banner = outcomeBox.querySelector('.amaes-review-outcome-banner');
+                    if (!banner) {
+                        banner = document.createElement('div');
+                        banner.className = 'amaes-review-outcome-banner';
+                        outcomeBox.appendChild(banner);
+                    }
+                    banner.style.cssText = `
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        gap: 8px;
+                        margin-top: 8px;
+                        padding: 6px 12px;
+                        border-radius: 6px;
+                        font-size: 11.5px;
+                        font-weight: 600;
+                        background: rgba(239, 68, 68, 0.12);
+                        border: 1px solid rgba(239, 68, 68, 0.35);
+                        color: #991b1b;
+                    `;
+                    if (isEmptyAnswer) {
+                        banner.innerHTML = `
+                            <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                ${ICONS.xCircle}
+                                <span><b>Incorrect / No Answer Submitted</b>${rightAnswerForDisplay ? ` — Correct: &ldquo;${escapeHtml(rightAnswerForDisplay)}&rdquo;` : ''}</span>
+                            </div>
+                            <span style="font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700; white-space: nowrap; background: rgba(239, 68, 68, 0.25);">
+                                Incorrect
+                            </span>
                         `;
-                        if (isEmptyAnswer) {
-                            banner.innerHTML = `
-                                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                    ${ICONS.xCircle}
-                                    <span><b>Incorrect / No Answer Submitted</b>${rightAnswerForDisplay ? ` — Correct: &ldquo;${escapeHtml(rightAnswerForDisplay)}&rdquo;` : ''}</span>
-                                </div>
-                                <span style="font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700; white-space: nowrap; background: rgba(239, 68, 68, 0.25);">
-                                    Incorrect
-                                </span>
-                            `;
-                        } else {
-                            banner.innerHTML = `
-                                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                    ${ICONS.xCircle}
-                                    <span><b>Eliminated:</b> &ldquo;${escapeHtml(wrongText)}&rdquo; (Confirmed Incorrect)</span>
-                                </div>
-                                <span style="font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700; white-space: nowrap; background: rgba(239, 68, 68, 0.25);">
-                                    Eliminated
-                                </span>
-                            `;
-                        }
+                    } else {
+                        banner.innerHTML = `
+                            <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                ${ICONS.xCircle}
+                                <span><b>Eliminated Choice:</b> &ldquo;${escapeHtml(wrongText)}&rdquo; (Confirmed Incorrect)${rightAnswerForDisplay ? ` — Correct: &ldquo;${escapeHtml(rightAnswerForDisplay)}&rdquo;` : ''}</span>
+                            </div>
+                            <span style="font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700; white-space: nowrap; background: rgba(239, 68, 68, 0.25);">
+                                Eliminated
+                            </span>
+                        `;
                     }
+                }
+
+                // Highlight the eliminated choice row on the question card with badge & tint
+                if (wrongList.length > 0) {
+                    const choiceRows = que.querySelectorAll('.answer > div, .answer > tr, .answer li');
+                    choiceRows.forEach(row => {
+                        const label = row.querySelector('label') || row;
+                        const rowText = normalizeChoice(cleanDOMToAI(label).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim());
+                        const isThisWrong = wrongList.some(w => {
+                            const wText = typeof w === 'string' ? normalizeChoice(w) : normalizeChoice(w.text || '');
+                            return wText && (rowText === wText || rowText.includes(wText) || wText.includes(rowText));
+                        });
+                        if (isThisWrong && !row.querySelector('.amaes-eliminated-badge')) {
+                            row.style.background = 'rgba(239, 68, 68, 0.08)';
+                            row.style.borderRadius = '5px';
+                            const elimBadge = document.createElement('span');
+                            elimBadge.className = 'amaes-eliminated-badge';
+                            elimBadge.style.cssText = `
+                                font-size: 9.5px;
+                                font-weight: 700;
+                                padding: 2px 6px;
+                                border-radius: 4px;
+                                margin-left: 8px;
+                                background: rgba(239, 68, 68, 0.18);
+                                color: #dc2626;
+                                border: 1px solid rgba(239, 68, 68, 0.35);
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 3px;
+                            `;
+                            elimBadge.innerHTML = `${ICONS.xCircle} Eliminated`;
+                            label.appendChild(elimBadge);
+                        }
+                    });
                 }
             }
 

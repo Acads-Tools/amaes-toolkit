@@ -895,17 +895,71 @@
                     margin-top: 3px !important;
                 }
 
-                .amaes-web-ai-btn {
-                    background: #f0fdf4 !important;
-                    color: #15803d !important;
+                .amaes-web-ai-split-btn {
+                    display: flex !important;
+                    align-items: stretch !important;
+                    width: 100% !important;
+                    border-radius: 6px !important;
                     border: 1px solid #bbf7d0 !important;
-                    margin-top: 0 !important;
+                    background: #f0fdf4 !important;
+                    box-sizing: border-box !important;
+                    overflow: hidden !important;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+                    transition: all 0.15s ease !important;
                 }
 
-                .amaes-web-ai-btn:hover {
-                    background: #dcfce7 !important;
+                .amaes-web-ai-split-btn:hover {
                     border-color: #86efac !important;
+                    box-shadow: 0 2px 4px rgba(22, 101, 52, 0.12) !important;
+                }
+
+                .amaes-web-ai-main-action {
+                    flex: 1 !important;
+                    min-width: 0 !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 3px !important;
+                    background: transparent !important;
+                    border: none !important;
+                    color: #15803d !important;
+                    font-size: 10px !important;
+                    font-weight: 700 !important;
+                    padding: 4px 4px !important;
+                    cursor: pointer !important;
+                    white-space: nowrap !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                    transition: background 0.15s ease !important;
+                    min-height: 24px !important;
+                    box-sizing: border-box !important;
+                }
+
+                .amaes-web-ai-main-action:hover {
+                    background: #dcfce7 !important;
                     color: #166534 !important;
+                }
+
+                .amaes-web-ai-arrow-btn {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    background: rgba(21, 128, 61, 0.08) !important;
+                    border: none !important;
+                    border-left: 1px solid #bbf7d0 !important;
+                    color: #15803d !important;
+                    font-size: 10px !important;
+                    font-weight: 700 !important;
+                    padding: 0 7px !important;
+                    cursor: pointer !important;
+                    transition: background 0.15s ease !important;
+                    min-height: 24px !important;
+                    box-sizing: border-box !important;
+                }
+
+                .amaes-web-ai-arrow-btn:hover {
+                    background: #bbf7d0 !important;
+                    color: #14532d !important;
                 }
 
                 .amaes-web-ai-menu {

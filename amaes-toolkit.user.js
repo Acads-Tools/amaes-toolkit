@@ -6416,7 +6416,7 @@
         const clone = rootNode.cloneNode(true);
 
         // Strip non-content scripts, toolkit buttons, injected UI badges & Moodle feedback icons/accessibility text
-        clone.querySelectorAll('script, style, noscript, .amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-card-btn-container, .amaes-copy-ai-card-btn, .amaes-ask-ai-card-btn, .amaes-copy-img-card-btn, .amaes-paste-ai-card-btn, .amaes-web-ai-container, .amaes-web-ai-btn, .amaes-web-ai-menu, .amaes-web-ai-item, .amaes-web-ai-row, .amaes-web-ai-pill, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-thinking-indicator, .amaes-ai-fallback-bar, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, .accesshide, .sr-only').forEach(el => el.remove());
+        clone.querySelectorAll('script, style, noscript, .amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-card-btn-container, .amaes-copy-ai-card-btn, .amaes-ask-ai-card-btn, .amaes-copy-img-card-btn, .amaes-paste-ai-card-btn, .amaes-web-ai-container, .amaes-web-ai-split-btn, .amaes-web-ai-main-action, .amaes-web-ai-arrow-btn, .amaes-web-ai-btn, .amaes-web-ai-menu, .amaes-web-ai-item, .amaes-web-ai-row, .amaes-web-ai-pill, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-thinking-indicator, .amaes-ai-fallback-bar, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, .accesshide, .sr-only').forEach(el => el.remove());
 
         // Convert Superscripts (e.g. 2^3 -> 2³, x^2 -> x², or ^{complex})
         clone.querySelectorAll('sup').forEach(sup => {
@@ -7641,6 +7641,28 @@
     // --------------------------------------------------
     // Multi-Web AI Launchers (ChatGPT, Perplexity, Gemini)
     // --------------------------------------------------
+    const WEB_AI_PROVIDERS = {
+        chatgpt: { id: 'chatgpt', name: 'ChatGPT', icon: '💬', badge: '(Auto-fill)' },
+        perplexity: { id: 'perplexity', name: 'Perplexity', icon: '⚡', badge: '(Auto-search)' },
+        gemini: { id: 'gemini', name: 'Gemini', icon: '✦', badge: '(Copy & Go)' }
+    };
+
+    function getPreferredWebAi() {
+        const saved = localStorage.getItem('amaes_preferred_web_ai');
+        return (saved && WEB_AI_PROVIDERS[saved]) ? saved : 'chatgpt';
+    }
+
+    function setPreferredWebAi(providerId) {
+        if (WEB_AI_PROVIDERS[providerId]) {
+            localStorage.setItem('amaes_preferred_web_ai', providerId);
+            const info = WEB_AI_PROVIDERS[providerId];
+            document.querySelectorAll('.amaes-web-ai-main-action').forEach(btn => {
+                btn.innerHTML = `<span class="amaes-web-ai-icon">${info.icon}</span> <span>${info.name}</span>`;
+                btn.title = `Ask ${info.name}: Click to solve question in ${info.name}`;
+            });
+        }
+    }
+
     function openExternalAi(provider, que) {
         if (!que) que = getActiveQuestion() || document.querySelector('.que');
         if (!que) {
@@ -7771,37 +7793,54 @@
                 };
                 btnContainer.appendChild(btnAskAi);
 
-                // 1d. Multi-Web AI Launcher Dropdown (Phone & Mobile Friendly - No Truncation)
+                // 1d. Multi-Web AI Smart 1-Tap Launcher with Dropdown
                 const webAiContainer = document.createElement('div');
                 webAiContainer.className = 'amaes-web-ai-container';
-                webAiContainer.title = 'Send question directly to Web AI';
+                webAiContainer.title = 'Open question directly in Web AI';
 
-                const btnWebAi = document.createElement('button');
-                btnWebAi.type = 'button';
-                btnWebAi.className = 'amaes-copy-ai-card-btn amaes-web-ai-btn';
-                btnWebAi.title = 'Open question in external AI (ChatGPT, Perplexity, Gemini)';
-                btnWebAi.innerHTML = `<span>🌐 Web AI ▾</span>`;
+                const splitBtn = document.createElement('div');
+                splitBtn.className = 'amaes-web-ai-split-btn';
+
+                const prefAi = getPreferredWebAi();
+                const prefInfo = WEB_AI_PROVIDERS[prefAi];
+
+                const mainAction = document.createElement('button');
+                mainAction.type = 'button';
+                mainAction.className = 'amaes-web-ai-main-action';
+                mainAction.title = `Ask ${prefInfo.name}: Click to solve question in ${prefInfo.name}`;
+                mainAction.innerHTML = `<span class="amaes-web-ai-icon">${prefInfo.icon}</span> <span>${prefInfo.name}</span>`;
+                mainAction.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openExternalAi(getPreferredWebAi(), que);
+                };
+
+                const arrowBtn = document.createElement('button');
+                arrowBtn.type = 'button';
+                arrowBtn.className = 'amaes-web-ai-arrow-btn';
+                arrowBtn.title = 'Switch Web AI (ChatGPT, Perplexity, Gemini)';
+                arrowBtn.innerHTML = `<span>▾</span>`;
 
                 const menu = document.createElement('div');
                 menu.className = 'amaes-web-ai-menu';
                 menu.style.display = 'none';
 
                 menu.innerHTML = `
-                    <button type="button" class="amaes-web-ai-item amaes-pill-chatgpt" title="Opens ChatGPT with question pre-filled">
+                    <button type="button" class="amaes-web-ai-item amaes-pill-chatgpt" data-provider="chatgpt" title="Opens ChatGPT with question pre-filled">
                         <span class="amaes-ai-icon">💬</span>
                         <span class="amaes-ai-label">ChatGPT <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Auto-fill)</small></span>
                     </button>
-                    <button type="button" class="amaes-web-ai-item amaes-pill-perplexity" title="Searches question in Perplexity">
+                    <button type="button" class="amaes-web-ai-item amaes-pill-perplexity" data-provider="perplexity" title="Searches question in Perplexity">
                         <span class="amaes-ai-icon">⚡</span>
                         <span class="amaes-ai-label">Perplexity <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Auto-search)</small></span>
                     </button>
-                    <button type="button" class="amaes-web-ai-item amaes-pill-gemini" title="Copies prompt and opens Google Gemini">
+                    <button type="button" class="amaes-web-ai-item amaes-pill-gemini" data-provider="gemini" title="Copies prompt and opens Google Gemini">
                         <span class="amaes-ai-icon">✦</span>
                         <span class="amaes-ai-label">Google Gemini <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Copy & Go)</small></span>
                     </button>
                 `;
 
-                btnWebAi.onclick = (e) => {
+                arrowBtn.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     document.querySelectorAll('.amaes-web-ai-menu').forEach(m => {
@@ -7815,13 +7854,15 @@
                         e.preventDefault();
                         e.stopPropagation();
                         menu.style.display = 'none';
-                        if (item.classList.contains('amaes-pill-chatgpt')) openExternalAi('chatgpt', que);
-                        else if (item.classList.contains('amaes-pill-perplexity')) openExternalAi('perplexity', que);
-                        else if (item.classList.contains('amaes-pill-gemini')) openExternalAi('gemini', que);
+                        const selectedProvider = item.dataset.provider;
+                        setPreferredWebAi(selectedProvider);
+                        openExternalAi(selectedProvider, que);
                     };
                 });
 
-                webAiContainer.appendChild(btnWebAi);
+                splitBtn.appendChild(mainAction);
+                splitBtn.appendChild(arrowBtn);
+                webAiContainer.appendChild(splitBtn);
                 webAiContainer.appendChild(menu);
                 btnContainer.appendChild(webAiContainer);
             }
@@ -11758,60 +11799,91 @@
                     return cleanDOMToAI(re).replace(/^The correct answers? (is|are):?\s*['"]/i, '').replace(/['"]?\s*$/i, '').trim();
                 })();
 
-                const outcomeBox = que.querySelector('.outcome');
-                if (outcomeBox || isEmptyAnswer) {
-                    let targetBox = outcomeBox;
-                    if (!targetBox) {
-                        const formulationBox = que.querySelector('.formulation, .content');
-                        if (formulationBox) {
-                            targetBox = document.createElement('div');
-                            targetBox.className = 'outcome clearfix';
-                            formulationBox.appendChild(targetBox);
-                        }
+                let outcomeBox = que.querySelector('.outcome');
+                if (!outcomeBox) {
+                    const formulationBox = que.querySelector('.formulation, .content');
+                    if (formulationBox) {
+                        outcomeBox = document.createElement('div');
+                        outcomeBox.className = 'outcome clearfix';
+                        formulationBox.appendChild(outcomeBox);
                     }
-                    if (targetBox) {
-                        let banner = targetBox.querySelector('.amaes-review-outcome-banner');
-                        if (!banner) {
-                            banner = document.createElement('div');
-                            banner.className = 'amaes-review-outcome-banner';
-                            targetBox.appendChild(banner);
-                        }
-                        banner.style.cssText = `
-                            display: flex;
-                            align-items: center;
-                            justify-content: space-between;
-                            gap: 8px;
-                            margin-top: 8px;
-                            padding: 6px 12px;
-                            border-radius: 6px;
-                            font-size: 11.5px;
-                            font-weight: 600;
-                            background: rgba(239, 68, 68, 0.12);
-                            border: 1px solid rgba(239, 68, 68, 0.35);
-                            color: #991b1b;
+                }
+                if (outcomeBox) {
+                    let banner = outcomeBox.querySelector('.amaes-review-outcome-banner');
+                    if (!banner) {
+                        banner = document.createElement('div');
+                        banner.className = 'amaes-review-outcome-banner';
+                        outcomeBox.appendChild(banner);
+                    }
+                    banner.style.cssText = `
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        gap: 8px;
+                        margin-top: 8px;
+                        padding: 6px 12px;
+                        border-radius: 6px;
+                        font-size: 11.5px;
+                        font-weight: 600;
+                        background: rgba(239, 68, 68, 0.12);
+                        border: 1px solid rgba(239, 68, 68, 0.35);
+                        color: #991b1b;
+                    `;
+                    if (isEmptyAnswer) {
+                        banner.innerHTML = `
+                            <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                ${ICONS.xCircle}
+                                <span><b>Incorrect / No Answer Submitted</b>${rightAnswerForDisplay ? ` — Correct: &ldquo;${escapeHtml(rightAnswerForDisplay)}&rdquo;` : ''}</span>
+                            </div>
+                            <span style="font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700; white-space: nowrap; background: rgba(239, 68, 68, 0.25);">
+                                Incorrect
+                            </span>
                         `;
-                        if (isEmptyAnswer) {
-                            banner.innerHTML = `
-                                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                    ${ICONS.xCircle}
-                                    <span><b>Incorrect / No Answer Submitted</b>${rightAnswerForDisplay ? ` — Correct: &ldquo;${escapeHtml(rightAnswerForDisplay)}&rdquo;` : ''}</span>
-                                </div>
-                                <span style="font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700; white-space: nowrap; background: rgba(239, 68, 68, 0.25);">
-                                    Incorrect
-                                </span>
-                            `;
-                        } else {
-                            banner.innerHTML = `
-                                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                    ${ICONS.xCircle}
-                                    <span><b>Eliminated:</b> &ldquo;${escapeHtml(wrongText)}&rdquo; (Confirmed Incorrect)</span>
-                                </div>
-                                <span style="font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700; white-space: nowrap; background: rgba(239, 68, 68, 0.25);">
-                                    Eliminated
-                                </span>
-                            `;
-                        }
+                    } else {
+                        banner.innerHTML = `
+                            <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                ${ICONS.xCircle}
+                                <span><b>Eliminated Choice:</b> &ldquo;${escapeHtml(wrongText)}&rdquo; (Confirmed Incorrect)${rightAnswerForDisplay ? ` — Correct: &ldquo;${escapeHtml(rightAnswerForDisplay)}&rdquo;` : ''}</span>
+                            </div>
+                            <span style="font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700; white-space: nowrap; background: rgba(239, 68, 68, 0.25);">
+                                Eliminated
+                            </span>
+                        `;
                     }
+                }
+
+                // Highlight the eliminated choice row on the question card with badge & tint
+                if (wrongList.length > 0) {
+                    const choiceRows = que.querySelectorAll('.answer > div, .answer > tr, .answer li');
+                    choiceRows.forEach(row => {
+                        const label = row.querySelector('label') || row;
+                        const rowText = normalizeChoice(cleanDOMToAI(label).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim());
+                        const isThisWrong = wrongList.some(w => {
+                            const wText = typeof w === 'string' ? normalizeChoice(w) : normalizeChoice(w.text || '');
+                            return wText && (rowText === wText || rowText.includes(wText) || wText.includes(rowText));
+                        });
+                        if (isThisWrong && !row.querySelector('.amaes-eliminated-badge')) {
+                            row.style.background = 'rgba(239, 68, 68, 0.08)';
+                            row.style.borderRadius = '5px';
+                            const elimBadge = document.createElement('span');
+                            elimBadge.className = 'amaes-eliminated-badge';
+                            elimBadge.style.cssText = `
+                                font-size: 9.5px;
+                                font-weight: 700;
+                                padding: 2px 6px;
+                                border-radius: 4px;
+                                margin-left: 8px;
+                                background: rgba(239, 68, 68, 0.18);
+                                color: #dc2626;
+                                border: 1px solid rgba(239, 68, 68, 0.35);
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 3px;
+                            `;
+                            elimBadge.innerHTML = `${ICONS.xCircle} Eliminated`;
+                            label.appendChild(elimBadge);
+                        }
+                    });
                 }
             }
 
@@ -13811,17 +13883,71 @@
                     margin-top: 3px !important;
                 }
 
-                .amaes-web-ai-btn {
-                    background: #f0fdf4 !important;
-                    color: #15803d !important;
+                .amaes-web-ai-split-btn {
+                    display: flex !important;
+                    align-items: stretch !important;
+                    width: 100% !important;
+                    border-radius: 6px !important;
                     border: 1px solid #bbf7d0 !important;
-                    margin-top: 0 !important;
+                    background: #f0fdf4 !important;
+                    box-sizing: border-box !important;
+                    overflow: hidden !important;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+                    transition: all 0.15s ease !important;
                 }
 
-                .amaes-web-ai-btn:hover {
-                    background: #dcfce7 !important;
+                .amaes-web-ai-split-btn:hover {
                     border-color: #86efac !important;
+                    box-shadow: 0 2px 4px rgba(22, 101, 52, 0.12) !important;
+                }
+
+                .amaes-web-ai-main-action {
+                    flex: 1 !important;
+                    min-width: 0 !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 3px !important;
+                    background: transparent !important;
+                    border: none !important;
+                    color: #15803d !important;
+                    font-size: 10px !important;
+                    font-weight: 700 !important;
+                    padding: 4px 4px !important;
+                    cursor: pointer !important;
+                    white-space: nowrap !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                    transition: background 0.15s ease !important;
+                    min-height: 24px !important;
+                    box-sizing: border-box !important;
+                }
+
+                .amaes-web-ai-main-action:hover {
+                    background: #dcfce7 !important;
                     color: #166534 !important;
+                }
+
+                .amaes-web-ai-arrow-btn {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    background: rgba(21, 128, 61, 0.08) !important;
+                    border: none !important;
+                    border-left: 1px solid #bbf7d0 !important;
+                    color: #15803d !important;
+                    font-size: 10px !important;
+                    font-weight: 700 !important;
+                    padding: 0 7px !important;
+                    cursor: pointer !important;
+                    transition: background 0.15s ease !important;
+                    min-height: 24px !important;
+                    box-sizing: border-box !important;
+                }
+
+                .amaes-web-ai-arrow-btn:hover {
+                    background: #bbf7d0 !important;
+                    color: #14532d !important;
                 }
 
                 .amaes-web-ai-menu {
