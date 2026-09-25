@@ -6631,6 +6631,43 @@
         return "```json\n" + JSON.stringify(report, null, 2) + "\n```";
     }
 
+    function generateDiagnosticAuditLog() {
+        const lines = (typeof activityHistory !== 'undefined' && Array.isArray(activityHistory))
+            ? activityHistory.map(item => `[${item.time}] ${item.text}`).reverse()
+            : [];
+        const userAgent = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : 'Unknown';
+        const platform = (typeof navigator !== 'undefined' && (navigator.userAgentData?.platform || navigator.platform)) ? (navigator.userAgentData?.platform || navigator.platform) : 'Unknown';
+        const screenSize = (typeof window !== 'undefined' && window.screen) ? `${window.screen.width}x${window.screen.height}` : 'Unknown';
+        const currentUrl = (typeof window !== 'undefined' && window.location) ? window.location.href : 'Unknown';
+        const currentSub = (typeof subCode !== 'undefined' && subCode) ? subCode : ((typeof detectCourseInfo === 'function') ? (detectCourseInfo().subjectCode || 'General') : 'General');
+        const cachedCount = (typeof getCachedAnswers === 'function' && currentSub) ? (getCachedAnswers(currentSub) || []).length : 0;
+        const unknownTypes = typeof getUnknownQuestionTypes === 'function' ? getUnknownQuestionTypes() : [];
+
+        const diagnosticHeader = [
+            `=== AMAES MOODLE TOOLKIT DIAGNOSTIC AUDIT LOG ===`,
+            `Timestamp: ${new Date().toISOString()}`,
+            `Toolkit Version: ${SCRIPT_VERSION}`,
+            `Subject / Course: ${currentSub}`,
+            `Page URL: ${currentUrl}`,
+            `User Agent: ${userAgent}`,
+            `Platform: ${platform}`,
+            `Screen: ${screenSize}`,
+            `Active Mode: ${(typeof autoQuizMode !== 'undefined' && autoQuizMode) ? 'Auto-Quiz' : 'Passive'} | Auto-Pick: ${(typeof autoPickQuiz !== 'undefined') ? autoPickQuiz : false} | Smart-Next: ${(typeof autoNextVerified !== 'undefined') ? autoNextVerified : false}`,
+            `Cloud Sync: ${localStorage.getItem('amaes_auto_cloud_sync') !== 'false'}`,
+            `Cached DB Questions: ${cachedCount}`,
+            `Recorded Unknown Question Types: ${unknownTypes.length}`,
+            ...(unknownTypes.length > 0 ? [
+                ``,
+                `--- RECORDED UNKNOWN QUESTION TYPES JSON ---`,
+                JSON.stringify(unknownTypes, null, 2)
+            ] : []),
+            ``,
+            `--- ACTIVITY LOG TIMELINE ---`
+        ].join('\n');
+
+        return `${diagnosticHeader}\n` + lines.join('\n') + `\n=== END DIAGNOSTIC LOG ===`;
+    }
+
     function copyToClipboard(text) {
         if (typeof GM_setClipboard === 'function') {
             try {
@@ -7452,11 +7489,17 @@
                         </div>
                     </div>
 
-                    <!-- Logs Option -->
-                    <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; user-select: none; font-size: 11.5px; color: var(--text-secondary, #cbd5e1);">
-                        <input type="checkbox" id="amaes-bug-include-logs" checked style="accent-color: #6366f1; margin-top: 2px;">
-                        <span>Attach comprehensive diagnostics (action timeline, quiz structure, and activity logs — no passwords or tokens)</span>
-                    </label>
+                    <!-- Logs Option & Privacy Reassurance -->
+                    <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;">
+                        <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; user-select: none; font-size: 11.5px; color: #e2e8f0; font-weight: 500;">
+                            <input type="checkbox" id="amaes-bug-include-logs" checked style="accent-color: #10b981; margin-top: 2px;">
+                            <span>Attach diagnostic log (action timeline, quiz structure & error logs)</span>
+                        </label>
+                        <div style="font-size: 10.5px; color: #94a3b8; line-height: 1.45; padding-left: 22px;">
+                            🛡️ <b>Strict Privacy Guarantee:</b> No personal student data, IDs, names, passwords, or session tokens are ever collected or leaked.
+                            <a href="https://github.com/Acads-Tools/amaes-toolkit/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline; margin-left: 4px; font-weight: 600;">Read SECURITY.md</a>
+                        </div>
+                    </div>
 
                     <div id="amaes-bug-error-msg" style="display: none; padding: 8px 10px; border-radius: 6px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171; font-size: 11.5px;"></div>
 
@@ -13113,7 +13156,17 @@
             addLine(`Local Question Cache:`, 'var(--accent-blue)');
             addLine(`• Total verified questions: ${totalQuestions}`, 'var(--text-secondary)');
             addLine(`• Subject count: ${totalKeys} (${subjects.slice(0, 10).join(', ')}${subjects.length > 10 ? '...' : ''})`, 'var(--text-secondary)');
-        } else if (c === 'logs') {
+        } else if (c === 'logs -c' || c === 'logs --copy' || c === 'diagnostics -c' || c === 'diagnostic -c' || c === 'diag -c') {
+            const auditReport = generateDiagnosticAuditLog();
+            copyToClipboard(auditReport).then(() => {
+                const count = (typeof activityHistory !== 'undefined' && activityHistory) ? activityHistory.length : 0;
+                addLine(`[OK] Copied full system diagnostic audit log to clipboard (${count} events).`, 'var(--accent-green)');
+                addLine(`Timestamp: ${new Date().toISOString()}`, 'var(--text-muted)');
+                showToast(`Copied diagnostic audit log (${count} events)!`, 2500);
+            }).catch(err => {
+                addLine(`Failed to copy diagnostics: ${err.message}`, 'var(--accent-pink)');
+            });
+        } else if (c === 'logs' || c === 'diagnostics') {
             if (!activityHistory || activityHistory.length === 0) {
                 addLine(`Audit activity history buffer is empty.`, 'var(--text-muted)');
             } else {
@@ -13121,6 +13174,7 @@
                 activityHistory.slice(0, 10).forEach(item => {
                     addLine(`[${item.time}] ${item.text}`, 'var(--text-secondary)');
                 });
+                addLine(`Tip: Type 'logs -c' to copy full system diagnostic audit log to clipboard.`, 'var(--text-muted)');
             }
         } else if (c === 'unknown' || c === 'unknowns') {
             const list = getUnknownQuestionTypes();
@@ -13142,14 +13196,15 @@
             addLine('Terminal buffer cleared.', 'var(--text-muted)');
         } else if (c === 'help') {
             addLine('Admin Command Suite:', 'var(--accent-purple)');
-            addLine('• status  - System health, active course context & relay status', 'var(--text-secondary)');
-            addLine('• ping    - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
-            addLine('• users   - Shows privacy status (active-user telemetry disabled)', 'var(--text-secondary)');
-            addLine('• cache   - Question bank statistics and stored course codes', 'var(--text-secondary)');
-            addLine('• logs    - Dumps recent audit events directly in console', 'var(--text-secondary)');
-            addLine('• unknown - Lists all recorded unknown question type signatures', 'var(--text-secondary)');
-            addLine('• clear   - Clears terminal output screen buffer', 'var(--text-secondary)');
-            addLine('• help    - Displays this command reference list', 'var(--text-secondary)');
+            addLine('• status    - System health, active course context & relay status', 'var(--text-secondary)');
+            addLine('• ping      - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
+            addLine('• users     - Shows privacy status (active-user telemetry disabled)', 'var(--text-secondary)');
+            addLine('• cache     - Question bank statistics and stored course codes', 'var(--text-secondary)');
+            addLine('• logs      - Dumps recent audit events directly in console', 'var(--text-secondary)');
+            addLine('• logs -c   - Copies full system diagnostic audit log to clipboard', 'var(--text-secondary)');
+            addLine('• unknown   - Lists all recorded unknown question type signatures', 'var(--text-secondary)');
+            addLine('• clear     - Clears terminal output screen buffer', 'var(--text-secondary)');
+            addLine('• help      - Displays this command reference list', 'var(--text-secondary)');
         } else {
             addLine(`Unknown command: '${cmd}'. Type 'help' for available commands.`, 'var(--accent-amber)');
         }
@@ -16395,40 +16450,11 @@
                     return;
                 }
                 const lines = activityHistory.map(item => `[${item.time}] ${item.text}`).reverse();
-                const userAgent = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : 'Unknown';
-                const platform = (typeof navigator !== 'undefined' && (navigator.userAgentData?.platform || navigator.platform)) ? (navigator.userAgentData?.platform || navigator.platform) : 'Unknown';
-                const screenSize = (typeof window !== 'undefined' && window.screen) ? `${window.screen.width}x${window.screen.height}` : 'Unknown';
-                const currentUrl = (typeof window !== 'undefined' && window.location) ? window.location.href : 'Unknown';
-                const cachedCount = (typeof getCachedAnswers === 'function' && subCode) ? (getCachedAnswers(subCode) || []).length : 0;
-                const unknownTypes = typeof getUnknownQuestionTypes === 'function' ? getUnknownQuestionTypes() : [];
-
-                const diagnosticHeader = [
-                    `=== AMAES MOODLE TOOLKIT DIAGNOSTIC AUDIT LOG ===`,
-                    `Timestamp: ${new Date().toISOString()}`,
-                    `Toolkit Version: ${SCRIPT_VERSION}`,
-                    `Subject / Course: ${subCode || 'General'}`,
-                    `Page URL: ${currentUrl}`,
-                    `User Agent: ${userAgent}`,
-                    `Platform: ${platform}`,
-                    `Screen: ${screenSize}`,
-                    `Active Mode: ${autoQuizMode ? 'Auto-Quiz' : 'Passive'} | Auto-Pick: ${autoPickQuiz} | Smart-Next: ${autoNextVerified}`,
-                    `Cloud Sync: ${localStorage.getItem('amaes_auto_cloud_sync') !== 'false'}`,
-                    `Cached DB Questions: ${cachedCount}`,
-                    `Recorded Unknown Question Types: ${unknownTypes.length}`,
-                    ...(unknownTypes.length > 0 ? [
-                        ``,
-                        `--- RECORDED UNKNOWN QUESTION TYPES JSON ---`,
-                        JSON.stringify(unknownTypes, null, 2)
-                    ] : []),
-                    ``,
-                    `--- ACTIVITY LOG TIMELINE ---`
-                ].join('\n');
-
-                const logText = `${diagnosticHeader}\n` + lines.join('\n') + `\n=== END DIAGNOSTIC LOG ===`;
+                const logText = lines.join('\n');
                 try {
                     await copyToClipboard(logText);
-                    showToast(`Copied ${activityHistory.length} log events + diagnostics!`);
-                    setLog(`Copied <b>${activityHistory.length}</b> activity log entries with system diagnostics to clipboard.`, "var(--accent-blue)");
+                    showToast(`Copied ${activityHistory.length} log entries!`);
+                    setLog(`Copied <b>${activityHistory.length}</b> activity log entries to clipboard.`, "var(--accent-blue)");
                 } catch (err) {
                     showToast("Failed to copy logs to clipboard.");
                 }

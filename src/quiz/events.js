@@ -1258,40 +1258,11 @@
                     return;
                 }
                 const lines = activityHistory.map(item => `[${item.time}] ${item.text}`).reverse();
-                const userAgent = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : 'Unknown';
-                const platform = (typeof navigator !== 'undefined' && (navigator.userAgentData?.platform || navigator.platform)) ? (navigator.userAgentData?.platform || navigator.platform) : 'Unknown';
-                const screenSize = (typeof window !== 'undefined' && window.screen) ? `${window.screen.width}x${window.screen.height}` : 'Unknown';
-                const currentUrl = (typeof window !== 'undefined' && window.location) ? window.location.href : 'Unknown';
-                const cachedCount = (typeof getCachedAnswers === 'function' && subCode) ? (getCachedAnswers(subCode) || []).length : 0;
-                const unknownTypes = typeof getUnknownQuestionTypes === 'function' ? getUnknownQuestionTypes() : [];
-
-                const diagnosticHeader = [
-                    `=== AMAES MOODLE TOOLKIT DIAGNOSTIC AUDIT LOG ===`,
-                    `Timestamp: ${new Date().toISOString()}`,
-                    `Toolkit Version: ${SCRIPT_VERSION}`,
-                    `Subject / Course: ${subCode || 'General'}`,
-                    `Page URL: ${currentUrl}`,
-                    `User Agent: ${userAgent}`,
-                    `Platform: ${platform}`,
-                    `Screen: ${screenSize}`,
-                    `Active Mode: ${autoQuizMode ? 'Auto-Quiz' : 'Passive'} | Auto-Pick: ${autoPickQuiz} | Smart-Next: ${autoNextVerified}`,
-                    `Cloud Sync: ${localStorage.getItem('amaes_auto_cloud_sync') !== 'false'}`,
-                    `Cached DB Questions: ${cachedCount}`,
-                    `Recorded Unknown Question Types: ${unknownTypes.length}`,
-                    ...(unknownTypes.length > 0 ? [
-                        ``,
-                        `--- RECORDED UNKNOWN QUESTION TYPES JSON ---`,
-                        JSON.stringify(unknownTypes, null, 2)
-                    ] : []),
-                    ``,
-                    `--- ACTIVITY LOG TIMELINE ---`
-                ].join('\n');
-
-                const logText = `${diagnosticHeader}\n` + lines.join('\n') + `\n=== END DIAGNOSTIC LOG ===`;
+                const logText = lines.join('\n');
                 try {
                     await copyToClipboard(logText);
-                    showToast(`Copied ${activityHistory.length} log events + diagnostics!`);
-                    setLog(`Copied <b>${activityHistory.length}</b> activity log entries with system diagnostics to clipboard.`, "var(--accent-blue)");
+                    showToast(`Copied ${activityHistory.length} log entries!`);
+                    setLog(`Copied <b>${activityHistory.length}</b> activity log entries to clipboard.`, "var(--accent-blue)");
                 } catch (err) {
                     showToast("Failed to copy logs to clipboard.");
                 }

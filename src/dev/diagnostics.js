@@ -21,6 +21,43 @@
         return "```json\n" + JSON.stringify(report, null, 2) + "\n```";
     }
 
+    function generateDiagnosticAuditLog() {
+        const lines = (typeof activityHistory !== 'undefined' && Array.isArray(activityHistory))
+            ? activityHistory.map(item => `[${item.time}] ${item.text}`).reverse()
+            : [];
+        const userAgent = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : 'Unknown';
+        const platform = (typeof navigator !== 'undefined' && (navigator.userAgentData?.platform || navigator.platform)) ? (navigator.userAgentData?.platform || navigator.platform) : 'Unknown';
+        const screenSize = (typeof window !== 'undefined' && window.screen) ? `${window.screen.width}x${window.screen.height}` : 'Unknown';
+        const currentUrl = (typeof window !== 'undefined' && window.location) ? window.location.href : 'Unknown';
+        const currentSub = (typeof subCode !== 'undefined' && subCode) ? subCode : ((typeof detectCourseInfo === 'function') ? (detectCourseInfo().subjectCode || 'General') : 'General');
+        const cachedCount = (typeof getCachedAnswers === 'function' && currentSub) ? (getCachedAnswers(currentSub) || []).length : 0;
+        const unknownTypes = typeof getUnknownQuestionTypes === 'function' ? getUnknownQuestionTypes() : [];
+
+        const diagnosticHeader = [
+            `=== AMAES MOODLE TOOLKIT DIAGNOSTIC AUDIT LOG ===`,
+            `Timestamp: ${new Date().toISOString()}`,
+            `Toolkit Version: ${SCRIPT_VERSION}`,
+            `Subject / Course: ${currentSub}`,
+            `Page URL: ${currentUrl}`,
+            `User Agent: ${userAgent}`,
+            `Platform: ${platform}`,
+            `Screen: ${screenSize}`,
+            `Active Mode: ${(typeof autoQuizMode !== 'undefined' && autoQuizMode) ? 'Auto-Quiz' : 'Passive'} | Auto-Pick: ${(typeof autoPickQuiz !== 'undefined') ? autoPickQuiz : false} | Smart-Next: ${(typeof autoNextVerified !== 'undefined') ? autoNextVerified : false}`,
+            `Cloud Sync: ${localStorage.getItem('amaes_auto_cloud_sync') !== 'false'}`,
+            `Cached DB Questions: ${cachedCount}`,
+            `Recorded Unknown Question Types: ${unknownTypes.length}`,
+            ...(unknownTypes.length > 0 ? [
+                ``,
+                `--- RECORDED UNKNOWN QUESTION TYPES JSON ---`,
+                JSON.stringify(unknownTypes, null, 2)
+            ] : []),
+            ``,
+            `--- ACTIVITY LOG TIMELINE ---`
+        ].join('\n');
+
+        return `${diagnosticHeader}\n` + lines.join('\n') + `\n=== END DIAGNOSTIC LOG ===`;
+    }
+
     function copyToClipboard(text) {
         if (typeof GM_setClipboard === 'function') {
             try {
@@ -842,11 +879,17 @@
                         </div>
                     </div>
 
-                    <!-- Logs Option -->
-                    <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; user-select: none; font-size: 11.5px; color: var(--text-secondary, #cbd5e1);">
-                        <input type="checkbox" id="amaes-bug-include-logs" checked style="accent-color: #6366f1; margin-top: 2px;">
-                        <span>Attach comprehensive diagnostics (action timeline, quiz structure, and activity logs — no passwords or tokens)</span>
-                    </label>
+                    <!-- Logs Option & Privacy Reassurance -->
+                    <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;">
+                        <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; user-select: none; font-size: 11.5px; color: #e2e8f0; font-weight: 500;">
+                            <input type="checkbox" id="amaes-bug-include-logs" checked style="accent-color: #10b981; margin-top: 2px;">
+                            <span>Attach diagnostic log (action timeline, quiz structure & error logs)</span>
+                        </label>
+                        <div style="font-size: 10.5px; color: #94a3b8; line-height: 1.45; padding-left: 22px;">
+                            🛡️ <b>Strict Privacy Guarantee:</b> No personal student data, IDs, names, passwords, or session tokens are ever collected or leaked.
+                            <a href="https://github.com/Acads-Tools/amaes-toolkit/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: underline; margin-left: 4px; font-weight: 600;">Read SECURITY.md</a>
+                        </div>
+                    </div>
 
                     <div id="amaes-bug-error-msg" style="display: none; padding: 8px 10px; border-radius: 6px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171; font-size: 11.5px;"></div>
 

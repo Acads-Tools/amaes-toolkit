@@ -132,7 +132,17 @@
             addLine(`Local Question Cache:`, 'var(--accent-blue)');
             addLine(`• Total verified questions: ${totalQuestions}`, 'var(--text-secondary)');
             addLine(`• Subject count: ${totalKeys} (${subjects.slice(0, 10).join(', ')}${subjects.length > 10 ? '...' : ''})`, 'var(--text-secondary)');
-        } else if (c === 'logs') {
+        } else if (c === 'logs -c' || c === 'logs --copy' || c === 'diagnostics -c' || c === 'diagnostic -c' || c === 'diag -c') {
+            const auditReport = generateDiagnosticAuditLog();
+            copyToClipboard(auditReport).then(() => {
+                const count = (typeof activityHistory !== 'undefined' && activityHistory) ? activityHistory.length : 0;
+                addLine(`[OK] Copied full system diagnostic audit log to clipboard (${count} events).`, 'var(--accent-green)');
+                addLine(`Timestamp: ${new Date().toISOString()}`, 'var(--text-muted)');
+                showToast(`Copied diagnostic audit log (${count} events)!`, 2500);
+            }).catch(err => {
+                addLine(`Failed to copy diagnostics: ${err.message}`, 'var(--accent-pink)');
+            });
+        } else if (c === 'logs' || c === 'diagnostics') {
             if (!activityHistory || activityHistory.length === 0) {
                 addLine(`Audit activity history buffer is empty.`, 'var(--text-muted)');
             } else {
@@ -140,6 +150,7 @@
                 activityHistory.slice(0, 10).forEach(item => {
                     addLine(`[${item.time}] ${item.text}`, 'var(--text-secondary)');
                 });
+                addLine(`Tip: Type 'logs -c' to copy full system diagnostic audit log to clipboard.`, 'var(--text-muted)');
             }
         } else if (c === 'unknown' || c === 'unknowns') {
             const list = getUnknownQuestionTypes();
@@ -161,14 +172,15 @@
             addLine('Terminal buffer cleared.', 'var(--text-muted)');
         } else if (c === 'help') {
             addLine('Admin Command Suite:', 'var(--accent-purple)');
-            addLine('• status  - System health, active course context & relay status', 'var(--text-secondary)');
-            addLine('• ping    - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
-            addLine('• users   - Shows privacy status (active-user telemetry disabled)', 'var(--text-secondary)');
-            addLine('• cache   - Question bank statistics and stored course codes', 'var(--text-secondary)');
-            addLine('• logs    - Dumps recent audit events directly in console', 'var(--text-secondary)');
-            addLine('• unknown - Lists all recorded unknown question type signatures', 'var(--text-secondary)');
-            addLine('• clear   - Clears terminal output screen buffer', 'var(--text-secondary)');
-            addLine('• help    - Displays this command reference list', 'var(--text-secondary)');
+            addLine('• status    - System health, active course context & relay status', 'var(--text-secondary)');
+            addLine('• ping      - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
+            addLine('• users     - Shows privacy status (active-user telemetry disabled)', 'var(--text-secondary)');
+            addLine('• cache     - Question bank statistics and stored course codes', 'var(--text-secondary)');
+            addLine('• logs      - Dumps recent audit events directly in console', 'var(--text-secondary)');
+            addLine('• logs -c   - Copies full system diagnostic audit log to clipboard', 'var(--text-secondary)');
+            addLine('• unknown   - Lists all recorded unknown question type signatures', 'var(--text-secondary)');
+            addLine('• clear     - Clears terminal output screen buffer', 'var(--text-secondary)');
+            addLine('• help      - Displays this command reference list', 'var(--text-secondary)');
         } else {
             addLine(`Unknown command: '${cmd}'. Type 'help' for available commands.`, 'var(--accent-amber)');
         }

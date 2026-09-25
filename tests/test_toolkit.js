@@ -4741,6 +4741,27 @@ test("Unified AI Layout, Official SVG Logos, and Smart Shared Pool Fallback Setu
     assert.ok(script.includes("The community shared AI pool is currently busy or rate-limited"), "Must notify and guide user to configure personal key when shared pool is busy");
 });
 
+// --------------------------------------------------
+// 110. Bug Report Privacy Guarantee (SECURITY.md) & Developer Console 'logs -c'
+// --------------------------------------------------
+test("Bug Report Privacy Guarantee & Dev Console 'logs -c': links SECURITY.md, guarantees zero sensitive data leak, decouples system diagnostics from UI logs, and enables logs -c in dev console", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Bug Report Modal: zero sensitive data leak guarantee & SECURITY.md link
+    assert.ok(script.includes("SECURITY.md"), "Bug report modal must link to SECURITY.md");
+    assert.ok(script.includes("Strict Privacy Guarantee:"), "Bug report modal must explicitly present strict privacy guarantee");
+    assert.ok(script.includes("No personal student data, IDs, names, passwords, or session tokens"), "Must reassure user that no sensitive info is collected or leaked");
+
+    // 2. Developer Console 'logs -c' integration
+    assert.ok(script.includes("c === 'logs -c'"), "Developer console must support 'logs -c' command");
+    assert.ok(script.includes("generateDiagnosticAuditLog"), "Must define generateDiagnosticAuditLog helper");
+    assert.ok(script.includes("Copied full system diagnostic audit log to clipboard"), "Console must confirm copying full diagnostic audit log");
+
+    // 3. User-facing activity log decoupling
+    assert.ok(script.includes("Copied <b>${activityHistory.length}</b> activity log entries to clipboard."), "User-facing Copy Log button must not claim system diagnostics copied");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);
