@@ -2863,8 +2863,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.8.0'), "Userscript header must specify v1.8.0");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.8.0";'), "Constant SCRIPT_VERSION must be v1.8.0");
+    assert.ok(script.includes('@version      1.8.1'), "Userscript header must specify v1.8.1");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.8.1";'), "Constant SCRIPT_VERSION must be v1.8.1");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3929,6 +3929,8 @@ test("Gemini AI: Interface Integration, Course Tools card, Setup modal, Quiz tab
 
     // 3. Quiz tab settings block & toggles
     assert.ok(script.includes("id=\"amaes-ai-quiz-settings-block\""), "Quiz tab must feature AI Assistant settings block");
+    assert.ok(script.includes('<details id="amaes-ai-quiz-settings-block"'), "AI settings must be in collapsible details element");
+    assert.ok(!script.includes('<details id="amaes-ai-quiz-settings-block" open'), "AI settings details must not be open by default");
     assert.ok(script.includes("id=\"chk-ai-quiz-enabled\""), "Must include toggle for AI Quiz Solver");
     assert.ok(script.includes("id=\"chk-ai-auto-select\""), "Must include toggle for Auto-Select AI Answers");
 
@@ -3993,10 +3995,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.8.0-blue.svg"), "README badge must show v1.8.0");
+    assert.ok(readme.includes("version-1.8.1-blue.svg"), "README badge must show v1.8.1");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.8.0<"), "Website must display v1.8.0 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.8.1<"), "Website must display v1.8.1 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 

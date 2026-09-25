@@ -1009,6 +1009,23 @@
             };
         }
 
+        // Dynamic hint text for collapsible accordions
+        const aiBlockDetails = document.getElementById('amaes-ai-quiz-settings-block');
+        if (aiBlockDetails) {
+            const hint = aiBlockDetails.querySelector('.amaes-ai-toggle-hint');
+            aiBlockDetails.addEventListener('toggle', () => {
+                if (hint) hint.textContent = aiBlockDetails.open ? 'Click to collapse' : 'Click to expand';
+            });
+        }
+
+        const advDetails = document.getElementById('amaes-advanced-quiz-settings');
+        if (advDetails) {
+            const hint = advDetails.querySelector('.amaes-adv-toggle-hint');
+            advDetails.addEventListener('toggle', () => {
+                if (hint) hint.textContent = advDetails.open ? 'Click to collapse' : 'Click to expand';
+            });
+        }
+
         // Header Reset Settings Button Handler
         const resetBtn = document.getElementById('amaes-reset-btn');
         if (resetBtn) {

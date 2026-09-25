@@ -60,7 +60,7 @@
 
         const quizAiBlock = document.getElementById('amaes-ai-quiz-settings-block');
         if (quizAiBlock) {
-            quizAiBlock.style.display = isConfigured ? 'flex' : 'none';
+            quizAiBlock.style.display = isConfigured ? 'block' : 'none';
         }
     }
 

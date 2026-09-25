@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.8.0
+// @version      1.8.1
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -27,7 +27,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.8.0";
+    const SCRIPT_VERSION = "v1.8.1";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -8275,7 +8275,7 @@
 
         const quizAiBlock = document.getElementById('amaes-ai-quiz-settings-block');
         if (quizAiBlock) {
-            quizAiBlock.style.display = isConfigured ? 'flex' : 'none';
+            quizAiBlock.style.display = isConfigured ? 'block' : 'none';
         }
     }
 
@@ -13173,60 +13173,65 @@
                         </label>
                     </div>
 
-                    <!-- Dynamic Google Gemini AI Settings Block (Visible when key is configured) -->
-                    <div id="amaes-ai-quiz-settings-block" style="display: ${geminiApiKey ? 'flex' : 'none'}; flex-direction: column; gap: 5px; margin-top: 2px; border-top: 1px solid var(--border-subtle); padding-top: 6px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <span style="font-size: 9.5px; font-weight: 700; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
-                                <span>Google Gemini AI (Experimental)</span>
+                    <!-- Collapsible Google Gemini AI Settings (Collapsed by default for clean UX) -->
+                    <details id="amaes-ai-quiz-settings-block" style="display: ${geminiApiKey ? 'block' : 'none'}; margin-top: 2px; border: 1px solid rgba(168, 85, 247, 0.28); border-radius: 6px; background: rgba(168, 85, 247, 0.05); overflow: hidden;">
+                        <summary style="cursor: pointer; padding: 5px 8px; font-size: 10px; font-weight: 700; color: #c084fc; display: flex; align-items: center; justify-content: space-between; user-select: none;">
+                            <span style="display: flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.5px; font-size: 9.5px;">
+                                <span>✨ Google Gemini AI (Experimental)</span>
                             </span>
-                            <span id="amaes-ai-quiz-status-pill" style="font-size: 8.5px; font-weight: 700; color: #34d399; background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.3); border-radius: 3px; padding: 1px 5px;">Active</span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span id="amaes-ai-quiz-status-pill" style="font-size: 8.5px; font-weight: 700; color: #34d399; background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.3); border-radius: 3px; padding: 1px 5px;">Active</span>
+                                <span class="amaes-ai-toggle-hint" style="font-size: 8.5px; color: var(--text-muted);">Click to expand</span>
+                            </div>
+                        </summary>
+                        <div style="display: flex; flex-direction: column; gap: 5px; padding: 6px 8px; border-top: 1px solid rgba(168, 85, 247, 0.2); background: rgba(0, 0, 0, 0.15);">
+                            <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #c084fc; cursor: pointer; font-weight: 700;" title="When question is not in DB, automatically ask Google Gemini 1.5 Flash for the answer">
+                                <input id="chk-ai-quiz-enabled" type="checkbox" ${aiQuizEnabled ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
+                                <div>
+                                    <span>Get Answers from AI on Unknown Questions</span>
+                                    <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Auto-answers uncertain multiple choice and true/false questions</div>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="When enabled, automatically selects the option suggested by AI. When disabled, only highlights it with a purple badge">
+                                <input id="chk-ai-auto-select" type="checkbox" ${aiAutoSelect ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
+                                <div>
+                                    <span>Auto-Select AI Answers</span>
+                                    <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Automatically checks AI choice (if off, highlights in purple for manual review)</div>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="When enabled, automatically copies unknown questions to clipboard if AI cannot solve or times out">
+                                <input id="chk-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
+                                <div>
+                                    <span>Auto-Copy on AI Failure</span>
+                                    <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Copies question to clipboard if AI fails or times out (Default: ON)</div>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="When enabled, automatically moves to the next page 1.5s after AI selects a choice">
+                                <input id="chk-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
+                                <div>
+                                    <span>Auto-Advance After AI Answer</span>
+                                    <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Automatically moves to next page 1.5s after AI selects a choice (Default: ON)</div>
+                                </div>
+                            </label>
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
+                                <span style="font-size: 10px; color: #e9d5ff; font-weight: 600;">Retry Attempts on Failure:</span>
+                                <select id="sel-ai-retry-count" style="background: rgba(0,0,0,0.35); border: 1px solid #a855f7; border-radius: 4px; color: #f3e8ff; font-size: 10px; padding: 2px 6px; cursor: pointer;">
+                                    <option value="1" ${aiRetryCount === 1 ? 'selected' : ''}>1 retry</option>
+                                    <option value="2" ${aiRetryCount === 2 ? 'selected' : ''}>2 retries (Default)</option>
+                                    <option value="3" ${aiRetryCount === 3 ? 'selected' : ''}>3 retries</option>
+                                    <option value="4" ${aiRetryCount === 4 ? 'selected' : ''}>4 retries</option>
+                                    <option value="5" ${aiRetryCount === 5 ? 'selected' : ''}>5 retries</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
+                                <span style="font-size: 10px; color: #e9d5ff; font-weight: 600;">API Plan Tier:</span>
+                                <select id="sel-ai-plan-tier" style="background: rgba(0,0,0,0.35); border: 1px solid #a855f7; border-radius: 4px; color: #f3e8ff; font-size: 10px; padding: 2px 6px; cursor: pointer;">
+                                    <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
+                                    <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
+                                </select>
+                            </div>
                         </div>
-                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #c084fc; cursor: pointer; font-weight: 700;" title="When question is not in DB, automatically ask Google Gemini 1.5 Flash for the answer">
-                            <input id="chk-ai-quiz-enabled" type="checkbox" ${aiQuizEnabled ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
-                            <div>
-                                <span>Get Answers from AI on Unknown Questions</span>
-                                <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Auto-answers uncertain multiple choice and true/false questions</div>
-                            </div>
-                        </label>
-                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="When enabled, automatically selects the option suggested by AI. When disabled, only highlights it with a purple badge">
-                            <input id="chk-ai-auto-select" type="checkbox" ${aiAutoSelect ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
-                            <div>
-                                <span>Auto-Select AI Answers</span>
-                                <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Automatically checks AI choice (if off, highlights in purple for manual review)</div>
-                            </div>
-                        </label>
-                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="When enabled, automatically copies unknown questions to clipboard if AI cannot solve or times out">
-                            <input id="chk-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
-                            <div>
-                                <span>Auto-Copy on AI Failure</span>
-                                <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Copies question to clipboard if AI fails or times out (Default: ON)</div>
-                            </div>
-                        </label>
-                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="When enabled, automatically moves to the next page 1.5s after AI selects a choice">
-                            <input id="chk-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
-                            <div>
-                                <span>Auto-Advance After AI Answer</span>
-                                <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Automatically moves to next page 1.5s after AI selects a choice (Default: ON)</div>
-                            </div>
-                        </label>
-                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
-                            <span style="font-size: 10px; color: #e9d5ff; font-weight: 600;">Retry Attempts on Failure:</span>
-                            <select id="sel-ai-retry-count" style="background: rgba(0,0,0,0.35); border: 1px solid #a855f7; border-radius: 4px; color: #f3e8ff; font-size: 10px; padding: 2px 6px; cursor: pointer;">
-                                <option value="1" ${aiRetryCount === 1 ? 'selected' : ''}>1 retry</option>
-                                <option value="2" ${aiRetryCount === 2 ? 'selected' : ''}>2 retries (Default)</option>
-                                <option value="3" ${aiRetryCount === 3 ? 'selected' : ''}>3 retries</option>
-                                <option value="4" ${aiRetryCount === 4 ? 'selected' : ''}>4 retries</option>
-                                <option value="5" ${aiRetryCount === 5 ? 'selected' : ''}>5 retries</option>
-                            </select>
-                        </div>
-                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
-                            <span style="font-size: 10px; color: #e9d5ff; font-weight: 600;">API Plan Tier:</span>
-                            <select id="sel-ai-plan-tier" style="background: rgba(0,0,0,0.35); border: 1px solid #a855f7; border-radius: 4px; color: #f3e8ff; font-size: 10px; padding: 2px 6px; cursor: pointer;">
-                                <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
-                                <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
-                            </select>
-                        </div>
-                    </div>
+                    </details>
 
                     <!-- Collapsible Advanced Settings (Collapsed by default for clean UX) -->
                     <details id="amaes-advanced-quiz-settings" style="margin-top: 2px; border: 1px solid var(--border-subtle); border-radius: 6px; background: rgba(0,0,0,0.12); overflow: hidden;">
@@ -13234,7 +13239,7 @@
                             <span style="display: flex; align-items: center; gap: 5px;">
                                 ${ICONS.tools} <span>Advanced Settings</span>
                             </span>
-                            <span style="font-size: 8.5px; color: var(--text-muted);">Click to expand</span>
+                            <span class="amaes-adv-toggle-hint" style="font-size: 8.5px; color: var(--text-muted);">Click to expand</span>
                         </summary>
                         <div style="display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--border-subtle); background: rgba(0,0,0,0.18);">
                             <!-- Section: Quiz Navigation & Behavior -->
@@ -15448,6 +15453,23 @@
             btnOpenGeminiSetup.onclick = () => {
                 showGeminiSetupModal();
             };
+        }
+
+        // Dynamic hint text for collapsible accordions
+        const aiBlockDetails = document.getElementById('amaes-ai-quiz-settings-block');
+        if (aiBlockDetails) {
+            const hint = aiBlockDetails.querySelector('.amaes-ai-toggle-hint');
+            aiBlockDetails.addEventListener('toggle', () => {
+                if (hint) hint.textContent = aiBlockDetails.open ? 'Click to collapse' : 'Click to expand';
+            });
+        }
+
+        const advDetails = document.getElementById('amaes-advanced-quiz-settings');
+        if (advDetails) {
+            const hint = advDetails.querySelector('.amaes-adv-toggle-hint');
+            advDetails.addEventListener('toggle', () => {
+                if (hint) hint.textContent = advDetails.open ? 'Click to collapse' : 'Click to expand';
+            });
         }
 
         // Header Reset Settings Button Handler
