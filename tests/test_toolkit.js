@@ -4679,6 +4679,38 @@ test("Quiz Passable Grade Safety Guard (≥80%) & Under Construction CLI: only m
     assert.ok(!ucScript.includes("Emergency Stealth Mode"), "Must remove stealth mode wording");
 });
 
+// --------------------------------------------------
+// 148. Question Visual Snippet + Pure Text Dual-MIME Copy & Standalone Copy Img Removal
+// --------------------------------------------------
+test("Visual Snippet & Pure Text Dual-MIME Copy: captures image/drag-and-drop snippet alongside pure text and removes standalone Copy Img button", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Standalone Copy Img button removal
+    assert.ok(!script.includes("amaes-copy-img-card-btn"), "Standalone Copy Img button (.amaes-copy-img-card-btn) must be completely removed");
+    assert.ok(!script.includes("<span>Copy Img</span>"), "Standalone Copy Img label must not be rendered");
+
+    // 2. Dual-MIME Snippet Copy and Image Extraction
+    assert.ok(script.includes("function copyQuestionWithOptionalImage(que, text)"), "Must define copyQuestionWithOptionalImage function");
+    assert.ok(script.includes("function captureQuestionSnippetBlob(que)"), "Must define captureQuestionSnippetBlob function");
+    assert.ok(script.includes("function getImageBlob(imgUrl)"), "Must define getImageBlob function");
+
+    // 3. Dual-MIME ClipboardItem creation: image/png AND text/plain
+    assert.ok(script.includes("'image/png': pngBlob"), "ClipboardItem must contain image/png blob for image-aware AI");
+    assert.ok(script.includes("'text/plain': textBlob"), "ClipboardItem must contain text/plain blob for pure text alongside image");
+    assert.ok(script.includes("navigator.clipboard.write(["), "Must write dual-MIME ClipboardItem array to clipboard");
+
+    // 4. Drag & Drop and Image Detection
+    assert.ok(script.includes("qData.isDragDrop"), "Must detect drag and drop questions via isDragDrop");
+    assert.ok(script.includes("ddwtos") && script.includes("ddmarker"), "Must recognize Moodle drag-and-drop classes");
+
+    // 5. Button and Auto-Copy Integration
+    assert.ok(script.includes("copyRes.withImage ? 'Copied Snippet!' : 'Copied!'"), "Copy AI button must indicate snippet copy when image/drag-and-drop is present");
+    assert.ok(script.includes("copyQuestionWithOptionalImage(targetQue, textToCopy)"), "triggerAutoCopyForAI must use copyQuestionWithOptionalImage");
+    assert.ok(script.includes("copyQuestionWithOptionalImage(firstBlockedQue, aiPromptText)"), "Solver auto-copy fallback must use copyQuestionWithOptionalImage");
+    assert.ok(script.includes("copyQuestionWithOptionalImage(que, promptText)"), "Gemini auto-copy and fallback UI must use copyQuestionWithOptionalImage");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

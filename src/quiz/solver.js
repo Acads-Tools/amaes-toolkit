@@ -701,7 +701,7 @@
                 // Feature 1: Instant Auto-Copy — copy prompt immediately on unknown question detection,
                 // before AI is invoked or any condition is checked (aiAutoCopyOnFail guard respected).
                 if (aiAutoCopyOnFail && qData && qData.questionType !== 'unknown') {
-                    copyToClipboard(aiPromptText).catch(() => {});
+                    copyQuestionWithOptionalImage(firstBlockedQue, aiPromptText).catch(() => {});
                 }
 
                 firstBlockedQue.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -775,7 +775,7 @@
                     const rateLimitStatus = getAiRateLimitStatus();
                     if (rateLimitStatus.isLimited) {
                         firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());
-                        copyToClipboard(aiPromptText).catch(() => {});
+                        copyQuestionWithOptionalImage(firstBlockedQue, aiPromptText).catch(() => {});
                         const rlReason = `Google is temporarily limiting AI requests. Try again in ${rateLimitStatus.remainingSec} seconds.`;
                         setLog(`[AI Rate Limit] Question #${qData ? qData.qNum : ''}: ${rlReason} (Prompt copied)`, "var(--accent-amber)");
                         showToast(`AI rate limit: available in ${rateLimitStatus.remainingSec}s`, 3500);
@@ -805,7 +805,7 @@
                     firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());
 
                     // Auto-copy question prompt in background as seamless backup for the student
-                    copyToClipboard(aiPromptText).catch(() => {});
+                    copyQuestionWithOptionalImage(firstBlockedQue, aiPromptText).catch(() => {});
 
                     const courseInfo = detectCourseInfo();
                     const courseCode = courseInfo.subjectCode || '';
@@ -859,8 +859,8 @@
                     }
                 } else {
                     // Copy question for AI helper
-                    copyToClipboard(aiPromptText).then(() => {
-                        showToast(`Question #${qData ? qData.qNum : ''} copied to clipboard — ready to paste!`, 3000);
+                    copyQuestionWithOptionalImage(firstBlockedQue, aiPromptText).then((res) => {
+                        showToast(res && res.withImage ? `Visual snippet & Question #${qData ? qData.qNum : ''} copied to clipboard!` : `Question #${qData ? qData.qNum : ''} copied to clipboard — ready to paste!`, 3000);
                     }).catch(() => {});
                 }
 
@@ -1701,8 +1701,9 @@
                     if (que) {
                         e.preventDefault();
                         const text = formatQuestionForAI(que, aiPromptHint);
-                        copyToClipboard(text);
-                        showToast("Shortcut: Question copied for AI");
+                        copyQuestionWithOptionalImage(que, text).then((res) => {
+                            showToast(res && res.withImage ? "Shortcut: Visual snippet & question copied for AI" : "Shortcut: Question copied for AI");
+                        }).catch(() => {});
                     }
                 }
                 return;

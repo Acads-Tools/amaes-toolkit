@@ -3774,7 +3774,7 @@
                 // Feature 1: Instant Auto-Copy — copy prompt immediately on unknown question detection,
                 // before AI is invoked or any condition is checked (aiAutoCopyOnFail guard respected).
                 if (aiAutoCopyOnFail && qData && qData.questionType !== 'unknown') {
-                    copyToClipboard(aiPromptText).catch(() => {});
+                    copyQuestionWithOptionalImage(firstBlockedQue, aiPromptText).catch(() => {});
                 }
 
                 firstBlockedQue.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -3848,7 +3848,7 @@
                     const rateLimitStatus = getAiRateLimitStatus();
                     if (rateLimitStatus.isLimited) {
                         firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());
-                        copyToClipboard(aiPromptText).catch(() => {});
+                        copyQuestionWithOptionalImage(firstBlockedQue, aiPromptText).catch(() => {});
                         const rlReason = `Google is temporarily limiting AI requests. Try again in ${rateLimitStatus.remainingSec} seconds.`;
                         setLog(`[AI Rate Limit] Question #${qData ? qData.qNum : ''}: ${rlReason} (Prompt copied)`, "var(--accent-amber)");
                         showToast(`AI rate limit: available in ${rateLimitStatus.remainingSec}s`, 3500);
@@ -3878,7 +3878,7 @@
                     firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());
 
                     // Auto-copy question prompt in background as seamless backup for the student
-                    copyToClipboard(aiPromptText).catch(() => {});
+                    copyQuestionWithOptionalImage(firstBlockedQue, aiPromptText).catch(() => {});
 
                     const courseInfo = detectCourseInfo();
                     const courseCode = courseInfo.subjectCode || '';
@@ -3932,8 +3932,8 @@
                     }
                 } else {
                     // Copy question for AI helper
-                    copyToClipboard(aiPromptText).then(() => {
-                        showToast(`Question #${qData ? qData.qNum : ''} copied to clipboard — ready to paste!`, 3000);
+                    copyQuestionWithOptionalImage(firstBlockedQue, aiPromptText).then((res) => {
+                        showToast(res && res.withImage ? `Visual snippet & Question #${qData ? qData.qNum : ''} copied to clipboard!` : `Question #${qData ? qData.qNum : ''} copied to clipboard — ready to paste!`, 3000);
                     }).catch(() => {});
                 }
 
@@ -4774,8 +4774,9 @@
                     if (que) {
                         e.preventDefault();
                         const text = formatQuestionForAI(que, aiPromptHint);
-                        copyToClipboard(text);
-                        showToast("Shortcut: Question copied for AI");
+                        copyQuestionWithOptionalImage(que, text).then((res) => {
+                            showToast(res && res.withImage ? "Shortcut: Visual snippet & question copied for AI" : "Shortcut: Question copied for AI");
+                        }).catch(() => {});
                     }
                 }
                 return;
@@ -6744,7 +6745,7 @@
         const clone = rootNode.cloneNode(true);
 
         // Strip non-content scripts, toolkit buttons, injected UI badges & Moodle feedback icons/accessibility text
-        clone.querySelectorAll('script, style, noscript, .amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-card-btn-container, .amaes-copy-ai-card-btn, .amaes-ask-ai-card-btn, .amaes-copy-img-card-btn, .amaes-paste-ai-card-btn, .amaes-web-ai-container, .amaes-web-ai-split-btn, .amaes-web-ai-main-action, .amaes-web-ai-arrow-btn, .amaes-web-ai-btn, .amaes-web-ai-menu, .amaes-web-ai-item, .amaes-web-ai-row, .amaes-web-ai-pill, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-thinking-indicator, .amaes-ai-fallback-bar, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, .accesshide, .sr-only').forEach(el => el.remove());
+        clone.querySelectorAll('script, style, noscript, .amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-card-btn-container, .amaes-copy-ai-card-btn, .amaes-ask-ai-card-btn, .amaes-paste-ai-card-btn, .amaes-web-ai-container, .amaes-web-ai-split-btn, .amaes-web-ai-main-action, .amaes-web-ai-arrow-btn, .amaes-web-ai-btn, .amaes-web-ai-menu, .amaes-web-ai-item, .amaes-web-ai-row, .amaes-web-ai-pill, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-thinking-indicator, .amaes-ai-fallback-bar, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, .accesshide, .sr-only').forEach(el => el.remove());
 
         // Convert Superscripts (e.g. 2^3 -> 2³, x^2 -> x², or ^{complex})
         clone.querySelectorAll('sup').forEach(sup => {
@@ -6861,6 +6862,154 @@
         }).join('\n');
 
         return text.trim();
+    }
+
+    // Fetch or convert an image URL to a PNG blob
+    async function getImageBlob(imgUrl) {
+        if (!imgUrl) return null;
+        try {
+            const response = await fetch(imgUrl);
+            const blob = await response.blob();
+            if (blob.type === 'image/png') return blob;
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            await new Promise((res, rej) => {
+                img.onload = res;
+                img.onerror = rej;
+                img.src = imgUrl;
+            });
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth || img.width;
+            canvas.height = img.naturalHeight || img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            return await new Promise(r => canvas.toBlob(r, 'image/png'));
+        } catch (err) {
+            logDebug('getImageBlob error:', err.message);
+            return null;
+        }
+    }
+
+    // Capture visual snapshot/snippet of a question card as a PNG Blob (diagrams, figures, and drag & drop)
+    async function captureQuestionSnippetBlob(que) {
+        if (!que || typeof document === 'undefined') return null;
+        try {
+            const formulation = que.querySelector('.formulation') || que.querySelector('.content') || que;
+            if (!formulation) return null;
+
+            // Clone formulation to render clean snippet without toolkit controls
+            const clone = formulation.cloneNode(true);
+            clone.querySelectorAll('.amaes-card-btn-container, .amaes-web-ai-row, .amaes-que-top-toolbar, .amaes-ai-thinking-indicator, .amaes-ai-fallback-bar, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag, .accesshide, .sr-only').forEach(el => el.remove());
+
+            // Convert images in clone to data URLs to avoid cross-origin canvas security errors
+            const origImgs = formulation.querySelectorAll('img');
+            const cloneImgs = clone.querySelectorAll('img');
+            for (let i = 0; i < cloneImgs.length && i < origImgs.length; i++) {
+                const orig = origImgs[i];
+                const cl = cloneImgs[i];
+                if (orig.complete && orig.naturalWidth > 0) {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = orig.naturalWidth;
+                        canvas.height = orig.naturalHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(orig, 0, 0);
+                        cl.src = canvas.toDataURL('image/png');
+                    } catch (e) {}
+                }
+            }
+
+            const rect = formulation.getBoundingClientRect();
+            const width = Math.max(Math.min(rect.width || 750, 1000), 450);
+            const height = Math.max(rect.height || 350, 180);
+
+            const xhtml = new XMLSerializer().serializeToString(clone);
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+                <foreignObject width="100%" height="100%">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="background:#ffffff; color:#0f172a; font-family:-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size:13.5px; line-height:1.5; padding:16px; box-sizing:border-box;">
+                        ${xhtml}
+                    </div>
+                </foreignObject>
+            </svg>`;
+
+            const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+            const svgUrl = URL.createObjectURL(svgBlob);
+
+            const img = new Image();
+            const pngBlob = await new Promise((resolve) => {
+                const timeout = setTimeout(() => resolve(null), 1800);
+                img.onload = () => {
+                    clearTimeout(timeout);
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, width, height);
+                        ctx.drawImage(img, 0, 0);
+                        URL.revokeObjectURL(svgUrl);
+                        canvas.toBlob(resolve, 'image/png');
+                    } catch (err) {
+                        URL.revokeObjectURL(svgUrl);
+                        resolve(null);
+                    }
+                };
+                img.onerror = () => {
+                    clearTimeout(timeout);
+                    URL.revokeObjectURL(svgUrl);
+                    resolve(null);
+                };
+                img.src = svgUrl;
+            });
+
+            if (pngBlob) return pngBlob;
+        } catch (err) {
+            logDebug('captureQuestionSnippetBlob error:', err.message);
+        }
+        return null;
+    }
+
+    // Copy question to clipboard: if question has images or is drag & drop, copies image snippet AND pure text simultaneously!
+    async function copyQuestionWithOptionalImage(que, text) {
+        if (!text) return { success: false, withImage: false };
+
+        const qData = que && typeof extractQuestionData === 'function' ? extractQuestionData(que) : null;
+        const hasImg = Boolean(que && que.querySelector('.formulation img, .qtext img, .ddarea img, .drop img, .drags img'));
+        const isDragDrop = Boolean((qData && qData.isDragDrop) ||
+                           (que && que.classList && (que.classList.contains('que_dragdrop') || que.classList.contains('ddwtos') || que.classList.contains('ddmarker') || que.classList.contains('ddimageortext'))) ||
+                           (que && que.querySelector('.drop, .draghome, .drags, .ddarea, .dragboxes, .place1, .drag')));
+
+        let pngBlob = null;
+        if (hasImg || isDragDrop) {
+            pngBlob = await captureQuestionSnippetBlob(que);
+            if (!pngBlob && hasImg) {
+                const firstImg = que.querySelector('.formulation img, .qtext img, .ddarea img');
+                if (firstImg && firstImg.src) {
+                    pngBlob = await getImageBlob(firstImg.src);
+                }
+            }
+        }
+
+        // Dual-MIME clipboard: copies BOTH image/png AND text/plain together so image-aware AI sees the snippet, while textboxes get pure text
+        if (pngBlob && typeof ClipboardItem !== 'undefined' && navigator.clipboard && navigator.clipboard.write) {
+            try {
+                const textBlob = new Blob([text], { type: 'text/plain' });
+                await navigator.clipboard.write([
+                    new ClipboardItem({
+                        'image/png': pngBlob,
+                        'text/plain': textBlob
+                    })
+                ]);
+                return { success: true, withImage: true };
+            } catch (err) {
+                logDebug('Dual clipboard copy failed, falling back to pure text copy:', err.message);
+            }
+        }
+
+        // Standard pure text copy fallback
+        await copyToClipboard(text);
+        return { success: true, withImage: false };
     }
 
     // Copy an image directly to the OS clipboard as a PNG blob
@@ -8015,9 +8164,9 @@
             window.open(url, '_blank');
             showToast('Opening Perplexity with question pre-filled...');
         } else if (provider === 'gemini') {
-            copyToClipboard(text).then(() => {
+            copyQuestionWithOptionalImage(que, text).then((res) => {
                 window.open('https://gemini.google.com/app', '_blank');
-                showToast('Question copied! Press Ctrl+V in Google Gemini.', 3500);
+                showToast(res && res.withImage ? 'Visual snippet & text copied! Press Ctrl+V in Google Gemini.' : 'Question copied! Press Ctrl+V in Google Gemini.', 3500);
             }).catch(() => {
                 window.open('https://gemini.google.com/app', '_blank');
                 showToast('Opening Google Gemini...', 2500);
@@ -8100,11 +8249,11 @@
                 aiActions.className = 'amaes-card-ai-actions';
                 aiActions.style.cssText = 'display: flex; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;';
 
-                // 1a. Copy Question Text Button
+                // 1a. Copy Question Text / Visual Snippet Button
                 const btnText = document.createElement('button');
                 btnText.type = 'button';
                 btnText.className = 'amaes-copy-ai-card-btn';
-                btnText.title = 'Copy question and choices (strict direct answer instruction for AI)';
+                btnText.title = 'Copy question and choices (copies visual snippet + text for images and drag & drop)';
                 btnText.innerHTML = `${ICONS.copy || ICONS.sparkles} <span>Copy AI</span>`;
 
                 btnText.onclick = async (e) => {
@@ -8116,11 +8265,11 @@
                     const text = formatQuestionForAI(que, aiPromptHint);
                     if (!text) return;
                     try {
-                        await copyToClipboard(text);
-                        btnText.innerHTML = `${ICONS.check} <span>Copied!</span>`;
+                        const copyRes = await copyQuestionWithOptionalImage(que, text);
+                        btnText.innerHTML = `${ICONS.check} <span>${copyRes && copyRes.withImage ? 'Copied Snippet!' : 'Copied!'}</span>`;
                         btnText.style.borderColor = 'var(--accent-green, #10b981)';
                         btnText.style.color = 'var(--accent-green, #10b981)';
-                        showToast(willIncludeContext ? 'Question copied with Course AI Context!' : 'Question & choices copied for AI!');
+                        showToast(copyRes && copyRes.withImage ? 'Visual snippet & text copied for AI!' : (willIncludeContext ? 'Question copied with Course AI Context!' : 'Question & choices copied for AI!'));
                         if (willIncludeContext) {
                             setLog("Copied question with Course Context for AI.", "var(--accent-green)");
                         }
@@ -8149,41 +8298,6 @@
                         await autoSelectFromAiClipboard(que);
                     };
                     aiActions.appendChild(btnPaste);
-                }
-
-                // 1c. Copy Image Button (if question has diagram/circuits)
-                const qImages = que.querySelectorAll('.formulation img, .qtext img');
-                if (qImages.length > 0) {
-                    const firstImgUrl = qImages[0].src;
-                    const btnImg = document.createElement('button');
-                    btnImg.type = 'button';
-                    btnImg.className = 'amaes-copy-ai-card-btn amaes-copy-img-card-btn';
-                    btnImg.title = 'Copy question diagram/image to clipboard for Gemini multimodal input';
-                    btnImg.innerHTML = `${ICONS.camera} <span>Copy Img</span>`;
-
-                    btnImg.onclick = async (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setActiveQuestion(que, true);
-                        btnImg.innerHTML = `<span>Copying...</span>`;
-                        const res = await copyImageBlobToClipboard(firstImgUrl);
-                        if (res.success) {
-                            btnImg.innerHTML = `${ICONS.check} <span>Image Copied!</span>`;
-                            btnImg.style.borderColor = 'var(--accent-green, #10b981)';
-                            btnImg.style.color = 'var(--accent-green, #10b981)';
-                            showToast('Image copied to clipboard! Paste directly into Gemini.');
-                        } else {
-                            btnImg.innerHTML = `${ICONS.check} <span>URL Copied</span>`;
-                            window.open(firstImgUrl, '_blank');
-                            showToast('Image URL copied & opened in new tab.');
-                        }
-                        setTimeout(() => {
-                            btnImg.innerHTML = `${ICONS.camera} <span>Copy Img</span>`;
-                            btnImg.style.borderColor = '';
-                            btnImg.style.color = '';
-                        }, 2000);
-                    };
-                    aiActions.appendChild(btnImg);
                 }
 
                 // 1d. Built-in AI Solver Section (Differentiated with clear header & button)
@@ -8502,12 +8616,21 @@
         if (signature === lastCopiedSignature) return;
         lastCopiedSignature = signature;
 
-        copyToClipboard(textToCopy).then(() => {
-            logDebug('Copied unknown question for AI helper');
-            showToast('Question copied! Ready to paste into AI helper.');
+        let targetQue = null;
+        for (const que of queElements) {
+            if (!que.querySelector('.amaes-verified-badge')) {
+                targetQue = que;
+                break;
+            }
+        }
+        if (!targetQue && queElements.length > 0) targetQue = queElements[0];
+
+        copyQuestionWithOptionalImage(targetQue, textToCopy).then((res) => {
+            logDebug('Copied unknown question for AI helper' + (res && res.withImage ? ' with snippet' : ''));
+            showToast(res && res.withImage ? 'Visual snippet & question copied! Ready to paste into AI.' : 'Question copied! Ready to paste into AI helper.');
             const statusEl = document.getElementById('amaes-status');
             if (statusEl) {
-                statusEl.innerHTML = `<span style="color:var(--accent-green);">Question ready to paste into AI helper!</span>`;
+                statusEl.innerHTML = `<span style="color:var(--accent-green);">${res && res.withImage ? 'Visual snippet & text ready to paste into AI!' : 'Question ready to paste into AI helper!'}</span>`;
             }
         }).catch(err => {
             logDebug('Auto-copy failed:', err.message);
@@ -9274,8 +9397,8 @@
                 copyBtn.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    copyToClipboard(promptText).then(() => {
-                        showToast('Question copied for AI.');
+                    copyQuestionWithOptionalImage(que, promptText).then((res) => {
+                        showToast(res && res.withImage ? 'Visual snippet & question copied for AI.' : 'Question copied for AI.');
                     }).catch(() => {});
                 };
             }
@@ -9419,8 +9542,8 @@
             copyBtn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                copyToClipboard(promptText).then(() => {
-                    showToast('Question copied for AI.');
+                copyQuestionWithOptionalImage(que, promptText).then((res) => {
+                    showToast(res && res.withImage ? 'Visual snippet & question copied for AI.' : 'Question copied for AI.');
                 }).catch(() => {});
             };
         }
@@ -9511,7 +9634,7 @@
         const rateLimitStatus = getAiRateLimitStatus();
         if (rateLimitStatus.isLimited) {
             if (getAiAutoCopyOnFail()) {
-                copyToClipboard(promptText).catch(() => {});
+                copyQuestionWithOptionalImage(que, promptText).catch(() => {});
             }
             const rlMsg = `Google is temporarily limiting AI requests. Available again in about ${rateLimitStatus.remainingSec} seconds.`;
             setLog(`[AI Rate Limit] Question #${qData ? qData.qNum : ''}: ${rlMsg} (Prompt copied)`, "var(--accent-amber)");
@@ -9791,7 +9914,7 @@
                         // More than 1 uneliminated choices remain; do NOT select the wrong answer!
                         const wrongReason = `AI suggested "${matched.choiceText}", but it is confirmed INCORRECT by database.`;
                         if (getAiAutoCopyOnFail()) {
-                            copyToClipboard(promptText).catch(() => {});
+                            copyQuestionWithOptionalImage(que, promptText).catch(() => {});
                         }
                         showAiFallbackBar(que, qData, promptText, async () => {
                             await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
@@ -9835,7 +9958,7 @@
                 const cleanSnippet = answerText.trim().replace(/\s+/g, ' ').slice(0, 32);
                 const mismatchReason = `AI suggested "${cleanSnippet}", but it couldn't be matched to any option.`;
                 if (getAiAutoCopyOnFail()) {
-                    copyToClipboard(promptText).catch(() => {});
+                    copyQuestionWithOptionalImage(que, promptText).catch(() => {});
                 }
                 showAiFallbackBar(que, qData, promptText, async () => {
                     await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
@@ -9879,8 +10002,8 @@
 
         // Auto-copy question to clipboard if enabled on failure
         if (getAiAutoCopyOnFail()) {
-            copyToClipboard(promptText).then(() => {
-                showToast('Question copied to clipboard for external AI solving.', 3500);
+            copyQuestionWithOptionalImage(que, promptText).then((res) => {
+                showToast(res && res.withImage ? 'Visual snippet & question copied to clipboard for external AI solving.' : 'Question copied to clipboard for external AI solving.', 3500);
             }).catch(() => {});
         }
 
@@ -14410,16 +14533,6 @@
                     border-color: #f59e0b !important;
                 }
 
-                .amaes-copy-img-card-btn {
-                    background: rgba(14, 165, 233, 0.12) !important;
-                    color: #0ea5e9 !important;
-                    border-color: rgba(14, 165, 233, 0.3) !important;
-                }
-                .amaes-copy-img-card-btn:hover,
-                .amaes-copy-img-card-btn:active {
-                    background: rgba(14, 165, 233, 0.22) !important;
-                    border-color: #0ea5e9 !important;
-                }
 
                 /* Built-in AI Section (Left Sidebar) */
                 .amaes-builtin-ai-section {

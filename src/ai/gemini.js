@@ -675,8 +675,8 @@
                 copyBtn.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    copyToClipboard(promptText).then(() => {
-                        showToast('Question copied for AI.');
+                    copyQuestionWithOptionalImage(que, promptText).then((res) => {
+                        showToast(res && res.withImage ? 'Visual snippet & question copied for AI.' : 'Question copied for AI.');
                     }).catch(() => {});
                 };
             }
@@ -820,8 +820,8 @@
             copyBtn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                copyToClipboard(promptText).then(() => {
-                    showToast('Question copied for AI.');
+                copyQuestionWithOptionalImage(que, promptText).then((res) => {
+                    showToast(res && res.withImage ? 'Visual snippet & question copied for AI.' : 'Question copied for AI.');
                 }).catch(() => {});
             };
         }
@@ -912,7 +912,7 @@
         const rateLimitStatus = getAiRateLimitStatus();
         if (rateLimitStatus.isLimited) {
             if (getAiAutoCopyOnFail()) {
-                copyToClipboard(promptText).catch(() => {});
+                copyQuestionWithOptionalImage(que, promptText).catch(() => {});
             }
             const rlMsg = `Google is temporarily limiting AI requests. Available again in about ${rateLimitStatus.remainingSec} seconds.`;
             setLog(`[AI Rate Limit] Question #${qData ? qData.qNum : ''}: ${rlMsg} (Prompt copied)`, "var(--accent-amber)");
@@ -1192,7 +1192,7 @@
                         // More than 1 uneliminated choices remain; do NOT select the wrong answer!
                         const wrongReason = `AI suggested "${matched.choiceText}", but it is confirmed INCORRECT by database.`;
                         if (getAiAutoCopyOnFail()) {
-                            copyToClipboard(promptText).catch(() => {});
+                            copyQuestionWithOptionalImage(que, promptText).catch(() => {});
                         }
                         showAiFallbackBar(que, qData, promptText, async () => {
                             await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
@@ -1236,7 +1236,7 @@
                 const cleanSnippet = answerText.trim().replace(/\s+/g, ' ').slice(0, 32);
                 const mismatchReason = `AI suggested "${cleanSnippet}", but it couldn't be matched to any option.`;
                 if (getAiAutoCopyOnFail()) {
-                    copyToClipboard(promptText).catch(() => {});
+                    copyQuestionWithOptionalImage(que, promptText).catch(() => {});
                 }
                 showAiFallbackBar(que, qData, promptText, async () => {
                     await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
@@ -1280,8 +1280,8 @@
 
         // Auto-copy question to clipboard if enabled on failure
         if (getAiAutoCopyOnFail()) {
-            copyToClipboard(promptText).then(() => {
-                showToast('Question copied to clipboard for external AI solving.', 3500);
+            copyQuestionWithOptionalImage(que, promptText).then((res) => {
+                showToast(res && res.withImage ? 'Visual snippet & question copied to clipboard for external AI solving.' : 'Question copied to clipboard for external AI solving.', 3500);
             }).catch(() => {});
         }
 

@@ -325,9 +325,9 @@
             window.open(url, '_blank');
             showToast('Opening Perplexity with question pre-filled...');
         } else if (provider === 'gemini') {
-            copyToClipboard(text).then(() => {
+            copyQuestionWithOptionalImage(que, text).then((res) => {
                 window.open('https://gemini.google.com/app', '_blank');
-                showToast('Question copied! Press Ctrl+V in Google Gemini.', 3500);
+                showToast(res && res.withImage ? 'Visual snippet & text copied! Press Ctrl+V in Google Gemini.' : 'Question copied! Press Ctrl+V in Google Gemini.', 3500);
             }).catch(() => {
                 window.open('https://gemini.google.com/app', '_blank');
                 showToast('Opening Google Gemini...', 2500);
@@ -410,11 +410,11 @@
                 aiActions.className = 'amaes-card-ai-actions';
                 aiActions.style.cssText = 'display: flex; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;';
 
-                // 1a. Copy Question Text Button
+                // 1a. Copy Question Text / Visual Snippet Button
                 const btnText = document.createElement('button');
                 btnText.type = 'button';
                 btnText.className = 'amaes-copy-ai-card-btn';
-                btnText.title = 'Copy question and choices (strict direct answer instruction for AI)';
+                btnText.title = 'Copy question and choices (copies visual snippet + text for images and drag & drop)';
                 btnText.innerHTML = `${ICONS.copy || ICONS.sparkles} <span>Copy AI</span>`;
 
                 btnText.onclick = async (e) => {
@@ -426,11 +426,11 @@
                     const text = formatQuestionForAI(que, aiPromptHint);
                     if (!text) return;
                     try {
-                        await copyToClipboard(text);
-                        btnText.innerHTML = `${ICONS.check} <span>Copied!</span>`;
+                        const copyRes = await copyQuestionWithOptionalImage(que, text);
+                        btnText.innerHTML = `${ICONS.check} <span>${copyRes && copyRes.withImage ? 'Copied Snippet!' : 'Copied!'}</span>`;
                         btnText.style.borderColor = 'var(--accent-green, #10b981)';
                         btnText.style.color = 'var(--accent-green, #10b981)';
-                        showToast(willIncludeContext ? 'Question copied with Course AI Context!' : 'Question & choices copied for AI!');
+                        showToast(copyRes && copyRes.withImage ? 'Visual snippet & text copied for AI!' : (willIncludeContext ? 'Question copied with Course AI Context!' : 'Question & choices copied for AI!'));
                         if (willIncludeContext) {
                             setLog("Copied question with Course Context for AI.", "var(--accent-green)");
                         }
@@ -459,41 +459,6 @@
                         await autoSelectFromAiClipboard(que);
                     };
                     aiActions.appendChild(btnPaste);
-                }
-
-                // 1c. Copy Image Button (if question has diagram/circuits)
-                const qImages = que.querySelectorAll('.formulation img, .qtext img');
-                if (qImages.length > 0) {
-                    const firstImgUrl = qImages[0].src;
-                    const btnImg = document.createElement('button');
-                    btnImg.type = 'button';
-                    btnImg.className = 'amaes-copy-ai-card-btn amaes-copy-img-card-btn';
-                    btnImg.title = 'Copy question diagram/image to clipboard for Gemini multimodal input';
-                    btnImg.innerHTML = `${ICONS.camera} <span>Copy Img</span>`;
-
-                    btnImg.onclick = async (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setActiveQuestion(que, true);
-                        btnImg.innerHTML = `<span>Copying...</span>`;
-                        const res = await copyImageBlobToClipboard(firstImgUrl);
-                        if (res.success) {
-                            btnImg.innerHTML = `${ICONS.check} <span>Image Copied!</span>`;
-                            btnImg.style.borderColor = 'var(--accent-green, #10b981)';
-                            btnImg.style.color = 'var(--accent-green, #10b981)';
-                            showToast('Image copied to clipboard! Paste directly into Gemini.');
-                        } else {
-                            btnImg.innerHTML = `${ICONS.check} <span>URL Copied</span>`;
-                            window.open(firstImgUrl, '_blank');
-                            showToast('Image URL copied & opened in new tab.');
-                        }
-                        setTimeout(() => {
-                            btnImg.innerHTML = `${ICONS.camera} <span>Copy Img</span>`;
-                            btnImg.style.borderColor = '';
-                            btnImg.style.color = '';
-                        }, 2000);
-                    };
-                    aiActions.appendChild(btnImg);
                 }
 
                 // 1d. Built-in AI Solver Section (Differentiated with clear header & button)
@@ -812,12 +777,21 @@
         if (signature === lastCopiedSignature) return;
         lastCopiedSignature = signature;
 
-        copyToClipboard(textToCopy).then(() => {
-            logDebug('Copied unknown question for AI helper');
-            showToast('Question copied! Ready to paste into AI helper.');
+        let targetQue = null;
+        for (const que of queElements) {
+            if (!que.querySelector('.amaes-verified-badge')) {
+                targetQue = que;
+                break;
+            }
+        }
+        if (!targetQue && queElements.length > 0) targetQue = queElements[0];
+
+        copyQuestionWithOptionalImage(targetQue, textToCopy).then((res) => {
+            logDebug('Copied unknown question for AI helper' + (res && res.withImage ? ' with snippet' : ''));
+            showToast(res && res.withImage ? 'Visual snippet & question copied! Ready to paste into AI.' : 'Question copied! Ready to paste into AI helper.');
             const statusEl = document.getElementById('amaes-status');
             if (statusEl) {
-                statusEl.innerHTML = `<span style="color:var(--accent-green);">Question ready to paste into AI helper!</span>`;
+                statusEl.innerHTML = `<span style="color:var(--accent-green);">${res && res.withImage ? 'Visual snippet & text ready to paste into AI!' : 'Question ready to paste into AI helper!'}</span>`;
             }
         }).catch(err => {
             logDebug('Auto-copy failed:', err.message);

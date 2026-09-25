@@ -1021,16 +1021,6 @@
                     border-color: #f59e0b !important;
                 }
 
-                .amaes-copy-img-card-btn {
-                    background: rgba(14, 165, 233, 0.12) !important;
-                    color: #0ea5e9 !important;
-                    border-color: rgba(14, 165, 233, 0.3) !important;
-                }
-                .amaes-copy-img-card-btn:hover,
-                .amaes-copy-img-card-btn:active {
-                    background: rgba(14, 165, 233, 0.22) !important;
-                    border-color: #0ea5e9 !important;
-                }
 
                 /* Built-in AI Section (Left Sidebar) */
                 .amaes-builtin-ai-section {
