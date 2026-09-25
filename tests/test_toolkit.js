@@ -4793,7 +4793,8 @@ test("Fast Answer (Turbo) Mode: accelerates next-page transitions, batch-fills v
 
     // 1. Settings card & HUD controls
     assert.ok(script.includes('id="chk-fast-quiz-mode"'), "Panel must include Fast Answer Mode checkbox");
-    assert.ok(script.includes('⚡ Fast Answer Mode'), "Must display non-techy friendly label 'Fast Answer Mode'");
+    assert.ok(script.includes('Fast Answer Mode'), "Must display non-techy friendly label 'Fast Answer Mode'");
+    assert.ok(script.includes('id="amaes-fast-quiz-icon"'), "Must display SVG icon badge for Fast Mode");
     assert.ok(script.includes('id="btn-hud-fast-quiz"'), "HUD must include Fast Mode toggle button");
     assert.ok(script.includes('Fast Co-Pilot ⚡'), "HUD status badge must indicate Fast Co-Pilot when active");
 
@@ -4821,12 +4822,15 @@ test("Privacy-Safe Session Telemetry: tracks session-only quiz count, dispatches
     assert.ok(script.includes("getAnonymousInstallId"), "Must generate anonymous installation UUID");
     assert.ok(script.includes("dispatchUsageTelemetry"), "Must define dispatchUsageTelemetry");
 
-    // 3. Cloudflare worker telemetry and stats routes
+    // 3. Cloudflare worker telemetry and stats routes with timeframe support
     assert.ok(workerScript.includes('path === "/telemetry"'), "Relay worker must route /telemetry");
     assert.ok(workerScript.includes('path === "/telemetry/stats"'), "Relay worker must route /telemetry/stats");
+    assert.ok(workerScript.includes("rawTimeframe"), "Worker must parse timeframe/period parameter");
 
-    // 4. Developer Console stats integration
+    // 4. Developer Console stats integration & timeframe/feature commands
     assert.ok(script.includes("c === 'stats' || c === 'telemetry'"), "Developer console must support 'stats' command");
+    assert.ok(script.includes("c === 'features'"), "Developer console must support 'features' command");
+    assert.ok(script.includes("users <timeframe>"), "Developer console must document users timeframe query");
 });
 
 console.log("\n==================================================");

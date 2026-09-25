@@ -1116,20 +1116,32 @@
         if (chk) chk.checked = fastQuizMode;
         const card = document.getElementById('amaes-fast-answer-card');
         if (card) {
-            card.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255, 255, 255, 0.04)';
-            card.style.borderColor = fastQuizMode ? 'rgba(245, 158, 11, 0.35)' : 'var(--border-subtle)';
+            card.style.background = fastQuizMode
+                ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(217, 119, 6, 0.08) 100%)'
+                : 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%)';
+            card.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.25)';
+            card.style.boxShadow = fastQuizMode ? '0 0 10px rgba(245, 158, 11, 0.15)' : 'none';
+        }
+        const title = document.getElementById('amaes-fast-quiz-title');
+        if (title) {
+            title.style.color = fastQuizMode ? '#f59e0b' : 'var(--text-primary)';
+        }
+        const iconBadge = document.getElementById('amaes-fast-quiz-icon');
+        if (iconBadge) {
+            iconBadge.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.12)';
         }
         const pill = document.getElementById('amaes-fast-quiz-pill');
         if (pill) {
-            pill.style.background = fastQuizMode ? '#f59e0b' : 'var(--border-subtle)';
-            pill.style.color = fastQuizMode ? '#000' : 'var(--text-muted)';
+            pill.style.background = fastQuizMode ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(245, 158, 11, 0.12)';
+            pill.style.color = fastQuizMode ? '#000' : '#f59e0b';
+            pill.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.3)';
         }
         const hudFastBtn = document.getElementById('btn-hud-fast-quiz');
         if (hudFastBtn) {
             hudFastBtn.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255,255,255,0.08)';
             hudFastBtn.style.color = fastQuizMode ? '#f59e0b' : '#94a3b8';
             hudFastBtn.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(255,255,255,0.15)';
-            hudFastBtn.innerHTML = `⚡ ${fastQuizMode ? 'Turbo ON' : 'Turbo'}`;
+            hudFastBtn.innerHTML = `${ICONS.zap} <span>${fastQuizMode ? 'Turbo ON' : 'Turbo'}</span>`;
         }
         const hudModeText = document.getElementById('hud-mode-text');
         if (hudModeText && autoQuizMode && !isWaitingForUserAnswer) {
@@ -1330,8 +1342,8 @@
             </button>
 
             <!-- Fast Mode HUD Toggle -->
-            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700;" title="Toggle Fast Answer (Turbo) Mode">
-                ⚡ ${fastQuizMode ? 'Turbo ON' : 'Turbo'}
+            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Toggle Fast Answer (Turbo) Mode">
+                ${ICONS.zap} <span>${fastQuizMode ? 'Turbo ON' : 'Turbo'}</span>
             </button>
 
             <!-- Toggle Toolkit Panel -->

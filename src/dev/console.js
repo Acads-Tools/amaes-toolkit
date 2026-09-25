@@ -126,19 +126,78 @@
             }
         } else if (c === 'users') {
             addLine(`Active-user telemetry is disabled for privacy.`, 'var(--accent-green)');
-        } else if (c === 'stats' || c === 'telemetry') {
-            addLine(`Fetching live anonymous mesh & usage metrics...`, 'var(--text-muted)');
+            addLine(`Tip: Type 'stats <1h|6h|24h|7d|30d|overall>' or 'users <timeframe>' to view aggregate counts without identity tracking.`, 'var(--text-muted)');
+        } else if (cmd.trim().toLowerCase().startsWith('users ') && cmd.trim().split(/\s+/)[1]) {
+            const tf = cmd.trim().split(/\s+/)[1].toLowerCase();
+            addLine(`Fetching anonymous user counts (${tf})...`, 'var(--text-muted)');
             const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
-            fetch(`${relayUrl}/telemetry/stats`)
+            fetch(`${relayUrl}/telemetry/stats?timeframe=${encodeURIComponent(tf)}`)
                 .then(r => r.json())
                 .then(data => {
                     if (data && data.success) {
-                        addLine(`Anonymous Usage & Network Telemetry (Past 24h):`, 'var(--accent-purple)');
-                        addLine(`• Active Unique Users (24h): ${data.active_users_24h}`, 'var(--accent-green)');
-                        addLine(`• Total Telemetry Events (24h): ${data.total_events_24h}`, 'var(--text-secondary)');
-                        addLine(`• Session Quizzes Solved Reported: ${data.total_session_quizzes_reported}`, 'var(--accent-blue)');
-                        addLine(`• Fast Answer (Turbo) Users: ${data.fast_mode_active_count}`, 'var(--accent-amber)');
-                        const vList = Object.entries(data.versions || {}).map(([v, count]) => `v${v}: ${count}`).join(', ');
+                        const count = typeof data.active_users !== 'undefined' ? data.active_users : data.active_users_24h;
+                        const label = data.timeframe || tf;
+                        addLine(`Anonymous Active Users (${label}):`, 'var(--accent-purple)');
+                        addLine(`• Unique Active Devices: ${count}`, 'var(--accent-green)');
+                        addLine(`• Total Quizzes Solved: ${data.total_session_quizzes_reported || 0}`, 'var(--accent-blue)');
+                        addLine(`• Fast Answer (Turbo) Users: ${data.fast_mode_active_count || 0} (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
+                    } else {
+                        addLine(`Unable to retrieve metrics for '${tf}'.`, 'var(--accent-pink)');
+                    }
+                })
+                .catch(err => {
+                    addLine(`Connection failed: ${err.message}`, 'var(--accent-pink)');
+                });
+        } else if (c === 'features' || c === 'featurestats' || cmd.trim().toLowerCase().startsWith('features ')) {
+            const parts = cmd.trim().split(/\s+/);
+            const tf = (parts[1] || '24h').toLowerCase();
+            addLine(`Analyzing feature adoption across users (${tf})...`, 'var(--text-muted)');
+            const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
+            fetch(`${relayUrl}/telemetry/stats?timeframe=${encodeURIComponent(tf)}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.success) {
+                        const count = typeof data.active_users !== 'undefined' ? data.active_users : data.active_users_24h;
+                        const label = data.timeframe || tf;
+                        addLine(`Feature Adoption Summary (${label}):`, 'var(--accent-purple)');
+                        addLine(`• ⚡ Fast Answer (Turbo) Mode: ${data.fast_mode_active_count || 0} of ${count} users (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
+                        addLine(`• Auto-Quiz Completions: ${data.total_session_quizzes_reported || 0} quizzes solved`, 'var(--accent-green)');
+                        if (data.events && Object.keys(data.events).length > 0) {
+                            const evts = Object.entries(data.events).map(([k, v]) => `${k}: ${v}`).join(' | ');
+                            addLine(`• Action Events: ${evts}`, 'var(--accent-blue)');
+                        }
+                        const vList = Object.entries(data.versions || {}).map(([v, cnt]) => `v${v}: ${cnt}`).join(', ');
+                        addLine(`• Active Script Versions: ${vList || 'None'}`, 'var(--text-secondary)');
+                        addLine(`• Local Client Status: Fast Mode: ${fastQuizMode ? 'ON' : 'OFF'} | Auto-Quiz: ${autoQuizMode ? 'ON' : 'OFF'}`, 'var(--text-muted)');
+                    } else {
+                        addLine(`Feature breakdown currently unavailable from relay.`, 'var(--accent-pink)');
+                    }
+                })
+                .catch(err => {
+                    addLine(`Relay query error: ${err.message}`, 'var(--accent-pink)');
+                });
+        } else if (c === 'stats' || c === 'telemetry' || cmd.trim().toLowerCase().startsWith('stats ') || cmd.trim().toLowerCase().startsWith('telemetry ')) {
+            const parts = cmd.trim().split(/\s+/);
+            const tf = (parts[1] || '24h').toLowerCase();
+            addLine(`Fetching live anonymous telemetry (${tf})...`, 'var(--text-muted)');
+            const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
+            fetch(`${relayUrl}/telemetry/stats?timeframe=${encodeURIComponent(tf)}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.success) {
+                        const count = typeof data.active_users !== 'undefined' ? data.active_users : data.active_users_24h;
+                        const eventsCount = typeof data.total_events !== 'undefined' ? data.total_events : data.total_events_24h;
+                        const label = data.timeframe || tf;
+                        addLine(`Anonymous Usage & Feature Telemetry (${label}):`, 'var(--accent-purple)');
+                        addLine(`• Active Unique Users: ${count}`, 'var(--accent-green)');
+                        addLine(`• Total Telemetry Events: ${eventsCount}`, 'var(--text-secondary)');
+                        addLine(`• Session Quizzes Solved Reported: ${data.total_session_quizzes_reported || 0}`, 'var(--accent-blue)');
+                        addLine(`• Fast Answer (Turbo) Users: ${data.fast_mode_active_count || 0} (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
+                        if (data.events && Object.keys(data.events).length > 0) {
+                            const eList = Object.entries(data.events).map(([ev, num]) => `${ev}: ${num}`).join(', ');
+                            addLine(`• Activity Breakdown: ${eList}`, 'var(--text-secondary)');
+                        }
+                        const vList = Object.entries(data.versions || {}).map(([v, cnt]) => `v${v} (${cnt})`).join(', ');
                         addLine(`• Version Distribution: ${vList || 'None reported'}`, 'var(--text-secondary)');
                         addLine(`• Current Client Session Quizzes: ${sessionQuizzesSolved || 0}`, 'var(--text-muted)');
                     } else {
@@ -210,15 +269,17 @@
             addLine('Terminal buffer cleared.', 'var(--text-muted)');
         } else if (c === 'help') {
             addLine('Admin Command Suite:', 'var(--accent-purple)');
-            addLine('• status    - System health, active course context & relay status', 'var(--text-secondary)');
-            addLine('• ping      - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
-            addLine('• stats     - Live anonymous user counts, versions, and session quiz stats', 'var(--text-secondary)');
-            addLine('• cache     - Question bank statistics and stored course codes', 'var(--text-secondary)');
-            addLine('• logs      - Dumps recent audit events directly in console', 'var(--text-secondary)');
-            addLine('• logs -c   - Copies full system diagnostic audit log to clipboard', 'var(--text-secondary)');
-            addLine('• unknown   - Lists all recorded unknown question type signatures', 'var(--text-secondary)');
-            addLine('• clear     - Clears terminal output screen buffer', 'var(--text-secondary)');
-            addLine('• help      - Displays this command reference list', 'var(--text-secondary)');
+            addLine('• status                   - System health, active course context & relay status', 'var(--text-secondary)');
+            addLine('• stats [1h|6h|24h|7d|all] - Live user counts, quizzes solved & adoption rates', 'var(--text-secondary)');
+            addLine('• users [1h|6h|24h|7d|all] - Aggregate unique active user counts by timeframe', 'var(--text-secondary)');
+            addLine('• features [timeframe]     - Feature adoption breakdown (Fast mode, auto-quiz, etc.)', 'var(--text-secondary)');
+            addLine('• ping                     - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
+            addLine('• cache                    - Question bank statistics and stored course codes', 'var(--text-secondary)');
+            addLine('• logs                     - Dumps recent audit events directly in console', 'var(--text-secondary)');
+            addLine('• logs -c                  - Copies full system diagnostic audit log to clipboard', 'var(--text-secondary)');
+            addLine('• unknown                  - Lists all recorded unknown question type signatures', 'var(--text-secondary)');
+            addLine('• clear                    - Clears terminal output screen buffer', 'var(--text-secondary)');
+            addLine('• help                     - Displays this command reference list', 'var(--text-secondary)');
         } else {
             addLine(`Unknown command: '${cmd}'. Type 'help' for available commands.`, 'var(--accent-amber)');
         }

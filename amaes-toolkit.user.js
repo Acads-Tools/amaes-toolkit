@@ -4211,20 +4211,32 @@
         if (chk) chk.checked = fastQuizMode;
         const card = document.getElementById('amaes-fast-answer-card');
         if (card) {
-            card.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255, 255, 255, 0.04)';
-            card.style.borderColor = fastQuizMode ? 'rgba(245, 158, 11, 0.35)' : 'var(--border-subtle)';
+            card.style.background = fastQuizMode
+                ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(217, 119, 6, 0.08) 100%)'
+                : 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%)';
+            card.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.25)';
+            card.style.boxShadow = fastQuizMode ? '0 0 10px rgba(245, 158, 11, 0.15)' : 'none';
+        }
+        const title = document.getElementById('amaes-fast-quiz-title');
+        if (title) {
+            title.style.color = fastQuizMode ? '#f59e0b' : 'var(--text-primary)';
+        }
+        const iconBadge = document.getElementById('amaes-fast-quiz-icon');
+        if (iconBadge) {
+            iconBadge.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.12)';
         }
         const pill = document.getElementById('amaes-fast-quiz-pill');
         if (pill) {
-            pill.style.background = fastQuizMode ? '#f59e0b' : 'var(--border-subtle)';
-            pill.style.color = fastQuizMode ? '#000' : 'var(--text-muted)';
+            pill.style.background = fastQuizMode ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(245, 158, 11, 0.12)';
+            pill.style.color = fastQuizMode ? '#000' : '#f59e0b';
+            pill.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.3)';
         }
         const hudFastBtn = document.getElementById('btn-hud-fast-quiz');
         if (hudFastBtn) {
             hudFastBtn.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255,255,255,0.08)';
             hudFastBtn.style.color = fastQuizMode ? '#f59e0b' : '#94a3b8';
             hudFastBtn.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(255,255,255,0.15)';
-            hudFastBtn.innerHTML = `⚡ ${fastQuizMode ? 'Turbo ON' : 'Turbo'}`;
+            hudFastBtn.innerHTML = `${ICONS.zap} <span>${fastQuizMode ? 'Turbo ON' : 'Turbo'}</span>`;
         }
         const hudModeText = document.getElementById('hud-mode-text');
         if (hudModeText && autoQuizMode && !isWaitingForUserAnswer) {
@@ -4425,8 +4437,8 @@
             </button>
 
             <!-- Fast Mode HUD Toggle -->
-            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700;" title="Toggle Fast Answer (Turbo) Mode">
-                ⚡ ${fastQuizMode ? 'Turbo ON' : 'Turbo'}
+            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Toggle Fast Answer (Turbo) Mode">
+                ${ICONS.zap} <span>${fastQuizMode ? 'Turbo ON' : 'Turbo'}</span>
             </button>
 
             <!-- Toggle Toolkit Panel -->
@@ -13345,19 +13357,78 @@
             }
         } else if (c === 'users') {
             addLine(`Active-user telemetry is disabled for privacy.`, 'var(--accent-green)');
-        } else if (c === 'stats' || c === 'telemetry') {
-            addLine(`Fetching live anonymous mesh & usage metrics...`, 'var(--text-muted)');
+            addLine(`Tip: Type 'stats <1h|6h|24h|7d|30d|overall>' or 'users <timeframe>' to view aggregate counts without identity tracking.`, 'var(--text-muted)');
+        } else if (cmd.trim().toLowerCase().startsWith('users ') && cmd.trim().split(/\s+/)[1]) {
+            const tf = cmd.trim().split(/\s+/)[1].toLowerCase();
+            addLine(`Fetching anonymous user counts (${tf})...`, 'var(--text-muted)');
             const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
-            fetch(`${relayUrl}/telemetry/stats`)
+            fetch(`${relayUrl}/telemetry/stats?timeframe=${encodeURIComponent(tf)}`)
                 .then(r => r.json())
                 .then(data => {
                     if (data && data.success) {
-                        addLine(`Anonymous Usage & Network Telemetry (Past 24h):`, 'var(--accent-purple)');
-                        addLine(`• Active Unique Users (24h): ${data.active_users_24h}`, 'var(--accent-green)');
-                        addLine(`• Total Telemetry Events (24h): ${data.total_events_24h}`, 'var(--text-secondary)');
-                        addLine(`• Session Quizzes Solved Reported: ${data.total_session_quizzes_reported}`, 'var(--accent-blue)');
-                        addLine(`• Fast Answer (Turbo) Users: ${data.fast_mode_active_count}`, 'var(--accent-amber)');
-                        const vList = Object.entries(data.versions || {}).map(([v, count]) => `v${v}: ${count}`).join(', ');
+                        const count = typeof data.active_users !== 'undefined' ? data.active_users : data.active_users_24h;
+                        const label = data.timeframe || tf;
+                        addLine(`Anonymous Active Users (${label}):`, 'var(--accent-purple)');
+                        addLine(`• Unique Active Devices: ${count}`, 'var(--accent-green)');
+                        addLine(`• Total Quizzes Solved: ${data.total_session_quizzes_reported || 0}`, 'var(--accent-blue)');
+                        addLine(`• Fast Answer (Turbo) Users: ${data.fast_mode_active_count || 0} (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
+                    } else {
+                        addLine(`Unable to retrieve metrics for '${tf}'.`, 'var(--accent-pink)');
+                    }
+                })
+                .catch(err => {
+                    addLine(`Connection failed: ${err.message}`, 'var(--accent-pink)');
+                });
+        } else if (c === 'features' || c === 'featurestats' || cmd.trim().toLowerCase().startsWith('features ')) {
+            const parts = cmd.trim().split(/\s+/);
+            const tf = (parts[1] || '24h').toLowerCase();
+            addLine(`Analyzing feature adoption across users (${tf})...`, 'var(--text-muted)');
+            const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
+            fetch(`${relayUrl}/telemetry/stats?timeframe=${encodeURIComponent(tf)}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.success) {
+                        const count = typeof data.active_users !== 'undefined' ? data.active_users : data.active_users_24h;
+                        const label = data.timeframe || tf;
+                        addLine(`Feature Adoption Summary (${label}):`, 'var(--accent-purple)');
+                        addLine(`• ⚡ Fast Answer (Turbo) Mode: ${data.fast_mode_active_count || 0} of ${count} users (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
+                        addLine(`• Auto-Quiz Completions: ${data.total_session_quizzes_reported || 0} quizzes solved`, 'var(--accent-green)');
+                        if (data.events && Object.keys(data.events).length > 0) {
+                            const evts = Object.entries(data.events).map(([k, v]) => `${k}: ${v}`).join(' | ');
+                            addLine(`• Action Events: ${evts}`, 'var(--accent-blue)');
+                        }
+                        const vList = Object.entries(data.versions || {}).map(([v, cnt]) => `v${v}: ${cnt}`).join(', ');
+                        addLine(`• Active Script Versions: ${vList || 'None'}`, 'var(--text-secondary)');
+                        addLine(`• Local Client Status: Fast Mode: ${fastQuizMode ? 'ON' : 'OFF'} | Auto-Quiz: ${autoQuizMode ? 'ON' : 'OFF'}`, 'var(--text-muted)');
+                    } else {
+                        addLine(`Feature breakdown currently unavailable from relay.`, 'var(--accent-pink)');
+                    }
+                })
+                .catch(err => {
+                    addLine(`Relay query error: ${err.message}`, 'var(--accent-pink)');
+                });
+        } else if (c === 'stats' || c === 'telemetry' || cmd.trim().toLowerCase().startsWith('stats ') || cmd.trim().toLowerCase().startsWith('telemetry ')) {
+            const parts = cmd.trim().split(/\s+/);
+            const tf = (parts[1] || '24h').toLowerCase();
+            addLine(`Fetching live anonymous telemetry (${tf})...`, 'var(--text-muted)');
+            const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
+            fetch(`${relayUrl}/telemetry/stats?timeframe=${encodeURIComponent(tf)}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.success) {
+                        const count = typeof data.active_users !== 'undefined' ? data.active_users : data.active_users_24h;
+                        const eventsCount = typeof data.total_events !== 'undefined' ? data.total_events : data.total_events_24h;
+                        const label = data.timeframe || tf;
+                        addLine(`Anonymous Usage & Feature Telemetry (${label}):`, 'var(--accent-purple)');
+                        addLine(`• Active Unique Users: ${count}`, 'var(--accent-green)');
+                        addLine(`• Total Telemetry Events: ${eventsCount}`, 'var(--text-secondary)');
+                        addLine(`• Session Quizzes Solved Reported: ${data.total_session_quizzes_reported || 0}`, 'var(--accent-blue)');
+                        addLine(`• Fast Answer (Turbo) Users: ${data.fast_mode_active_count || 0} (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
+                        if (data.events && Object.keys(data.events).length > 0) {
+                            const eList = Object.entries(data.events).map(([ev, num]) => `${ev}: ${num}`).join(', ');
+                            addLine(`• Activity Breakdown: ${eList}`, 'var(--text-secondary)');
+                        }
+                        const vList = Object.entries(data.versions || {}).map(([v, cnt]) => `v${v} (${cnt})`).join(', ');
                         addLine(`• Version Distribution: ${vList || 'None reported'}`, 'var(--text-secondary)');
                         addLine(`• Current Client Session Quizzes: ${sessionQuizzesSolved || 0}`, 'var(--text-muted)');
                     } else {
@@ -13429,15 +13500,17 @@
             addLine('Terminal buffer cleared.', 'var(--text-muted)');
         } else if (c === 'help') {
             addLine('Admin Command Suite:', 'var(--accent-purple)');
-            addLine('• status    - System health, active course context & relay status', 'var(--text-secondary)');
-            addLine('• ping      - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
-            addLine('• stats     - Live anonymous user counts, versions, and session quiz stats', 'var(--text-secondary)');
-            addLine('• cache     - Question bank statistics and stored course codes', 'var(--text-secondary)');
-            addLine('• logs      - Dumps recent audit events directly in console', 'var(--text-secondary)');
-            addLine('• logs -c   - Copies full system diagnostic audit log to clipboard', 'var(--text-secondary)');
-            addLine('• unknown   - Lists all recorded unknown question type signatures', 'var(--text-secondary)');
-            addLine('• clear     - Clears terminal output screen buffer', 'var(--text-secondary)');
-            addLine('• help      - Displays this command reference list', 'var(--text-secondary)');
+            addLine('• status                   - System health, active course context & relay status', 'var(--text-secondary)');
+            addLine('• stats [1h|6h|24h|7d|all] - Live user counts, quizzes solved & adoption rates', 'var(--text-secondary)');
+            addLine('• users [1h|6h|24h|7d|all] - Aggregate unique active user counts by timeframe', 'var(--text-secondary)');
+            addLine('• features [timeframe]     - Feature adoption breakdown (Fast mode, auto-quiz, etc.)', 'var(--text-secondary)');
+            addLine('• ping                     - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
+            addLine('• cache                    - Question bank statistics and stored course codes', 'var(--text-secondary)');
+            addLine('• logs                     - Dumps recent audit events directly in console', 'var(--text-secondary)');
+            addLine('• logs -c                  - Copies full system diagnostic audit log to clipboard', 'var(--text-secondary)');
+            addLine('• unknown                  - Lists all recorded unknown question type signatures', 'var(--text-secondary)');
+            addLine('• clear                    - Clears terminal output screen buffer', 'var(--text-secondary)');
+            addLine('• help                     - Displays this command reference list', 'var(--text-secondary)');
         } else {
             addLine(`Unknown command: '${cmd}'. Type 'help' for available commands.`, 'var(--accent-amber)');
         }
@@ -14024,17 +14097,20 @@
                         </button>
                     </div>
 
-                    <!-- Fast Answer (Turbo) Setting - Friendly & Understandable for Non-Techy Users -->
-                    <div id="amaes-fast-answer-card" style="background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255, 255, 255, 0.04)'}; border: 1px solid ${fastQuizMode ? 'rgba(245, 158, 11, 0.35)' : 'var(--border-subtle)'}; border-radius: 6px; padding: 5px 8px; transition: all 0.2s ease;">
-                        <label style="display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; font-size: 10.5px; cursor: pointer;">
-                            <div style="display: flex; align-items: flex-start; gap: 6px;">
-                                <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
+                    <!-- Fast Answer (Turbo) Setting - Sleek, Highlighted & Cohesive -->
+                    <div id="amaes-fast-answer-card" style="background: ${fastQuizMode ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(217, 119, 6, 0.08) 100%)' : 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%)'}; border: 1px solid ${fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.25)'}; border-radius: 8px; padding: 7px 9px; box-shadow: ${fastQuizMode ? '0 0 10px rgba(245, 158, 11, 0.15)' : 'none'}; transition: all 0.2s ease;">
+                        <label style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; font-size: 10.5px; cursor: pointer;">
+                            <div style="display: flex; align-items: flex-start; gap: 7px;">
+                                <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="accent-color: #f59e0b; cursor: pointer; margin-top: 2px;" />
                                 <div>
-                                    <span style="font-weight: 700; color: ${fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--text-primary)'};">⚡ Fast Answer Mode</span>
-                                    <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Answers visible questions instantly & speeds up moving to the next page</div>
+                                    <div style="display: flex; align-items: center; gap: 5px;">
+                                        <span id="amaes-fast-quiz-icon" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 4px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.12)'}; color: #f59e0b; flex-shrink: 0; transition: all 0.2s ease;">${ICONS.zap}</span>
+                                        <span id="amaes-fast-quiz-title" style="font-weight: 700; color: ${fastQuizMode ? '#f59e0b' : 'var(--text-primary)'}; font-size: 11px; transition: color 0.2s ease;">Fast Answer Mode</span>
+                                    </div>
+                                    <div style="font-size: 9px; color: var(--text-secondary); font-weight: normal; margin-top: 2px; line-height: 1.35;">Answers visible questions instantly & speeds up moving to the next page</div>
                                 </div>
                             </div>
-                            <span id="amaes-fast-quiz-pill" style="font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 4px; background: ${fastQuizMode ? '#f59e0b' : 'var(--border-subtle)'}; color: ${fastQuizMode ? '#000' : 'var(--text-muted)'};">TURBO</span>
+                            <span id="amaes-fast-quiz-pill" style="font-size: 8px; font-weight: 800; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 4px; background: ${fastQuizMode ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(245, 158, 11, 0.12)'}; color: ${fastQuizMode ? '#000' : '#f59e0b'}; border: 1px solid ${fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.3)'}; transition: all 0.2s ease; text-transform: uppercase;">TURBO</span>
                         </label>
                     </div>
 

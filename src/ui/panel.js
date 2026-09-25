@@ -164,17 +164,20 @@
                         </button>
                     </div>
 
-                    <!-- Fast Answer (Turbo) Setting - Friendly & Understandable for Non-Techy Users -->
-                    <div id="amaes-fast-answer-card" style="background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255, 255, 255, 0.04)'}; border: 1px solid ${fastQuizMode ? 'rgba(245, 158, 11, 0.35)' : 'var(--border-subtle)'}; border-radius: 6px; padding: 5px 8px; transition: all 0.2s ease;">
-                        <label style="display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; font-size: 10.5px; cursor: pointer;">
-                            <div style="display: flex; align-items: flex-start; gap: 6px;">
-                                <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
+                    <!-- Fast Answer (Turbo) Setting - Sleek, Highlighted & Cohesive -->
+                    <div id="amaes-fast-answer-card" style="background: ${fastQuizMode ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(217, 119, 6, 0.08) 100%)' : 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%)'}; border: 1px solid ${fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.25)'}; border-radius: 8px; padding: 7px 9px; box-shadow: ${fastQuizMode ? '0 0 10px rgba(245, 158, 11, 0.15)' : 'none'}; transition: all 0.2s ease;">
+                        <label style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; font-size: 10.5px; cursor: pointer;">
+                            <div style="display: flex; align-items: flex-start; gap: 7px;">
+                                <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="accent-color: #f59e0b; cursor: pointer; margin-top: 2px;" />
                                 <div>
-                                    <span style="font-weight: 700; color: ${fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--text-primary)'};">⚡ Fast Answer Mode</span>
-                                    <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Answers visible questions instantly & speeds up moving to the next page</div>
+                                    <div style="display: flex; align-items: center; gap: 5px;">
+                                        <span id="amaes-fast-quiz-icon" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 4px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.12)'}; color: #f59e0b; flex-shrink: 0; transition: all 0.2s ease;">${ICONS.zap}</span>
+                                        <span id="amaes-fast-quiz-title" style="font-weight: 700; color: ${fastQuizMode ? '#f59e0b' : 'var(--text-primary)'}; font-size: 11px; transition: color 0.2s ease;">Fast Answer Mode</span>
+                                    </div>
+                                    <div style="font-size: 9px; color: var(--text-secondary); font-weight: normal; margin-top: 2px; line-height: 1.35;">Answers visible questions instantly & speeds up moving to the next page</div>
                                 </div>
                             </div>
-                            <span id="amaes-fast-quiz-pill" style="font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 4px; background: ${fastQuizMode ? '#f59e0b' : 'var(--border-subtle)'}; color: ${fastQuizMode ? '#000' : 'var(--text-muted)'};">TURBO</span>
+                            <span id="amaes-fast-quiz-pill" style="font-size: 8px; font-weight: 800; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 4px; background: ${fastQuizMode ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(245, 158, 11, 0.12)'}; color: ${fastQuizMode ? '#000' : '#f59e0b'}; border: 1px solid ${fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.3)'}; transition: all 0.2s ease; text-transform: uppercase;">TURBO</span>
                         </label>
                     </div>
 
