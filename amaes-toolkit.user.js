@@ -401,12 +401,23 @@
             localStorage.setItem('amaes_pending_update_time', String(Date.now()));
             localStorage.setItem('amaes_update_in_progress', '1');
         } catch (e) {}
-        showToast(`Opening v${ver} installer. After confirming update in Violentmonkey, click Refresh Page!`, 6500);
+        showToast(`Opening v${ver} installer... After confirming in Violentmonkey, page will auto-refresh!`, 6500);
         try {
             window.open(SCRIPT_RAW_URL, '_blank');
         } catch (e) {
             window.location.href = SCRIPT_RAW_URL;
         }
+
+        // Fallback auto-refresh: In case student confirms update without switching focus (e.g. mobile popup), auto-refresh after 6s
+        setTimeout(() => {
+            const pending = localStorage.getItem('amaes_pending_update_install');
+            if (pending && isNewerVersion(pending, SCRIPT_VERSION) && document.visibilityState === 'visible') {
+                showToast(`Update v${ver} detected! Refreshing page to apply...`, 2000);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            }
+        }, 6000);
     }
 
     function injectTopNavUpdateNotification(latestVersion) {
@@ -543,8 +554,10 @@
 
     function setupPendingUpdateFocusListener() {
         let lastFocusPrompt = 0;
+        let isReloading = false;
         const handleReturnFocus = () => {
             try {
+                if (isReloading) return;
                 const pendingRaw = localStorage.getItem('amaes_pending_update_install');
                 const pending = pendingRaw && isNewerVersion(pendingRaw, SCRIPT_VERSION) ? pendingRaw : null;
                 const latestKnown = normalizeVersion(localStorage.getItem('amaes_latest_version_seen'));
@@ -563,10 +576,22 @@
                 }
 
                 const now = Date.now();
-                if (now - lastFocusPrompt < 10000) return;
+                if (now - lastFocusPrompt < 2000) return;
                 lastFocusPrompt = now;
 
-                showToast(`Update v${pending} is queued in Violentmonkey. It will apply when the userscript manager reloads the script.`, 7000);
+                const updateTime = Number(localStorage.getItem('amaes_pending_update_time') || 0);
+                const elapsed = now - updateTime;
+
+                // Auto-refresh when student returns from confirming in Violentmonkey / script manager
+                if (elapsed >= 1000) {
+                    isReloading = true;
+                    showToast(`Update detected! Refreshing page to apply v${pending}...`, 2500);
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showToast(`Update v${pending} is queued in Violentmonkey. It will apply when the userscript manager reloads the script.`, 5000);
+                }
             } catch (e) {}
         };
 
@@ -607,7 +632,7 @@
                 versionPill.title = `Update ${targetPending} is waiting for confirmation in Violentmonkey`;
                 versionPill.style.borderColor = '#f59e0b';
                 versionPill.style.color = '#f59e0b';
-                versionPill.onclick = () => triggerScriptUpdate(pending);
+                versionPill.onclick = () => window.location.reload();
             } else {
                 versionPill.innerHTML = `${SCRIPT_VERSION} <span style="display: inline-flex; align-items: center; background: #10b981; color: #fff; padding: 0 4px; border-radius: 3px; font-size: 8px; margin-left: 2px; font-weight: 800; letter-spacing: 0; white-space: nowrap;">→ ${targetVer}</span>`;
                 versionPill.title = `Update available: ${targetVer}. Click to install`;
@@ -637,17 +662,22 @@
                         margin-bottom: 8px;
                         font-size: 11px;
                         animation: amaesFadeIn 0.3s ease;
-                    ">
+                        cursor: pointer;
+                    " title="Click to refresh page and apply update immediately">
                         <div style="display: flex; align-items: center; gap: 6px; min-width: 0; color: #a7f3d0;">
                             <span style="font-weight: 700; white-space: nowrap; font-size: 11px;">
-                                Opened in Violentmonkey
+                                Update v${pending} Ready
                             </span>
                         </div>
                         <span style="font-size: 10px; color: #a7f3d0; white-space: nowrap;">
-                            Waiting for Violentmonkey
+                            Auto-refreshing on return...
                         </span>
                     </div>
                 `;
+                const bEl = document.getElementById('amaes-update-banner');
+                if (bEl) {
+                    bEl.onclick = () => window.location.reload();
+                }
             } else {
                 container.innerHTML = `
                     <div id="amaes-update-banner" style="
