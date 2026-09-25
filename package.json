@@ -1,6 +1,6 @@
 {
   "name": "amaes-toolkit",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals.",
   "main": "amaes-toolkit.user.js",
   "scripts": {

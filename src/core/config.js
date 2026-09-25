@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.8.1";
+    const SCRIPT_VERSION = "v1.8.2";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;

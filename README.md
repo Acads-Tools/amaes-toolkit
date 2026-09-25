@@ -10,14 +10,14 @@
 </p>
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js"><img src="https://img.shields.io/badge/version-1.8.1-blue.svg" alt="Version 1.8.1"></a>
+  <a href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js"><img src="https://img.shields.io/badge/version-1.8.2-blue.svg" alt="Version 1.8.2"></a>
   <a href="https://acads-tools.github.io/amaes-toolkit/"><img src="https://img.shields.io/badge/platform-Violentmonkey%20%7C%20Tampermonkey-darkblue.svg" alt="Platform Compatibility"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="#zero-telemetry--privacy-architecture"><img src="https://img.shields.io/badge/privacy-zero--telemetry-success.svg" alt="Zero Telemetry"></a>
   <a href=".github/workflows/privacy-check.yml"><img src="https://img.shields.io/badge/privacy--audit-passing-brightgreen.svg" alt="Privacy Check Passed"></a>
 </p>
 
-> **Compatibility Notice:** Version **1.8.1** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](docs/CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
+> **Compatibility Notice:** Version **1.8.2** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](docs/CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
 
 ---
 
