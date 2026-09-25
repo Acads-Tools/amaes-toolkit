@@ -13283,7 +13283,7 @@
                     <details id="amaes-ai-quiz-settings-block" style="display: ${geminiApiKey ? 'block' : 'none'}; margin-top: 2px; border: 1px solid rgba(168, 85, 247, 0.28); border-radius: 6px; background: rgba(168, 85, 247, 0.05); overflow: hidden;">
                         <summary style="cursor: pointer; padding: 5px 8px; font-size: 10px; font-weight: 700; color: #c084fc; display: flex; align-items: center; justify-content: space-between; user-select: none;">
                             <span style="display: flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.5px; font-size: 9.5px;">
-                                <span>✨ Google Gemini AI (Experimental)</span>
+                                <span>Google Gemini AI (Experimental)</span>
                             </span>
                             <div style="display: flex; align-items: center; gap: 6px;">
                                 <span id="amaes-ai-quiz-status-pill" style="font-size: 8.5px; font-weight: 700; color: #34d399; background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.3); border-radius: 3px; padding: 1px 5px;">Active</span>
