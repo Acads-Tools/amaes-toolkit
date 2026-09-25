@@ -4412,6 +4412,37 @@ test("Client Compatibility & Update Check Robustness", () => {
     assert.ok(script.includes("toolkitSelectors.forEach"), "Must purge open panels, quick info modals, and settings on lockout");
 });
 
+test("Audio Notifications & On-Demand AI Manual Retry on Unknown / Short-Answer Questions", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Procedural Web Audio API sound engine
+    assert.ok(script.includes("function playToolkitSound(type)"), "Must define playToolkitSound function");
+    assert.ok(script.includes("type === 'quest_done'"), "Must support quest_done audio notification");
+    assert.ok(script.includes("type === 'manual_intervention'"), "Must support manual_intervention audio notification");
+    assert.ok(script.includes("ctx.createOscillator()"), "Must use Web Audio API oscillators for zero-dependency sound");
+
+    // 2. Audio alert settings toggle
+    assert.ok(script.includes("id=\"chk-audio-alerts\""), "Settings UI must provide chk-audio-alerts checkbox");
+    assert.ok(script.includes("amaes_enable_audio_alerts"), "Must persist enableAudioAlerts in localStorage");
+
+    // 3. On-Demand "Ask AI" / "Retry AI" Card Button
+    assert.ok(script.includes("amaes-ask-ai-card-btn"), "Question card toolbar must include amaes-ask-ai-card-btn");
+    assert.ok(script.includes("manualSolveWithAi(que, btnAskAi)"), "Card Ask AI button must invoke manualSolveWithAi");
+
+    // 4. On-Demand "Ask AI" / "Retry AI" in Blockage HUD
+    assert.ok(script.includes("id=\"btn-blockage-ask-ai\""), "Blockage HUD must include btn-blockage-ask-ai button");
+    assert.ok(script.includes("manualSolveWithAi(firstBlockedQue, blockageAskAi)"), "Blockage HUD button must invoke manualSolveWithAi");
+
+    // 5. Short-Answer / Fill-in-the-Blank prompt and inference support
+    assert.ok(script.includes("[Fill-in-the-Blank / Short Answer]"), "buildGeminiCompactPrompt must construct short-answer prompt");
+    assert.ok(script.includes("function applyAiTextHighlight("), "Must define applyAiTextHighlight for text inputs");
+    assert.ok(script.includes("function manualSolveWithAi("), "Must define manualSolveWithAi handler");
+
+    // 6. Audio notification triggers
+    assert.ok(script.includes("playToolkitSound('manual_intervention')"), "Must trigger manual_intervention sound on blocked question");
+    assert.ok(script.includes("playToolkitSound('quest_done')"), "Must trigger quest_done sound on quiz finish/summary");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

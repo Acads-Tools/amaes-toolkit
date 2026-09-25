@@ -979,6 +979,7 @@
     let enableKeyboardShortcuts = localStorage.getItem('amaes_enable_hotkeys') !== 'false'; // default true: N, Space, 1-4, C, P, H
     let autoCommunityShare = localStorage.getItem('amaes_auto_community_share') !== 'false'; // default true: auto-share on review / harvest
     let autoMinimizeQuiz = localStorage.getItem('amaes_auto_min_quiz') !== 'false'; // default true: smart pill in quiz
+    let enableAudioAlerts = localStorage.getItem('amaes_enable_audio_alerts') !== 'false'; // default true: audio chime on quiz completion & intervention alert
 
     const GEMINI_API_KEY_STORAGE_KEY = 'amaes_gemini_api_key';
     const GEMINI_API_KEYS_STORAGE_KEY = 'amaes_gemini_api_keys';
@@ -1502,7 +1503,91 @@
         lock: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
         unlock: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`,
         globe: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
+        bell: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`,
+        volume: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`,
     };
+
+    // Web Audio API Procedural Sound Engine (Zero external dependencies)
+    let audioCtxInstance = null;
+    function getAudioContext() {
+        try {
+            if (!audioCtxInstance) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) audioCtxInstance = new AudioCtx();
+            }
+            if (audioCtxInstance && audioCtxInstance.state === 'suspended') {
+                audioCtxInstance.resume().catch(() => {});
+            }
+        } catch (_) {}
+        return audioCtxInstance;
+    }
+
+    // Auto-resume AudioContext on user interaction
+    if (typeof window !== 'undefined') {
+        ['click', 'keydown', 'touchstart'].forEach(evt => {
+            window.addEventListener(evt, () => {
+                if (audioCtxInstance && audioCtxInstance.state === 'suspended') {
+                    audioCtxInstance.resume().catch(() => {});
+                }
+            }, { passive: true, capture: true });
+        });
+    }
+
+    function playToolkitSound(type) {
+        if (!enableAudioAlerts) return;
+        try {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            const now = ctx.currentTime;
+
+            if (type === 'quest_done' || type === 'complete') {
+                // Bright, celebratory multi-tone ascending ding (D5 -> A5 -> D6 chime)
+                const notes = [
+                    { freq: 587.33, start: 0, dur: 0.25 },
+                    { freq: 880.00, start: 0.1, dur: 0.35 },
+                    { freq: 1174.66, start: 0.2, dur: 0.8 }
+                ];
+                notes.forEach(n => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(n.freq, now + n.start);
+
+                    gain.gain.setValueAtTime(0.0001, now + n.start);
+                    gain.gain.exponentialRampToValueAtTime(0.18, now + n.start + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now + n.start);
+                    osc.stop(now + n.start + n.dur);
+                });
+            } else if (type === 'manual_intervention' || type === 'unknown') {
+                // Gentle, distinctive two-tone alert chime (F5 -> D5 soft marimba tone)
+                const notes = [
+                    { freq: 698.46, start: 0, dur: 0.14 },
+                    { freq: 587.33, start: 0.12, dur: 0.4 }
+                ];
+                notes.forEach(n => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(n.freq, now + n.start);
+
+                    gain.gain.setValueAtTime(0.0001, now + n.start);
+                    gain.gain.exponentialRampToValueAtTime(0.16, now + n.start + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now + n.start);
+                    osc.stop(now + n.start + n.dur);
+                });
+            }
+        } catch (e) {
+            logDebug("Audio notification error: " + e.message);
+        }
+    }
 
 
     // Detect whether user is currently logged into Moodle
@@ -1568,6 +1653,7 @@
         enableKeyboardShortcuts = true;
         autoCommunityShare = true;
         autoMinimizeQuiz = false;
+        enableAudioAlerts = true;
         aiQuizEnabled = true;
         aiAutoSelect = true;
 
@@ -1591,6 +1677,7 @@
         updateCheck('chk-auto-copy-ai', true);
         updateCheck('chk-smart-skip', false);
         updateCheck('chk-auto-min-quiz', false);
+        updateCheck('chk-audio-alerts', true);
         updateCheck('chk-in-question-ai', true);
         updateCheck('chk-show-in-q-btns', true);
         updateCheck('chk-ai-hint', true);
@@ -3301,6 +3388,7 @@
         if (isFinish) {
             setLog("<b>All Questions Answered!</b> Advancing to summary in <b>1.0s</b>...", "var(--accent-green)");
             showToast("All questions answered! Advancing to summary in 1s...", 1500);
+            playToolkitSound('quest_done');
         } else {
             setLog("<b>Question Answered:</b> Advancing to next page in <b>0.8s</b>...", "var(--accent-blue)");
             showToast("Answer selected! Advancing to next page...", 1200);
@@ -3376,6 +3464,7 @@
                     logDebug("Smart Navigation: All questions answered! Proceeding to finish attempt.");
                     setLog("<b>All Questions Answered!</b> Proceeding to summary screen...", "var(--accent-green)");
                     showToast("All questions answered! Finishing attempt...", 2500);
+                    playToolkitSound('quest_done');
                     finishBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     finishBtn.click();
                     return true;
@@ -3635,6 +3724,11 @@
                         setLog(`[AI Rate Limit] Question #${qData ? qData.qNum : ''}: ${rlReason} (Prompt copied)`, "var(--accent-amber)");
                         showToast(`AI rate limit: available in ${rateLimitStatus.remainingSec}s`, 3500);
 
+                        if (!firstBlockedQue.dataset.amaesInterventionAlertPlayed) {
+                            firstBlockedQue.dataset.amaesInterventionAlertPlayed = 'true';
+                            playToolkitSound('manual_intervention');
+                        }
+
                         showAiFallbackBar(firstBlockedQue, qData, aiPromptText, async () => {
                             isSolverRunning = false;
                             autoSolveQuizQuestion();
@@ -3723,6 +3817,11 @@
                     // the compact matcher hint so the same warning is not shown twice.
                     firstBlockedQue.querySelectorAll('.amaes-unanswered-hint').forEach(hint => hint.remove());
                     setQuestionAiTag(firstBlockedQue, false);
+                    if (!firstBlockedQue.dataset.amaesInterventionAlertPlayed) {
+                        firstBlockedQue.dataset.amaesInterventionAlertPlayed = 'true';
+                        playToolkitSound('manual_intervention');
+                    }
+
                     const hud = document.createElement('div');
                     hud.className = 'amaes-blockage-hud';
                     hud.style.cssText = `
@@ -3755,6 +3854,22 @@
                             </div>
                         </div>
                         <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                            <button id="btn-blockage-ask-ai" type="button" class="amaes-inline-btn" style="
+                                padding: 4px 10px;
+                                font-size: 11px;
+                                font-weight: 700;
+                                background: #f5f3ff;
+                                color: #7c3aed;
+                                border: 1px solid #c4b5fd;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 4px;
+                                transition: all 0.15s ease;
+                            " title="Ask Google Gemini AI to analyze and solve this question directly">
+                                ${ICONS.sparkles} <span>${firstBlockedQue.dataset.amaesAiAttempted ? 'Retry AI' : 'Ask AI'}</span>
+                            </button>
                             <button id="btn-blockage-stop" type="button" class="amaes-inline-btn" style="
                                 padding: 4px 10px;
                                 font-size: 11px;
@@ -3776,6 +3891,15 @@
 
                     const formulation = firstBlockedQue.querySelector('.formulation, .content') || firstBlockedQue;
                     formulation.insertBefore(hud, formulation.firstChild);
+
+                    const blockageAskAi = hud.querySelector('#btn-blockage-ask-ai');
+                    if (blockageAskAi) {
+                        blockageAskAi.onclick = async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            await manualSolveWithAi(firstBlockedQue, blockageAskAi);
+                        };
+                    }
 
                     const blockageStop = hud.querySelector('#btn-blockage-stop');
                     if (blockageStop) {
@@ -3871,6 +3995,10 @@
     function handleQuizSummaryAutoSubmit() {
         if (!checkIsQuizSummaryPage()) return;
         promoteAttemptEvidenceFromScore();
+        if (!sessionStorage.getItem('amaes_summary_ding_' + window.location.href)) {
+            sessionStorage.setItem('amaes_summary_ding_' + window.location.href, 'true');
+            playToolkitSound('quest_done');
+        }
         logDebug("Quiz Summary reached. Student reviews at their own pace (Auto-submit disabled by design).");
     }
 
@@ -6145,7 +6273,7 @@
         const clone = rootNode.cloneNode(true);
 
         // Strip non-content scripts, toolkit buttons, injected UI badges & Moodle feedback icons/accessibility text
-        clone.querySelectorAll('script, style, noscript, .amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-copy-ai-card-btn, .amaes-copy-img-card-btn, .amaes-paste-ai-card-btn, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-thinking-indicator, .amaes-ai-fallback-bar, .amaes-ai-suggested-badge, .amaes-ai-question-tag, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, .accesshide, .sr-only').forEach(el => el.remove());
+        clone.querySelectorAll('script, style, noscript, .amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-copy-ai-card-btn, .amaes-ask-ai-card-btn, .amaes-copy-img-card-btn, .amaes-paste-ai-card-btn, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-thinking-indicator, .amaes-ai-fallback-bar, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, .accesshide, .sr-only').forEach(el => el.remove());
 
         // Convert Superscripts (e.g. 2^3 -> 2³, x^2 -> x², or ^{complex})
         clone.querySelectorAll('sup').forEach(sup => {
@@ -6804,6 +6932,20 @@
                     await autoSelectFromAiClipboard(que);
                 };
                 btnContainer.appendChild(btnPaste);
+
+                // 1c. Ask / Retry AI Button on Question Card
+                const btnAskAi = document.createElement('button');
+                btnAskAi.type = 'button';
+                btnAskAi.className = 'amaes-copy-ai-card-btn amaes-ask-ai-card-btn';
+                btnAskAi.title = 'Ask Google Gemini AI to analyze and solve this question directly';
+                btnAskAi.innerHTML = `${ICONS.sparkles} <span>${que.dataset.amaesAiAttempted ? 'Retry AI' : 'Ask AI'}</span>`;
+                btnAskAi.onclick = async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setActiveQuestion(que, true);
+                    await manualSolveWithAi(que, btnAskAi);
+                };
+                btnContainer.appendChild(btnAskAi);
             }
 
             // 2. Copy Image Button (if question has diagram/circuits)
@@ -7146,6 +7288,14 @@
             lines.push(`[Course: ${courseCode}]`);
         }
         lines.push(`Question: ${qData.qText || ''}`);
+
+        // Handle Short Answer / Fill-in-the-Blank text inputs
+        if (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0)) {
+            lines.push(`[Fill-in-the-Blank / Short Answer]`);
+            lines.push(`Reply with ONLY the exact, concise word or phrase (typically 1 to 3 words) that directly answers the question or fills the blank. No explanation. No quotes.`);
+            return lines.join('\n');
+        }
+
         lines.push(`Choices:`);
 
         const eliminatedSet = getEliminatedChoicesForQuestion(que, qData, courseCode);
@@ -7831,6 +7981,17 @@
 
         const cachedAns = getCachedAiAnswer(qData);
         if (cachedAns && cachedAns.choiceText) {
+            const textInput = que.querySelector('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"], textarea');
+            if (textInput && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0))) {
+                textInput.value = cachedAns.choiceText;
+                applyAiTextHighlight(que, textInput, cachedAns.choiceText);
+                setLog(`[AI Cache] Reusing previously solved answer for Question #${qData ? qData.qNum : ''} (0 API requests)`, "var(--accent-purple)");
+                showToast(`Reused cached AI answer for #${qData ? qData.qNum : ''}.`, 2000);
+                if (typeof onSuccess === 'function') {
+                    await onSuccess({ choiceText: cachedAns.choiceText, input: textInput });
+                }
+                return;
+            }
             const matched = matchAiAnswerToChoice(cachedAns.choiceText, que, qData);
             if (matched && matched.row && !isChoiceRowEliminated(matched.row)) {
                 applyAiChoiceHighlight(matched.row);
@@ -8013,6 +8174,33 @@
         if (isAborted) return;
 
         if (answerText) {
+            // Check for Short-Answer / Fill-in-the-Blank text inputs
+            const textInput = que.querySelector('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"], textarea');
+            if (textInput && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0))) {
+                const cleaned = answerText
+                    .replace(/^Answer:\s*/i, '')
+                    .replace(/^The correct answer is:\s*/i, '')
+                    .replace(/^[a-e][.)]\s*/i, '')
+                    .replace(/^["']|["']$/g, '')
+                    .trim();
+                if (cleaned) {
+                    textInput.value = cleaned;
+                    textInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    textInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    textInput.dispatchEvent(new Event('blur', { bubbles: true }));
+
+                    applyAiTextHighlight(que, textInput, cleaned);
+                    saveAiAnswerToCache(qData, { choiceText: cleaned });
+                    recordAttemptAnswerEvidence(que, cleaned, 'ai_inference');
+                    setLog(`[AI Suggestion] Gemini suggested <b>${escapeHtml(cleaned)}</b> for #${qData ? qData.qNum : ''}. (Paused for review)`, "var(--accent-purple)");
+                    showToast(`Gemini suggested: "${cleaned}" for #${qData ? qData.qNum : ''}.`, 3000);
+                    if (typeof onSuccess === 'function') {
+                        await onSuccess({ choiceText: cleaned, input: textInput });
+                    }
+                    return;
+                }
+            }
+
             const matched = matchAiAnswerToChoice(answerText, que, qData);
             if (matched && matched.row) {
                 // Hard Safety Guard: Check if the AI returned a confirmed WRONG choice!
@@ -8151,6 +8339,113 @@
 
         if (typeof onFallback === 'function') {
             onFallback();
+        }
+    }
+
+    // Visual highlight & suggestion badge for Short-Answer / text input questions
+    function applyAiTextHighlight(que, textInput, answerText) {
+        if (!que || !textInput) return;
+        textInput.style.borderColor = '#8b5cf6';
+        textInput.style.boxShadow = '0 0 0 2px rgba(139, 92, 246, 0.2)';
+        textInput.style.borderRadius = '5px';
+
+        que.querySelectorAll('.amaes-ai-text-badge').forEach(el => el.remove());
+        const badge = document.createElement('div');
+        badge.className = 'amaes-ai-text-badge';
+        badge.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 6px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(139, 92, 246, 0.12);
+            color: #7c3aed;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        `;
+        badge.innerHTML = `${ICONS.sparkles} <span>AI Suggestion: <strong>${escapeHtml(answerText)}</strong></span>`;
+
+        const parent = textInput.parentElement || textInput;
+        if (parent.nextSibling) {
+            parent.parentNode.insertBefore(badge, parent.nextSibling);
+        } else {
+            parent.parentNode.appendChild(badge);
+        }
+    }
+
+    // Manual on-demand AI solver trigger (invoked by clicking "Ask AI" or "Retry AI" on question card or blockage HUD)
+    async function manualSolveWithAi(que, triggerBtn = null) {
+        if (!que) return;
+        setActiveQuestion(que, true);
+
+        const keys = getGeminiApiKeys();
+        if (keys.length === 0) {
+            showToast("Gemini AI is not configured. Please set your free Google AI Studio key.", 3500);
+            showGeminiSetupModal();
+            return;
+        }
+
+        const qData = extractQuestionData(que);
+        if (!qData) {
+            showToast("Could not extract question content.", 3000);
+            return;
+        }
+
+        que.dataset.amaesAiAttempted = 'true';
+
+        // Update button text to loading state
+        const cardAiBtn = que.querySelector('.amaes-ask-ai-card-btn');
+        const blockageAiBtn = que.querySelector('#btn-blockage-ask-ai');
+        if (cardAiBtn) cardAiBtn.innerHTML = `<span>Asking AI...</span>`;
+        if (blockageAiBtn) blockageAiBtn.innerHTML = `<span>Asking AI...</span>`;
+
+        const courseInfo = detectCourseInfo();
+        const courseCode = courseInfo.subjectCode || '';
+        const promptText = buildGeminiCompactPrompt(qData, courseCode, que);
+
+        await handleGeminiQuestionInference({
+            que,
+            qData,
+            promptText,
+            onSuccess: async (matched) => {
+                if (matched && matched.choiceText) {
+                    recordAttemptAnswerEvidence(que, matched.choiceText, 'ai_inference');
+                }
+                que.querySelectorAll('.amaes-blockage-hud, .amaes-unanswered-hint').forEach(el => el.remove());
+                que.querySelectorAll('.amaes-que-top-toolbar').forEach(toolbar => {
+                    toolbar.style.display = 'flex';
+                });
+                que.style.outline = '2px solid rgba(139, 92, 246, 0.7)';
+                que.style.borderRadius = '8px';
+                setQuestionAiTag(que, true);
+
+                if (matched && matched.input) {
+                    if (matched.input.type === 'radio' || matched.input.type === 'checkbox') {
+                        matched.input.checked = true;
+                        matched.input.click();
+                        if (matched.input.parentElement) matched.input.parentElement.click();
+                        matched.input.dispatchEvent(new Event('input', { bubbles: true }));
+                        matched.input.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+
+                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+                showToast(`Gemini resolved Question #${qData ? qData.qNum : ''}!`, 3000);
+            },
+            onFallback: () => {
+                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+            }
+        });
+
+        if (cardAiBtn && cardAiBtn.innerHTML.includes('Asking AI...')) {
+            cardAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+        }
+        if (blockageAiBtn && blockageAiBtn.innerHTML.includes('Asking AI...')) {
+            blockageAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
         }
     }
 
@@ -9212,7 +9507,7 @@
 
         // Clone and strip any toolkit-injected badges so toolkit's own check icons don't trigger false positives
         const clone = elem.cloneNode(true);
-        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-card-btn-container, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag').forEach(el => el.remove());
+        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-card-btn-container, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag').forEach(el => el.remove());
 
         const text = (clone.innerText || clone.textContent || '');
         if (/[✓✔]/.test(text)) return true;
@@ -9227,7 +9522,7 @@
 
         // Clone and strip any toolkit-injected badges
         const clone = elem.cloneNode(true);
-        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-card-btn-container, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag').forEach(el => el.remove());
+        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-card-btn-container, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag').forEach(el => el.remove());
 
         const text = (clone.innerText || clone.textContent || '');
         if (/[✗✘✕✖]/.test(text)) return true;
@@ -10476,6 +10771,11 @@
 
         const urlParams = new URLSearchParams(window.location.search);
         const attemptId = urlParams.get('attempt') || urlParams.get('id') || urlParams.get('cmid') || window.location.search || window.location.pathname;
+
+        if (!sessionStorage.getItem(`amaes_review_ding_${attemptId}`)) {
+            sessionStorage.setItem(`amaes_review_ding_${attemptId}`, '1');
+            playToolkitSound('quest_done');
+        }
 
         // Check for multi-page review pagination: expand to show all questions on one page if available
         const showAllLink = document.querySelector('a[href*="review.php"][href*="showall=1"], a[href*="showall=true"]');
@@ -11766,6 +12066,10 @@
                                 <input id="chk-keyboard-shortcuts" type="checkbox" ${enableKeyboardShortcuts ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Keyboard Shortcuts (N, C, V, P, H, 1-4)</span>
                             </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Audio feedback: Plays a bright chime ding when the quiz is finished and a subtle alert chime when manual intervention is needed on an unknown question">
+                                <input id="chk-audio-alerts" type="checkbox" ${enableAudioAlerts ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Audio Notifications (Quest Finish Ding & Intervention Alert)</span>
+                            </label>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Auto-minimize toolkit panel to floating smart pill during quiz attempts">
                                 <input id="chk-auto-min-quiz" type="checkbox" ${autoMinimizeQuiz ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Auto-minimize panel during quiz attempts</span>
@@ -12376,6 +12680,19 @@
                     box-shadow: 0 2px 4px rgba(37,99,235,0.12) !important;
                 }
 
+                .amaes-ask-ai-card-btn {
+                    background: #faf5ff !important;
+                    color: #7e22ce !important;
+                    border: 1px solid #e9d5ff !important;
+                }
+
+                .amaes-ask-ai-card-btn:hover {
+                    background: #f3e8ff !important;
+                    border-color: #a855f7 !important;
+                    color: #6b21a8 !important;
+                    box-shadow: 0 2px 4px rgba(168,85,247,0.15) !important;
+                }
+
                 .amaes-copy-ai-card-btn svg {
                     width: 12px !important;
                     height: 12px !important;
@@ -12926,6 +13243,19 @@
                 localStorage.setItem('amaes_enable_hotkeys', enableKeyboardShortcuts);
                 showToast(`Keyboard Navigation: ${enableKeyboardShortcuts ? 'Enabled' : 'Disabled'}`);
                 setLog(`Keyboard Navigation: <b>${enableKeyboardShortcuts ? 'ON' : 'OFF'}</b>`, enableKeyboardShortcuts ? "var(--accent-blue)" : "var(--accent-amber)", enableKeyboardShortcuts ? "N, Space, 1-4, C, P, H active" : "Key navigation disabled");
+            };
+        }
+
+        const chkAudioAlerts = document.getElementById('chk-audio-alerts');
+        if (chkAudioAlerts) {
+            chkAudioAlerts.onchange = () => {
+                enableAudioAlerts = chkAudioAlerts.checked;
+                localStorage.setItem('amaes_enable_audio_alerts', enableAudioAlerts ? 'true' : 'false');
+                showToast(`Audio Notifications: ${enableAudioAlerts ? 'Enabled' : 'Disabled'}`);
+                setLog(`Audio Notifications: <b>${enableAudioAlerts ? 'ON' : 'OFF'}</b>`, enableAudioAlerts ? "var(--accent-green)" : "var(--accent-amber)");
+                if (enableAudioAlerts) {
+                    playToolkitSound('quest_done');
+                }
             };
         }
 
