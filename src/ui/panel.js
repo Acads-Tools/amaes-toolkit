@@ -429,7 +429,7 @@
                                 <button id="btn-mark-quiz" class="amaes-btn amaes-btn-pink" title="Mark quizzes & exams with a passable grade (≥80%) as done (skips unattempted or failed quizzes)">
                                     ${ICONS.edit} <span>Mark Quizzes / Exams Only</span>
                                 </button>
-                                <button id="btn-mark-all" class="amaes-btn amaes-btn-gray">
+                                <button id="btn-mark-all" class="amaes-btn amaes-btn-gray" title="Mark all activities as done (quizzes must meet the passing grade threshold ≥80%)">
                                     ${ICONS.zap} <span>Mark ALL as Done</span>
                                 </button>
                             </div>

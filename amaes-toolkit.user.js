@@ -6714,8 +6714,9 @@
         'Tip: Use the floating toolkit pill to pause automation, open settings, or review the current status.',
         'Tip: Personal Gemini keys stay in your browser; contributor sharing is optional and encrypted.',
         'Tip: Course Tools > Activity Auto-Marker > Mark Lectures & Vids marks unfinished lecture and video activities complete.',
-        'Tip: Course Tools > Activity Auto-Marker > Mark Quizzes / Exams Only targets quiz activities without changing lecture progress.',
-        'Tip: Course Tools > Activity Auto-Marker > Mark ALL as Done processes every unfinished activity found on the current course page.',
+        'Tip: Course Tools > Activity Auto-Marker > Mark Quizzes / Exams Only safely marks quizzes with a passable score (≥80%) as done, leaving failing or unattempted quizzes strictly untouched.',
+        'Tip: Passable Grade Guard: Quizzes scoring below 80% or unattempted are never auto-marked as done, ensuring incomplete attempts are never closed accidentally.',
+        'Tip: Course Tools > Activity Auto-Marker > Mark ALL as Done processes unfinished activities, respecting the strict ≥80% passable grade threshold for all quizzes.',
         'Tip: Use Course Tools > Highlight Missing Quizzes to find unanswered or unattempted quizzes on a Grades or Course page.',
         'Tip: Course Tools > Search Helper copies a subject-aware search phrase and opens Google for study-guide lookup.',
         'Tip: In the AI Assistant card, Auto-Copy Question on AI Failure puts a clean fallback prompt on your clipboard.',
@@ -13941,7 +13942,7 @@
                                 <button id="btn-mark-quiz" class="amaes-btn amaes-btn-pink" title="Mark quizzes & exams with a passable grade (≥80%) as done (skips unattempted or failed quizzes)">
                                     ${ICONS.edit} <span>Mark Quizzes / Exams Only</span>
                                 </button>
-                                <button id="btn-mark-all" class="amaes-btn amaes-btn-gray">
+                                <button id="btn-mark-all" class="amaes-btn amaes-btn-gray" title="Mark all activities as done (quizzes must meet the passing grade threshold ≥80%)">
                                     ${ICONS.zap} <span>Mark ALL as Done</span>
                                 </button>
                             </div>

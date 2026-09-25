@@ -36,6 +36,7 @@
   * [4-Tier Answer Intelligence](#4-tier-answer-intelligence)
   * [Multi-Course Grades Harvester](#multi-course-grades-harvester-batch-scanner)
   * [Autonomous Solver vs Companion Mode](#autonomous-solver-vs-companion-mode)
+  * [Activity Auto-Marker & Passable Grade Guard (≥ 80%)](#activity-auto-marker--passable-grade-guard--80)
 * [Installation & Setup](#installation--setup)
 * [Keyboard Shortcuts](#keyboard-shortcuts)
 * [Developer & Contributing Guide](#developer--contributing-guide)
@@ -95,10 +96,18 @@ Before installing, ensure your environment meets the following specifications:
   * `C`: Formats the active question, choices, and instructions ready for your preferred AI tool.
   * `V`: Automatically parses clipboard content and selects matching choices or fills text inputs in the browser.
 
-### 5. Autonomous Web Scraper Fallback Engine
+### 5. Course Tools: Activity Auto-Marker & Passable Grade Guard (≥ 80%)
+* **Lecture & Video Batch Completer:** Automatically checks off asynchronous lectures and video activities with 1 click.
+* **Strict Passable Grade Safety Guard (≥ 80%):** When marking quizzes or clicking "Mark ALL as Done", the toolkit strictly verifies your actual score via the Moodle Grade Report (`/grade/report/user/index.php`) and activity completion markers.
+  * **Passable (≥ 80%):** Quizzes and exams with a recorded grade of 80% or higher (or marked as passed) are safely marked as done.
+  * **Under 80% / Failing (< 80%):** Quizzes with scores below 80% or marked as failed are strictly skipped and left untouched.
+  * **Unattempted / No Grade:** Quizzes that have not yet been taken or have no recorded score are strictly skipped and left untouched, ensuring you never accidentally bypass an assessment.
+* **Live Audit Log:** Displays verified percentages in real time (e.g. `[1/3] Marking: Quiz 1... [90%]`) and reports clear safety warnings when unpassed quizzes remain protected.
+
+### 6. Autonomous Web Scraper Fallback Engine
 * **Background Study Search:** When an answer is missing from the local database, the toolkit searches verified online study guides and extracts confirmed answer keys automatically.
 
-### 6. Privacy-Safe Community Synchronization
+### 7. Privacy-Safe Community Synchronization
 * **Automatic Course Bank Loading:** Automatically fetches verified questions for your active subject directly from the open study database ([`Acads-Tools/database`](https://github.com/Acads-Tools/database)) upon opening Moodle.
 * **Consensus-Driven Question Sharing:** Confirmed review answers from completed quiz attempts are pooled anonymously to expand coverage for fellow students.
 * **Strict Zero-PII Guarantee:** Student names, student IDs, email addresses, passwords, grades, and Moodle session tokens are never collected, logged, or transmitted.
@@ -145,6 +154,17 @@ The toolkit offers two distinct operational modes depending on your preference:
 * **Autonomous Auto-Quiz Solver:** Selects verified answers and clicks "Next page" automatically.
   * **How to Enable:** In the **Quiz** tab, toggle **Auto-Quiz Mode: ON** (or press keyboard shortcut `P`).
   * **Safety Gate:** If a question has no confirmed answer, the solver pauses automatically, brings up the in-question toolbar, and sounds an intervention chime.
+
+### Activity Auto-Marker & Passable Grade Guard (≥ 80%)
+Located in the **Course Tools** tab under **Activity Auto-Marker**, this utility automates course completion tracking while strictly enforcing academic safety:
+
+* **Strict 80% Passable Threshold:**
+  * When clicking **Mark Quizzes / Exams Only** or **Mark ALL as Done**, the toolkit checks the student's actual grades via `fetchCourseGradesMap` (reading Moodle's user grade report) and activity completion markers via `evaluateQuizPassableGrade`.
+  * **Passed (≥ 80%):** Quizzes and exams with a recorded grade of 80% or higher (or marked as passed) are safely marked as done.
+  * **Under 80% / Failing (< 80%):** Quizzes with scores below 80% or marked as failed are strictly skipped and left untouched.
+  * **Unattempted / No Grade:** Quizzes that have not yet been taken or have no recorded score are strictly skipped and left untouched. This ensures upcoming assessments are never closed or bypassed prematurely.
+* **Live Audit Log:** Each processed quiz displays its verified score percentage in the status log (e.g., `[1/3] Marking: Quiz 1... [90%]`). If no quizzes meet the passing threshold, an explanatory warning confirms that failing and unattempted quizzes remained untouched for student protection.
+* **Full Reversibility:** Granular undo buttons (**Undo Lectures & Vids**, **Undo Quizzes / Exams**, **Undo ALL**) are provided to revert any activity completion state whenever needed.
 
 ---
 
