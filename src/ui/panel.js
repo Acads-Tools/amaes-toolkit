@@ -967,6 +967,42 @@
                     color: #14532d !important;
                 }
 
+                .amaes-card-ai-drawer {
+                    width: 100% !important;
+                    box-sizing: border-box !important;
+                    margin-top: 3px !important;
+                    border: 1px solid rgba(139, 92, 246, 0.3) !important;
+                    border-radius: 6px !important;
+                    background: rgba(139, 92, 246, 0.04) !important;
+                    overflow: visible !important;
+                }
+
+                .amaes-card-ai-drawer-summary {
+                    padding: 4px 6px !important;
+                    font-size: 10px !important;
+                    font-weight: 700 !important;
+                    color: #a78bfa !important;
+                    cursor: pointer !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: space-between !important;
+                    user-select: none !important;
+                    border-radius: 5px !important;
+                    transition: background 0.15s ease !important;
+                }
+
+                .amaes-card-ai-drawer-summary:hover {
+                    background: rgba(139, 92, 246, 0.1) !important;
+                }
+
+                .amaes-card-ai-drawer-summary::-webkit-details-marker {
+                    display: none !important;
+                }
+
+                .amaes-card-ai-drawer[open] .amaes-card-ai-drawer-hint {
+                    transform: rotate(180deg) !important;
+                }
+
                 .amaes-web-ai-menu {
                     position: absolute !important;
                     top: calc(100% + 4px) !important;

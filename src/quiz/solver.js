@@ -846,6 +846,9 @@
                             if (aiAutoNextOnAiAnswer || autoNextVerified) {
                                 scheduleAutoNextAfterAnswer(800, false, firstBlockedQue, aiAutoNextOnAiAnswer);
                             }
+                            if (typeof updateQuestionAiDrawerState === 'function') {
+                                updateQuestionAiDrawerState(firstBlockedQue, false);
+                            }
                         }
                     });
 
@@ -862,6 +865,10 @@
                 }
 
                 // If reaching here: either question is ineligible for AI (e.g. text/drag), AI is not enabled, or AI failed
+                firstBlockedQue.dataset.amaesAiFailed = 'true';
+                if (typeof updateQuestionAiDrawerState === 'function') {
+                    updateQuestionAiDrawerState(firstBlockedQue, true);
+                }
                 setLog(
                     `<b>Question #${qData ? qData.qNum : ''} Auto-Copied:</b> Prompt copied to clipboard. ` +
                     `Paste from AI (press <b>V</b>) or select manually, then press <b>N</b> or click <b>Next page</b> to proceed.`,
@@ -2943,6 +2950,10 @@
                 }
             } else {
                 matchedCount++;
+            }
+
+            if (typeof updateQuestionAiDrawerState === 'function') {
+                updateQuestionAiDrawerState(que);
             }
         });
 

@@ -335,6 +335,62 @@
         }
     }
 
+    // Helper to control whether in-question AI tools should be minimized or auto-unminimized
+    function updateQuestionAiDrawerState(que, forceUnminimize = false) {
+        if (!que) return;
+        const drawer = que.querySelector('.amaes-card-ai-drawer');
+        if (!drawer) return;
+
+        const hint = drawer.querySelector('.amaes-card-ai-drawer-hint');
+
+        if (forceUnminimize) {
+            drawer.open = true;
+            if (hint) hint.textContent = '▴';
+            return;
+        }
+
+        const hasVerified = Boolean(que.querySelector('.amaes-verified-badge'));
+        const existingAiChoice = que.querySelector('.amaes-ai-suggested-choice');
+        const hasAiChoice = Boolean(existingAiChoice && !isChoiceRowEliminated(existingAiChoice));
+
+        // 1. If verified by DB or solved by built-in AI, ALWAYS minimize!
+        if (hasVerified || hasAiChoice) {
+            drawer.open = false;
+            if (hint) hint.textContent = '▾';
+            return;
+        }
+
+        // 2. Question has no verified answer in DB:
+        const hasAiKey = Boolean(typeof getAvailableGeminiKey === 'function' && getAvailableGeminiKey());
+        const aiConfigured = hasAiKey && aiQuizEnabled;
+
+        // Condition A: Built-in AI not set up or disabled -> auto-unminimize and show
+        if (!aiConfigured) {
+            drawer.open = true;
+            if (hint) hint.textContent = '▴';
+            return;
+        }
+
+        // Condition B: Question type not eligible for Gemini AI -> auto-unminimize and show
+        const qData = extractQuestionData(que);
+        if (typeof isEligibleForAiSolver === 'function' && !isEligibleForAiSolver(que, qData)) {
+            drawer.open = true;
+            if (hint) hint.textContent = '▴';
+            return;
+        }
+
+        // Condition C: Built-in AI attempted and failed -> auto-unminimize and show
+        if (que.dataset.amaesAiFailed === 'true' || que.querySelector('.amaes-ai-fallback-bar')) {
+            drawer.open = true;
+            if (hint) hint.textContent = '▴';
+            return;
+        }
+
+        // Otherwise (built-in AI is configured and ready to attempt solving): keep minimized
+        drawer.open = false;
+        if (hint) hint.textContent = '▾';
+    }
+
     // Inject sleek "Copy for AI" and "Copy Image" buttons on each question card in Moodle
     function injectQuestionCopyButtons() {
         if (!checkIsQuizPage()) return;
@@ -366,6 +422,31 @@
             activeBadge.className = 'amaes-active-focus-badge';
             activeBadge.innerHTML = `${ICONS.check} <span>Target Question</span>`;
             btnContainer.appendChild(activeBadge);
+
+            // Collapsible AI Drawer: Minimized by default on verified questions, auto-unminimized when unknown or AI failed
+            const aiDrawer = document.createElement('details');
+            aiDrawer.className = 'amaes-card-ai-drawer';
+            aiDrawer.style.cssText = 'width: 100%; box-sizing: border-box; margin-top: 2px; border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 6px; background: rgba(139, 92, 246, 0.04); overflow: visible;';
+
+            const aiSummary = document.createElement('summary');
+            aiSummary.className = 'amaes-card-ai-drawer-summary';
+            aiSummary.style.cssText = 'padding: 4px 6px; font-size: 10px; font-weight: 700; color: #a78bfa; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; border-radius: 5px; transition: background 0.15s ease;';
+            aiSummary.title = 'AI Tools & External Launchers (Click to toggle)';
+            aiSummary.innerHTML = `
+                <span style="display: flex; align-items: center; gap: 4px;">
+                    ${ICONS.sparkles} <span>AI Tools</span>
+                </span>
+                <span class="amaes-card-ai-drawer-hint" style="font-size: 8.5px; color: var(--text-muted, #94a3b8); transition: transform 0.2s ease;">▾</span>
+            `;
+
+            aiDrawer.addEventListener('toggle', () => {
+                const hint = aiDrawer.querySelector('.amaes-card-ai-drawer-hint');
+                if (hint) hint.textContent = aiDrawer.open ? '▴' : '▾';
+            });
+
+            const aiActions = document.createElement('div');
+            aiActions.className = 'amaes-card-ai-actions';
+            aiActions.style.cssText = 'display: flex; flex-direction: column; gap: 4px; padding: 4px 3px 5px 3px; border-top: 1px solid rgba(139, 92, 246, 0.15);';
 
             // 1. Copy Question Text Button
             const btnText = document.createElement('button');
@@ -400,7 +481,7 @@
                     console.error('Copy failed:', err);
                 }
             };
-            btnContainer.appendChild(btnText);
+            aiActions.appendChild(btnText);
 
             // 1b. Paste AI Button on Question Card
             if (checkIsQuizAttemptPage()) {
@@ -415,7 +496,7 @@
                     setActiveQuestion(que, true);
                     await autoSelectFromAiClipboard(que);
                 };
-                btnContainer.appendChild(btnPaste);
+                aiActions.appendChild(btnPaste);
 
                 // 1c. Ask / Retry AI Button on Question Card
                 const btnAskAi = document.createElement('button');
@@ -429,7 +510,7 @@
                     setActiveQuestion(que, true);
                     await manualSolveWithAi(que, btnAskAi);
                 };
-                btnContainer.appendChild(btnAskAi);
+                aiActions.appendChild(btnAskAi);
 
                 // 1d. Multi-Web AI Smart 1-Tap Launcher with Dropdown
                 const webAiContainer = document.createElement('div');
@@ -502,7 +583,7 @@
                 splitBtn.appendChild(arrowBtn);
                 webAiContainer.appendChild(splitBtn);
                 webAiContainer.appendChild(menu);
-                btnContainer.appendChild(webAiContainer);
+                aiActions.appendChild(webAiContainer);
             }
 
             // 2. Copy Image Button (if question has diagram/circuits)
@@ -537,8 +618,14 @@
                         btnImg.style.color = '';
                     }, 2000);
                 };
-                btnContainer.appendChild(btnImg);
+                aiActions.appendChild(btnImg);
             }
+
+            aiDrawer.appendChild(aiSummary);
+            aiDrawer.appendChild(aiActions);
+            btnContainer.appendChild(aiDrawer);
+
+            updateQuestionAiDrawerState(que);
 
             const infoCol = que.querySelector('.info');
             const contentCol = que.querySelector('.content');

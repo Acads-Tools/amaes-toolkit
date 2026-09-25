@@ -4607,6 +4607,25 @@ test("Multi-Web AI Launchers & Choice Eliminated Marker: provides 1-click extern
     assert.ok(script.includes("'Choice Eliminated'"), "Harvester must use user-friendly 'Choice Eliminated' label instead of 'Wrong Choice Saved'");
 });
 
+// --------------------------------------------------
+// 145. In-Question AI Tools Collapsible Drawer & Auto-Unminimize Lifecycle
+// --------------------------------------------------
+test("In-Question AI Tools Collapsible Drawer & Auto-Unminimize Lifecycle: minimized by default on verified questions, auto-unminimizes on unknown questions, no setup AI, or AI failure", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Structural integrity
+    assert.ok(script.includes("function updateQuestionAiDrawerState(que"), "Must define updateQuestionAiDrawerState function");
+    assert.ok(script.includes("amaes-card-ai-drawer"), "Question cards must feature amaes-card-ai-drawer details element");
+    assert.ok(script.includes("amaes-card-ai-drawer-summary"), "Must include drawer summary toggle");
+    assert.ok(script.includes("amaes-card-ai-actions"), "Must contain container for nested AI action buttons");
+
+    // 2. Lifecycle triggers
+    assert.ok(script.includes("amaes-verified-badge") && script.includes("drawer.open = false"), "Verified questions must keep AI drawer minimized");
+    assert.ok(script.includes("forceUnminimize") && script.includes("drawer.open = true"), "Must support unminimizing drawer on failure or manual trigger");
+    assert.ok(script.includes("que.dataset.amaesAiFailed"), "Must track AI failure state to unminimize drawer");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

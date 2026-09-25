@@ -554,12 +554,20 @@
         const que = targetRow.closest('.que');
         if (que) {
             setQuestionAiTag(que, true);
+            que.dataset.amaesAiFailed = 'false';
+            if (typeof updateQuestionAiDrawerState === 'function') {
+                updateQuestionAiDrawerState(que, false);
+            }
         }
     }
 
     // Fallback bar with dynamic failure reason, Configure Key (if auth error), Retry AI, and Copy for AI
     function showAiFallbackBar(que, qData, promptText, onRetry, { reason = '', isAuthError = false, isRateLimit = false, waitSeconds = 0 } = {}) {
         que.querySelectorAll('.amaes-ai-fallback-bar').forEach(el => el.remove());
+        que.dataset.amaesAiFailed = 'true';
+        if (typeof updateQuestionAiDrawerState === 'function') {
+            updateQuestionAiDrawerState(que, true);
+        }
         if (activeRateLimitTimerInterval) {
             clearInterval(activeRateLimitTimerInterval);
             activeRateLimitTimerInterval = null;

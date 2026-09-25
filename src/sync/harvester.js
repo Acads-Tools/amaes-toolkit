@@ -675,7 +675,7 @@
 
         // Clone and strip any toolkit-injected badges so toolkit's own check icons don't trigger false positives
         const clone = elem.cloneNode(true);
-        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-card-btn-container, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag').forEach(el => el.remove());
+        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-card-btn-container, .amaes-card-ai-drawer, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag').forEach(el => el.remove());
 
         const text = (clone.innerText || clone.textContent || '');
         if (/[✓✔]/.test(text)) return true;
@@ -690,7 +690,7 @@
 
         // Clone and strip any toolkit-injected badges
         const clone = elem.cloneNode(true);
-        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-card-btn-container, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag').forEach(el => el.remove());
+        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-card-btn-container, .amaes-card-ai-drawer, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag').forEach(el => el.remove());
 
         const text = (clone.innerText || clone.textContent || '');
         if (/[✗✘✕✖]/.test(text)) return true;
