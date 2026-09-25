@@ -1,25 +1,47 @@
-# AMAES Toolkit
+<p align="center">
+  <img src="assets/amaes-toolkit-logo.png" alt="AMAES Toolkit Logo" width="120" height="120">
+</p>
 
-[![Version](https://img.shields.io/badge/version-1.8.0-blue.svg)](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js)
-[![Platform](https://img.shields.io/badge/platform-Violentmonkey%20%7C%20Tampermonkey-darkblue.svg)](https://acads-tools.github.io/amaes-toolkit/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
-> **Compatibility:** Version **1.8.0** is currently supported. Older clients
-> are blocked at startup and must be updated from the [official userscript
-> link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js).
-> See [CLIENT-COMPATIBILITY.md](CLIENT-COMPATIBILITY.md) for the policy.
-
-> An assistive study enhancement and question repository client for AMA Education System and ACLC College students on Moodle (`semestral.amaes.com`). Provides real-time answer verification, autonomous study assistance, and zero-PII community question consensus.
+<h1 align="center">AMAES Toolkit</h1>
 
 <p align="center">
-  <img src="assets/amaes-toolkit-live-demo.gif" alt="AMAES Toolkit Live Interface Demo" width="100%" style="border-radius: 8px;">
+  <b>Universal Assistive Study Toolkit & Offline Question Bank for Moodle Portals</b><br>
+  <span>Designed for students on <code>semestral.amaes.com</code></span>
+</p>
+
+<p align="center">
+  <a href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js"><img src="https://img.shields.io/badge/version-1.8.0-blue.svg" alt="Version 1.8.0"></a>
+  <a href="https://acads-tools.github.io/amaes-toolkit/"><img src="https://img.shields.io/badge/platform-Violentmonkey%20%7C%20Tampermonkey-darkblue.svg" alt="Platform Compatibility"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="#zero-telemetry--privacy-architecture"><img src="https://img.shields.io/badge/privacy-zero--telemetry-success.svg" alt="Zero Telemetry"></a>
+  <a href=".github/workflows/privacy-check.yml"><img src="https://img.shields.io/badge/privacy--audit-passing-brightgreen.svg" alt="Privacy Check Passed"></a>
+</p>
+
+> **Compatibility Notice:** Version **1.8.0** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
+
+---
+
+<p align="center">
+  <img src="assets/amaes-toolkit-live-demo.gif" alt="AMAES Toolkit Live Interface Demo" width="100%" style="border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.25);">
+  <br>
+  <em>Live in-quiz assistance: visual answer highlighting, autonomous progress guard, and in-question banner controls.</em>
 </p>
 
 ---
 
+## Table of Contents
+* [Key Features](#features)
+* [Multi-Course Grades Harvester (Batch Scanner)](#multi-course-grades-harvester-batch-scanner)
+* [Installation & Setup](#installation--setup)
+* [Keyboard Shortcuts](#keyboard-shortcuts)
+* [Developer & Contributing Guide](#developer--contributing-guide)
+* [Zero Telemetry & Privacy Architecture](#zero-telemetry--privacy-architecture)
+* [Frequently Asked Questions](#frequently-asked-questions)
+* [Academic Integrity & Liability Disclaimer](#academic-integrity--liability-disclaimer)
+
+---
+
 <a id="features"></a>
-<a id="-features"></a>
-<a id="feature"></a>
 
 ## Features
 
@@ -36,10 +58,10 @@
 * **Interactive Dropdowns & Matching:** Resolves matching table dropdowns and gap-select options.
 * **Drag-and-Drop:** Highlights available choices, marks drop zones, and provides 1-click token placement.
 
-### 3. Privacy-Safe Community Synchronization
-* **Automatic Course Bank Loading:** Automatically fetches verified questions for your active subject directly from the open study database ([`Acads-Tools/database`](https://github.com/Acads-Tools/database)) upon opening Moodle.
-* **Consensus-Driven Question Sharing:** Confirmed review answers from completed quiz attempts are pooled anonymously to expand coverage for fellow students.
-* **Strict Zero-PII Guarantee:** Student names, student IDs, email addresses, passwords, grades, and Moodle session tokens are never collected, logged, or transmitted.
+### 3. Multi-Course Grades Harvester (Batch Scanner)
+* **One-Click Historical Review:** Scans your completed past quiz attempts from Moodle grade reports and catalogs 100% verified answers into your offline database.
+* **Elimination Learning:** Automatically records choices confirmed wrong in past attempts, ensuring you never select known incorrect answers again.
+* **Dashboard Badges:** Injects live coverage pills (e.g., `45 Verified Answers Cached`) onto course cards on the Moodle homepage.
 
 ### 4. Built-in Google Gemini AI Assistant (Experimental) & Study Tools
 * **Native In-Quiz AI Solver:** Directly answers uncertain Multiple Choice and True/False questions in real time using Google Gemini via a free personal Google AI Studio API key.
@@ -57,15 +79,33 @@
 ### 5. Autonomous Web Scraper Fallback Engine
 * **Background Study Search:** When an answer is missing from the local database, the toolkit searches verified online study guides and extracts confirmed answer keys automatically.
 
-### 6. Course Navigation & Assessment Overview
-* **Term Breakdown & Tracking:** Displays verified question counts organized by academic term (Prelim, Midterm, Prefi, Final).
-* **Direct Course Access:** Provides 1-click navigation to course modules, grade breakdowns, and syllabus activities.
+### 6. Privacy-Safe Community Synchronization
+* **Automatic Course Bank Loading:** Automatically fetches verified questions for your active subject directly from the open study database ([`Acads-Tools/database`](https://github.com/Acads-Tools/database)) upon opening Moodle.
+* **Consensus-Driven Question Sharing:** Confirmed review answers from completed quiz attempts are pooled anonymously to expand coverage for fellow students.
+* **Strict Zero-PII Guarantee:** Student names, student IDs, email addresses, passwords, grades, and Moodle session tokens are never collected, logged, or transmitted.
 
 ---
 
-<a id="quick-start"></a>
-<a id="installation"></a>
-<a id="install"></a>
+## Multi-Course Grades Harvester (Batch Scanner)
+
+The Grades Harvester allows you to quickly build an answer library for all your current subjects by scanning past graded quizzes in seconds.
+
+### How it Works
+1. When you complete a quiz, Moodle provides a review screen with full marks and checkmarks showing exactly which answers were correct.
+2. Rather than visiting every quiz individually, the Harvester accesses Moodle's built-in User Grade Report (`/grade/report/user/index.php`).
+3. It parses all finished quizzes that scored 100% or full marks on specific questions, extracts the verified ground truth, and stores them in your browser's offline `localStorage`.
+
+### How to Trigger
+* **Automatic Mode (Default):** Whenever you navigate to your Moodle Dashboard (`/my/`) or open a course homepage, the Harvester runs quietly once per session in the background.
+* **Manual Trigger:**
+  1. Open the toolkit sidebar by clicking the floating icon in the bottom-right corner.
+  2. Navigate to the **Database** tab.
+  3. Click **Sync & Scan Past Quizzes**.
+  4. The status log will show the number of newly discovered verified answers cataloged into your library.
+
+---
+
+<a id="installation--setup"></a>
 
 ## Installation & Setup
 
@@ -101,42 +141,11 @@ Install the **[Violentmonkey](https://violentmonkey.github.io/)** extension for 
 3. Follow the 4-step guide to get your free personal API key from [Google AI Studio](https://aistudio.google.com/app/apikey) (100% free with any standard Google account).
 4. Paste your key and click **Test & Save Key**. The toolkit is now ready to assist with uncertain quiz questions automatically!
 
-Shared AI fallback is enabled by default in the setup window. If Google
-temporarily rate-limits your personal key, the toolkit may try a small,
-project-managed pool so you do not have to wait. Your personal key is never
-uploaded to that pool. Shared capacity is limited; if it is full, the toolkit
-will explain what happened and let you retry or add another personal key.
-Disable **Use shared AI help if my key is temporarily busy** if you do not
-want this fallback.
-
-### Where your Gemini key is stored
-
-Your personal Gemini key is saved in your browser only by default. It is sent
-to Google when you ask Gemini for help, but it is not uploaded to the AMAES
-Cloudflare relay.
-
-The setup option **Share my key when I am inactive (optional)** is separate
-from shared AI fallback:
-
-* **Sharing unchecked:** your key stays local and is used only for your
-  requests.
-* **Sharing checked:** you explicitly opt in to contributor sharing. The relay
-  encrypts the key before storing it in Cloudflare D1. It remains reserved for
-  you while you are active and may help another user only after the inactive
-  grace period.
-* **Sharing disabled later:** the toolkit requests deletion of the encrypted
-  contributor copy. Your local personal key can remain available until you
-  remove it.
-
-**Use shared AI help if my key is temporarily busy** does not upload or share
-your key. It only lets your installation request limited help from the
-already-encrypted contributor pool. You can review the full contributor-key
-rules in the [relay documentation](https://github.com/Acads-Tools/database/blob/main/relay/README.md#contributor-key-sharing).
+Shared AI fallback is enabled by default in the setup window. If Google temporarily rate-limits your personal key, the toolkit may try a small, project-managed pool so you do not have to wait. Your personal key is never uploaded to that pool. Shared capacity is limited; if it is full, the toolkit will explain what happened and let you retry or add another personal key. Disable **Use shared AI help if my key is temporarily busy** if you do not want this fallback.
 
 ---
 
 <a id="keyboard-shortcuts"></a>
-<a id="shortcuts"></a>
 
 ## Keyboard Shortcuts
 
@@ -153,21 +162,73 @@ rules in the [relay documentation](https://github.com/Acads-Tools/database/blob/
 
 ---
 
-<a id="technical-documentation"></a>
-<a id="documentation"></a>
+<a id="developer--contributing-guide"></a>
 
-## Technical Documentation
+## Developer & Contributing Guide
 
-Comprehensive guides detailing the system architecture, DOM injection model, and anti-sabotage merge engine are available in the **[`docs/`](docs/)** directory:
+Contributions, bug reports, and pull requests from students and developers are warmly welcomed.
 
-* **[DOM Injections & UI Overlays](docs/dom-injections.md)**: Catalog of every injected interface element, HUD component, button, and status indicator.
-* **[Quiz Lifecycle & Answer Harvesting](docs/quiz-lifecycle-and-harvesting.md)**: Details of question parsing, solver matching tiers, 4-tier ground truth harvesting on review pages, and distractor debunking.
-* **[Community Pipeline & Cloud Architecture](docs/pipeline-and-cloud-architecture.md)**: Architecture guide for the serverless consensus pipeline (Cloudflare Worker Relay, GitHub Issues, GitHub Actions, and Python anti-sabotage merge engine).
+### Reporting Bugs & Feature Requests
+* **In-App 1-Click Bug Reporter:** While on Moodle, click the **Bug icon** (`#amaes-bug-btn`) in the toolkit header. You can describe the issue, inspect attached diagnostic logs (sanitized of all personal data), and submit directly to create a tracking issue.
+* **GitHub Issues:** Open an issue via the [GitHub Issue Tracker](https://github.com/Acads-Tools/amaes-toolkit/issues).
+
+### Modular Source Architecture & Building from Source
+The repository is structured with clean domain modules in `src/` and an automated build pipeline:
+
+```text
+src/
+├── meta.js              # Tampermonkey / Violentmonkey header block
+├── init.js              # Lifecycle bootstrapper & DOM observers
+├── core/                # Configuration, versioning & unified HTTP client
+├── moodle/              # Question parsing, course & activity detectors
+├── quiz/                # Autonomous solver & DOM event bindings
+├── ai/                  # Gemini client, rate limiter & prompt formatter
+├── sync/                # Auto-updater, study scraper & review harvester
+├── ui/                  # Theme CSS, SVG icons, panel & modal HTML
+└── dev/                 # Diagnostics log exporter & secret developer console
+```
+
+#### Build Commands
+Prerequisites: Node.js 18+.
+
+```bash
+# Clone the repository
+git clone https://github.com/Acads-Tools/amaes-toolkit.git
+cd amaes-toolkit
+
+# Bundle src/ into distribution file amaes-toolkit.user.js
+npm run build
+
+# Run the comprehensive 143-test regression suite
+npm test
+
+# Validate JavaScript syntax
+npm run syntax
+```
+
+### Privacy & Contributor Rules
+* **Mandatory Zero-PII Rule:** All commits must adhere strictly to anonymous project identity:
+  ```bash
+  git config user.name "AcademicContributor"
+  git config user.email "academic-contributor@users.noreply.github.com"
+  ```
+* Automated CI enforces `.github/workflows/privacy-check.yml` on every pull request, blocking personal names, file paths, and private emails.
+
+---
+
+<a id="zero-telemetry--privacy-architecture"></a>
+
+## Zero Telemetry & Privacy Architecture
+
+Privacy is the foundational design requirement of AMAES Toolkit:
+
+* **100% Client-Side Execution:** All question matching, solver algorithms, and option selection happen inside your browser tab.
+* **Zero Account Tracking:** The toolkit has no analytics trackers, no Google Analytics, no Facebook pixels, and no telemetry pings.
+* **Encrypted Relay:** When sharing confirmed review questions with the community consensus bank, questions are stripped of student identifiers, user IDs, timestamps, and cookies before transmission.
 
 ---
 
 <a id="frequently-asked-questions"></a>
-<a id="faq"></a>
 
 ## Frequently Asked Questions
 
@@ -197,17 +258,20 @@ Recent versions of Chromium (Google Chrome and Brave) require users to enable "D
 
 ---
 
-<a id="important-use-disclaimer"></a>
+<a id="academic-integrity--liability-disclaimer"></a>
 
-## Important Use Disclaimer
+## Academic Integrity & Liability Disclaimer
 
-AMAES Toolkit is an independent, unofficial assistive study tool. It is **not affiliated with, endorsed by, sponsored by, or operated by** AMA Education System, ACLC, Moodle, Violentmonkey, Tampermonkey, or any browser vendor. Product names and trademarks belong to their respective owners.
-
-Use the toolkit only where permitted by your institution, instructor, assessment rules, and applicable law. Do not use it to cheat, impersonate another person, bypass access controls or proctoring, interfere with a service, or submit work that violates academic-integrity policies. You are solely responsible for your use of the software, your account, your data, and anything you submit through Moodle. You must obtain any permission required before using it.
-
-The software and website are provided **“as is” and “as available,”** without warranties or guarantees of any kind, including accuracy, availability, security, fitness for a particular purpose, or non-infringement. The developer and contributors are not responsible for lost data, service interruptions, account actions, academic outcomes, disciplinary action, legal claims, or other direct, indirect, incidental, or consequential losses arising from use or misuse, to the maximum extent permitted by applicable law. Nothing here excludes liability that cannot legally be excluded.
-
-By downloading, installing, accessing, or using the toolkit, you agree to these terms and agree, to the maximum extent permitted by law, to defend and hold harmless the developer and contributors from claims, losses, liabilities, costs, and expenses arising from your violation of these terms, applicable law, or third-party rights. If you do not agree, do not use or install the toolkit. This notice is not legal advice; consult a qualified lawyer about your jurisdiction and circumstances. Review the [Terms of Use](TERMS.md) and [MIT License](LICENSE) before using the project.
+> [!CAUTION]
+> ### Important Institutional & Academic Integrity Notice
+> AMAES Toolkit is developed and distributed solely as an assistive study companion, accessibility aid, and personal revision question repository.
+> 
+> * **Educational Purpose Only:** This tool is intended for self-testing, concept review, and studying. It is not intended to circumvent legitimate academic assessments or institutional evaluation.
+> * **Institutional Compliance:** Users are solely responsible for ensuring that their use of this software complies with their school's Student Handbook, Academic Honesty Policies, assessment instructions, and Moodle Terms of Service.
+> * **No Liability:** The authors, contributors, and maintainers accept **zero liability** for any academic sanctions, disciplinary actions, grade invalidations, account suspensions, or administrative penalties resulting from the use or misuse of this tool.
+> * **No Institutional Affiliation:** AMAES Toolkit is an independent, unofficial open-source project. It is **not affiliated with, endorsed by, sponsored by, or operated by** AMA Education System (AMAES), AMA University, Moodle Pty Ltd, Violentmonkey, Tampermonkey, or any browser vendor.
+> 
+> The software is provided **"AS IS" and "AS AVAILABLE"** under the [MIT License](LICENSE), without warranty of any kind, express or implied. By installing or using this software, you assume all responsibility and risk associated with its use. Review the complete [Terms of Use](TERMS.md) before installing.
 
 ---
 
