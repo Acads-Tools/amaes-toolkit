@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 /**
  * Build Script for AMAES Toolkit
- * Bundles modular src/ components into distribution files:
+ * Bundles modular src/ components into:
  *  - amaes-toolkit.user.js (repository root for userscript managers & raw URLs)
- *  - dist/amaes-toolkit.user.js (compiled artifact directory)
  *  - public/amaes-toolkit.user.js (installer web portal)
  */
 
@@ -13,10 +12,8 @@ const { execSync } = require('child_process');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const SRC_DIR = path.join(ROOT_DIR, 'src');
-const DIST_DIR = path.join(ROOT_DIR, 'dist');
 const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
 const OUTPUT_FILE = path.join(ROOT_DIR, 'amaes-toolkit.user.js');
-const DIST_FILE = path.join(DIST_DIR, 'amaes-toolkit.user.js');
 const PUBLIC_FILE = path.join(PUBLIC_DIR, 'amaes-toolkit.user.js');
 const PARENT_OUTPUT = path.join(ROOT_DIR, '..', 'amaes-toolkit.user.js');
 
@@ -46,7 +43,6 @@ const BUILD_MANIFEST = [
 
 console.log('Building AMAES Toolkit from src/ modules...');
 
-if (!fs.existsSync(DIST_DIR)) fs.mkdirSync(DIST_DIR, { recursive: true });
 if (!fs.existsSync(PUBLIC_DIR)) fs.mkdirSync(PUBLIC_DIR, { recursive: true });
 
 let bundled = '';
@@ -63,7 +59,6 @@ for (const relPath of BUILD_MANIFEST) {
 
 // Write to distribution targets
 fs.writeFileSync(OUTPUT_FILE, bundled, 'utf8');
-fs.writeFileSync(DIST_FILE, bundled, 'utf8');
 fs.writeFileSync(PUBLIC_FILE, bundled, 'utf8');
 
 // Copy assets/ to public/assets for GitHub Pages deployment
@@ -74,9 +69,8 @@ if (fs.existsSync(ASSETS_SRC)) {
 }
 
 console.log(`\nSuccessfully built:`);
-console.log(`  • Root Distribution:   ${OUTPUT_FILE}`);
-console.log(`  • Compiled Artifact:   ${DIST_FILE}`);
-console.log(`  • Web Deployment:      ${PUBLIC_FILE}`);
+console.log(`  • Userscript:     ${OUTPUT_FILE}`);
+console.log(`  • Web Deployment: ${PUBLIC_FILE}`);
 console.log(`Total Lines: ${bundled.split('\n').length}`);
 console.log(`File Size:   ${(Buffer.byteLength(bundled, 'utf8') / 1024).toFixed(1)} KB`);
 

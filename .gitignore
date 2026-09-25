@@ -21,3 +21,4 @@ npm-debug.log
 # Ephemeral build artifacts generated into public/ for Pages deployment
 public/assets/
 public/amaes-toolkit.user.js
+dist/
