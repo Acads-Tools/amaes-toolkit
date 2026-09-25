@@ -3254,6 +3254,14 @@
                 Array.from(placeInputs).every(input => input.value && input.value !== '0' && input.value.trim());
         }
 
+        // Generalized fallback for unknown question input structures
+        const anyInputs = que.querySelectorAll('input:not([type="hidden"]), select, textarea');
+        if (anyInputs.length > 0) {
+            const hasChecked = Array.from(anyInputs).some(i => (i.type === 'radio' || i.type === 'checkbox') && i.checked);
+            const hasValue = Array.from(anyInputs).some(i => i.type !== 'radio' && i.type !== 'checkbox' && i.value && i.value.trim() && i.value !== '0');
+            if (hasChecked || hasValue) return true;
+        }
+
         return que.classList.contains('answered') || que.classList.contains('complete');
     }
 
@@ -6592,7 +6600,10 @@
             }
 
             const qSnippet = (que.querySelector('.qtext, .formulation') ? que.querySelector('.qtext, .formulation').innerText.slice(0, 160) : (qData && qData.qText ? qData.qText.slice(0, 160) : '')).trim();
-            const formulationHtml = que.querySelector('.formulation, .content') ? que.querySelector('.formulation, .content').innerHTML.slice(0, 600) : '';
+            let rawHtml = que.querySelector('.formulation, .content') ? que.querySelector('.formulation, .content').innerHTML : '';
+            rawHtml = rawHtml.replace(/data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+/g, '[image: embedded]');
+            rawHtml = rawHtml.replace(/([?&])(sesskey|attempt|token)=[a-zA-Z0-9]+/g, '$1$2=REDACTED');
+            const formulationHtml = rawHtml.slice(0, 500);
 
             const entry = {
                 id: `unk_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
