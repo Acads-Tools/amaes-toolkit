@@ -4537,8 +4537,16 @@ test("1-Click In-App Bug Reporting: header button triggers clean modal, validate
     assert.ok(script.includes("subjectCode: reportData.subjectCode"), "Payload must include subjectCode");
     assert.ok(script.includes("pageType: reportData.pageType"), "Payload must include pageType");
     assert.ok(script.includes("logs: Array.isArray(reportData.logs)"), "Payload must include diagnostic logs array");
+    assert.ok(script.includes("breadcrumbs: Array.isArray(reportData.breadcrumbs)"), "Payload must include user action breadcrumbs array");
+    assert.ok(script.includes("questionsSummary: Array.isArray(reportData.questionsSummary)"), "Payload must include questions summary array");
+    assert.ok(script.includes("settings: (reportData.settings"), "Payload must include settings object");
 
-    // 4. Bug Report Modal UI & Validation
+    // 4. User Action Breadcrumbs & Question Inventory Tracking
+    assert.ok(script.includes("function recordBreadcrumb(category, action"), "Must define recordBreadcrumb");
+    assert.ok(script.includes("function setupBreadcrumbListeners()"), "Must define setupBreadcrumbListeners");
+    assert.ok(script.includes("setupBreadcrumbListeners();"), "Must invoke setupBreadcrumbListeners on initialization");
+
+    // 5. Bug Report Modal UI & Validation
     assert.ok(script.includes("function showBugReportModal()"), "Must define showBugReportModal");
     assert.ok(script.includes("'amaes-bug-modal'"), "Modal must use 'amaes-bug-modal' identifier");
     assert.ok(script.includes("id=\"amaes-bug-description\""), "Modal must provide #amaes-bug-description textarea");

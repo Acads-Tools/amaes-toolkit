@@ -206,6 +206,22 @@
         console.log(`[AMAES Toolkit] ${entry}`);
     }
 
+    // User Action & Reproduction Breadcrumbs Tracker
+    const userBreadcrumbs = [];
+    function recordBreadcrumb(category, action, details = null) {
+        try {
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const entry = {
+                time: timeStr,
+                category: category || 'action',
+                action: String(action || '').slice(0, 140),
+                ...(details ? { details: String(details).slice(0, 180) } : {})
+            };
+            userBreadcrumbs.push(entry);
+            if (userBreadcrumbs.length > 50) userBreadcrumbs.shift();
+        } catch (_) {}
+    }
+
     // Activity State & Real-Time Logging Engine (Doing, Done, Plan)
     const activityHistory = [];
     let currentDoing = "Ready. Select a tool above.";
@@ -229,6 +245,7 @@
                     color: color || "var(--text-secondary)"
                 });
                 if (activityHistory.length > 50) activityHistory.pop();
+                recordBreadcrumb('toolkit', cleanDoing);
             }
         }
 
@@ -4737,6 +4754,61 @@
         });
     }
 
+    // Setup Passive User Action & Breadcrumb Listeners for Bug Reproduction
+    function setupBreadcrumbListeners() {
+        if (typeof document === 'undefined') return;
+
+        document.addEventListener('click', (e) => {
+            try {
+                const target = e.target;
+                if (!target) return;
+
+                // 1. Toolkit button / control click
+                const toolkitBtn = target.closest('#amaes-panel button, #amaes-panel a, #amaes-panel input, #amaes-panel select');
+                if (toolkitBtn) {
+                    const label = toolkitBtn.title || toolkitBtn.innerText || toolkitBtn.id || toolkitBtn.name || toolkitBtn.tagName;
+                    recordBreadcrumb('user_ui', `Clicked toolkit control: ${String(label).trim().slice(0, 50)}`);
+                    return;
+                }
+
+                // 2. Question option click (radio, checkbox, button inside .que)
+                const que = target.closest('.que');
+                if (que) {
+                    const numElem = que.querySelector('.info .no, .qno');
+                    const qNum = numElem ? numElem.innerText.replace(/\s+/g, ' ').trim() : 'Question';
+                    if (target.matches('input[type="radio"], input[type="checkbox"]')) {
+                        const optText = target.closest('.answer, label')?.innerText?.slice(0, 40) || target.value;
+                        recordBreadcrumb('user_quiz', `Selected choice on ${qNum}`, String(optText).replace(/\s+/g, ' ').trim());
+                    } else if (target.matches('button, a, .submitbtns input')) {
+                        recordBreadcrumb('user_quiz', `Clicked button on ${qNum}: ${(target.value || target.innerText || '').slice(0, 30)}`);
+                    }
+                    return;
+                }
+
+                // 3. Navigation / Submission button click
+                const navBtn = target.closest('.submitbtns input, #mod_quiz-next-nav, .mod_quiz-next-nav, a[href*="attempt.php"], a[href*="review.php"]');
+                if (navBtn) {
+                    const text = navBtn.value || navBtn.innerText || navBtn.title || 'Navigation';
+                    recordBreadcrumb('navigation', `User clicked navigation: ${String(text).trim().slice(0, 40)}`);
+                }
+            } catch (_) {}
+        }, true);
+
+        document.addEventListener('change', (e) => {
+            try {
+                const target = e.target;
+                if (!target) return;
+                const que = target.closest('.que');
+                if (que && target.matches('select')) {
+                    const numElem = que.querySelector('.info .no, .qno');
+                    const qNum = numElem ? numElem.innerText.replace(/\s+/g, ' ').trim() : 'Question';
+                    const selectedText = target.options[target.selectedIndex]?.text || target.value;
+                    recordBreadcrumb('user_quiz', `Selected dropdown option on ${qNum}`, String(selectedText).slice(0, 40));
+                }
+            } catch (_) {}
+        }, true);
+    }
+
     // Match questions & auto-highlight / auto-select on Moodle Quiz
     function highlightQuizAnswers(questionsDb, autoSelect = false, isManualSelect = false) {
         if (!questionsDb || questionsDb.length === 0) {
@@ -6750,6 +6822,9 @@
                     pageType: reportData.pageType || 'unknown',
                     environment: reportData.environment || `${(typeof navigator !== 'undefined' && navigator.userAgent) || 'Unknown'} (Screen: ${(typeof window !== 'undefined' && window.innerWidth) || 0}x${(typeof window !== 'undefined' && window.innerHeight) || 0})`,
                     logs: Array.isArray(reportData.logs) ? reportData.logs : [],
+                    breadcrumbs: Array.isArray(reportData.breadcrumbs) ? reportData.breadcrumbs : [],
+                    questionsSummary: Array.isArray(reportData.questionsSummary) ? reportData.questionsSummary : [],
+                    settings: (reportData.settings && typeof reportData.settings === 'object') ? reportData.settings : {},
                     contributorId: (typeof getAnonymousContributorId === 'function') ? getAnonymousContributorId() : 'anon'
                 };
 
@@ -6918,7 +6993,7 @@
                     <!-- Logs Option -->
                     <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; user-select: none; font-size: 11.5px; color: var(--text-secondary, #cbd5e1);">
                         <input type="checkbox" id="amaes-bug-include-logs" checked style="accent-color: #6366f1; margin-top: 2px;">
-                        <span>Attach recent anonymous session activity logs (redacts sensitive tokens, names, and passwords)</span>
+                        <span>Attach comprehensive diagnostics (action timeline, quiz structure, and activity logs — no passwords or tokens)</span>
                     </label>
 
                     <div id="amaes-bug-error-msg" style="display: none; padding: 8px 10px; border-radius: 6px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171; font-size: 11.5px;"></div>
@@ -6995,11 +7070,52 @@
             errorMsg.style.display = 'none';
 
             let logs = [];
+            let breadcrumbs = [];
+            let questionsSummary = [];
+            let settings = {};
+
             if (logsCheckbox && logsCheckbox.checked) {
                 try {
+                    // 1. Logs
                     logs = (typeof activityHistory !== 'undefined' && Array.isArray(activityHistory))
-                        ? activityHistory.slice(0, 20).map(item => `[${item.time}] ${(item.text || '').replace(/<[^>]+>/g, '')}`)
+                        ? activityHistory.slice(0, 40).map(item => `[${item.time}] ${(item.text || '').replace(/<[^>]+>/g, '')}`)
                         : [];
+
+                    // 2. User Action Breadcrumbs (what the user clicked and did)
+                    breadcrumbs = (typeof userBreadcrumbs !== 'undefined' && Array.isArray(userBreadcrumbs))
+                        ? userBreadcrumbs.slice(-35).map(b => `[${b.time}] [${b.category}] ${b.action}${b.details ? ' — ' + b.details : ''}`)
+                        : [];
+
+                    // 3. Questions Summary on active page
+                    const queNodes = Array.from(document.querySelectorAll('.que'));
+                    questionsSummary = queNodes.map((que, idx) => {
+                        const numElem = que.querySelector('.info .no, .qno');
+                        const qNum = numElem ? numElem.innerText.replace(/\s+/g, ' ').trim() : `Q${idx + 1}`;
+                        const rawType = (typeof identifyQuestionType === 'function') ? identifyQuestionType(que) : 'unknown';
+                        const checkedInputs = que.querySelectorAll('input:checked, select option:checked, textarea:not(:placeholder-shown)');
+                        const gradeElem = que.querySelector('.grade');
+                        const gradeText = gradeElem ? gradeElem.innerText.replace(/\s+/g, ' ').trim() : null;
+                        return {
+                            num: qNum,
+                            type: rawType,
+                            answered: checkedInputs.length > 0,
+                            ...(gradeText ? { grade: gradeText } : {})
+                        };
+                    });
+
+                    // 4. Active Toolkit Settings & Preferences
+                    settings = {
+                        autoQuizMode: typeof autoQuizMode !== 'undefined' ? autoQuizMode : false,
+                        quizPersonality: typeof quizPersonality !== 'undefined' ? quizPersonality : 'careful',
+                        autoNextQuiz: typeof autoNextQuiz !== 'undefined' ? autoNextQuiz : true,
+                        autoDelay: typeof autoDelaySeconds !== 'undefined' ? `${autoDelaySeconds}s` : '3s',
+                        highlightOnly: localStorage.getItem('amaes_highlight_only') === 'true',
+                        cloudSync: localStorage.getItem('amaes_auto_cloud_sync') !== 'false',
+                        aiAssisted: localStorage.getItem('amaes_ai_assisted') === 'true',
+                        hasGeminiKey: !!localStorage.getItem('amaes_gemini_api_key'),
+                        cachedAnswersCount: (typeof getCachedAnswers === 'function' && activeSubCode) ? (getCachedAnswers(activeSubCode) || []).length : 0,
+                        unknownTypesCount: (typeof getUnknownQuestionTypes === 'function') ? getUnknownQuestionTypes().length : 0
+                    };
                 } catch (_) {}
             }
 
@@ -7008,7 +7124,10 @@
                     description: desc,
                     subjectCode: activeSubCode,
                     pageType: activePageType,
-                    logs: logs
+                    logs: logs,
+                    breadcrumbs: breadcrumbs,
+                    questionsSummary: questionsSummary,
+                    settings: settings
                 });
 
                 modalBody.innerHTML = `
@@ -15416,6 +15535,7 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
         startCapabilityTips();
         setupQuizAutomation();
         setupQuizKeyboardShortcuts();
+        setupBreadcrumbListeners();
         showWelcomeOnboardingModal(false);
         injectDashboardCourseBadges();
         injectDashboardGuideBanner();
