@@ -3620,6 +3620,10 @@
     let isSolverRunning = false;
 
     async function runAutoQuizSolver(forceRun = false) {
+        if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') {
+            autoQuizMode = false;
+            return;
+        }
         if (!checkIsQuizAttemptPage()) return;
 
         // STRICT PAUSE CHECK: If Auto-Quiz is not explicitly active or force-run, halt completely
@@ -4260,6 +4264,7 @@
 
     // Floating HUD for Quiz Attempt Screen
     function injectQuizFloatingHUD() {
+        if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') return;
         if (!checkIsQuizAttemptPage()) return;
         if (document.getElementById('amaes-quiz-hud')) return;
 
@@ -4913,6 +4918,9 @@
 
     // Match questions & auto-highlight / auto-select on Moodle Quiz
     function highlightQuizAnswers(questionsDb, autoSelect = false, isManualSelect = false) {
+        if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') {
+            return { matched: 0, total: 0, error: "Toolkit locked" };
+        }
         if (!questionsDb || questionsDb.length === 0) {
             return { matched: 0, total: 0, error: "No cached questions found" };
         }
@@ -8258,6 +8266,7 @@
 
     // Inject sleek in-question AI tools: Left sidebar (.info below Flag question) for core tools & Built-in AI; Right side (.formulation) for Web AI launchers
     function injectQuestionCopyButtons() {
+        if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') return;
         if (!checkIsQuizPage()) return;
         const queElements = document.querySelectorAll('.que');
 
@@ -8493,6 +8502,7 @@
 
     // Inject sleek in-question top toolbar with Stop / Resume button on every question card ("uptopquestion")
     function injectQuestionTopToolbars() {
+        if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') return;
         if (!checkIsQuizAttemptPage()) return;
         const queElements = document.querySelectorAll('.que');
         queElements.forEach(que => {
@@ -8685,6 +8695,7 @@
     // Observer and initializer for quiz automation
     let observerDebounceTimer = null;
     function setupQuizAutomation() {
+        if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') return;
         if (!checkIsQuizPage()) return;
 
         injectQuestionCopyButtons();
@@ -13509,6 +13520,12 @@
                 gotItButton.style.opacity = checked ? '1' : '0.5';
                 termsContainer.style.borderColor = checked ? 'rgba(16, 185, 129, 0.5)' : 'rgba(16, 185, 129, 0.2)';
                 if (typeof window._amaesUpdatePanelLockState === 'function') window._amaesUpdatePanelLockState();
+                if (!checked) {
+                    autoQuizMode = false;
+                    localStorage.setItem('amaes_auto_quiz_mode', 'false');
+                    showToast("Agreement unaccepted. Pausing tools and refreshing page...", 2500);
+                    setTimeout(() => window.location.reload(), 500);
+                }
             };
         }
 
@@ -13608,21 +13625,8 @@
             closeModalClean();
             localStorage.setItem('amaes_welcome_dismissed', 'true');
             if (typeof window._amaesUpdatePanelLockState === 'function') window._amaesUpdatePanelLockState();
-
-            // Initialize database / auto-sync
-            const dashCourses = typeof detectDashboardCourses === 'function' ? detectDashboardCourses() : [];
-            if (dashCourses && dashCourses.length > 0) {
-                showToast(`Downloading answers for ${dashCourses.length} courses...`, 3000);
-                if (typeof setLog === 'function') setLog(`Auto-syncing ${dashCourses.length} courses...`, "var(--accent-blue)");
-                dashCourses.forEach(c => {
-                    sessionStorage.setItem(`amaes_cloud_synced_${c.code}`, '1');
-                    if (typeof syncAnswersFromCloud === 'function') {
-                        syncAnswersFromCloud(c.code).catch(() => {});
-                    }
-                });
-            } else {
-                showToast("Ready! Open any course or quiz to start.", 3000);
-            }
+            showToast("Terms accepted! Toolkit unlocked. Refreshing to activate...", 2500);
+            setTimeout(() => window.location.reload(), 500);
         };
 
         if (gotItButton) gotItButton.onclick = dismiss;
@@ -13673,7 +13677,6 @@
                         <img id="amaes-logo-img" src="${TOOLKIT_LOGO_URL}" alt="" aria-hidden="true">
                         <span id="amaes-title">AMAES</span>
                         <span id="amaes-version-pill" title="${SCRIPT_VERSION}" style="display: inline-flex; align-items: center; max-width: 100%; overflow: visible; white-space: nowrap; font-size: 9px; font-weight: 700; color: var(--accent-blue, #3b82f6); background: rgba(59,130,246,0.12); padding: 1px 4px; border-radius: 4px; border: 1px solid rgba(59,130,246,0.25); cursor: pointer; user-select: none;">${SCRIPT_VERSION}</span>
-                        <span id="amaes-lock-pill" title="Toolkit Locked: Terms acceptance required (Click to view terms)" style="display: none; align-items: center; justify-content: center; width: 18px; height: 18px; color: #f87171; background: rgba(239,68,68,0.15); border-radius: 4px; border: 1px solid rgba(239,68,68,0.3); cursor: pointer; flex-shrink: 0;" aria-label="Toolkit Locked">${ICONS.lock}</span>
                     </div>
                 </div>
                 
@@ -16282,7 +16285,6 @@
 
         // Lock State & Terms Acceptance Management
         const lockOverlay = document.getElementById('amaes-panel-lock-overlay');
-        const lockPill = document.getElementById('amaes-lock-pill');
         const lockChk = document.getElementById('amaes-lock-chk-terms');
         const lockContainer = document.getElementById('amaes-lock-terms-label');
         const viewTermsBtn = document.getElementById('amaes-btn-lock-view-terms');
@@ -16294,13 +16296,11 @@
             if (!isAccepted) {
                 if (lockOverlay) lockOverlay.style.display = isMin ? 'none' : 'flex';
                 if (bodyEl) bodyEl.style.display = 'none';
-                if (lockPill) lockPill.style.display = 'inline-flex';
                 if (lockChk) lockChk.checked = false;
                 if (lockContainer) lockContainer.style.borderColor = 'rgba(255, 255, 255, 0.1)';
             } else {
                 if (lockOverlay) lockOverlay.style.display = 'none';
                 if (bodyEl) bodyEl.style.display = isMin ? 'none' : 'flex';
-                if (lockPill) lockPill.style.display = 'none';
                 if (lockChk) lockChk.checked = true;
             }
         };
@@ -16311,7 +16311,7 @@
                 if (lockChk.checked) {
                     if (lockContainer) lockContainer.style.borderColor = 'rgba(16, 185, 129, 0.5)';
                     localStorage.setItem('amaes_terms_acknowledged', 'true');
-                    showToast("Terms accepted! Toolkit unlocked.", 3000);
+                    showToast("Terms accepted! Toolkit unlocked. Refreshing to activate...", 2500);
                     updatePanelLockState();
 
                     const welcomeTerms = document.getElementById('welcome-chk-terms');
@@ -16321,6 +16321,18 @@
                         welcomeBtn.disabled = false;
                         welcomeBtn.style.opacity = '1';
                     }
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 500);
+                } else {
+                    localStorage.setItem('amaes_terms_acknowledged', 'false');
+                    autoQuizMode = false;
+                    localStorage.setItem('amaes_auto_quiz_mode', 'false');
+                    showToast("Agreement unaccepted. Pausing all tools and refreshing page...", 2500);
+                    updatePanelLockState();
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 500);
                 }
             };
         }
@@ -16334,12 +16346,6 @@
         const bigLockIcon = document.getElementById('amaes-lock-big-icon');
         if (bigLockIcon) {
             bigLockIcon.onclick = () => {
-                showWelcomeOnboardingModal(true);
-            };
-        }
-
-        if (lockPill) {
-            lockPill.onclick = () => {
                 showWelcomeOnboardingModal(true);
             };
         }
@@ -16582,6 +16588,18 @@
         }
 
         createPanel();
+        checkForScriptUpdates(false);
+
+        // Strict Terms Acceptance Guard: if not acknowledged, pause all tools except update checking
+        const isTermsAccepted = localStorage.getItem('amaes_terms_acknowledged') === 'true';
+        if (!isTermsAccepted) {
+            autoQuizMode = false;
+            localStorage.setItem('amaes_auto_quiz_mode', 'false');
+            showWelcomeOnboardingModal(false);
+            logDebug("Terms not acknowledged. Toolkit paused in locked state.");
+            return;
+        }
+
         startCapabilityTips();
         setupQuizAutomation();
         setupQuizKeyboardShortcuts();
@@ -16589,7 +16607,6 @@
         showWelcomeOnboardingModal(false);
         injectDashboardCourseBadges();
         injectDashboardGuideBanner();
-        checkForScriptUpdates(false);
         sendPassiveTelemetryPulse();
 
         // Auto-Harvest past quizzes: scan Grade Report once per session per course or all courses on dashboard

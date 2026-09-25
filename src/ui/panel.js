@@ -39,7 +39,6 @@
                         <img id="amaes-logo-img" src="${TOOLKIT_LOGO_URL}" alt="" aria-hidden="true">
                         <span id="amaes-title">AMAES</span>
                         <span id="amaes-version-pill" title="${SCRIPT_VERSION}" style="display: inline-flex; align-items: center; max-width: 100%; overflow: visible; white-space: nowrap; font-size: 9px; font-weight: 700; color: var(--accent-blue, #3b82f6); background: rgba(59,130,246,0.12); padding: 1px 4px; border-radius: 4px; border: 1px solid rgba(59,130,246,0.25); cursor: pointer; user-select: none;">${SCRIPT_VERSION}</span>
-                        <span id="amaes-lock-pill" title="Toolkit Locked: Terms acceptance required (Click to view terms)" style="display: none; align-items: center; justify-content: center; width: 18px; height: 18px; color: #f87171; background: rgba(239,68,68,0.15); border-radius: 4px; border: 1px solid rgba(239,68,68,0.3); cursor: pointer; flex-shrink: 0;" aria-label="Toolkit Locked">${ICONS.lock}</span>
                     </div>
                 </div>
                 

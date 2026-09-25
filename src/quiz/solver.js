@@ -544,6 +544,10 @@
     let isSolverRunning = false;
 
     async function runAutoQuizSolver(forceRun = false) {
+        if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') {
+            autoQuizMode = false;
+            return;
+        }
         if (!checkIsQuizAttemptPage()) return;
 
         // STRICT PAUSE CHECK: If Auto-Quiz is not explicitly active or force-run, halt completely
@@ -1184,6 +1188,7 @@
 
     // Floating HUD for Quiz Attempt Screen
     function injectQuizFloatingHUD() {
+        if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') return;
         if (!checkIsQuizAttemptPage()) return;
         if (document.getElementById('amaes-quiz-hud')) return;
 
@@ -1837,6 +1842,9 @@
 
     // Match questions & auto-highlight / auto-select on Moodle Quiz
     function highlightQuizAnswers(questionsDb, autoSelect = false, isManualSelect = false) {
+        if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') {
+            return { matched: 0, total: 0, error: "Toolkit locked" };
+        }
         if (!questionsDb || questionsDb.length === 0) {
             return { matched: 0, total: 0, error: "No cached questions found" };
         }

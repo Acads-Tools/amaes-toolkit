@@ -3283,13 +3283,15 @@ test("Toolkit Panel Lockout: locks panel when terms are not acknowledged and pro
     assert.ok(script.includes('id="amaes-panel-lock-overlay"'), "Lock overlay element must exist in panel template");
     assert.ok(script.includes('Toolkit Locked'), "Lock overlay must announce 'Toolkit Locked'");
     assert.ok(script.includes('id="amaes-lock-chk-terms"'), "Lock overlay must include terms acceptance checkbox");
-    assert.ok(script.includes('id="amaes-lock-pill"'), "Header must include lock status pill");
+    assert.ok(!script.includes('id="amaes-lock-pill"'), "Redundant header lock status pill must be removed");
 
     // 2. Logic & Wiring
     assert.ok(script.includes("updatePanelLockState"), "Panel lock state update function must exist");
     assert.ok(script.includes("localStorage.getItem('amaes_terms_acknowledged') === 'true'"), "Lock state must check amaes_terms_acknowledged");
     assert.ok(script.includes("localStorage.removeItem('amaes_terms_acknowledged')"), "Reset installation must clear amaes_terms_acknowledged");
     assert.ok(script.includes("Terms accepted! Toolkit unlocked."), "Checking terms checkbox must auto-unlock toolkit");
+    assert.ok(script.includes("Agreement unaccepted. Pausing all tools and refreshing page..."), "Unchecking terms must pause tools and refresh");
+    assert.ok(script.includes("Terms not acknowledged. Toolkit paused in locked state."), "Initialization must halt when terms not accepted");
 });
 // --------------------------------------------------
 // 92. Removal of Import / Export JSON Backups Feature

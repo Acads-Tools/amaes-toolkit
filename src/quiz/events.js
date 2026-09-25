@@ -1090,7 +1090,6 @@
 
         // Lock State & Terms Acceptance Management
         const lockOverlay = document.getElementById('amaes-panel-lock-overlay');
-        const lockPill = document.getElementById('amaes-lock-pill');
         const lockChk = document.getElementById('amaes-lock-chk-terms');
         const lockContainer = document.getElementById('amaes-lock-terms-label');
         const viewTermsBtn = document.getElementById('amaes-btn-lock-view-terms');
@@ -1102,13 +1101,11 @@
             if (!isAccepted) {
                 if (lockOverlay) lockOverlay.style.display = isMin ? 'none' : 'flex';
                 if (bodyEl) bodyEl.style.display = 'none';
-                if (lockPill) lockPill.style.display = 'inline-flex';
                 if (lockChk) lockChk.checked = false;
                 if (lockContainer) lockContainer.style.borderColor = 'rgba(255, 255, 255, 0.1)';
             } else {
                 if (lockOverlay) lockOverlay.style.display = 'none';
                 if (bodyEl) bodyEl.style.display = isMin ? 'none' : 'flex';
-                if (lockPill) lockPill.style.display = 'none';
                 if (lockChk) lockChk.checked = true;
             }
         };
@@ -1119,7 +1116,7 @@
                 if (lockChk.checked) {
                     if (lockContainer) lockContainer.style.borderColor = 'rgba(16, 185, 129, 0.5)';
                     localStorage.setItem('amaes_terms_acknowledged', 'true');
-                    showToast("Terms accepted! Toolkit unlocked.", 3000);
+                    showToast("Terms accepted! Toolkit unlocked. Refreshing to activate...", 2500);
                     updatePanelLockState();
 
                     const welcomeTerms = document.getElementById('welcome-chk-terms');
@@ -1129,6 +1126,18 @@
                         welcomeBtn.disabled = false;
                         welcomeBtn.style.opacity = '1';
                     }
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 500);
+                } else {
+                    localStorage.setItem('amaes_terms_acknowledged', 'false');
+                    autoQuizMode = false;
+                    localStorage.setItem('amaes_auto_quiz_mode', 'false');
+                    showToast("Agreement unaccepted. Pausing all tools and refreshing page...", 2500);
+                    updatePanelLockState();
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 500);
                 }
             };
         }
@@ -1142,12 +1151,6 @@
         const bigLockIcon = document.getElementById('amaes-lock-big-icon');
         if (bigLockIcon) {
             bigLockIcon.onclick = () => {
-                showWelcomeOnboardingModal(true);
-            };
-        }
-
-        if (lockPill) {
-            lockPill.onclick = () => {
                 showWelcomeOnboardingModal(true);
             };
         }

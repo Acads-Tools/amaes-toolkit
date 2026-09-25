@@ -297,6 +297,12 @@
                 gotItButton.style.opacity = checked ? '1' : '0.5';
                 termsContainer.style.borderColor = checked ? 'rgba(16, 185, 129, 0.5)' : 'rgba(16, 185, 129, 0.2)';
                 if (typeof window._amaesUpdatePanelLockState === 'function') window._amaesUpdatePanelLockState();
+                if (!checked) {
+                    autoQuizMode = false;
+                    localStorage.setItem('amaes_auto_quiz_mode', 'false');
+                    showToast("Agreement unaccepted. Pausing tools and refreshing page...", 2500);
+                    setTimeout(() => window.location.reload(), 500);
+                }
             };
         }
 
@@ -396,21 +402,8 @@
             closeModalClean();
             localStorage.setItem('amaes_welcome_dismissed', 'true');
             if (typeof window._amaesUpdatePanelLockState === 'function') window._amaesUpdatePanelLockState();
-
-            // Initialize database / auto-sync
-            const dashCourses = typeof detectDashboardCourses === 'function' ? detectDashboardCourses() : [];
-            if (dashCourses && dashCourses.length > 0) {
-                showToast(`Downloading answers for ${dashCourses.length} courses...`, 3000);
-                if (typeof setLog === 'function') setLog(`Auto-syncing ${dashCourses.length} courses...`, "var(--accent-blue)");
-                dashCourses.forEach(c => {
-                    sessionStorage.setItem(`amaes_cloud_synced_${c.code}`, '1');
-                    if (typeof syncAnswersFromCloud === 'function') {
-                        syncAnswersFromCloud(c.code).catch(() => {});
-                    }
-                });
-            } else {
-                showToast("Ready! Open any course or quiz to start.", 3000);
-            }
+            showToast("Terms accepted! Toolkit unlocked. Refreshing to activate...", 2500);
+            setTimeout(() => window.location.reload(), 500);
         };
 
         if (gotItButton) gotItButton.onclick = dismiss;

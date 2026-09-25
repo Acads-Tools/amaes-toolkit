@@ -18,6 +18,18 @@
         }
 
         createPanel();
+        checkForScriptUpdates(false);
+
+        // Strict Terms Acceptance Guard: if not acknowledged, pause all tools except update checking
+        const isTermsAccepted = localStorage.getItem('amaes_terms_acknowledged') === 'true';
+        if (!isTermsAccepted) {
+            autoQuizMode = false;
+            localStorage.setItem('amaes_auto_quiz_mode', 'false');
+            showWelcomeOnboardingModal(false);
+            logDebug("Terms not acknowledged. Toolkit paused in locked state.");
+            return;
+        }
+
         startCapabilityTips();
         setupQuizAutomation();
         setupQuizKeyboardShortcuts();
@@ -25,7 +37,6 @@
         showWelcomeOnboardingModal(false);
         injectDashboardCourseBadges();
         injectDashboardGuideBanner();
-        checkForScriptUpdates(false);
         sendPassiveTelemetryPulse();
 
         // Auto-Harvest past quizzes: scan Grade Report once per session per course or all courses on dashboard
