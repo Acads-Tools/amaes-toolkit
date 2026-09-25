@@ -12655,7 +12655,7 @@
         const btnCopyInstallGuide = document.getElementById('btn-copy-install-guide');
         if (btnCopyInstallGuide) {
             btnCopyInstallGuide.onclick = () => {
-                const guideText = `AMAES & ACLC Moodle Toolkit - Setup & Installation Guide\n\n` +
+                const guideText = `AMAES Moodle Toolkit - Setup & Installation Guide\n\n` +
                     `Step 1: Install Violentmonkey (Recommended Userscript Manager):\n` +
                     `• Chrome / Brave: https://chromewebstore.google.com/detail/violentmonkey/jinjaccalgkegednnccohejagnlnfdag\n` +
                     `• Firefox: https://addons.mozilla.org/en-US/firefox/addon/violentmonkey/\n` +

@@ -13,29 +13,43 @@ const SRC_DIR = path.join(ROOT_DIR, 'src');
 const OUTPUT_FILE = path.join(ROOT_DIR, 'amaes-toolkit.user.js');
 const PARENT_OUTPUT = path.join(ROOT_DIR, '..', 'amaes-toolkit.user.js');
 
+/**
+ * Explicit lifecycle order for assembling the userscript IIFE.
+ */
+const BUILD_MANIFEST = [
+    'meta.js',
+    'core/config.js',
+    'sync/updater.js',
+    'ui/theme.js',
+    'ui/icons.js',
+    'moodle/detector.js',
+    'sync/amauoed.js',
+    'quiz/solver.js',
+    'moodle/highlighter.js',
+    'dev/diagnostics.js',
+    'ai/prompts.js',
+    'ai/gemini.js',
+    'sync/harvester.js',
+    'dev/console.js',
+    'ui/modals.js',
+    'ui/panel.js',
+    'quiz/events.js',
+    'init.js'
+];
+
 console.log('Building AMAES Toolkit from src/ modules...');
 
-if (!fs.existsSync(SRC_DIR)) {
-    console.error(`Error: Source directory not found: ${SRC_DIR}`);
-    process.exit(1);
-}
-
-const files = fs.readdirSync(SRC_DIR)
-    .filter(f => f.endsWith('.js'))
-    .sort();
-
-if (files.length === 0) {
-    console.error('Error: No source files found in src/');
-    process.exit(1);
-}
-
 let bundled = '';
-files.forEach(f => {
-    const filePath = path.join(SRC_DIR, f);
-    const content = fs.readFileSync(filePath, 'utf8');
+for (const relPath of BUILD_MANIFEST) {
+    const fullPath = path.join(SRC_DIR, relPath);
+    if (!fs.existsSync(fullPath)) {
+        console.error(`Error: Module file not found: ${fullPath}`);
+        process.exit(1);
+    }
+    const content = fs.readFileSync(fullPath, 'utf8');
     bundled += content;
-    console.log(`  + Bundled ${f} (${content.split('\n').length} lines)`);
-});
+    console.log(`  + Bundled ${relPath} (${content.split('\n').length} lines)`);
+}
 
 fs.writeFileSync(OUTPUT_FILE, bundled, 'utf8');
 console.log(`\nSuccessfully built: ${OUTPUT_FILE}`);
