@@ -344,6 +344,16 @@
         throw lastError || new Error('No available Gemini model found for this key.');
     }
 
+    let sharedAiPoolExhaustedUntil = 0;
+
+    function isSharedAiPoolTemporarilyExhausted() {
+        return Date.now() < sharedAiPoolExhaustedUntil;
+    }
+
+    function markSharedAiPoolExhausted(cooldownSec = 60) {
+        sharedAiPoolExhaustedUntil = Date.now() + (cooldownSec * 1000);
+    }
+
     async function callSharedAiFallback({ prompt, maxOutputTokens = 64, signal }) {
         if (!isSharedAiFallbackEnabled()) {
             throw new Error('Shared AI fallback is disabled');
@@ -367,7 +377,12 @@
                 signal
             });
             const data = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(data.error || `Shared AI HTTP ${response.status}`);
+            if (!response.ok) {
+                if (response.status === 429 || response.status === 503 || (data.error && /rate limit|quota|full|busy|exhausted/i.test(data.error))) {
+                    markSharedAiPoolExhausted(60);
+                }
+                throw new Error(data.error || `Shared AI HTTP ${response.status}`);
+            }
             return data;
         };
 
@@ -1011,15 +1026,50 @@
                     }
                     setLog(`[AI Assistant] Retrying Gemini (Attempt ${attempt}/${maxAttempts}) for Question #${qData ? qData.qNum : ''}...`, "var(--accent-purple)");
                 }
-                const res = await callGeminiApi({
-                    apiKey: getAvailableGeminiKey(),
-                    prompt: promptText,
-                    maxOutputTokens: 64,
-                    signal: abortCtrl.signal
-                });
-                if (res && res.text) {
-                    answerText = res.text;
-                    break;
+                const apiKey = getAvailableGeminiKey();
+                if (!apiKey) {
+                    if (isSharedAiFallbackEnabled() && !isSharedAiPoolTemporarilyExhausted()) {
+                        const sharedStatusTextEl = thinkingEl.querySelector('.amaes-ai-status-text');
+                        if (sharedStatusTextEl) {
+                            sharedStatusTextEl.textContent = 'Using community shared AI pool...';
+                        }
+                        setLog('[AI Assistant] No personal key configured. Using community shared AI pool...', "var(--accent-blue)");
+                        try {
+                            const sharedResult = await callSharedAiFallback({
+                                prompt: promptText,
+                                maxOutputTokens: 64,
+                                signal: abortCtrl.signal
+                            });
+                            if (sharedResult && sharedResult.text) {
+                                answerText = sharedResult.text;
+                                setLog('[AI Assistant] Shared AI responded. The answer is still a suggestion—please review it.', "var(--accent-blue)");
+                                break;
+                            }
+                        } catch (sharedError) {
+                            markSharedAiPoolExhausted(60);
+                            logDebug(`Shared AI fallback failed: ${sharedError.message}`);
+                            showToast("Shared AI pool is unavailable. Please configure your free Gemini key.", 4000);
+                            showGeminiSetupModal("The community shared AI pool is currently unavailable or exhausted. Add your free Google Gemini API key to continue solving questions instantly.");
+                            lastError = sharedError;
+                            break;
+                        }
+                    } else {
+                        showToast("Gemini AI is not configured. Please set your free Google AI Studio key.", 3500);
+                        showGeminiSetupModal("Gemini AI is not configured. Set up your free Google AI Studio key below to get started.");
+                        lastError = new Error('Gemini AI is not configured');
+                        break;
+                    }
+                } else {
+                    const res = await callGeminiApi({
+                        apiKey: apiKey,
+                        prompt: promptText,
+                        maxOutputTokens: 64,
+                        signal: abortCtrl.signal
+                    });
+                    if (res && res.text) {
+                        answerText = res.text;
+                        break;
+                    }
                 }
             } catch (err) {
                 lastError = err;
@@ -1035,7 +1085,7 @@
                     errLower.includes('429') || 
                     errLower.includes('rate limit') || 
                     errLower.includes('resource_exhausted')) {
-                    if (!sharedFallbackAttempted && isSharedAiFallbackEnabled()) {
+                    if (!sharedFallbackAttempted && isSharedAiFallbackEnabled() && !isSharedAiPoolTemporarilyExhausted()) {
                         sharedFallbackAttempted = true;
                         const sharedStatusTextEl = thinkingEl.querySelector('.amaes-ai-status-text');
                         if (sharedStatusTextEl) {
@@ -1054,6 +1104,7 @@
                                 break;
                             }
                         } catch (sharedError) {
+                            markSharedAiPoolExhausted(60);
                             logDebug(`Shared AI fallback unavailable: ${sharedError.message}`);
                             if (sharedStatusTextEl) {
                                 sharedStatusTextEl.textContent = 'Shared AI help is currently full. Returning to your personal-key options...';
@@ -1343,9 +1394,16 @@
 
         const keys = getGeminiApiKeys();
         if (keys.length === 0) {
-            showToast("Gemini AI is not configured. Please set your free Google AI Studio key.", 3500);
-            showGeminiSetupModal();
-            return;
+            if (!isSharedAiFallbackEnabled()) {
+                showToast("Gemini AI is not configured. Please set your free Google AI Studio key.", 3500);
+                showGeminiSetupModal("Gemini AI is not configured. Set up your free Google AI Studio key below to get started.");
+                return;
+            }
+            if (isSharedAiPoolTemporarilyExhausted()) {
+                showToast("Shared AI pool is temporarily busy. Add your own free key for instant answers.", 3500);
+                showGeminiSetupModal("The community shared AI pool is currently busy or rate-limited. Please configure your own free Gemini key below to solve questions without waiting.");
+                return;
+            }
         }
 
         const qData = extractQuestionData(que);
@@ -1392,26 +1450,27 @@
                     }
                 }
 
-                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
-                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
                 showToast(`Gemini resolved Question #${qData ? qData.qNum : ''}!`, 3000);
             },
             onFallback: () => {
-                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
-                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
             }
         });
 
         if (cardAiBtn && cardAiBtn.innerHTML.includes('Asking AI...')) {
-            cardAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+            cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
         }
         if (blockageAiBtn && blockageAiBtn.innerHTML.includes('Asking AI...')) {
-            blockageAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+            blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
         }
     }
 
     // Non-tech student setup modal for Google AI Studio API key
     function showGeminiSetupModal() {
+        const initialNotice = arguments[0] || '';
         let modal = document.getElementById('amaes-gemini-modal');
         if (modal) modal.remove();
 
@@ -1472,6 +1531,12 @@
 
                 <!-- Modal Content -->
                 <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px; max-height: 75vh; overflow-y: auto;">
+                    ${initialNotice ? `
+                    <div id="amaes-gemini-modal-notice" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; padding: 10px 12px; border-radius: 8px; font-size: 11.5px; line-height: 1.45; display: flex; align-items: flex-start; gap: 8px;">
+                        <span style="font-size: 14px; line-height: 1;">⚠️</span>
+                        <div>${escapeHtml(initialNotice)}</div>
+                    </div>
+                    ` : ''}
                     <div style="font-size: 11.5px; color: var(--text-secondary, #cbd5e1); line-height: 1.45;">
                         Get instant answers on uncertain questions directly in your quiz.
                         <span style="color: #34d399; font-weight: 600;">100% Free</span> with your personal Google account. 

@@ -1618,6 +1618,9 @@
         trash: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>`,
         terminal: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`,
         bug: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg>`,
+        chatgpt: `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M22.28 9.82a6 6 0 0 0-.52-4.91 6.05 6.05 0 0 0-6.51-2.9A6.06 6.06 0 0 0 4.98 4.18a6 6 0 0 0-4 2.9 6.05 6.05 0 0 0 .74 7.1 6 6 0 0 0 .51 4.91 6.05 6.05 0 0 0 6.52 2.9A6 6 0 0 0 13.26 24a6.05 6.05 0 0 0 5.77-4.2 6 6 0 0 0 4-2.9 6.05 6.05 0 0 0-.75-7.08zm-9.02 12.61a4.48 4.48 0 0 1-2.88-1.04l.14-.08 4.78-2.76a.8.8 0 0 0 .39-.68v-6.74l2.02 1.17a.07.07 0 0 1 .04.05v5.59a4.5 4.5 0 0 1-4.49 4.49zm-9.66-4.13a4.47 4.47 0 0 1-.54-3.01l.15.08 4.78 2.76a.77.77 0 0 0 .78 0l5.84-3.37v2.33a.08.08 0 0 1-.03.06L9.74 19.95a4.5 4.5 0 0 1-6.14-1.65zM2.34 7.9a4.49 4.49 0 0 1 2.37-1.98V11.6a.77.77 0 0 0 .38.68l5.82 3.35-2.02 1.17a.08.08 0 0 1-.07 0l-4.83-2.79A4.5 4.5 0 0 1 2.34 7.9zm16.1 3.85L12.6 8.38l2.02-1.16a.08.08 0 0 1 .07 0l4.83 2.79a4.5 4.5 0 0 1-.67 8.1v-5.67a.8.8 0 0 0-.41-.69zm2.01-3.02l-.14-.09-4.78-2.78a.78.78 0 0 0-.78 0L9.4 9.23V6.9a.07.07 0 0 1 .03-.06l4.83-2.79a4.5 4.5 0 0 1 6.68 4.66zM8.31 12.86l-2.02-1.16a.08.08 0 0 1-.04-.06V6.07a4.5 4.5 0 0 1 7.38-3.45l-.14.08L8.7 5.46a.8.8 0 0 0-.39.68v6.72zm1.3-1.9l2.42-1.4 2.43 1.4v2.8l-2.43 1.4-2.42-1.4z"/></svg>`,
+        gemini: `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/></svg>`,
+        perplexity: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>`,
     };
 
     // Web Audio API Procedural Sound Engine (Zero external dependencies)
@@ -8310,14 +8313,14 @@
                     const builtinHeader = document.createElement('div');
                     builtinHeader.className = 'amaes-builtin-ai-header';
                     builtinHeader.style.cssText = 'font-size: 9px; font-weight: 700; color: #a855f7; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: center; gap: 4px; user-select: none;';
-                    builtinHeader.innerHTML = `${ICONS.sparkles} <span>Built-in AI</span>`;
+                    builtinHeader.innerHTML = `${ICONS.gemini} <span>Built-in AI</span>`;
                     builtinAiSection.appendChild(builtinHeader);
 
                     const btnAskAi = document.createElement('button');
                     btnAskAi.type = 'button';
                     btnAskAi.className = 'amaes-copy-ai-card-btn amaes-ask-ai-card-btn';
                     btnAskAi.title = 'Ask Google Gemini AI to analyze and solve this question directly';
-                    btnAskAi.innerHTML = `${ICONS.sparkles} <span>${que.dataset.amaesAiAttempted ? 'Retry AI' : 'Solve with AI'}</span>`;
+                    btnAskAi.innerHTML = `${ICONS.gemini} <span>${que.dataset.amaesAiAttempted ? 'Retry AI' : 'Solve with AI'}</span>`;
                     btnAskAi.onclick = async (e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -8350,21 +8353,19 @@
             if (formulation && !que.querySelector('.amaes-web-ai-row')) {
                 const webAiRow = document.createElement('div');
                 webAiRow.className = 'amaes-web-ai-row';
-                webAiRow.style.cssText = 'display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px 0; width: 100%; box-sizing: border-box;';
 
                 const webAiLabel = document.createElement('span');
                 webAiLabel.className = 'amaes-web-ai-label';
-                webAiLabel.style.cssText = 'font-size: 10px; font-weight: 700; color: var(--text-muted, #64748b); text-transform: uppercase; letter-spacing: 0.5px; user-select: none; margin-right: 2px;';
-                webAiLabel.textContent = 'Web AI:';
+                webAiLabel.innerHTML = `${ICONS.globe || ICONS.external} <span>Web AI:</span>`;
                 webAiRow.appendChild(webAiLabel);
 
-                // 2a. Ask ChatGPT
+                // 2a. Ask ChatGPT (Official SVG logo)
                 const btnChatGpt = document.createElement('button');
                 btnChatGpt.type = 'button';
                 btnChatGpt.className = 'amaes-web-ai-item amaes-pill-chatgpt';
                 btnChatGpt.dataset.provider = 'chatgpt';
                 btnChatGpt.title = 'Open question directly in ChatGPT with answer prompt pre-filled';
-                btnChatGpt.innerHTML = `<span class="amaes-ai-icon">💬</span> <span>Ask ChatGPT</span>`;
+                btnChatGpt.innerHTML = `${ICONS.chatgpt} <span>ChatGPT</span>`;
                 btnChatGpt.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -8372,13 +8373,13 @@
                 };
                 webAiRow.appendChild(btnChatGpt);
 
-                // 2b. Google Gemini Web
+                // 2b. Google Gemini Web (Official Sparkle SVG logo)
                 const btnGemini = document.createElement('button');
                 btnGemini.type = 'button';
                 btnGemini.className = 'amaes-web-ai-item amaes-pill-gemini';
                 btnGemini.dataset.provider = 'gemini';
                 btnGemini.title = 'Open question in Google Gemini';
-                btnGemini.innerHTML = `<span class="amaes-ai-icon">✦</span> <span>Gemini Web</span>`;
+                btnGemini.innerHTML = `${ICONS.gemini} <span>Gemini Web</span>`;
                 btnGemini.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -8386,13 +8387,13 @@
                 };
                 webAiRow.appendChild(btnGemini);
 
-                // 2c. Perplexity AI
+                // 2c. Perplexity AI (Official Geometric SVG logo)
                 const btnPerplexity = document.createElement('button');
                 btnPerplexity.type = 'button';
                 btnPerplexity.className = 'amaes-web-ai-item amaes-pill-perplexity';
                 btnPerplexity.dataset.provider = 'perplexity';
                 btnPerplexity.title = 'Search question in Perplexity AI';
-                btnPerplexity.innerHTML = `<span class="amaes-ai-icon">⚡</span> <span>Perplexity</span>`;
+                btnPerplexity.innerHTML = `${ICONS.perplexity} <span>Perplexity</span>`;
                 btnPerplexity.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -9067,6 +9068,16 @@
         throw lastError || new Error('No available Gemini model found for this key.');
     }
 
+    let sharedAiPoolExhaustedUntil = 0;
+
+    function isSharedAiPoolTemporarilyExhausted() {
+        return Date.now() < sharedAiPoolExhaustedUntil;
+    }
+
+    function markSharedAiPoolExhausted(cooldownSec = 60) {
+        sharedAiPoolExhaustedUntil = Date.now() + (cooldownSec * 1000);
+    }
+
     async function callSharedAiFallback({ prompt, maxOutputTokens = 64, signal }) {
         if (!isSharedAiFallbackEnabled()) {
             throw new Error('Shared AI fallback is disabled');
@@ -9090,7 +9101,12 @@
                 signal
             });
             const data = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(data.error || `Shared AI HTTP ${response.status}`);
+            if (!response.ok) {
+                if (response.status === 429 || response.status === 503 || (data.error && /rate limit|quota|full|busy|exhausted/i.test(data.error))) {
+                    markSharedAiPoolExhausted(60);
+                }
+                throw new Error(data.error || `Shared AI HTTP ${response.status}`);
+            }
             return data;
         };
 
@@ -9734,15 +9750,50 @@
                     }
                     setLog(`[AI Assistant] Retrying Gemini (Attempt ${attempt}/${maxAttempts}) for Question #${qData ? qData.qNum : ''}...`, "var(--accent-purple)");
                 }
-                const res = await callGeminiApi({
-                    apiKey: getAvailableGeminiKey(),
-                    prompt: promptText,
-                    maxOutputTokens: 64,
-                    signal: abortCtrl.signal
-                });
-                if (res && res.text) {
-                    answerText = res.text;
-                    break;
+                const apiKey = getAvailableGeminiKey();
+                if (!apiKey) {
+                    if (isSharedAiFallbackEnabled() && !isSharedAiPoolTemporarilyExhausted()) {
+                        const sharedStatusTextEl = thinkingEl.querySelector('.amaes-ai-status-text');
+                        if (sharedStatusTextEl) {
+                            sharedStatusTextEl.textContent = 'Using community shared AI pool...';
+                        }
+                        setLog('[AI Assistant] No personal key configured. Using community shared AI pool...', "var(--accent-blue)");
+                        try {
+                            const sharedResult = await callSharedAiFallback({
+                                prompt: promptText,
+                                maxOutputTokens: 64,
+                                signal: abortCtrl.signal
+                            });
+                            if (sharedResult && sharedResult.text) {
+                                answerText = sharedResult.text;
+                                setLog('[AI Assistant] Shared AI responded. The answer is still a suggestion—please review it.', "var(--accent-blue)");
+                                break;
+                            }
+                        } catch (sharedError) {
+                            markSharedAiPoolExhausted(60);
+                            logDebug(`Shared AI fallback failed: ${sharedError.message}`);
+                            showToast("Shared AI pool is unavailable. Please configure your free Gemini key.", 4000);
+                            showGeminiSetupModal("The community shared AI pool is currently unavailable or exhausted. Add your free Google Gemini API key to continue solving questions instantly.");
+                            lastError = sharedError;
+                            break;
+                        }
+                    } else {
+                        showToast("Gemini AI is not configured. Please set your free Google AI Studio key.", 3500);
+                        showGeminiSetupModal("Gemini AI is not configured. Set up your free Google AI Studio key below to get started.");
+                        lastError = new Error('Gemini AI is not configured');
+                        break;
+                    }
+                } else {
+                    const res = await callGeminiApi({
+                        apiKey: apiKey,
+                        prompt: promptText,
+                        maxOutputTokens: 64,
+                        signal: abortCtrl.signal
+                    });
+                    if (res && res.text) {
+                        answerText = res.text;
+                        break;
+                    }
                 }
             } catch (err) {
                 lastError = err;
@@ -9758,7 +9809,7 @@
                     errLower.includes('429') || 
                     errLower.includes('rate limit') || 
                     errLower.includes('resource_exhausted')) {
-                    if (!sharedFallbackAttempted && isSharedAiFallbackEnabled()) {
+                    if (!sharedFallbackAttempted && isSharedAiFallbackEnabled() && !isSharedAiPoolTemporarilyExhausted()) {
                         sharedFallbackAttempted = true;
                         const sharedStatusTextEl = thinkingEl.querySelector('.amaes-ai-status-text');
                         if (sharedStatusTextEl) {
@@ -9777,6 +9828,7 @@
                                 break;
                             }
                         } catch (sharedError) {
+                            markSharedAiPoolExhausted(60);
                             logDebug(`Shared AI fallback unavailable: ${sharedError.message}`);
                             if (sharedStatusTextEl) {
                                 sharedStatusTextEl.textContent = 'Shared AI help is currently full. Returning to your personal-key options...';
@@ -10066,9 +10118,16 @@
 
         const keys = getGeminiApiKeys();
         if (keys.length === 0) {
-            showToast("Gemini AI is not configured. Please set your free Google AI Studio key.", 3500);
-            showGeminiSetupModal();
-            return;
+            if (!isSharedAiFallbackEnabled()) {
+                showToast("Gemini AI is not configured. Please set your free Google AI Studio key.", 3500);
+                showGeminiSetupModal("Gemini AI is not configured. Set up your free Google AI Studio key below to get started.");
+                return;
+            }
+            if (isSharedAiPoolTemporarilyExhausted()) {
+                showToast("Shared AI pool is temporarily busy. Add your own free key for instant answers.", 3500);
+                showGeminiSetupModal("The community shared AI pool is currently busy or rate-limited. Please configure your own free Gemini key below to solve questions without waiting.");
+                return;
+            }
         }
 
         const qData = extractQuestionData(que);
@@ -10115,26 +10174,27 @@
                     }
                 }
 
-                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
-                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
                 showToast(`Gemini resolved Question #${qData ? qData.qNum : ''}!`, 3000);
             },
             onFallback: () => {
-                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
-                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
             }
         });
 
         if (cardAiBtn && cardAiBtn.innerHTML.includes('Asking AI...')) {
-            cardAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+            cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
         }
         if (blockageAiBtn && blockageAiBtn.innerHTML.includes('Asking AI...')) {
-            blockageAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+            blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
         }
     }
 
     // Non-tech student setup modal for Google AI Studio API key
     function showGeminiSetupModal() {
+        const initialNotice = arguments[0] || '';
         let modal = document.getElementById('amaes-gemini-modal');
         if (modal) modal.remove();
 
@@ -10195,6 +10255,12 @@
 
                 <!-- Modal Content -->
                 <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px; max-height: 75vh; overflow-y: auto;">
+                    ${initialNotice ? `
+                    <div id="amaes-gemini-modal-notice" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; padding: 10px 12px; border-radius: 8px; font-size: 11.5px; line-height: 1.45; display: flex; align-items: flex-start; gap: 8px;">
+                        <span style="font-size: 14px; line-height: 1;">⚠️</span>
+                        <div>${escapeHtml(initialNotice)}</div>
+                    </div>
+                    ` : ''}
                     <div style="font-size: 11.5px; color: var(--text-secondary, #cbd5e1); line-height: 1.45;">
                         Get instant answers on uncertain questions directly in your quiz.
                         <span style="color: #34d399; font-weight: 600;">100% Free</span> with your personal Google account. 
@@ -14501,14 +14567,14 @@
                     display: flex !important;
                     align-items: center !important;
                     justify-content: center !important;
-                    gap: 5px !important;
-                    padding: 5px 8px !important;
+                    gap: 6px !important;
+                    padding: 5px 9px !important;
                     border-radius: 6px !important;
                     font-size: 11px !important;
-                    font-weight: 700 !important;
-                    background: rgba(59, 130, 246, 0.12) !important;
-                    color: #3b82f6 !important;
-                    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+                    font-weight: 600 !important;
+                    background: rgba(37, 99, 235, 0.08) !important;
+                    color: #2563eb !important;
+                    border: 1px solid rgba(37, 99, 235, 0.28) !important;
                     cursor: pointer !important;
                     transition: all 0.15s ease !important;
                     box-sizing: border-box !important;
@@ -14516,33 +14582,37 @@
                     width: 100% !important;
                     user-select: none !important;
                     text-align: center !important;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
                 }
                 .amaes-copy-ai-card-btn:hover,
                 .amaes-copy-ai-card-btn:active {
-                    background: rgba(59, 130, 246, 0.22) !important;
-                    border-color: #3b82f6 !important;
+                    background: rgba(37, 99, 235, 0.16) !important;
+                    border-color: #2563eb !important;
+                    color: #1d4ed8 !important;
+                    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.12) !important;
                 }
 
                 .amaes-paste-ai-card-btn {
-                    background: rgba(245, 158, 11, 0.12) !important;
-                    color: #f59e0b !important;
-                    border-color: rgba(245, 158, 11, 0.3) !important;
+                    background: rgba(245, 158, 11, 0.08) !important;
+                    color: #d97706 !important;
+                    border-color: rgba(245, 158, 11, 0.28) !important;
                 }
                 .amaes-paste-ai-card-btn:hover,
                 .amaes-paste-ai-card-btn:active {
-                    background: rgba(245, 158, 11, 0.22) !important;
-                    border-color: #f59e0b !important;
+                    background: rgba(245, 158, 11, 0.16) !important;
+                    border-color: #d97706 !important;
+                    color: #b45309 !important;
+                    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.12) !important;
                 }
-
 
                 /* Built-in AI Section (Left Sidebar) */
                 .amaes-builtin-ai-section {
                     display: flex !important;
                     flex-direction: column !important;
                     gap: 3px !important;
-                    margin-top: 4px !important;
-                    padding-top: 4px !important;
-                    border-top: 1px dashed rgba(168, 85, 247, 0.35) !important;
+                    margin-top: 5px !important;
+                    padding-top: 5px !important;
+                    border-top: 1px solid rgba(226, 232, 240, 0.9) !important;
                     width: 100% !important;
                     box-sizing: border-box !important;
                 }
@@ -14554,44 +14624,50 @@
                     gap: 4px !important;
                     font-size: 9px !important;
                     font-weight: 700 !important;
-                    color: #a855f7 !important;
+                    color: #8b5cf6 !important;
                     text-transform: uppercase !important;
                     letter-spacing: 0.5px !important;
                     user-select: none !important;
                 }
 
                 .amaes-ask-ai-card-btn {
-                    background: rgba(168, 85, 247, 0.12) !important;
-                    color: #a855f7 !important;
-                    border: 1px solid rgba(168, 85, 247, 0.3) !important;
+                    background: rgba(139, 92, 246, 0.08) !important;
+                    color: #7c3aed !important;
+                    border: 1px solid rgba(139, 92, 246, 0.28) !important;
                 }
                 .amaes-ask-ai-card-btn:hover,
                 .amaes-ask-ai-card-btn:active {
-                    background: rgba(168, 85, 247, 0.22) !important;
-                    border-color: #a855f7 !important;
-                    color: #9333ea !important;
+                    background: rgba(139, 92, 246, 0.16) !important;
+                    border-color: #7c3aed !important;
+                    color: #6d28d9 !important;
+                    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.12) !important;
                 }
 
                 /* Web AI Launcher Row (Right Side - Question Header) */
                 .amaes-web-ai-row {
-                    display: flex !important;
+                    display: inline-flex !important;
                     flex-wrap: wrap !important;
                     gap: 6px !important;
                     align-items: center !important;
-                    width: 100% !important;
-                    margin: 4px 0 8px 0 !important;
+                    margin: 4px 0 10px 0 !important;
+                    padding: 3px 6px !important;
+                    background: rgba(241, 245, 249, 0.7) !important;
+                    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+                    border-radius: 6px !important;
                     box-sizing: border-box !important;
                 }
 
                 .amaes-web-ai-label {
                     display: inline-flex !important;
                     align-items: center !important;
-                    font-size: 10px !important;
+                    gap: 4px !important;
+                    font-size: 9.5px !important;
                     font-weight: 700 !important;
-                    color: var(--text-muted, #64748b) !important;
+                    color: #64748b !important;
                     text-transform: uppercase !important;
                     letter-spacing: 0.5px !important;
                     user-select: none !important;
+                    padding: 0 2px !important;
                     margin-right: 2px !important;
                 }
 
@@ -14599,54 +14675,51 @@
                     display: inline-flex !important;
                     align-items: center !important;
                     gap: 5px !important;
-                    padding: 4px 10px !important;
-                    border-radius: 6px !important;
+                    padding: 3px 8px !important;
+                    border-radius: 5px !important;
                     font-size: 11px !important;
-                    font-weight: 700 !important;
+                    font-weight: 600 !important;
                     cursor: pointer !important;
                     transition: all 0.15s ease !important;
                     box-sizing: border-box !important;
-                    border: 1px solid transparent !important;
                     user-select: none !important;
                     touch-action: manipulation !important;
                     line-height: 1.3 !important;
                     white-space: nowrap !important;
+                    background: #ffffff !important;
+                    border: 1px solid #cbd5e1 !important;
+                    color: #334155 !important;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
                 }
 
-                .amaes-web-ai-item.amaes-pill-chatgpt {
-                    background: rgba(16, 185, 129, 0.14) !important;
-                    color: #10b981 !important;
-                    border-color: rgba(16, 185, 129, 0.35) !important;
+                .amaes-web-ai-item svg {
+                    width: 12px !important;
+                    height: 12px !important;
+                    flex-shrink: 0 !important;
                 }
+
                 .amaes-web-ai-item.amaes-pill-chatgpt:hover,
                 .amaes-web-ai-item.amaes-pill-chatgpt:active {
-                    background: rgba(16, 185, 129, 0.25) !important;
-                    border-color: #10b981 !important;
-                    color: #059669 !important;
+                    background: #f0fdf4 !important;
+                    border-color: #10a37f !important;
+                    color: #047857 !important;
+                    box-shadow: 0 1px 4px rgba(16, 163, 127, 0.15) !important;
                 }
 
-                .amaes-web-ai-item.amaes-pill-perplexity {
-                    background: rgba(20, 184, 166, 0.14) !important;
-                    color: #14b8a6 !important;
-                    border-color: rgba(20, 184, 166, 0.35) !important;
-                }
-                .amaes-web-ai-item.amaes-pill-perplexity:hover,
-                .amaes-web-ai-item.amaes-pill-perplexity:active {
-                    background: rgba(20, 184, 166, 0.25) !important;
-                    border-color: #14b8a6 !important;
-                    color: #0d9488 !important;
-                }
-
-                .amaes-web-ai-item.amaes-pill-gemini {
-                    background: rgba(168, 85, 247, 0.14) !important;
-                    color: #a855f7 !important;
-                    border-color: rgba(168, 85, 247, 0.35) !important;
-                }
                 .amaes-web-ai-item.amaes-pill-gemini:hover,
                 .amaes-web-ai-item.amaes-pill-gemini:active {
-                    background: rgba(168, 85, 247, 0.25) !important;
-                    border-color: #a855f7 !important;
-                    color: #9333ea !important;
+                    background: #faf5ff !important;
+                    border-color: #8b5cf6 !important;
+                    color: #7c3aed !important;
+                    box-shadow: 0 1px 4px rgba(139, 92, 246, 0.15) !important;
+                }
+
+                .amaes-web-ai-item.amaes-pill-perplexity:hover,
+                .amaes-web-ai-item.amaes-pill-perplexity:active {
+                    background: #f0fdfa !important;
+                    border-color: #06b6d4 !important;
+                    color: #0891b2 !important;
+                    box-shadow: 0 1px 4px rgba(6, 182, 212, 0.15) !important;
                 }
 
                 /* Active / Focused Question Card Highlight */

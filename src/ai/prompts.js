@@ -470,14 +470,14 @@
                     const builtinHeader = document.createElement('div');
                     builtinHeader.className = 'amaes-builtin-ai-header';
                     builtinHeader.style.cssText = 'font-size: 9px; font-weight: 700; color: #a855f7; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: center; gap: 4px; user-select: none;';
-                    builtinHeader.innerHTML = `${ICONS.sparkles} <span>Built-in AI</span>`;
+                    builtinHeader.innerHTML = `${ICONS.gemini} <span>Built-in AI</span>`;
                     builtinAiSection.appendChild(builtinHeader);
 
                     const btnAskAi = document.createElement('button');
                     btnAskAi.type = 'button';
                     btnAskAi.className = 'amaes-copy-ai-card-btn amaes-ask-ai-card-btn';
                     btnAskAi.title = 'Ask Google Gemini AI to analyze and solve this question directly';
-                    btnAskAi.innerHTML = `${ICONS.sparkles} <span>${que.dataset.amaesAiAttempted ? 'Retry AI' : 'Solve with AI'}</span>`;
+                    btnAskAi.innerHTML = `${ICONS.gemini} <span>${que.dataset.amaesAiAttempted ? 'Retry AI' : 'Solve with AI'}</span>`;
                     btnAskAi.onclick = async (e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -510,21 +510,19 @@
             if (formulation && !que.querySelector('.amaes-web-ai-row')) {
                 const webAiRow = document.createElement('div');
                 webAiRow.className = 'amaes-web-ai-row';
-                webAiRow.style.cssText = 'display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px 0; width: 100%; box-sizing: border-box;';
 
                 const webAiLabel = document.createElement('span');
                 webAiLabel.className = 'amaes-web-ai-label';
-                webAiLabel.style.cssText = 'font-size: 10px; font-weight: 700; color: var(--text-muted, #64748b); text-transform: uppercase; letter-spacing: 0.5px; user-select: none; margin-right: 2px;';
-                webAiLabel.textContent = 'Web AI:';
+                webAiLabel.innerHTML = `${ICONS.globe || ICONS.external} <span>Web AI:</span>`;
                 webAiRow.appendChild(webAiLabel);
 
-                // 2a. Ask ChatGPT
+                // 2a. Ask ChatGPT (Official SVG logo)
                 const btnChatGpt = document.createElement('button');
                 btnChatGpt.type = 'button';
                 btnChatGpt.className = 'amaes-web-ai-item amaes-pill-chatgpt';
                 btnChatGpt.dataset.provider = 'chatgpt';
                 btnChatGpt.title = 'Open question directly in ChatGPT with answer prompt pre-filled';
-                btnChatGpt.innerHTML = `<span class="amaes-ai-icon">💬</span> <span>Ask ChatGPT</span>`;
+                btnChatGpt.innerHTML = `${ICONS.chatgpt} <span>ChatGPT</span>`;
                 btnChatGpt.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -532,13 +530,13 @@
                 };
                 webAiRow.appendChild(btnChatGpt);
 
-                // 2b. Google Gemini Web
+                // 2b. Google Gemini Web (Official Sparkle SVG logo)
                 const btnGemini = document.createElement('button');
                 btnGemini.type = 'button';
                 btnGemini.className = 'amaes-web-ai-item amaes-pill-gemini';
                 btnGemini.dataset.provider = 'gemini';
                 btnGemini.title = 'Open question in Google Gemini';
-                btnGemini.innerHTML = `<span class="amaes-ai-icon">✦</span> <span>Gemini Web</span>`;
+                btnGemini.innerHTML = `${ICONS.gemini} <span>Gemini Web</span>`;
                 btnGemini.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -546,13 +544,13 @@
                 };
                 webAiRow.appendChild(btnGemini);
 
-                // 2c. Perplexity AI
+                // 2c. Perplexity AI (Official Geometric SVG logo)
                 const btnPerplexity = document.createElement('button');
                 btnPerplexity.type = 'button';
                 btnPerplexity.className = 'amaes-web-ai-item amaes-pill-perplexity';
                 btnPerplexity.dataset.provider = 'perplexity';
                 btnPerplexity.title = 'Search question in Perplexity AI';
-                btnPerplexity.innerHTML = `<span class="amaes-ai-icon">⚡</span> <span>Perplexity</span>`;
+                btnPerplexity.innerHTML = `${ICONS.perplexity} <span>Perplexity</span>`;
                 btnPerplexity.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();

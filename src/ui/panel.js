@@ -988,14 +988,14 @@
                     display: flex !important;
                     align-items: center !important;
                     justify-content: center !important;
-                    gap: 5px !important;
-                    padding: 5px 8px !important;
+                    gap: 6px !important;
+                    padding: 5px 9px !important;
                     border-radius: 6px !important;
                     font-size: 11px !important;
-                    font-weight: 700 !important;
-                    background: rgba(59, 130, 246, 0.12) !important;
-                    color: #3b82f6 !important;
-                    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+                    font-weight: 600 !important;
+                    background: rgba(37, 99, 235, 0.08) !important;
+                    color: #2563eb !important;
+                    border: 1px solid rgba(37, 99, 235, 0.28) !important;
                     cursor: pointer !important;
                     transition: all 0.15s ease !important;
                     box-sizing: border-box !important;
@@ -1003,33 +1003,37 @@
                     width: 100% !important;
                     user-select: none !important;
                     text-align: center !important;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
                 }
                 .amaes-copy-ai-card-btn:hover,
                 .amaes-copy-ai-card-btn:active {
-                    background: rgba(59, 130, 246, 0.22) !important;
-                    border-color: #3b82f6 !important;
+                    background: rgba(37, 99, 235, 0.16) !important;
+                    border-color: #2563eb !important;
+                    color: #1d4ed8 !important;
+                    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.12) !important;
                 }
 
                 .amaes-paste-ai-card-btn {
-                    background: rgba(245, 158, 11, 0.12) !important;
-                    color: #f59e0b !important;
-                    border-color: rgba(245, 158, 11, 0.3) !important;
+                    background: rgba(245, 158, 11, 0.08) !important;
+                    color: #d97706 !important;
+                    border-color: rgba(245, 158, 11, 0.28) !important;
                 }
                 .amaes-paste-ai-card-btn:hover,
                 .amaes-paste-ai-card-btn:active {
-                    background: rgba(245, 158, 11, 0.22) !important;
-                    border-color: #f59e0b !important;
+                    background: rgba(245, 158, 11, 0.16) !important;
+                    border-color: #d97706 !important;
+                    color: #b45309 !important;
+                    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.12) !important;
                 }
-
 
                 /* Built-in AI Section (Left Sidebar) */
                 .amaes-builtin-ai-section {
                     display: flex !important;
                     flex-direction: column !important;
                     gap: 3px !important;
-                    margin-top: 4px !important;
-                    padding-top: 4px !important;
-                    border-top: 1px dashed rgba(168, 85, 247, 0.35) !important;
+                    margin-top: 5px !important;
+                    padding-top: 5px !important;
+                    border-top: 1px solid rgba(226, 232, 240, 0.9) !important;
                     width: 100% !important;
                     box-sizing: border-box !important;
                 }
@@ -1041,44 +1045,50 @@
                     gap: 4px !important;
                     font-size: 9px !important;
                     font-weight: 700 !important;
-                    color: #a855f7 !important;
+                    color: #8b5cf6 !important;
                     text-transform: uppercase !important;
                     letter-spacing: 0.5px !important;
                     user-select: none !important;
                 }
 
                 .amaes-ask-ai-card-btn {
-                    background: rgba(168, 85, 247, 0.12) !important;
-                    color: #a855f7 !important;
-                    border: 1px solid rgba(168, 85, 247, 0.3) !important;
+                    background: rgba(139, 92, 246, 0.08) !important;
+                    color: #7c3aed !important;
+                    border: 1px solid rgba(139, 92, 246, 0.28) !important;
                 }
                 .amaes-ask-ai-card-btn:hover,
                 .amaes-ask-ai-card-btn:active {
-                    background: rgba(168, 85, 247, 0.22) !important;
-                    border-color: #a855f7 !important;
-                    color: #9333ea !important;
+                    background: rgba(139, 92, 246, 0.16) !important;
+                    border-color: #7c3aed !important;
+                    color: #6d28d9 !important;
+                    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.12) !important;
                 }
 
                 /* Web AI Launcher Row (Right Side - Question Header) */
                 .amaes-web-ai-row {
-                    display: flex !important;
+                    display: inline-flex !important;
                     flex-wrap: wrap !important;
                     gap: 6px !important;
                     align-items: center !important;
-                    width: 100% !important;
-                    margin: 4px 0 8px 0 !important;
+                    margin: 4px 0 10px 0 !important;
+                    padding: 3px 6px !important;
+                    background: rgba(241, 245, 249, 0.7) !important;
+                    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+                    border-radius: 6px !important;
                     box-sizing: border-box !important;
                 }
 
                 .amaes-web-ai-label {
                     display: inline-flex !important;
                     align-items: center !important;
-                    font-size: 10px !important;
+                    gap: 4px !important;
+                    font-size: 9.5px !important;
                     font-weight: 700 !important;
-                    color: var(--text-muted, #64748b) !important;
+                    color: #64748b !important;
                     text-transform: uppercase !important;
                     letter-spacing: 0.5px !important;
                     user-select: none !important;
+                    padding: 0 2px !important;
                     margin-right: 2px !important;
                 }
 
@@ -1086,54 +1096,51 @@
                     display: inline-flex !important;
                     align-items: center !important;
                     gap: 5px !important;
-                    padding: 4px 10px !important;
-                    border-radius: 6px !important;
+                    padding: 3px 8px !important;
+                    border-radius: 5px !important;
                     font-size: 11px !important;
-                    font-weight: 700 !important;
+                    font-weight: 600 !important;
                     cursor: pointer !important;
                     transition: all 0.15s ease !important;
                     box-sizing: border-box !important;
-                    border: 1px solid transparent !important;
                     user-select: none !important;
                     touch-action: manipulation !important;
                     line-height: 1.3 !important;
                     white-space: nowrap !important;
+                    background: #ffffff !important;
+                    border: 1px solid #cbd5e1 !important;
+                    color: #334155 !important;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
                 }
 
-                .amaes-web-ai-item.amaes-pill-chatgpt {
-                    background: rgba(16, 185, 129, 0.14) !important;
-                    color: #10b981 !important;
-                    border-color: rgba(16, 185, 129, 0.35) !important;
+                .amaes-web-ai-item svg {
+                    width: 12px !important;
+                    height: 12px !important;
+                    flex-shrink: 0 !important;
                 }
+
                 .amaes-web-ai-item.amaes-pill-chatgpt:hover,
                 .amaes-web-ai-item.amaes-pill-chatgpt:active {
-                    background: rgba(16, 185, 129, 0.25) !important;
-                    border-color: #10b981 !important;
-                    color: #059669 !important;
+                    background: #f0fdf4 !important;
+                    border-color: #10a37f !important;
+                    color: #047857 !important;
+                    box-shadow: 0 1px 4px rgba(16, 163, 127, 0.15) !important;
                 }
 
-                .amaes-web-ai-item.amaes-pill-perplexity {
-                    background: rgba(20, 184, 166, 0.14) !important;
-                    color: #14b8a6 !important;
-                    border-color: rgba(20, 184, 166, 0.35) !important;
-                }
-                .amaes-web-ai-item.amaes-pill-perplexity:hover,
-                .amaes-web-ai-item.amaes-pill-perplexity:active {
-                    background: rgba(20, 184, 166, 0.25) !important;
-                    border-color: #14b8a6 !important;
-                    color: #0d9488 !important;
-                }
-
-                .amaes-web-ai-item.amaes-pill-gemini {
-                    background: rgba(168, 85, 247, 0.14) !important;
-                    color: #a855f7 !important;
-                    border-color: rgba(168, 85, 247, 0.35) !important;
-                }
                 .amaes-web-ai-item.amaes-pill-gemini:hover,
                 .amaes-web-ai-item.amaes-pill-gemini:active {
-                    background: rgba(168, 85, 247, 0.25) !important;
-                    border-color: #a855f7 !important;
-                    color: #9333ea !important;
+                    background: #faf5ff !important;
+                    border-color: #8b5cf6 !important;
+                    color: #7c3aed !important;
+                    box-shadow: 0 1px 4px rgba(139, 92, 246, 0.15) !important;
+                }
+
+                .amaes-web-ai-item.amaes-pill-perplexity:hover,
+                .amaes-web-ai-item.amaes-pill-perplexity:active {
+                    background: #f0fdfa !important;
+                    border-color: #06b6d4 !important;
+                    color: #0891b2 !important;
+                    box-shadow: 0 1px 4px rgba(6, 182, 212, 0.15) !important;
                 }
 
                 /* Active / Focused Question Card Highlight */

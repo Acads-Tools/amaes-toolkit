@@ -4711,6 +4711,36 @@ test("Visual Snippet & Pure Text Dual-MIME Copy: captures image/drag-and-drop sn
     assert.ok(script.includes("copyQuestionWithOptionalImage(que, promptText)"), "Gemini auto-copy and fallback UI must use copyQuestionWithOptionalImage");
 });
 
+// --------------------------------------------------
+// 109. Unified AI Layout, Official SVG Logos, and Smart Shared Pool Fallback Setup
+// --------------------------------------------------
+test("Unified AI Layout, Official SVG Logos, and Smart Shared Pool Fallback Setup: replaces emojis with official SVG logos, differentiates built-in AI, and smartly falls back to shared pool or setup modal", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Official SVG logos present in ICONS and used in AI buttons
+    assert.ok(script.includes("chatgpt: `<svg"), "ICONS must define authentic ChatGPT SVG logo");
+    assert.ok(script.includes("gemini: `<svg"), "ICONS must define authentic Gemini 4-point sparkle SVG logo");
+    assert.ok(script.includes("perplexity: `<svg"), "ICONS must define authentic Perplexity asterisk SVG logo");
+
+    // 2. Zero emojis in AI launcher buttons
+    assert.ok(!script.includes("💬 <span>ChatGPT</span>"), "ChatGPT button must not use emoji 💬");
+    assert.ok(!script.includes("⚡ <span>Perplexity</span>"), "Perplexity button must not use emoji ⚡");
+    assert.ok(script.includes("${ICONS.chatgpt} <span>ChatGPT</span>"), "ChatGPT launcher must use SVG icon");
+    assert.ok(script.includes("${ICONS.gemini} <span>Gemini Web</span>"), "Gemini Web launcher must use SVG icon");
+    assert.ok(script.includes("${ICONS.perplexity} <span>Perplexity</span>"), "Perplexity launcher must use SVG icon");
+
+    // 3. Built-in AI branding and styling
+    assert.ok(script.includes("amaes-builtin-ai-header"), "Question card must render dedicated Built-in AI header");
+    assert.ok(script.includes("amaes-builtin-ai-section"), "Question card must group built-in AI into distinct section");
+
+    // 4. Smart shared AI pool fallback & setup modal notice
+    assert.ok(script.includes("isSharedAiPoolTemporarilyExhausted"), "Must track whether shared AI pool is temporarily exhausted");
+    assert.ok(script.includes("markSharedAiPoolExhausted"), "Must define markSharedAiPoolExhausted");
+    assert.ok(script.includes("amaes-gemini-modal-notice"), "Setup modal must support displaying initialNotice alert banner");
+    assert.ok(script.includes("The community shared AI pool is currently busy or rate-limited"), "Must notify and guide user to configure personal key when shared pool is busy");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);
