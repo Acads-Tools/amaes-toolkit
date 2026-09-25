@@ -967,58 +967,138 @@
                     color: #14532d !important;
                 }
 
-                .amaes-card-ai-drawer {
+                .amaes-card-btn-container {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    gap: 4px !important;
+                    margin-top: 6px !important;
                     width: 100% !important;
                     box-sizing: border-box !important;
-                    margin-top: 3px !important;
-                    border: 1px solid rgba(139, 92, 246, 0.3) !important;
-                    border-radius: 6px !important;
-                    background: rgba(139, 92, 246, 0.04) !important;
-                    overflow: visible !important;
                 }
 
-                .amaes-card-ai-drawer-summary {
-                    padding: 4px 6px !important;
-                    font-size: 10px !important;
-                    font-weight: 700 !important;
-                    color: #a78bfa !important;
-                    cursor: pointer !important;
+                .amaes-card-ai-actions {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    gap: 4px !important;
+                    width: 100% !important;
+                    box-sizing: border-box !important;
+                }
+
+                .amaes-copy-ai-card-btn {
                     display: flex !important;
                     align-items: center !important;
-                    justify-content: space-between !important;
+                    justify-content: center !important;
+                    gap: 5px !important;
+                    padding: 5px 8px !important;
+                    border-radius: 6px !important;
+                    font-size: 11px !important;
+                    font-weight: 700 !important;
+                    background: rgba(59, 130, 246, 0.12) !important;
+                    color: #3b82f6 !important;
+                    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+                    cursor: pointer !important;
+                    transition: all 0.15s ease !important;
+                    box-sizing: border-box !important;
+                    line-height: 1.3 !important;
+                    width: 100% !important;
                     user-select: none !important;
-                    border-radius: 5px !important;
-                    transition: background 0.15s ease !important;
+                    text-align: center !important;
+                }
+                .amaes-copy-ai-card-btn:hover,
+                .amaes-copy-ai-card-btn:active {
+                    background: rgba(59, 130, 246, 0.22) !important;
+                    border-color: #3b82f6 !important;
                 }
 
-                .amaes-card-ai-drawer-summary:hover {
-                    background: rgba(139, 92, 246, 0.1) !important;
+                .amaes-paste-ai-card-btn {
+                    background: rgba(245, 158, 11, 0.12) !important;
+                    color: #f59e0b !important;
+                    border-color: rgba(245, 158, 11, 0.3) !important;
+                }
+                .amaes-paste-ai-card-btn:hover,
+                .amaes-paste-ai-card-btn:active {
+                    background: rgba(245, 158, 11, 0.22) !important;
+                    border-color: #f59e0b !important;
                 }
 
-                .amaes-card-ai-drawer-summary::-webkit-details-marker {
-                    display: none !important;
+                .amaes-copy-img-card-btn {
+                    background: rgba(14, 165, 233, 0.12) !important;
+                    color: #0ea5e9 !important;
+                    border-color: rgba(14, 165, 233, 0.3) !important;
+                }
+                .amaes-copy-img-card-btn:hover,
+                .amaes-copy-img-card-btn:active {
+                    background: rgba(14, 165, 233, 0.22) !important;
+                    border-color: #0ea5e9 !important;
                 }
 
-                .amaes-card-ai-drawer[open] .amaes-card-ai-drawer-hint {
-                    transform: rotate(180deg) !important;
+                /* Built-in AI Section (Left Sidebar) */
+                .amaes-builtin-ai-section {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    gap: 3px !important;
+                    margin-top: 4px !important;
+                    padding-top: 4px !important;
+                    border-top: 1px dashed rgba(168, 85, 247, 0.35) !important;
+                    width: 100% !important;
+                    box-sizing: border-box !important;
                 }
 
+                .amaes-builtin-ai-header {
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 4px !important;
+                    font-size: 9px !important;
+                    font-weight: 700 !important;
+                    color: #a855f7 !important;
+                    text-transform: uppercase !important;
+                    letter-spacing: 0.5px !important;
+                    user-select: none !important;
+                }
+
+                .amaes-ask-ai-card-btn {
+                    background: rgba(168, 85, 247, 0.12) !important;
+                    color: #a855f7 !important;
+                    border: 1px solid rgba(168, 85, 247, 0.3) !important;
+                }
+                .amaes-ask-ai-card-btn:hover,
+                .amaes-ask-ai-card-btn:active {
+                    background: rgba(168, 85, 247, 0.22) !important;
+                    border-color: #a855f7 !important;
+                    color: #9333ea !important;
+                }
+
+                /* Web AI Launcher Row (Right Side - Question Header) */
                 .amaes-web-ai-row {
                     display: flex !important;
                     flex-wrap: wrap !important;
                     gap: 6px !important;
                     align-items: center !important;
                     width: 100% !important;
+                    margin: 4px 0 8px 0 !important;
                     box-sizing: border-box !important;
+                }
+
+                .amaes-web-ai-label {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    font-size: 10px !important;
+                    font-weight: 700 !important;
+                    color: var(--text-muted, #64748b) !important;
+                    text-transform: uppercase !important;
+                    letter-spacing: 0.5px !important;
+                    user-select: none !important;
+                    margin-right: 2px !important;
                 }
 
                 .amaes-web-ai-item {
                     display: inline-flex !important;
                     align-items: center !important;
-                    gap: 6px !important;
-                    padding: 5px 11px !important;
+                    gap: 5px !important;
+                    padding: 4px 10px !important;
                     border-radius: 6px !important;
-                    font-size: 11.5px !important;
+                    font-size: 11px !important;
                     font-weight: 700 !important;
                     cursor: pointer !important;
                     transition: all 0.15s ease !important;
@@ -1027,6 +1107,7 @@
                     user-select: none !important;
                     touch-action: manipulation !important;
                     line-height: 1.3 !important;
+                    white-space: nowrap !important;
                 }
 
                 .amaes-web-ai-item.amaes-pill-chatgpt {
@@ -1063,39 +1144,6 @@
                     background: rgba(168, 85, 247, 0.25) !important;
                     border-color: #a855f7 !important;
                     color: #9333ea !important;
-                }
-
-                .amaes-copy-ai-card-btn {
-                    display: inline-flex !important;
-                    align-items: center !important;
-                    gap: 6px !important;
-                    padding: 5px 11px !important;
-                    border-radius: 6px !important;
-                    font-size: 11.5px !important;
-                    font-weight: 700 !important;
-                    background: rgba(59, 130, 246, 0.14) !important;
-                    color: #3b82f6 !important;
-                    border: 1px solid rgba(59, 130, 246, 0.35) !important;
-                    cursor: pointer !important;
-                    transition: all 0.15s ease !important;
-                    box-sizing: border-box !important;
-                    line-height: 1.3 !important;
-                }
-                .amaes-copy-ai-card-btn:hover,
-                .amaes-copy-ai-card-btn:active {
-                    background: rgba(59, 130, 246, 0.25) !important;
-                    border-color: #3b82f6 !important;
-                }
-
-                .amaes-paste-ai-card-btn {
-                    background: rgba(245, 158, 11, 0.14) !important;
-                    color: #f59e0b !important;
-                    border-color: rgba(245, 158, 11, 0.35) !important;
-                }
-                .amaes-paste-ai-card-btn:hover,
-                .amaes-paste-ai-card-btn:active {
-                    background: rgba(245, 158, 11, 0.25) !important;
-                    border-color: #f59e0b !important;
                 }
 
                 /* Active / Focused Question Card Highlight */

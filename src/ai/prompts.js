@@ -335,63 +335,42 @@
         }
     }
 
-    // Helper to control whether in-question AI tools should be minimized or auto-unminimized
+    // Helper to control in-question AI tools state & retry styling
     function updateQuestionAiDrawerState(que, forceUnminimize = false) {
         if (!que) return;
         const drawer = que.querySelector('.amaes-card-ai-drawer');
-        if (!drawer) return;
-
-        const hint = drawer.querySelector('.amaes-card-ai-drawer-hint');
-
-        if (forceUnminimize) {
-            drawer.open = true;
-            if (hint) hint.textContent = '▴';
-            return;
+        if (drawer) {
+            const hint = drawer.querySelector('.amaes-card-ai-drawer-hint');
+            if (forceUnminimize) {
+                drawer.open = true;
+                if (hint) hint.textContent = '▴';
+            } else {
+                const hasVerified = Boolean(que.querySelector('.amaes-verified-badge'));
+                const existingAiChoice = que.querySelector('.amaes-ai-suggested-choice');
+                const hasAiChoice = Boolean(existingAiChoice && !isChoiceRowEliminated(existingAiChoice));
+                if (hasVerified || hasAiChoice) {
+                    drawer.open = false;
+                    if (hint) hint.textContent = '▾';
+                } else {
+                    drawer.open = true;
+                    if (hint) hint.textContent = '▴';
+                }
+            }
         }
 
-        const hasVerified = Boolean(que.querySelector('.amaes-verified-badge'));
-        const existingAiChoice = que.querySelector('.amaes-ai-suggested-choice');
-        const hasAiChoice = Boolean(existingAiChoice && !isChoiceRowEliminated(existingAiChoice));
-
-        // 1. If verified by DB or solved by built-in AI, ALWAYS minimize!
-        if (hasVerified || hasAiChoice) {
-            drawer.open = false;
-            if (hint) hint.textContent = '▾';
-            return;
+        // Update Built-in AI retry button text & styling if attempted or failed
+        const askAiBtn = que.querySelector('.amaes-ask-ai-card-btn');
+        if (askAiBtn) {
+            if (que.dataset.amaesAiFailed === 'true' || que.querySelector('.amaes-ai-fallback-bar')) {
+                askAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+                askAiBtn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+            } else if (que.dataset.amaesAiAttempted === 'true') {
+                askAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+            }
         }
-
-        // 2. Question has no verified answer in DB:
-        const hasAiKey = Boolean(typeof getAvailableGeminiKey === 'function' && getAvailableGeminiKey());
-        const aiConfigured = hasAiKey && aiQuizEnabled;
-
-        // Condition A: Built-in AI not set up or disabled -> auto-unminimize and show
-        if (!aiConfigured) {
-            drawer.open = true;
-            if (hint) hint.textContent = '▴';
-            return;
-        }
-
-        // Condition B: Question type not eligible for Gemini AI -> auto-unminimize and show
-        const qData = extractQuestionData(que);
-        if (typeof isEligibleForAiSolver === 'function' && !isEligibleForAiSolver(que, qData)) {
-            drawer.open = true;
-            if (hint) hint.textContent = '▴';
-            return;
-        }
-
-        // Condition C: Built-in AI attempted and failed -> auto-unminimize and show
-        if (que.dataset.amaesAiFailed === 'true' || que.querySelector('.amaes-ai-fallback-bar')) {
-            drawer.open = true;
-            if (hint) hint.textContent = '▴';
-            return;
-        }
-
-        // Otherwise (built-in AI is configured and ready to attempt solving): keep minimized
-        drawer.open = false;
-        if (hint) hint.textContent = '▾';
     }
 
-    // Inject sleek "Copy for AI" and "Copy Image" buttons on each question card in Moodle
+    // Inject sleek in-question AI tools: Left sidebar (.info below Flag question) for core tools & Built-in AI; Right side (.formulation) for Web AI launchers
     function injectQuestionCopyButtons() {
         if (!checkIsQuizPage()) return;
         const queElements = document.querySelectorAll('.que');
@@ -399,6 +378,7 @@
         // Never show Copy AI / Target Question buttons on review screens (where quiz is finished) or if user disabled them
         if (checkIsReviewPage() || !showInQuestionAiBtns) {
             document.querySelectorAll('.amaes-card-btn-container').forEach(el => el.remove());
+            document.querySelectorAll('.amaes-web-ai-row').forEach(el => el.remove());
             return;
         }
 
@@ -411,209 +391,221 @@
                 });
             }
 
-            if (que.querySelector('.amaes-card-btn-container')) return;
+            // ==============================================================
+            // 1. LEFT SIDE: Core Toolkit & Built-in AI (.info below Flag)
+            // ==============================================================
+            if (!que.querySelector('.amaes-card-btn-container')) {
+                const btnContainer = document.createElement('div');
+                btnContainer.className = 'amaes-card-btn-container';
+                btnContainer.style.cssText = 'display: flex; flex-direction: column; gap: 4px; margin-top: 6px; width: 100%; box-sizing: border-box;';
 
-            const btnContainer = document.createElement('div');
-            btnContainer.className = 'amaes-card-btn-container';
-            btnContainer.style.cssText = 'display: flex; flex-direction: column; gap: 4px; margin-top: 6px; width: 100%; box-sizing: border-box;';
+                // Active / Target Question Indicator Badge
+                const activeBadge = document.createElement('div');
+                activeBadge.className = 'amaes-active-focus-badge';
+                activeBadge.innerHTML = `${ICONS.check} <span>Target Question</span>`;
+                btnContainer.appendChild(activeBadge);
 
-            // Active / Target Question Indicator Badge
-            const activeBadge = document.createElement('div');
-            activeBadge.className = 'amaes-active-focus-badge';
-            activeBadge.innerHTML = `${ICONS.check} <span>Target Question</span>`;
-            btnContainer.appendChild(activeBadge);
+                // Direct action buttons container
+                const aiActions = document.createElement('div');
+                aiActions.className = 'amaes-card-ai-actions';
+                aiActions.style.cssText = 'display: flex; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;';
 
-            // Collapsible AI Drawer: Minimized by default on verified questions, auto-unminimized when unknown or AI failed
-            const aiDrawer = document.createElement('details');
-            aiDrawer.className = 'amaes-card-ai-drawer';
-            aiDrawer.style.cssText = 'width: 100%; box-sizing: border-box; margin-bottom: 6px; border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 8px; background: rgba(139, 92, 246, 0.03); overflow: hidden;';
+                // 1a. Copy Question Text Button
+                const btnText = document.createElement('button');
+                btnText.type = 'button';
+                btnText.className = 'amaes-copy-ai-card-btn';
+                btnText.title = 'Copy question and choices (strict direct answer instruction for AI)';
+                btnText.innerHTML = `${ICONS.copy || ICONS.sparkles} <span>Copy AI</span>`;
 
-            const aiSummary = document.createElement('summary');
-            aiSummary.className = 'amaes-card-ai-drawer-summary';
-            aiSummary.style.cssText = 'padding: 5px 10px; font-size: 11px; font-weight: 700; color: #a78bfa; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; background: rgba(139, 92, 246, 0.06); transition: background 0.15s ease;';
-            aiSummary.title = 'AI Tools & Solvers (Click to toggle)';
-            aiSummary.innerHTML = `
-                <span style="display: flex; align-items: center; gap: 5px;">
-                    ${ICONS.sparkles} <span>AI Tools & Solvers</span>
-                </span>
-                <span class="amaes-card-ai-drawer-hint" style="font-size: 9px; color: var(--text-muted, #94a3b8); transition: transform 0.2s ease;">▾</span>
-            `;
-
-            aiDrawer.addEventListener('toggle', () => {
-                const hint = aiDrawer.querySelector('.amaes-card-ai-drawer-hint');
-                if (hint) hint.textContent = aiDrawer.open ? '▴' : '▾';
-            });
-
-            const aiActions = document.createElement('div');
-            aiActions.className = 'amaes-card-ai-actions';
-            aiActions.style.cssText = 'display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; border-top: 1px solid rgba(139, 92, 246, 0.15);';
-
-            // Web AI Row / Direct Action Buttons (Direct 1-click pills, no clunky dropdown menus!)
-            const webAiRow = document.createElement('div');
-            webAiRow.className = 'amaes-web-ai-row';
-            webAiRow.style.cssText = 'display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; box-sizing: border-box;';
-
-            // 1. Copy Question Text Button
-            const btnText = document.createElement('button');
-            btnText.type = 'button';
-            btnText.className = 'amaes-copy-ai-card-btn';
-            btnText.title = 'Copy question and choices (strict direct answer instruction for AI)';
-            btnText.innerHTML = `${ICONS.copy || ICONS.sparkles} <span>Copy AI</span>`;
-
-            btnText.onclick = async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setActiveQuestion(que, true);
-                const qData = extractQuestionData(que);
-                const willIncludeContext = shouldInjectAiContext(qData ? qData.qNum : null);
-                const text = formatQuestionForAI(que, aiPromptHint);
-                if (!text) return;
-                try {
-                    await copyToClipboard(text);
-                    btnText.innerHTML = `${ICONS.check} <span>Copied!</span>`;
-                    btnText.style.borderColor = 'var(--accent-green, #10b981)';
-                    btnText.style.color = 'var(--accent-green, #10b981)';
-                    showToast(willIncludeContext ? 'Question copied with Course AI Context!' : 'Question & choices copied for AI!');
-                    if (willIncludeContext) {
-                        setLog("Copied question with Course Context for AI.", "var(--accent-green)");
+                btnText.onclick = async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setActiveQuestion(que, true);
+                    const qData = extractQuestionData(que);
+                    const willIncludeContext = shouldInjectAiContext(qData ? qData.qNum : null);
+                    const text = formatQuestionForAI(que, aiPromptHint);
+                    if (!text) return;
+                    try {
+                        await copyToClipboard(text);
+                        btnText.innerHTML = `${ICONS.check} <span>Copied!</span>`;
+                        btnText.style.borderColor = 'var(--accent-green, #10b981)';
+                        btnText.style.color = 'var(--accent-green, #10b981)';
+                        showToast(willIncludeContext ? 'Question copied with Course AI Context!' : 'Question & choices copied for AI!');
+                        if (willIncludeContext) {
+                            setLog("Copied question with Course Context for AI.", "var(--accent-green)");
+                        }
+                        setTimeout(() => {
+                            btnText.innerHTML = `${ICONS.copy || ICONS.sparkles} <span>Copy AI</span>`;
+                            btnText.style.borderColor = '';
+                            btnText.style.color = '';
+                        }, 1800);
+                    } catch (err) {
+                        console.error('Copy failed:', err);
                     }
-                    setTimeout(() => {
-                        btnText.innerHTML = `${ICONS.copy || ICONS.sparkles} <span>Copy AI</span>`;
-                        btnText.style.borderColor = '';
-                        btnText.style.color = '';
-                    }, 1800);
-                } catch (err) {
-                    console.error('Copy failed:', err);
+                };
+                aiActions.appendChild(btnText);
+
+                // 1b. Paste AI Button on Question Card
+                if (checkIsQuizAttemptPage()) {
+                    const btnPaste = document.createElement('button');
+                    btnPaste.type = 'button';
+                    btnPaste.className = 'amaes-copy-ai-card-btn amaes-paste-ai-card-btn';
+                    btnPaste.title = 'Paste AI response from clipboard to select this choice (V)';
+                    btnPaste.innerHTML = `${ICONS.clipboard} <span>Paste AI</span>`;
+                    btnPaste.onclick = async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setActiveQuestion(que, true);
+                        await autoSelectFromAiClipboard(que);
+                    };
+                    aiActions.appendChild(btnPaste);
                 }
-            };
-            webAiRow.appendChild(btnText);
 
-            // 2. Ask ChatGPT (1-Click direct launcher with prompt pre-filled!)
-            const btnChatGpt = document.createElement('button');
-            btnChatGpt.type = 'button';
-            btnChatGpt.className = 'amaes-web-ai-item amaes-pill-chatgpt';
-            btnChatGpt.dataset.provider = 'chatgpt';
-            btnChatGpt.title = 'Open question directly in ChatGPT with answer prompt pre-filled';
-            btnChatGpt.innerHTML = `<span class="amaes-ai-icon">💬</span> <span>Ask ChatGPT</span>`;
-            btnChatGpt.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                openExternalAi('chatgpt', que);
-            };
-            webAiRow.appendChild(btnChatGpt);
+                // 1c. Copy Image Button (if question has diagram/circuits)
+                const qImages = que.querySelectorAll('.formulation img, .qtext img');
+                if (qImages.length > 0) {
+                    const firstImgUrl = qImages[0].src;
+                    const btnImg = document.createElement('button');
+                    btnImg.type = 'button';
+                    btnImg.className = 'amaes-copy-ai-card-btn amaes-copy-img-card-btn';
+                    btnImg.title = 'Copy question diagram/image to clipboard for Gemini multimodal input';
+                    btnImg.innerHTML = `${ICONS.camera} <span>Copy Img</span>`;
 
-            // 2b. Ask / Retry Built-in AI Solver
-            if (checkIsQuizAttemptPage()) {
-                const btnAskAi = document.createElement('button');
-                btnAskAi.type = 'button';
-                btnAskAi.className = 'amaes-copy-ai-card-btn amaes-ask-ai-card-btn';
-                btnAskAi.title = 'Ask Google Gemini AI to analyze and solve this question directly';
-                btnAskAi.innerHTML = `${ICONS.sparkles} <span>${que.dataset.amaesAiAttempted ? 'Retry AI' : 'Solve with AI'}</span>`;
-                btnAskAi.onclick = async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setActiveQuestion(que, true);
-                    await manualSolveWithAi(que, btnAskAi);
-                };
-                webAiRow.appendChild(btnAskAi);
+                    btnImg.onclick = async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setActiveQuestion(que, true);
+                        btnImg.innerHTML = `<span>Copying...</span>`;
+                        const res = await copyImageBlobToClipboard(firstImgUrl);
+                        if (res.success) {
+                            btnImg.innerHTML = `${ICONS.check} <span>Image Copied!</span>`;
+                            btnImg.style.borderColor = 'var(--accent-green, #10b981)';
+                            btnImg.style.color = 'var(--accent-green, #10b981)';
+                            showToast('Image copied to clipboard! Paste directly into Gemini.');
+                        } else {
+                            btnImg.innerHTML = `${ICONS.check} <span>URL Copied</span>`;
+                            window.open(firstImgUrl, '_blank');
+                            showToast('Image URL copied & opened in new tab.');
+                        }
+                        setTimeout(() => {
+                            btnImg.innerHTML = `${ICONS.camera} <span>Copy Img</span>`;
+                            btnImg.style.borderColor = '';
+                            btnImg.style.color = '';
+                        }, 2000);
+                    };
+                    aiActions.appendChild(btnImg);
+                }
+
+                // 1d. Built-in AI Solver Section (Differentiated with clear header & button)
+                if (checkIsQuizAttemptPage()) {
+                    const builtinAiSection = document.createElement('div');
+                    builtinAiSection.className = 'amaes-builtin-ai-section';
+                    builtinAiSection.style.cssText = 'display: flex; flex-direction: column; gap: 3px; margin-top: 4px; padding-top: 4px; border-top: 1px dashed rgba(168, 85, 247, 0.35); width: 100%; box-sizing: border-box;';
+
+                    const builtinHeader = document.createElement('div');
+                    builtinHeader.className = 'amaes-builtin-ai-header';
+                    builtinHeader.style.cssText = 'font-size: 9px; font-weight: 700; color: #a855f7; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: center; gap: 4px; user-select: none;';
+                    builtinHeader.innerHTML = `${ICONS.sparkles} <span>Built-in AI</span>`;
+                    builtinAiSection.appendChild(builtinHeader);
+
+                    const btnAskAi = document.createElement('button');
+                    btnAskAi.type = 'button';
+                    btnAskAi.className = 'amaes-copy-ai-card-btn amaes-ask-ai-card-btn';
+                    btnAskAi.title = 'Ask Google Gemini AI to analyze and solve this question directly';
+                    btnAskAi.innerHTML = `${ICONS.sparkles} <span>${que.dataset.amaesAiAttempted ? 'Retry AI' : 'Solve with AI'}</span>`;
+                    btnAskAi.onclick = async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setActiveQuestion(que, true);
+                        await manualSolveWithAi(que, btnAskAi);
+                    };
+                    builtinAiSection.appendChild(btnAskAi);
+                    aiActions.appendChild(builtinAiSection);
+                }
+
+                btnContainer.appendChild(aiActions);
+
+                // Mount into .info (space below Flag question) or fallback to content
+                const infoCol = que.querySelector('.info');
+                const contentCol = que.querySelector('.content');
+
+                if (infoCol) {
+                    infoCol.appendChild(btnContainer);
+                } else if (contentCol) {
+                    contentCol.insertBefore(btnContainer, contentCol.firstChild);
+                } else {
+                    que.insertBefore(btnContainer, que.firstChild);
+                }
             }
 
-            // 3. Ask Google Gemini (1-Click launcher / solver)
-            const btnGemini = document.createElement('button');
-            btnGemini.type = 'button';
-            btnGemini.className = 'amaes-web-ai-item amaes-pill-gemini';
-            btnGemini.dataset.provider = 'gemini';
-            btnGemini.title = 'Open question in Google Gemini';
-            btnGemini.innerHTML = `<span class="amaes-ai-icon">✦</span> <span>Gemini</span>`;
-            btnGemini.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                openExternalAi('gemini', que);
-            };
-            webAiRow.appendChild(btnGemini);
+            // ==============================================================
+            // 2. RIGHT SIDE: Web AI Launchers (.formulation / question header)
+            // ==============================================================
+            const formulation = que.querySelector('.formulation') || que.querySelector('.content') || que;
+            if (formulation && !que.querySelector('.amaes-web-ai-row')) {
+                const webAiRow = document.createElement('div');
+                webAiRow.className = 'amaes-web-ai-row';
+                webAiRow.style.cssText = 'display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px 0; width: 100%; box-sizing: border-box;';
 
-            // 4. Perplexity AI (1-Click search)
-            const btnPerplexity = document.createElement('button');
-            btnPerplexity.type = 'button';
-            btnPerplexity.className = 'amaes-web-ai-item amaes-pill-perplexity';
-            btnPerplexity.dataset.provider = 'perplexity';
-            btnPerplexity.title = 'Search question in Perplexity AI';
-            btnPerplexity.innerHTML = `<span class="amaes-ai-icon">⚡</span> <span>Perplexity</span>`;
-            btnPerplexity.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                openExternalAi('perplexity', que);
-            };
-            webAiRow.appendChild(btnPerplexity);
+                const webAiLabel = document.createElement('span');
+                webAiLabel.className = 'amaes-web-ai-label';
+                webAiLabel.style.cssText = 'font-size: 10px; font-weight: 700; color: var(--text-muted, #64748b); text-transform: uppercase; letter-spacing: 0.5px; user-select: none; margin-right: 2px;';
+                webAiLabel.textContent = 'Web AI:';
+                webAiRow.appendChild(webAiLabel);
 
-            // 5. Paste AI Button on Question Card
-            if (checkIsQuizAttemptPage()) {
-                const btnPaste = document.createElement('button');
-                btnPaste.type = 'button';
-                btnPaste.className = 'amaes-copy-ai-card-btn amaes-paste-ai-card-btn';
-                btnPaste.title = 'Paste AI response from clipboard to select this choice (V)';
-                btnPaste.innerHTML = `${ICONS.clipboard} <span>Paste AI</span>`;
-                btnPaste.onclick = async (e) => {
+                // 2a. Ask ChatGPT
+                const btnChatGpt = document.createElement('button');
+                btnChatGpt.type = 'button';
+                btnChatGpt.className = 'amaes-web-ai-item amaes-pill-chatgpt';
+                btnChatGpt.dataset.provider = 'chatgpt';
+                btnChatGpt.title = 'Open question directly in ChatGPT with answer prompt pre-filled';
+                btnChatGpt.innerHTML = `<span class="amaes-ai-icon">💬</span> <span>Ask ChatGPT</span>`;
+                btnChatGpt.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    setActiveQuestion(que, true);
-                    await autoSelectFromAiClipboard(que);
+                    openExternalAi('chatgpt', que);
                 };
-                webAiRow.appendChild(btnPaste);
-            }
+                webAiRow.appendChild(btnChatGpt);
 
-            // 6. Copy Image Button (if question has diagram/circuits)
-            const qImages = que.querySelectorAll('.formulation img, .qtext img');
-            if (qImages.length > 0) {
-                const firstImgUrl = qImages[0].src;
-                const btnImg = document.createElement('button');
-                btnImg.type = 'button';
-                btnImg.className = 'amaes-copy-ai-card-btn amaes-copy-img-card-btn';
-                btnImg.title = 'Copy question diagram/image to clipboard for Gemini multimodal input';
-                btnImg.innerHTML = `${ICONS.camera} <span>Copy Img</span>`;
-
-                btnImg.onclick = async (e) => {
+                // 2b. Google Gemini Web
+                const btnGemini = document.createElement('button');
+                btnGemini.type = 'button';
+                btnGemini.className = 'amaes-web-ai-item amaes-pill-gemini';
+                btnGemini.dataset.provider = 'gemini';
+                btnGemini.title = 'Open question in Google Gemini';
+                btnGemini.innerHTML = `<span class="amaes-ai-icon">✦</span> <span>Gemini Web</span>`;
+                btnGemini.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    setActiveQuestion(que, true);
-                    btnImg.innerHTML = `<span>Copying...</span>`;
-                    const res = await copyImageBlobToClipboard(firstImgUrl);
-                    if (res.success) {
-                        btnImg.innerHTML = `${ICONS.check} <span>Image Copied!</span>`;
-                        btnImg.style.borderColor = 'var(--accent-green, #10b981)';
-                        btnImg.style.color = 'var(--accent-green, #10b981)';
-                        showToast('Image copied to clipboard! Paste directly into Gemini.');
-                    } else {
-                        btnImg.innerHTML = `${ICONS.check} <span>URL Copied</span>`;
-                        window.open(firstImgUrl, '_blank');
-                        showToast('Image URL copied & opened in new tab.');
-                    }
-                    setTimeout(() => {
-                        btnImg.innerHTML = `${ICONS.camera} <span>Copy Img</span>`;
-                        btnImg.style.borderColor = '';
-                        btnImg.style.color = '';
-                    }, 2000);
+                    openExternalAi('gemini', que);
                 };
-                webAiRow.appendChild(btnImg);
-            }
+                webAiRow.appendChild(btnGemini);
 
-            aiActions.appendChild(webAiRow);
-            aiDrawer.appendChild(aiSummary);
-            aiDrawer.appendChild(aiActions);
-            btnContainer.appendChild(aiDrawer);
+                // 2c. Perplexity AI
+                const btnPerplexity = document.createElement('button');
+                btnPerplexity.type = 'button';
+                btnPerplexity.className = 'amaes-web-ai-item amaes-pill-perplexity';
+                btnPerplexity.dataset.provider = 'perplexity';
+                btnPerplexity.title = 'Search question in Perplexity AI';
+                btnPerplexity.innerHTML = `<span class="amaes-ai-icon">⚡</span> <span>Perplexity</span>`;
+                btnPerplexity.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openExternalAi('perplexity', que);
+                };
+                webAiRow.appendChild(btnPerplexity);
+
+                const topToolbar = formulation.querySelector('.amaes-que-top-toolbar');
+                if (topToolbar && topToolbar.nextSibling) {
+                    formulation.insertBefore(webAiRow, topToolbar.nextSibling);
+                } else if (topToolbar) {
+                    formulation.appendChild(webAiRow);
+                } else {
+                    formulation.insertBefore(webAiRow, formulation.firstChild);
+                }
+            }
 
             updateQuestionAiDrawerState(que);
-
-            const formulation = que.querySelector('.formulation');
-            const contentCol = que.querySelector('.content');
-
-            if (formulation) {
-                formulation.insertBefore(btnContainer, formulation.firstChild);
-            } else if (contentCol) {
-                contentCol.insertBefore(btnContainer, contentCol.firstChild);
-            } else {
-                que.insertBefore(btnContainer, que.firstChild);
-            }
         });
 
         // Setup throttled window scroll listener to update active focus as user scrolls

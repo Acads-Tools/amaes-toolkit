@@ -4608,22 +4608,27 @@ test("Multi-Web AI Launchers & Choice Eliminated Marker: provides 1-click extern
 });
 
 // --------------------------------------------------
-// 145. In-Question AI Tools Collapsible Drawer & Auto-Unminimize Lifecycle
+// 145. In-Question AI Tools Layout & Differentiation Lifecycle
 // --------------------------------------------------
-test("In-Question AI Tools Collapsible Drawer & Auto-Unminimize Lifecycle: minimized by default on verified questions, auto-unminimizes on unknown questions, no setup AI, or AI failure", () => {
+test("In-Question AI Tools Layout & Differentiation Lifecycle: displays direct sidebar tools below flag question and Web AI launchers on right without collapse drawer", () => {
     const fs = require('fs');
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
-    // 1. Structural integrity
+    // 1. Structural integrity & Left sidebar placement (.info below flag question)
     assert.ok(script.includes("function updateQuestionAiDrawerState(que"), "Must define updateQuestionAiDrawerState function");
-    assert.ok(script.includes("amaes-card-ai-drawer"), "Question cards must feature amaes-card-ai-drawer details element");
-    assert.ok(script.includes("amaes-card-ai-drawer-summary"), "Must include drawer summary toggle");
-    assert.ok(script.includes("amaes-card-ai-actions"), "Must contain container for nested AI action buttons");
+    assert.ok(script.includes("amaes-card-btn-container"), "Question cards must feature amaes-card-btn-container in sidebar");
+    assert.ok(script.includes("infoCol.appendChild(btnContainer)"), "Must mount sidebar tools in .info space below flag question");
+    assert.ok(script.includes("amaes-card-ai-actions"), "Must contain container for toolkit action buttons");
 
-    // 2. Lifecycle triggers
-    assert.ok(script.includes("amaes-verified-badge") && script.includes("drawer.open = false"), "Verified questions must keep AI drawer minimized");
-    assert.ok(script.includes("forceUnminimize") && script.includes("drawer.open = true"), "Must support unminimizing drawer on failure or manual trigger");
-    assert.ok(script.includes("que.dataset.amaesAiFailed"), "Must track AI failure state to unminimize drawer");
+    // 2. Built-in AI solver vs Web AI differentiation
+    assert.ok(script.includes("amaes-builtin-ai-section"), "Must provide dedicated Built-in AI section in sidebar");
+    assert.ok(script.includes("amaes-builtin-ai-header"), "Must include Built-in AI header label");
+    assert.ok(script.includes("amaes-ask-ai-card-btn"), "Must provide direct Solve with AI button");
+    assert.ok(script.includes("amaes-web-ai-row"), "Right side must feature Web AI prompt launchers");
+    assert.ok(script.includes("amaes-web-ai-label"), "Must label Web AI section distinctly");
+
+    // 3. Lifecycle triggers
+    assert.ok(script.includes("que.dataset.amaesAiFailed"), "Must track AI failure state to update solver button");
 });
 
 // --------------------------------------------------
