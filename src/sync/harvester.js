@@ -1786,7 +1786,7 @@
                 `;
                 const wrongText = wrongList.map(w => typeof w === 'string' ? w : w.text).filter(Boolean).join(', ');
                 const isEmptyAnswer = !wrongText; // e.g. user cleared a fill-in-the-blank field
-                const pillLabel = isEmptyAnswer ? 'No Answer / Incorrect' : 'Wrong Choice Saved';
+                const pillLabel = isEmptyAnswer ? 'No Answer / Incorrect' : 'Choice Eliminated';
                 pill.title = isEmptyAnswer
                     ? 'No answer was submitted or the answer field was cleared. Check the verified answer below.'
                     : `Wrong choice "${wrongText}" eliminated in database. Will not be selected on next attempt!`;

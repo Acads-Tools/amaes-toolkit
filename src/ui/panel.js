@@ -888,6 +888,57 @@
                     flex-shrink: 0 !important;
                 }
 
+                .amaes-web-ai-row {
+                    display: flex !important;
+                    gap: 3px !important;
+                    width: 100% !important;
+                    box-sizing: border-box !important;
+                    margin-top: 3px !important;
+                }
+
+                .amaes-web-ai-pill {
+                    flex: 1 !important;
+                    min-width: 0 !important;
+                    padding: 3px 2px !important;
+                    font-size: 8.5px !important;
+                    font-weight: 700 !important;
+                    border-radius: 4px !important;
+                    border: 1px solid #cbd5e1 !important;
+                    background: #f8fafc !important;
+                    color: #475569 !important;
+                    cursor: pointer !important;
+                    text-align: center !important;
+                    transition: all 0.15s ease !important;
+                    white-space: nowrap !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                    user-select: none !important;
+                    box-sizing: border-box !important;
+                }
+
+                .amaes-web-ai-pill:hover {
+                    transform: translateY(-1px) !important;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+                }
+
+                .amaes-pill-chatgpt:hover {
+                    background: #ecfdf5 !important;
+                    color: #065f46 !important;
+                    border-color: #10b981 !important;
+                }
+
+                .amaes-pill-perplexity:hover {
+                    background: #f0fdfa !important;
+                    color: #115e59 !important;
+                    border-color: #14b8a6 !important;
+                }
+
+                .amaes-pill-gemini:hover {
+                    background: #faf5ff !important;
+                    color: #7e22ce !important;
+                    border-color: #a855f7 !important;
+                }
+
                 /* Active / Focused Question Card Highlight */
                 .que.amaes-active-focus-que {
                     outline: 2.5px solid #2563eb !important;

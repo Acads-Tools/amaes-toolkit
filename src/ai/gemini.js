@@ -625,10 +625,38 @@
                         align-items: center;
                         gap: 3px;
                     ">Copy for AI</button>
+                    <button type="button" class="amaes-ai-fallback-web-btn" data-provider="chatgpt" style="
+                        background: #ecfdf5;
+                        color: #065f46;
+                        border: 1px solid #a7f3d0;
+                        padding: 4px 8px;
+                        border-radius: 5px;
+                        font-size: 10.5px;
+                        font-weight: 700;
+                        cursor: pointer;
+                    " title="Open question in ChatGPT">ChatGPT ↗</button>
+                    <button type="button" class="amaes-ai-fallback-web-btn" data-provider="perplexity" style="
+                        background: #f0fdfa;
+                        color: #115e59;
+                        border: 1px solid #99f6e4;
+                        padding: 4px 8px;
+                        border-radius: 5px;
+                        font-size: 10.5px;
+                        font-weight: 700;
+                        cursor: pointer;
+                    " title="Open question in Perplexity">Perplexity ↗</button>
                 </div>
             `;
 
             formulation.insertBefore(bar, formulation.firstChild);
+
+            bar.querySelectorAll('.amaes-ai-fallback-web-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openExternalAi(btn.dataset.provider, que);
+                };
+            });
 
             let secLeft = waitSeconds;
             const timerEl = bar.querySelector('#amaes-ratelimit-countdown');
@@ -727,10 +755,38 @@
                     align-items: center;
                     gap: 3px;
                 ">Copy for AI</button>
+                <button type="button" class="amaes-ai-fallback-web-btn" data-provider="chatgpt" style="
+                    background: #ecfdf5;
+                    color: #065f46;
+                    border: 1px solid #a7f3d0;
+                    padding: 4px 8px;
+                    border-radius: 5px;
+                    font-size: 10.5px;
+                    font-weight: 700;
+                    cursor: pointer;
+                " title="Open question in ChatGPT">ChatGPT ↗</button>
+                <button type="button" class="amaes-ai-fallback-web-btn" data-provider="perplexity" style="
+                    background: #f0fdfa;
+                    color: #115e59;
+                    border: 1px solid #99f6e4;
+                    padding: 4px 8px;
+                    border-radius: 5px;
+                    font-size: 10.5px;
+                    font-weight: 700;
+                    cursor: pointer;
+                " title="Open question in Perplexity">Perplexity ↗</button>
             </div>
         `;
 
         formulation.insertBefore(bar, formulation.firstChild);
+
+        bar.querySelectorAll('.amaes-ai-fallback-web-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openExternalAi(btn.dataset.provider, que);
+            };
+        });
 
         const configBtn = bar.querySelector('.amaes-ai-config-btn');
         if (configBtn) {

@@ -6416,7 +6416,7 @@
         const clone = rootNode.cloneNode(true);
 
         // Strip non-content scripts, toolkit buttons, injected UI badges & Moodle feedback icons/accessibility text
-        clone.querySelectorAll('script, style, noscript, .amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-copy-ai-card-btn, .amaes-ask-ai-card-btn, .amaes-copy-img-card-btn, .amaes-paste-ai-card-btn, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-thinking-indicator, .amaes-ai-fallback-bar, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, .accesshide, .sr-only').forEach(el => el.remove());
+        clone.querySelectorAll('script, style, noscript, .amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-card-btn-container, .amaes-copy-ai-card-btn, .amaes-ask-ai-card-btn, .amaes-copy-img-card-btn, .amaes-paste-ai-card-btn, .amaes-web-ai-row, .amaes-web-ai-pill, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-thinking-indicator, .amaes-ai-fallback-bar, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag, .feedbackimage, .fa-check, .fa-remove, .fa-times, .fa-close, .accesshide, .sr-only').forEach(el => el.remove());
 
         // Convert Superscripts (e.g. 2^3 -> 2³, x^2 -> x², or ^{complex})
         clone.querySelectorAll('sup').forEach(sup => {
@@ -7638,6 +7638,43 @@
         return `${intro}${res}`.trim();
     }
 
+    // --------------------------------------------------
+    // Multi-Web AI Launchers (ChatGPT, Perplexity, Gemini)
+    // --------------------------------------------------
+    function openExternalAi(provider, que) {
+        if (!que) que = getActiveQuestion() || document.querySelector('.que');
+        if (!que) {
+            showToast('Please click a question first to select it.');
+            return;
+        }
+        setActiveQuestion(que, true);
+        const qData = extractQuestionData(que);
+        const willIncludeContext = shouldInjectAiContext(qData ? qData.qNum : null);
+        const text = formatQuestionForAI(que, aiPromptHint);
+        if (!text) {
+            showToast('Could not format question text.');
+            return;
+        }
+
+        if (provider === 'chatgpt') {
+            const url = `https://chatgpt.com/?q=${encodeURIComponent(text)}`;
+            window.open(url, '_blank');
+            showToast('Opening ChatGPT with question pre-filled...');
+        } else if (provider === 'perplexity') {
+            const url = `https://www.perplexity.ai/search?q=${encodeURIComponent(text)}`;
+            window.open(url, '_blank');
+            showToast('Opening Perplexity with question pre-filled...');
+        } else if (provider === 'gemini') {
+            copyToClipboard(text).then(() => {
+                window.open('https://gemini.google.com/app', '_blank');
+                showToast('Question copied! Press Ctrl+V in Google Gemini.', 3500);
+            }).catch(() => {
+                window.open('https://gemini.google.com/app', '_blank');
+                showToast('Opening Google Gemini...', 2500);
+            });
+        }
+    }
+
     // Inject sleek "Copy for AI" and "Copy Image" buttons on each question card in Moodle
     function injectQuestionCopyButtons() {
         if (!checkIsQuizPage()) return;
@@ -7733,6 +7770,49 @@
                     await manualSolveWithAi(que, btnAskAi);
                 };
                 btnContainer.appendChild(btnAskAi);
+
+                // 1d. Multi-Web AI Launchers Row (ChatGPT, Perplexity, Gemini)
+                const webAiRow = document.createElement('div');
+                webAiRow.className = 'amaes-web-ai-row';
+                webAiRow.title = 'Send question directly to Web AI';
+
+                const btnGpt = document.createElement('button');
+                btnGpt.type = 'button';
+                btnGpt.className = 'amaes-web-ai-pill amaes-pill-chatgpt';
+                btnGpt.title = 'Ask ChatGPT (Opens ChatGPT with question pre-filled)';
+                btnGpt.textContent = 'ChatGPT';
+                btnGpt.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openExternalAi('chatgpt', que);
+                };
+
+                const btnPerp = document.createElement('button');
+                btnPerp.type = 'button';
+                btnPerp.className = 'amaes-web-ai-pill amaes-pill-perplexity';
+                btnPerp.title = 'Ask Perplexity (Opens Perplexity with question pre-filled)';
+                btnPerp.textContent = 'Perplexity';
+                btnPerp.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openExternalAi('perplexity', que);
+                };
+
+                const btnGem = document.createElement('button');
+                btnGem.type = 'button';
+                btnGem.className = 'amaes-web-ai-pill amaes-pill-gemini';
+                btnGem.title = 'Ask Google Gemini (Copies prompt & opens Gemini tab)';
+                btnGem.textContent = 'Gemini';
+                btnGem.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openExternalAi('gemini', que);
+                };
+
+                webAiRow.appendChild(btnGpt);
+                webAiRow.appendChild(btnPerp);
+                webAiRow.appendChild(btnGem);
+                btnContainer.appendChild(webAiRow);
             }
 
             // 2. Copy Image Button (if question has diagram/circuits)
@@ -8698,10 +8778,38 @@
                         align-items: center;
                         gap: 3px;
                     ">Copy for AI</button>
+                    <button type="button" class="amaes-ai-fallback-web-btn" data-provider="chatgpt" style="
+                        background: #ecfdf5;
+                        color: #065f46;
+                        border: 1px solid #a7f3d0;
+                        padding: 4px 8px;
+                        border-radius: 5px;
+                        font-size: 10.5px;
+                        font-weight: 700;
+                        cursor: pointer;
+                    " title="Open question in ChatGPT">ChatGPT ↗</button>
+                    <button type="button" class="amaes-ai-fallback-web-btn" data-provider="perplexity" style="
+                        background: #f0fdfa;
+                        color: #115e59;
+                        border: 1px solid #99f6e4;
+                        padding: 4px 8px;
+                        border-radius: 5px;
+                        font-size: 10.5px;
+                        font-weight: 700;
+                        cursor: pointer;
+                    " title="Open question in Perplexity">Perplexity ↗</button>
                 </div>
             `;
 
             formulation.insertBefore(bar, formulation.firstChild);
+
+            bar.querySelectorAll('.amaes-ai-fallback-web-btn').forEach(btn => {
+                btn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openExternalAi(btn.dataset.provider, que);
+                };
+            });
 
             let secLeft = waitSeconds;
             const timerEl = bar.querySelector('#amaes-ratelimit-countdown');
@@ -8800,10 +8908,38 @@
                     align-items: center;
                     gap: 3px;
                 ">Copy for AI</button>
+                <button type="button" class="amaes-ai-fallback-web-btn" data-provider="chatgpt" style="
+                    background: #ecfdf5;
+                    color: #065f46;
+                    border: 1px solid #a7f3d0;
+                    padding: 4px 8px;
+                    border-radius: 5px;
+                    font-size: 10.5px;
+                    font-weight: 700;
+                    cursor: pointer;
+                " title="Open question in ChatGPT">ChatGPT ↗</button>
+                <button type="button" class="amaes-ai-fallback-web-btn" data-provider="perplexity" style="
+                    background: #f0fdfa;
+                    color: #115e59;
+                    border: 1px solid #99f6e4;
+                    padding: 4px 8px;
+                    border-radius: 5px;
+                    font-size: 10.5px;
+                    font-weight: 700;
+                    cursor: pointer;
+                " title="Open question in Perplexity">Perplexity ↗</button>
             </div>
         `;
 
         formulation.insertBefore(bar, formulation.firstChild);
+
+        bar.querySelectorAll('.amaes-ai-fallback-web-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openExternalAi(btn.dataset.provider, que);
+            };
+        });
 
         const configBtn = bar.querySelector('.amaes-ai-config-btn');
         if (configBtn) {
@@ -11588,7 +11724,7 @@
                 `;
                 const wrongText = wrongList.map(w => typeof w === 'string' ? w : w.text).filter(Boolean).join(', ');
                 const isEmptyAnswer = !wrongText; // e.g. user cleared a fill-in-the-blank field
-                const pillLabel = isEmptyAnswer ? 'No Answer / Incorrect' : 'Wrong Choice Saved';
+                const pillLabel = isEmptyAnswer ? 'No Answer / Incorrect' : 'Choice Eliminated';
                 pill.title = isEmptyAnswer
                     ? 'No answer was submitted or the answer field was cleared. Check the verified answer below.'
                     : `Wrong choice "${wrongText}" eliminated in database. Will not be selected on next attempt!`;
@@ -13645,6 +13781,57 @@
                     width: 12px !important;
                     height: 12px !important;
                     flex-shrink: 0 !important;
+                }
+
+                .amaes-web-ai-row {
+                    display: flex !important;
+                    gap: 3px !important;
+                    width: 100% !important;
+                    box-sizing: border-box !important;
+                    margin-top: 3px !important;
+                }
+
+                .amaes-web-ai-pill {
+                    flex: 1 !important;
+                    min-width: 0 !important;
+                    padding: 3px 2px !important;
+                    font-size: 8.5px !important;
+                    font-weight: 700 !important;
+                    border-radius: 4px !important;
+                    border: 1px solid #cbd5e1 !important;
+                    background: #f8fafc !important;
+                    color: #475569 !important;
+                    cursor: pointer !important;
+                    text-align: center !important;
+                    transition: all 0.15s ease !important;
+                    white-space: nowrap !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                    user-select: none !important;
+                    box-sizing: border-box !important;
+                }
+
+                .amaes-web-ai-pill:hover {
+                    transform: translateY(-1px) !important;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+                }
+
+                .amaes-pill-chatgpt:hover {
+                    background: #ecfdf5 !important;
+                    color: #065f46 !important;
+                    border-color: #10b981 !important;
+                }
+
+                .amaes-pill-perplexity:hover {
+                    background: #f0fdfa !important;
+                    color: #115e59 !important;
+                    border-color: #14b8a6 !important;
+                }
+
+                .amaes-pill-gemini:hover {
+                    background: #faf5ff !important;
+                    color: #7e22ce !important;
+                    border-color: #a855f7 !important;
                 }
 
                 /* Active / Focused Question Card Highlight */

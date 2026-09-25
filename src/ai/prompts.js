@@ -276,6 +276,43 @@
         return `${intro}${res}`.trim();
     }
 
+    // --------------------------------------------------
+    // Multi-Web AI Launchers (ChatGPT, Perplexity, Gemini)
+    // --------------------------------------------------
+    function openExternalAi(provider, que) {
+        if (!que) que = getActiveQuestion() || document.querySelector('.que');
+        if (!que) {
+            showToast('Please click a question first to select it.');
+            return;
+        }
+        setActiveQuestion(que, true);
+        const qData = extractQuestionData(que);
+        const willIncludeContext = shouldInjectAiContext(qData ? qData.qNum : null);
+        const text = formatQuestionForAI(que, aiPromptHint);
+        if (!text) {
+            showToast('Could not format question text.');
+            return;
+        }
+
+        if (provider === 'chatgpt') {
+            const url = `https://chatgpt.com/?q=${encodeURIComponent(text)}`;
+            window.open(url, '_blank');
+            showToast('Opening ChatGPT with question pre-filled...');
+        } else if (provider === 'perplexity') {
+            const url = `https://www.perplexity.ai/search?q=${encodeURIComponent(text)}`;
+            window.open(url, '_blank');
+            showToast('Opening Perplexity with question pre-filled...');
+        } else if (provider === 'gemini') {
+            copyToClipboard(text).then(() => {
+                window.open('https://gemini.google.com/app', '_blank');
+                showToast('Question copied! Press Ctrl+V in Google Gemini.', 3500);
+            }).catch(() => {
+                window.open('https://gemini.google.com/app', '_blank');
+                showToast('Opening Google Gemini...', 2500);
+            });
+        }
+    }
+
     // Inject sleek "Copy for AI" and "Copy Image" buttons on each question card in Moodle
     function injectQuestionCopyButtons() {
         if (!checkIsQuizPage()) return;
@@ -371,6 +408,49 @@
                     await manualSolveWithAi(que, btnAskAi);
                 };
                 btnContainer.appendChild(btnAskAi);
+
+                // 1d. Multi-Web AI Launchers Row (ChatGPT, Perplexity, Gemini)
+                const webAiRow = document.createElement('div');
+                webAiRow.className = 'amaes-web-ai-row';
+                webAiRow.title = 'Send question directly to Web AI';
+
+                const btnGpt = document.createElement('button');
+                btnGpt.type = 'button';
+                btnGpt.className = 'amaes-web-ai-pill amaes-pill-chatgpt';
+                btnGpt.title = 'Ask ChatGPT (Opens ChatGPT with question pre-filled)';
+                btnGpt.textContent = 'ChatGPT';
+                btnGpt.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openExternalAi('chatgpt', que);
+                };
+
+                const btnPerp = document.createElement('button');
+                btnPerp.type = 'button';
+                btnPerp.className = 'amaes-web-ai-pill amaes-pill-perplexity';
+                btnPerp.title = 'Ask Perplexity (Opens Perplexity with question pre-filled)';
+                btnPerp.textContent = 'Perplexity';
+                btnPerp.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openExternalAi('perplexity', que);
+                };
+
+                const btnGem = document.createElement('button');
+                btnGem.type = 'button';
+                btnGem.className = 'amaes-web-ai-pill amaes-pill-gemini';
+                btnGem.title = 'Ask Google Gemini (Copies prompt & opens Gemini tab)';
+                btnGem.textContent = 'Gemini';
+                btnGem.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openExternalAi('gemini', que);
+                };
+
+                webAiRow.appendChild(btnGpt);
+                webAiRow.appendChild(btnPerp);
+                webAiRow.appendChild(btnGem);
+                btnContainer.appendChild(webAiRow);
             }
 
             // 2. Copy Image Button (if question has diagram/circuits)

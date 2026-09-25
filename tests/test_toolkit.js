@@ -1844,7 +1844,7 @@ test("Review Question Markers: displays Saved to Study Bank badge when share is 
                 return { label: isDeduced ? "Deduced Locally" : "Saved Locally", type: "local", liveTag: "Saved Locally" };
             }
         } else if (isZeroMark) {
-            return { label: "Wrong Choice Saved", type: "eliminated" };
+            return { label: "Choice Eliminated", type: "eliminated" };
         }
         return null;
     }
@@ -1866,7 +1866,7 @@ test("Review Question Markers: displays Saved to Study Bank badge when share is 
 
     // Wrong choice eliminated
     const wrongElim = getMarkerStatus(false, false, true, true);
-    assert.strictEqual(wrongElim.label, "Wrong Choice Saved");
+    assert.strictEqual(wrongElim.label, "Choice Eliminated");
     assert.strictEqual(wrongElim.type, "eliminated");
 
     // Userscript code verification
@@ -2096,7 +2096,7 @@ test("Review Screen Full Mark Safety: questions that score 1.00 out of 1.00 are 
             pillStatus = cloudSharingOn ? "Uploaded to DB" : "Saved to Local DB";
             bannerText = `Verified Answer: "${ansText}"`;
         } else if (isZeroMark && !isFullMark) {
-            pillStatus = "Wrong Choice Saved";
+            pillStatus = "Choice Eliminated";
             bannerText = `Eliminated: "${wrongList.join(', ')}" (Confirmed Incorrect)`;
         }
 
@@ -2106,13 +2106,13 @@ test("Review Screen Full Mark Safety: questions that score 1.00 out of 1.00 are 
     // Case 1: Question scored 1.00 out of 1.00 with answer "Memory", even if wrongList has old wrong attempts
     const res1 = evaluateReviewMarker(true, false, "Memory", ["control"], true);
     assert.strictEqual(res1.isVerified, true, "Full mark question must be verified");
-    assert.strictEqual(res1.pillStatus, "Uploaded to DB", "Must show Uploaded to DB, NEVER Wrong Choice Saved");
+    assert.strictEqual(res1.pillStatus, "Uploaded to DB", "Must show Uploaded to DB, NEVER Choice Eliminated");
     assert.strictEqual(res1.bannerText, 'Verified Answer: "Memory"');
 
     // Case 2: Question scored 0.00 out of 1.00 with answer "Process" that was debunked
     const res2 = evaluateReviewMarker(false, true, "Process", ["Process"], true);
     assert.strictEqual(res2.isVerified, false, "Debunked answer cannot be verified");
-    assert.strictEqual(res2.pillStatus, "Wrong Choice Saved", "Zero mark question must show Wrong Choice Saved");
+    assert.strictEqual(res2.pillStatus, "Choice Eliminated", "Zero mark question must show Choice Eliminated");
     assert.strictEqual(res2.bannerText, 'Eliminated: "Process" (Confirmed Incorrect)');
 
     // Userscript code verification
@@ -4584,6 +4584,25 @@ test("1-Click In-App Bug Reporting: header button triggers clean modal, validate
     assert.ok(script.includes("id=\"amaes-bug-include-logs\""), "Modal must provide #amaes-bug-include-logs checkbox");
     assert.ok(script.includes("desc.length < 10"), "Must validate description length is at least 10 characters");
     assert.ok(script.includes("Issue #${res.issueNumber} Opened!"), "Modal must display created GitHub issue number upon success");
+});
+
+// 144. Multi-Web AI Launchers and Choice Eliminated Marker Integrity
+test("Multi-Web AI Launchers & Choice Eliminated Marker: provides 1-click external AI URLs and plain English choice elimination badge", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Multi-Web AI Launchers
+    assert.ok(script.includes("function openExternalAi(provider, que)"), "Must define openExternalAi helper");
+    assert.ok(script.includes("https://chatgpt.com/?q="), "openExternalAi must support ChatGPT with prompt query parameter");
+    assert.ok(script.includes("https://www.perplexity.ai/search?q="), "openExternalAi must support Perplexity with search query parameter");
+    assert.ok(script.includes("https://gemini.google.com/app"), "openExternalAi must support Google Gemini with auto-copy and web app launcher");
+    assert.ok(script.includes("class=\"amaes-web-ai-row\"") || script.includes("amaes-web-ai-row"), "Quiz question cards must render .amaes-web-ai-row container");
+    assert.ok(script.includes("amaes-pill-chatgpt"), "Cards must provide ChatGPT button");
+    assert.ok(script.includes("amaes-pill-perplexity"), "Cards must provide Perplexity button");
+    assert.ok(script.includes("amaes-pill-gemini"), "Cards must provide Gemini button");
+
+    // 2. Choice Eliminated Marker
+    assert.ok(script.includes("'Choice Eliminated'"), "Harvester must use user-friendly 'Choice Eliminated' label instead of 'Wrong Choice Saved'");
 });
 
 console.log("\n==================================================");
