@@ -44,10 +44,6 @@
                 </div>
                 
                 <div id="amaes-actions">
-                    <button id="amaes-reinstall-btn" class="amaes-icon-btn" title="Reinstall Toolkit in Violentmonkey (${SCRIPT_VERSION})">
-                        ${ICONS.download}
-                    </button>
-
                     <button id="amaes-reset-btn" class="amaes-icon-btn" title="Reset installation: clear toolkit data and reopen welcome setup">
                         ${ICONS.rotateCcw}
                     </button>
@@ -1007,80 +1003,99 @@
                     transform: rotate(180deg) !important;
                 }
 
-                .amaes-web-ai-menu {
-                    position: absolute !important;
-                    top: calc(100% + 4px) !important;
-                    left: 0 !important;
-                    z-index: 99999 !important;
-                    width: max-content !important;
-                    min-width: 180px !important;
-                    max-width: min(240px, 92vw) !important;
-                    background: #ffffff !important;
-                    border: 1px solid #cbd5e1 !important;
-                    border-radius: 8px !important;
-                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-                    padding: 5px !important;
+                .amaes-web-ai-row {
                     display: flex !important;
-                    flex-direction: column !important;
-                    gap: 3px !important;
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+                    flex-wrap: wrap !important;
+                    gap: 6px !important;
+                    align-items: center !important;
+                    width: 100% !important;
                     box-sizing: border-box !important;
                 }
 
                 .amaes-web-ai-item {
-                    display: flex !important;
+                    display: inline-flex !important;
                     align-items: center !important;
-                    gap: 8px !important;
-                    width: 100% !important;
-                    min-height: 34px !important;
-                    padding: 6px 10px !important;
+                    gap: 6px !important;
+                    padding: 5px 11px !important;
                     border-radius: 6px !important;
-                    border: 1px solid transparent !important;
-                    background: transparent !important;
-                    color: #1e293b !important;
-                    font-size: 11px !important;
-                    font-weight: 600 !important;
+                    font-size: 11.5px !important;
+                    font-weight: 700 !important;
                     cursor: pointer !important;
-                    text-align: left !important;
                     transition: all 0.15s ease !important;
                     box-sizing: border-box !important;
+                    border: 1px solid transparent !important;
+                    user-select: none !important;
                     touch-action: manipulation !important;
+                    line-height: 1.3 !important;
                 }
 
-                .amaes-web-ai-item:hover,
-                .amaes-web-ai-item:active {
-                    background: #f1f5f9 !important;
+                .amaes-web-ai-item.amaes-pill-chatgpt {
+                    background: rgba(16, 185, 129, 0.14) !important;
+                    color: #10b981 !important;
+                    border-color: rgba(16, 185, 129, 0.35) !important;
                 }
-
                 .amaes-web-ai-item.amaes-pill-chatgpt:hover,
                 .amaes-web-ai-item.amaes-pill-chatgpt:active {
-                    background: #ecfdf5 !important;
-                    color: #065f46 !important;
-                    border-color: #a7f3d0 !important;
+                    background: rgba(16, 185, 129, 0.25) !important;
+                    border-color: #10b981 !important;
+                    color: #059669 !important;
                 }
 
+                .amaes-web-ai-item.amaes-pill-perplexity {
+                    background: rgba(20, 184, 166, 0.14) !important;
+                    color: #14b8a6 !important;
+                    border-color: rgba(20, 184, 166, 0.35) !important;
+                }
                 .amaes-web-ai-item.amaes-pill-perplexity:hover,
                 .amaes-web-ai-item.amaes-pill-perplexity:active {
-                    background: #f0fdfa !important;
-                    color: #115e59 !important;
-                    border-color: #99f6e4 !important;
+                    background: rgba(20, 184, 166, 0.25) !important;
+                    border-color: #14b8a6 !important;
+                    color: #0d9488 !important;
                 }
 
+                .amaes-web-ai-item.amaes-pill-gemini {
+                    background: rgba(168, 85, 247, 0.14) !important;
+                    color: #a855f7 !important;
+                    border-color: rgba(168, 85, 247, 0.35) !important;
+                }
                 .amaes-web-ai-item.amaes-pill-gemini:hover,
                 .amaes-web-ai-item.amaes-pill-gemini:active {
-                    background: #faf5ff !important;
-                    color: #7e22ce !important;
-                    border-color: #e9d5ff !important;
+                    background: rgba(168, 85, 247, 0.25) !important;
+                    border-color: #a855f7 !important;
+                    color: #9333ea !important;
                 }
 
-                .amaes-web-ai-item .amaes-ai-icon {
-                    font-size: 13px !important;
-                    flex-shrink: 0 !important;
+                .amaes-copy-ai-card-btn {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    gap: 6px !important;
+                    padding: 5px 11px !important;
+                    border-radius: 6px !important;
+                    font-size: 11.5px !important;
+                    font-weight: 700 !important;
+                    background: rgba(59, 130, 246, 0.14) !important;
+                    color: #3b82f6 !important;
+                    border: 1px solid rgba(59, 130, 246, 0.35) !important;
+                    cursor: pointer !important;
+                    transition: all 0.15s ease !important;
+                    box-sizing: border-box !important;
+                    line-height: 1.3 !important;
+                }
+                .amaes-copy-ai-card-btn:hover,
+                .amaes-copy-ai-card-btn:active {
+                    background: rgba(59, 130, 246, 0.25) !important;
+                    border-color: #3b82f6 !important;
                 }
 
-                .amaes-web-ai-item .amaes-ai-label {
-                    flex: 1 !important;
-                    white-space: nowrap !important;
+                .amaes-paste-ai-card-btn {
+                    background: rgba(245, 158, 11, 0.14) !important;
+                    color: #f59e0b !important;
+                    border-color: rgba(245, 158, 11, 0.35) !important;
+                }
+                .amaes-paste-ai-card-btn:hover,
+                .amaes-paste-ai-card-btn:active {
+                    background: rgba(245, 158, 11, 0.25) !important;
+                    border-color: #f59e0b !important;
                 }
 
                 /* Active / Focused Question Card Highlight */

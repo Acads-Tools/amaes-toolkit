@@ -7909,17 +7909,17 @@
             // Collapsible AI Drawer: Minimized by default on verified questions, auto-unminimized when unknown or AI failed
             const aiDrawer = document.createElement('details');
             aiDrawer.className = 'amaes-card-ai-drawer';
-            aiDrawer.style.cssText = 'width: 100%; box-sizing: border-box; margin-top: 2px; border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 6px; background: rgba(139, 92, 246, 0.04); overflow: visible;';
+            aiDrawer.style.cssText = 'width: 100%; box-sizing: border-box; margin-bottom: 6px; border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 8px; background: rgba(139, 92, 246, 0.03); overflow: hidden;';
 
             const aiSummary = document.createElement('summary');
             aiSummary.className = 'amaes-card-ai-drawer-summary';
-            aiSummary.style.cssText = 'padding: 4px 6px; font-size: 10px; font-weight: 700; color: #a78bfa; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; border-radius: 5px; transition: background 0.15s ease;';
-            aiSummary.title = 'AI Tools & External Launchers (Click to toggle)';
+            aiSummary.style.cssText = 'padding: 5px 10px; font-size: 11px; font-weight: 700; color: #a78bfa; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; background: rgba(139, 92, 246, 0.06); transition: background 0.15s ease;';
+            aiSummary.title = 'AI Tools & Solvers (Click to toggle)';
             aiSummary.innerHTML = `
-                <span style="display: flex; align-items: center; gap: 4px;">
-                    ${ICONS.sparkles} <span>AI Tools</span>
+                <span style="display: flex; align-items: center; gap: 5px;">
+                    ${ICONS.sparkles} <span>AI Tools & Solvers</span>
                 </span>
-                <span class="amaes-card-ai-drawer-hint" style="font-size: 8.5px; color: var(--text-muted, #94a3b8); transition: transform 0.2s ease;">▾</span>
+                <span class="amaes-card-ai-drawer-hint" style="font-size: 9px; color: var(--text-muted, #94a3b8); transition: transform 0.2s ease;">▾</span>
             `;
 
             aiDrawer.addEventListener('toggle', () => {
@@ -7929,14 +7929,19 @@
 
             const aiActions = document.createElement('div');
             aiActions.className = 'amaes-card-ai-actions';
-            aiActions.style.cssText = 'display: flex; flex-direction: column; gap: 4px; padding: 4px 3px 5px 3px; border-top: 1px solid rgba(139, 92, 246, 0.15);';
+            aiActions.style.cssText = 'display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; border-top: 1px solid rgba(139, 92, 246, 0.15);';
+
+            // Web AI Row / Direct Action Buttons (Direct 1-click pills, no clunky dropdown menus!)
+            const webAiRow = document.createElement('div');
+            webAiRow.className = 'amaes-web-ai-row';
+            webAiRow.style.cssText = 'display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; box-sizing: border-box;';
 
             // 1. Copy Question Text Button
             const btnText = document.createElement('button');
             btnText.type = 'button';
             btnText.className = 'amaes-copy-ai-card-btn';
             btnText.title = 'Copy question and choices (strict direct answer instruction for AI)';
-            btnText.innerHTML = `${ICONS.sparkles} <span>Copy AI</span>`;
+            btnText.innerHTML = `${ICONS.copy || ICONS.sparkles} <span>Copy AI</span>`;
 
             btnText.onclick = async (e) => {
                 e.preventDefault();
@@ -7956,7 +7961,7 @@
                         setLog("Copied question with Course Context for AI.", "var(--accent-green)");
                     }
                     setTimeout(() => {
-                        btnText.innerHTML = `${ICONS.sparkles} <span>Copy AI</span>`;
+                        btnText.innerHTML = `${ICONS.copy || ICONS.sparkles} <span>Copy AI</span>`;
                         btnText.style.borderColor = '';
                         btnText.style.color = '';
                     }, 1800);
@@ -7964,14 +7969,72 @@
                     console.error('Copy failed:', err);
                 }
             };
-            aiActions.appendChild(btnText);
+            webAiRow.appendChild(btnText);
 
-            // 1b. Paste AI Button on Question Card
+            // 2. Ask ChatGPT (1-Click direct launcher with prompt pre-filled!)
+            const btnChatGpt = document.createElement('button');
+            btnChatGpt.type = 'button';
+            btnChatGpt.className = 'amaes-web-ai-item amaes-pill-chatgpt';
+            btnChatGpt.dataset.provider = 'chatgpt';
+            btnChatGpt.title = 'Open question directly in ChatGPT with answer prompt pre-filled';
+            btnChatGpt.innerHTML = `<span class="amaes-ai-icon">💬</span> <span>Ask ChatGPT</span>`;
+            btnChatGpt.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openExternalAi('chatgpt', que);
+            };
+            webAiRow.appendChild(btnChatGpt);
+
+            // 2b. Ask / Retry Built-in AI Solver
+            if (checkIsQuizAttemptPage()) {
+                const btnAskAi = document.createElement('button');
+                btnAskAi.type = 'button';
+                btnAskAi.className = 'amaes-copy-ai-card-btn amaes-ask-ai-card-btn';
+                btnAskAi.title = 'Ask Google Gemini AI to analyze and solve this question directly';
+                btnAskAi.innerHTML = `${ICONS.sparkles} <span>${que.dataset.amaesAiAttempted ? 'Retry AI' : 'Solve with AI'}</span>`;
+                btnAskAi.onclick = async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setActiveQuestion(que, true);
+                    await manualSolveWithAi(que, btnAskAi);
+                };
+                webAiRow.appendChild(btnAskAi);
+            }
+
+            // 3. Ask Google Gemini (1-Click launcher / solver)
+            const btnGemini = document.createElement('button');
+            btnGemini.type = 'button';
+            btnGemini.className = 'amaes-web-ai-item amaes-pill-gemini';
+            btnGemini.dataset.provider = 'gemini';
+            btnGemini.title = 'Open question in Google Gemini';
+            btnGemini.innerHTML = `<span class="amaes-ai-icon">✦</span> <span>Gemini</span>`;
+            btnGemini.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openExternalAi('gemini', que);
+            };
+            webAiRow.appendChild(btnGemini);
+
+            // 4. Perplexity AI (1-Click search)
+            const btnPerplexity = document.createElement('button');
+            btnPerplexity.type = 'button';
+            btnPerplexity.className = 'amaes-web-ai-item amaes-pill-perplexity';
+            btnPerplexity.dataset.provider = 'perplexity';
+            btnPerplexity.title = 'Search question in Perplexity AI';
+            btnPerplexity.innerHTML = `<span class="amaes-ai-icon">⚡</span> <span>Perplexity</span>`;
+            btnPerplexity.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openExternalAi('perplexity', que);
+            };
+            webAiRow.appendChild(btnPerplexity);
+
+            // 5. Paste AI Button on Question Card
             if (checkIsQuizAttemptPage()) {
                 const btnPaste = document.createElement('button');
                 btnPaste.type = 'button';
                 btnPaste.className = 'amaes-copy-ai-card-btn amaes-paste-ai-card-btn';
-                btnPaste.title = 'Paste AI response from clipboard to this question (V)';
+                btnPaste.title = 'Paste AI response from clipboard to select this choice (V)';
                 btnPaste.innerHTML = `${ICONS.clipboard} <span>Paste AI</span>`;
                 btnPaste.onclick = async (e) => {
                     e.preventDefault();
@@ -7979,97 +8042,10 @@
                     setActiveQuestion(que, true);
                     await autoSelectFromAiClipboard(que);
                 };
-                aiActions.appendChild(btnPaste);
-
-                // 1c. Ask / Retry AI Button on Question Card
-                const btnAskAi = document.createElement('button');
-                btnAskAi.type = 'button';
-                btnAskAi.className = 'amaes-copy-ai-card-btn amaes-ask-ai-card-btn';
-                btnAskAi.title = 'Ask Google Gemini AI to analyze and solve this question directly';
-                btnAskAi.innerHTML = `${ICONS.sparkles} <span>${que.dataset.amaesAiAttempted ? 'Retry AI' : 'Ask AI'}</span>`;
-                btnAskAi.onclick = async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setActiveQuestion(que, true);
-                    await manualSolveWithAi(que, btnAskAi);
-                };
-                aiActions.appendChild(btnAskAi);
-
-                // 1d. Multi-Web AI Smart 1-Tap Launcher with Dropdown
-                const webAiContainer = document.createElement('div');
-                webAiContainer.className = 'amaes-web-ai-container';
-                webAiContainer.title = 'Open question directly in Web AI';
-
-                const splitBtn = document.createElement('div');
-                splitBtn.className = 'amaes-web-ai-split-btn';
-
-                const prefAi = getPreferredWebAi();
-                const prefInfo = WEB_AI_PROVIDERS[prefAi];
-
-                const mainAction = document.createElement('button');
-                mainAction.type = 'button';
-                mainAction.className = 'amaes-web-ai-main-action';
-                mainAction.title = `Ask ${prefInfo.name}: Click to solve question in ${prefInfo.name}`;
-                mainAction.innerHTML = `<span class="amaes-web-ai-icon">${prefInfo.icon}</span> <span>${prefInfo.name}</span>`;
-                mainAction.onclick = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openExternalAi(getPreferredWebAi(), que);
-                };
-
-                const arrowBtn = document.createElement('button');
-                arrowBtn.type = 'button';
-                arrowBtn.className = 'amaes-web-ai-arrow-btn';
-                arrowBtn.title = 'Switch Web AI (ChatGPT, Perplexity, Gemini)';
-                arrowBtn.innerHTML = `<span>▾</span>`;
-
-                const menu = document.createElement('div');
-                menu.className = 'amaes-web-ai-menu';
-                menu.style.display = 'none';
-
-                menu.innerHTML = `
-                    <button type="button" class="amaes-web-ai-item amaes-pill-chatgpt" data-provider="chatgpt" title="Opens ChatGPT with question pre-filled">
-                        <span class="amaes-ai-icon">💬</span>
-                        <span class="amaes-ai-label">ChatGPT <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Auto-fill)</small></span>
-                    </button>
-                    <button type="button" class="amaes-web-ai-item amaes-pill-perplexity" data-provider="perplexity" title="Searches question in Perplexity">
-                        <span class="amaes-ai-icon">⚡</span>
-                        <span class="amaes-ai-label">Perplexity <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Auto-search)</small></span>
-                    </button>
-                    <button type="button" class="amaes-web-ai-item amaes-pill-gemini" data-provider="gemini" title="Copies prompt and opens Google Gemini">
-                        <span class="amaes-ai-icon">✦</span>
-                        <span class="amaes-ai-label">Google Gemini <small style="font-weight:normal;opacity:0.8;font-size:9.5px;">(Copy & Go)</small></span>
-                    </button>
-                `;
-
-                arrowBtn.onclick = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    document.querySelectorAll('.amaes-web-ai-menu').forEach(m => {
-                        if (m !== menu) m.style.display = 'none';
-                    });
-                    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-                };
-
-                menu.querySelectorAll('.amaes-web-ai-item').forEach(item => {
-                    item.onclick = (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        menu.style.display = 'none';
-                        const selectedProvider = item.dataset.provider;
-                        setPreferredWebAi(selectedProvider);
-                        openExternalAi(selectedProvider, que);
-                    };
-                });
-
-                splitBtn.appendChild(mainAction);
-                splitBtn.appendChild(arrowBtn);
-                webAiContainer.appendChild(splitBtn);
-                webAiContainer.appendChild(menu);
-                aiActions.appendChild(webAiContainer);
+                webAiRow.appendChild(btnPaste);
             }
 
-            // 2. Copy Image Button (if question has diagram/circuits)
+            // 6. Copy Image Button (if question has diagram/circuits)
             const qImages = que.querySelectorAll('.formulation img, .qtext img');
             if (qImages.length > 0) {
                 const firstImgUrl = qImages[0].src;
@@ -8101,20 +8077,21 @@
                         btnImg.style.color = '';
                     }, 2000);
                 };
-                aiActions.appendChild(btnImg);
+                webAiRow.appendChild(btnImg);
             }
 
+            aiActions.appendChild(webAiRow);
             aiDrawer.appendChild(aiSummary);
             aiDrawer.appendChild(aiActions);
             btnContainer.appendChild(aiDrawer);
 
             updateQuestionAiDrawerState(que);
 
-            const infoCol = que.querySelector('.info');
+            const formulation = que.querySelector('.formulation');
             const contentCol = que.querySelector('.content');
 
-            if (infoCol) {
-                infoCol.appendChild(btnContainer);
+            if (formulation) {
+                formulation.insertBefore(btnContainer, formulation.firstChild);
             } else if (contentCol) {
                 contentCol.insertBefore(btnContainer, contentCol.firstChild);
             } else {
@@ -13257,10 +13234,6 @@
                 </div>
                 
                 <div id="amaes-actions">
-                    <button id="amaes-reinstall-btn" class="amaes-icon-btn" title="Reinstall Toolkit in Violentmonkey (${SCRIPT_VERSION})">
-                        ${ICONS.download}
-                    </button>
-
                     <button id="amaes-reset-btn" class="amaes-icon-btn" title="Reset installation: clear toolkit data and reopen welcome setup">
                         ${ICONS.rotateCcw}
                     </button>
@@ -14220,80 +14193,99 @@
                     transform: rotate(180deg) !important;
                 }
 
-                .amaes-web-ai-menu {
-                    position: absolute !important;
-                    top: calc(100% + 4px) !important;
-                    left: 0 !important;
-                    z-index: 99999 !important;
-                    width: max-content !important;
-                    min-width: 180px !important;
-                    max-width: min(240px, 92vw) !important;
-                    background: #ffffff !important;
-                    border: 1px solid #cbd5e1 !important;
-                    border-radius: 8px !important;
-                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-                    padding: 5px !important;
+                .amaes-web-ai-row {
                     display: flex !important;
-                    flex-direction: column !important;
-                    gap: 3px !important;
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+                    flex-wrap: wrap !important;
+                    gap: 6px !important;
+                    align-items: center !important;
+                    width: 100% !important;
                     box-sizing: border-box !important;
                 }
 
                 .amaes-web-ai-item {
-                    display: flex !important;
+                    display: inline-flex !important;
                     align-items: center !important;
-                    gap: 8px !important;
-                    width: 100% !important;
-                    min-height: 34px !important;
-                    padding: 6px 10px !important;
+                    gap: 6px !important;
+                    padding: 5px 11px !important;
                     border-radius: 6px !important;
-                    border: 1px solid transparent !important;
-                    background: transparent !important;
-                    color: #1e293b !important;
-                    font-size: 11px !important;
-                    font-weight: 600 !important;
+                    font-size: 11.5px !important;
+                    font-weight: 700 !important;
                     cursor: pointer !important;
-                    text-align: left !important;
                     transition: all 0.15s ease !important;
                     box-sizing: border-box !important;
+                    border: 1px solid transparent !important;
+                    user-select: none !important;
                     touch-action: manipulation !important;
+                    line-height: 1.3 !important;
                 }
 
-                .amaes-web-ai-item:hover,
-                .amaes-web-ai-item:active {
-                    background: #f1f5f9 !important;
+                .amaes-web-ai-item.amaes-pill-chatgpt {
+                    background: rgba(16, 185, 129, 0.14) !important;
+                    color: #10b981 !important;
+                    border-color: rgba(16, 185, 129, 0.35) !important;
                 }
-
                 .amaes-web-ai-item.amaes-pill-chatgpt:hover,
                 .amaes-web-ai-item.amaes-pill-chatgpt:active {
-                    background: #ecfdf5 !important;
-                    color: #065f46 !important;
-                    border-color: #a7f3d0 !important;
+                    background: rgba(16, 185, 129, 0.25) !important;
+                    border-color: #10b981 !important;
+                    color: #059669 !important;
                 }
 
+                .amaes-web-ai-item.amaes-pill-perplexity {
+                    background: rgba(20, 184, 166, 0.14) !important;
+                    color: #14b8a6 !important;
+                    border-color: rgba(20, 184, 166, 0.35) !important;
+                }
                 .amaes-web-ai-item.amaes-pill-perplexity:hover,
                 .amaes-web-ai-item.amaes-pill-perplexity:active {
-                    background: #f0fdfa !important;
-                    color: #115e59 !important;
-                    border-color: #99f6e4 !important;
+                    background: rgba(20, 184, 166, 0.25) !important;
+                    border-color: #14b8a6 !important;
+                    color: #0d9488 !important;
                 }
 
+                .amaes-web-ai-item.amaes-pill-gemini {
+                    background: rgba(168, 85, 247, 0.14) !important;
+                    color: #a855f7 !important;
+                    border-color: rgba(168, 85, 247, 0.35) !important;
+                }
                 .amaes-web-ai-item.amaes-pill-gemini:hover,
                 .amaes-web-ai-item.amaes-pill-gemini:active {
-                    background: #faf5ff !important;
-                    color: #7e22ce !important;
-                    border-color: #e9d5ff !important;
+                    background: rgba(168, 85, 247, 0.25) !important;
+                    border-color: #a855f7 !important;
+                    color: #9333ea !important;
                 }
 
-                .amaes-web-ai-item .amaes-ai-icon {
-                    font-size: 13px !important;
-                    flex-shrink: 0 !important;
+                .amaes-copy-ai-card-btn {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    gap: 6px !important;
+                    padding: 5px 11px !important;
+                    border-radius: 6px !important;
+                    font-size: 11.5px !important;
+                    font-weight: 700 !important;
+                    background: rgba(59, 130, 246, 0.14) !important;
+                    color: #3b82f6 !important;
+                    border: 1px solid rgba(59, 130, 246, 0.35) !important;
+                    cursor: pointer !important;
+                    transition: all 0.15s ease !important;
+                    box-sizing: border-box !important;
+                    line-height: 1.3 !important;
+                }
+                .amaes-copy-ai-card-btn:hover,
+                .amaes-copy-ai-card-btn:active {
+                    background: rgba(59, 130, 246, 0.25) !important;
+                    border-color: #3b82f6 !important;
                 }
 
-                .amaes-web-ai-item .amaes-ai-label {
-                    flex: 1 !important;
-                    white-space: nowrap !important;
+                .amaes-paste-ai-card-btn {
+                    background: rgba(245, 158, 11, 0.14) !important;
+                    color: #f59e0b !important;
+                    border-color: rgba(245, 158, 11, 0.35) !important;
+                }
+                .amaes-paste-ai-card-btn:hover,
+                .amaes-paste-ai-card-btn:active {
+                    background: rgba(245, 158, 11, 0.25) !important;
+                    border-color: #f59e0b !important;
                 }
 
                 /* Active / Focused Question Card Highlight */
@@ -15737,13 +15729,6 @@
             });
         }
 
-        // Header Reinstall Button Handler
-        const reinstallBtn = document.getElementById('amaes-reinstall-btn');
-        if (reinstallBtn) {
-            reinstallBtn.onclick = () => {
-                triggerScriptReinstall();
-            };
-        }
 
         // Header Reset Settings Button Handler
         const resetBtn = document.getElementById('amaes-reset-btn');
