@@ -4443,6 +4443,43 @@ test("Audio Notifications & On-Demand AI Manual Retry on Unknown / Short-Answer 
     assert.ok(script.includes("playToolkitSound('quest_done')"), "Must trigger quest_done sound on quiz finish/summary");
 });
 
+test("Gapselect / Dropdown Pick Support, Unknown Question Type JSON Store, and Review Screen Wrong Answer Debunking Guard", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. cleanDOMToAI converts <select> into readable [Dropdown N (Opt1 | Opt2)] tokens
+    assert.ok(script.includes("Convert select / dropdown elements (e.g. gapselect inline dropdowns)"), "cleanDOMToAI must convert select elements");
+    assert.ok(script.includes("[Dropdown ${selectCount}"), "cleanDOMToAI must format dropdown labels with options or selected value");
+
+    // 2. Question type identification & categorization
+    assert.ok(script.includes("function identifyQuestionType(que)"), "Must define identifyQuestionType");
+    assert.ok(script.includes("function mapQuestionTypeCategory(rawType)"), "Must define mapQuestionTypeCategory");
+    assert.ok(script.includes("gapselect"), "Must explicitly identify gapselect question type");
+
+    // 3. Unknown Question Type Telemetry JSON Store
+    assert.ok(script.includes("function recordUnknownQuestionType(que"), "Must define recordUnknownQuestionType");
+    assert.ok(script.includes("amaes_unknown_question_types"), "Must use amaes_unknown_question_types in localStorage");
+    assert.ok(script.includes("function getUnknownQuestionTypes()"), "Must define getUnknownQuestionTypes");
+    assert.ok(script.includes("function exportUnknownQuestionTypesJson()"), "Must define exportUnknownQuestionTypesJson");
+    assert.ok(script.includes("function clearUnknownQuestionTypes()"), "Must define clearUnknownQuestionTypes");
+
+    // 4. Review Page Guard & Short Answer Wrong-Answer Debunking
+    assert.ok(script.includes("// Never run highlightQuizAnswers on review pages"), "highlightQuizAnswers must have review page early exit");
+    assert.ok(script.includes("if (checkIsReviewPage()) {"), "highlightQuizAnswers must check checkIsReviewPage");
+    assert.ok(script.includes("const validCandidates = candidates.filter"), "Must filter candidates against allWrongList before picking suggested answer");
+    assert.ok(script.includes("textInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()"), "Short-answer hint must require validCandidates and not be on review page");
+    assert.ok(script.includes("selectInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()"), "Select hint must require validCandidates and not be on review page");
+
+    // 5. Gapselect Prompt Builder & Gemini Inference
+    assert.ok(script.includes("[Dropdown Pick / Fill Blank]"), "buildGeminiCompactPrompt must format gapselect dropdown prompts");
+    assert.ok(script.includes("Gemini selected") && script.includes("dropdown option"), "handleGeminiQuestionInference must support picking select options");
+    assert.ok(script.includes("qData.isGapSelect"), "extractQuestionData must set isGapSelect");
+    assert.ok(script.includes("selectInputs.length > 0 && (!qData.choices || qData.choices.length === 0)"), "handleGeminiQuestionInference must support selectInputs dropdown matching");
+
+    // 6. Diagnostic Log & Terminal Commands Integration
+    assert.ok(script.includes("Recorded Unknown Question Types:"), "Diagnostic audit log must include unknown question types count and JSON");
+    assert.ok(script.includes("c === 'unknown' || c === 'unknowns'"), "Developer console must support 'unknown' command");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

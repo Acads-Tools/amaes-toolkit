@@ -4727,6 +4727,12 @@
 
         let matchedCount = 0;
 
+        // Never run highlightQuizAnswers on review pages (which already show students' answers, feedback, and keys).
+        // Prevents injecting fill buttons, green borders, or contradictory suggestions over graded results.
+        if (checkIsReviewPage()) {
+            return { matched: 0, total: queContainers.length, isReview: true };
+        }
+
         queContainers.forEach(que => {
             const qtextElem = que.querySelector('.qtext, .formulation .qtext');
             if (!qtextElem) return;
@@ -4855,6 +4861,29 @@
                 }
             });
 
+            // Inspect DOM for explicit Moodle red crosses or zero marks on text inputs and dropdowns
+            const liveTextInputs = que.querySelectorAll('input[type="text"], input.form-control, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
+            liveTextInputs.forEach(ti => {
+                const val = (ti.value || ti.getAttribute('value') || '').trim();
+                const isCrossed = hasChoiceCross(ti) || hasChoiceCross(ti.parentElement) || qGradeInfo.isZeroMark;
+                if ((isCrossed || qGradeInfo.isZeroMark) && val) {
+                    const norm = normalizeChoice(val);
+                    verifiedNorms.delete(norm);
+                    verifiedNorms.delete(unscriptDigits(norm));
+                }
+            });
+            const liveSelectInputs = que.querySelectorAll('select');
+            liveSelectInputs.forEach(sel => {
+                const opt = (sel.selectedIndex >= 0 && sel.options) ? sel.options[sel.selectedIndex] : null;
+                const optText = (opt && opt.value && !opt.text.toLowerCase().includes('choose')) ? (opt.text || opt.innerText).trim() : '';
+                const isCrossed = hasChoiceCross(sel) || hasChoiceCross(sel.parentElement) || qGradeInfo.isZeroMark;
+                if ((isCrossed || qGradeInfo.isZeroMark) && optText) {
+                    const norm = normalizeChoice(optText);
+                    verifiedNorms.delete(norm);
+                    verifiedNorms.delete(unscriptDigits(norm));
+                }
+            });
+
             // Compile all eliminated wrong choices known for this question
             const allWrongList = [];
             candidates.forEach(cand => {
@@ -4885,6 +4914,39 @@
                         allWrongList.push({ norm: txt, text: rawLabel || txt, count: 1 });
                     }
                 }
+            });
+            liveTextInputs.forEach(ti => {
+                const val = (ti.value || ti.getAttribute('value') || '').trim();
+                const isCrossed = hasChoiceCross(ti) || hasChoiceCross(ti.parentElement) || qGradeInfo.isZeroMark;
+                if ((isCrossed || qGradeInfo.isZeroMark) && val) {
+                    const norm = normalizeChoice(val);
+                    if (!allWrongList.some(item => item.norm === norm || unscriptDigits(item.norm) === unscriptDigits(norm))) {
+                        allWrongList.push({ norm, text: val, count: 1 });
+                    }
+                }
+            });
+            liveSelectInputs.forEach(sel => {
+                const opt = (sel.selectedIndex >= 0 && sel.options) ? sel.options[sel.selectedIndex] : null;
+                const optText = (opt && opt.value && !opt.text.toLowerCase().includes('choose')) ? (opt.text || opt.innerText).trim() : '';
+                const isCrossed = hasChoiceCross(sel) || hasChoiceCross(sel.parentElement) || qGradeInfo.isZeroMark;
+                if ((isCrossed || qGradeInfo.isZeroMark) && optText) {
+                    const norm = normalizeChoice(optText);
+                    if (!allWrongList.some(item => item.norm === norm || unscriptDigits(item.norm) === unscriptDigits(norm))) {
+                        allWrongList.push({ norm, text: optText, count: 1 });
+                    }
+                }
+            });
+
+            // Filter candidates: exclude any candidate whose answer was confirmed WRONG
+            const validCandidates = candidates.filter(cand => {
+                const ansText = cand.ansRaw || cand.answer || '';
+                const ansNorm = cand.ansNorm || normalizeChoice(ansText);
+                if (!ansNorm) return false;
+                const isConfirmedWrong = allWrongList.some(w => {
+                    const wNorm = normalizeChoice(w.norm || w.text || w);
+                    return wNorm === ansNorm || unscriptDigits(wNorm) === unscriptDigits(ansNorm);
+                });
+                return !isConfirmedWrong;
             });
 
             // Contradiction Guard: A multiple-choice question cannot have 100% of choices wrong!
@@ -5266,8 +5328,8 @@
             // Handle Short Answer / Text inputs (both standard and inline cloze inputs)
             if (!foundMatchForQuestion) {
                 const textInputs = que.querySelectorAll('input[type="text"], input.form-control, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
-                if (textInputs.length > 0 && candidates.length > 0) {
-                    const bestCand = candidates[0];
+                if (textInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()) {
+                    const bestCand = validCandidates[0];
                     const bestAnswer = bestCand.ansRaw || bestCand.answer || '';
                     const isAmauoed = Boolean((bestCand.source || '').toLowerCase().includes('amauoed') || (Array.isArray(bestCand.sources) && bestCand.sources.some(s => s.toLowerCase().includes('amauoed'))));
                     const courseInfo = detectCourseInfo();
@@ -5370,8 +5432,8 @@
             // Handle Dropdown / Select elements (matching questions table, cloze / gapselect dropdowns)
             if (!foundMatchForQuestion) {
                 const selectInputs = que.querySelectorAll('select');
-                if (selectInputs.length > 0 && candidates.length > 0) {
-                    const bestCand = candidates[0];
+                if (selectInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()) {
+                    const bestCand = validCandidates[0];
                     const bestAnswer = bestCand.ansRaw || bestCand.answer || '';
                     const isAmauoed = Boolean((bestCand.source || '').toLowerCase().includes('amauoed') || (Array.isArray(bestCand.sources) && bestCand.sources.some(s => s.toLowerCase().includes('amauoed'))));
                     const courseInfo = detectCourseInfo();
@@ -6349,6 +6411,26 @@
             inp.replaceWith(document.createTextNode(` ${blankLabel} `));
         });
 
+        // Convert select / dropdown elements (e.g. gapselect inline dropdowns) into readable options
+        let selectCount = 0;
+        clone.querySelectorAll('select').forEach(sel => {
+            selectCount++;
+            const selectedOpt = (sel.selectedIndex >= 0 && sel.options) ? sel.options[sel.selectedIndex] : null;
+            const selectedVal = (selectedOpt && selectedOpt.value && selectedOpt.value !== '0' && !selectedOpt.text.toLowerCase().includes('choose')) ? selectedOpt.text.trim() : '';
+            const options = Array.from(sel.querySelectorAll('option'))
+                .map(o => (o.innerText || o.textContent || '').trim())
+                .filter(o => o && !o.toLowerCase().includes('choose'));
+            let selLabel = '';
+            if (selectedVal) {
+                selLabel = `[Dropdown ${selectCount}: ${selectedVal}]`;
+            } else if (options.length > 0) {
+                selLabel = `[Dropdown ${selectCount} (${options.join(' | ')})]`;
+            } else {
+                selLabel = `[Dropdown ${selectCount}]`;
+            }
+            sel.replaceWith(document.createTextNode(` ${selLabel} `));
+        });
+
         // Convert tables (Truth Tables, Logic Mappings) to markdown rows
         clone.querySelectorAll('table').forEach(table => {
             const rows = [];
@@ -6402,6 +6484,136 @@
             await copyToClipboard(imgUrl);
             return { success: false, fallbackUrl: imgUrl };
         }
+    }
+
+    function mapQuestionTypeCategory(rawType) {
+        if (!rawType) return 'unknown';
+        const t = rawType.toLowerCase();
+        if (t === 'multichoice' || t === 'multichoiceset') return 'multichoice';
+        if (t === 'truefalse') return 'truefalse';
+        if (t === 'shortanswer' || t === 'numerical' || t === 'calculated' || t === 'calculatedsimple' || t === 'calculatedmulti') return 'shortanswer';
+        if (t === 'gapselect' || t === 'select' || t === 'cloze_select') return 'gapselect';
+        if (t === 'match' || t === 'matching') return 'match';
+        if (t.startsWith('dd') || t.includes('drag') || t.includes('drop')) return 'dragdrop';
+        if (t === 'essay') return 'essay';
+        if (t === 'multianswer') return 'gapselect';
+        return 'unknown';
+    }
+
+    function identifyQuestionType(que) {
+        if (!que) return 'unknown';
+
+        // 1. Inspect Moodle's class on .que container
+        const classList = Array.from(que.classList || []);
+        for (const cls of classList) {
+            const lower = cls.toLowerCase();
+            if (lower.startsWith('qtype_')) {
+                const sub = lower.replace('qtype_', '');
+                return mapQuestionTypeCategory(sub);
+            }
+            if (['multichoice', 'truefalse', 'shortanswer', 'gapselect', 'match', 'ddwtos', 'ddimageortext', 'ddmarker', 'essay', 'numerical', 'multianswer', 'calculated'].includes(lower)) {
+                return mapQuestionTypeCategory(lower);
+            }
+        }
+
+        // 2. DOM signature checks
+        if (que.querySelector('.draghome, .drags, .drop, .dropzone, span.droptarget, .droppable')) {
+            return 'dragdrop';
+        }
+
+        const selects = que.querySelectorAll('select');
+        if (selects.length > 0) {
+            if (que.querySelector('.answer table select, td.control select')) {
+                return 'match';
+            }
+            return 'gapselect';
+        }
+
+        if (que.querySelector('textarea, [contenteditable="true"], [data-fieldtype="editor"]')) {
+            return 'essay';
+        }
+
+        const radios = que.querySelectorAll('.answer input[type="radio"]');
+        if (radios.length > 0) {
+            if (radios.length === 2) {
+                const labels = Array.from(que.querySelectorAll('.answer label, .answer div.r0, .answer div.r1')).map(l => (l.innerText || '').toLowerCase());
+                if (labels.some(l => l.includes('true')) && labels.some(l => l.includes('false'))) {
+                    return 'truefalse';
+                }
+            }
+            return 'multichoice';
+        }
+
+        if (que.querySelectorAll('.answer input[type="checkbox"]').length > 0) {
+            return 'multichoice';
+        }
+
+        if (que.querySelector('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"]')) {
+            return 'shortanswer';
+        }
+
+        return 'unknown';
+    }
+
+    function recordUnknownQuestionType(que, qData = null) {
+        try {
+            if (!que) return;
+            const raw = localStorage.getItem('amaes_unknown_question_types');
+            const list = raw ? JSON.parse(raw) : [];
+
+            const classList = Array.from(que.classList || []).filter(c => !c.startsWith('amaes') && c !== 'clearfix');
+            const inputs = Array.from(que.querySelectorAll('input, select, textarea, button, [contenteditable], .drop, .draghome')).map(el => {
+                let tag = el.tagName.toLowerCase();
+                if (el.type) tag += `[type=${el.type}]`;
+                if (el.className) tag += `.${el.className.split(/\s+/).filter(c => c && !c.startsWith('amaes')).join('.')}`;
+                return tag;
+            });
+            const signature = `${classList.sort().join(' ')} | ${inputs.sort().join(', ')}`;
+
+            if (list.some(item => item.signature === signature)) {
+                return;
+            }
+
+            const qSnippet = (que.querySelector('.qtext, .formulation') ? que.querySelector('.qtext, .formulation').innerText.slice(0, 160) : (qData && qData.qText ? qData.qText.slice(0, 160) : '')).trim();
+            const formulationHtml = que.querySelector('.formulation, .content') ? que.querySelector('.formulation, .content').innerHTML.slice(0, 600) : '';
+
+            const entry = {
+                id: `unk_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                timestamp: new Date().toISOString(),
+                url: (typeof window !== 'undefined' && window.location) ? window.location.href.split('?')[0] : '',
+                classes: classList,
+                signature: signature,
+                inputCount: inputs.length,
+                inputsSummary: inputs.slice(0, 10),
+                snippet: qSnippet,
+                htmlSample: formulationHtml
+            };
+
+            list.push(entry);
+            if (list.length > 25) list.splice(0, list.length - 25);
+            localStorage.setItem('amaes_unknown_question_types', JSON.stringify(list));
+            logDebug(`Recorded unknown question type signature: ${signature}`);
+        } catch (e) {
+            logDebug('Failed to record unknown question type:', e && e.message);
+        }
+    }
+
+    function getUnknownQuestionTypes() {
+        try {
+            const raw = localStorage.getItem('amaes_unknown_question_types');
+            return raw ? JSON.parse(raw) : [];
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function clearUnknownQuestionTypes() {
+        localStorage.removeItem('amaes_unknown_question_types');
+    }
+
+    function exportUnknownQuestionTypesJson() {
+        const types = getUnknownQuestionTypes();
+        return JSON.stringify(types, null, 2);
     }
 
     // Extract Question & Choices cleanly from a Moodle .que element
@@ -6572,10 +6784,27 @@
             /select (?:one or more choices?|one or more|all that apply)/i.test(qText)
         );
 
+        const questionType = identifyQuestionType(que);
+        const gapSelects = Array.from(que.querySelectorAll('.qtext select, .formulation select'));
+        const isGapSelect = (questionType === 'gapselect' || (gapSelects.length > 0 && choices.length === 0));
+
+        if (questionType === 'unknown') {
+            recordUnknownQuestionType(que, { qNum, qText, questionType });
+        }
+
+        const gapSelectOptions = (isGapSelect || gapSelects.length > 0) ? gapSelects.map((sel, idx) => ({
+            index: idx + 1,
+            options: Array.from(sel.querySelectorAll('option')).map(o => (o.innerText || o.textContent || '').trim()).filter(o => o && !o.toLowerCase().includes('choose')),
+            selectElem: sel
+        })) : [];
+
         return {
             qNum,
             qText,
             choices,
+            questionType,
+            isGapSelect,
+            gapSelectOptions,
             isMultiChoice,
             isShortAnswer,
             isEssay,
@@ -6782,6 +7011,19 @@
                 } else {
                     output += `\n\nInstructions: Answer ONLY with the correct option letter (a, b, c, or d) and the exact choice text. Do NOT pick any confirmed wrong choices. Do NOT give explanations.`;
                 }
+            }
+        } else if (data.isGapSelect) {
+            output += `[Dropdown Selection / Cloze Question]\n`;
+            if (data.gapSelectOptions && data.gapSelectOptions.length > 0) {
+                data.gapSelectOptions.forEach(g => {
+                    output += `Dropdown ${g.index} Options: ${g.options.join(' | ')}\n`;
+                });
+            }
+            if (detectedAnswer && copyIncludeConfidence) {
+                output += `\n[DETECTED ANSWER IN DATABASE]:\n- Suggested: ${detectedAnswer.text} (${detectedAnswer.label} • ${detectedAnswer.source})\n`;
+            }
+            if (withHint) {
+                output += `\nInstructions: Select the exact matching dropdown option for the blank(s). Reply ONLY with the option text. No explanation.`;
             }
         } else if (data.matchPairs && data.matchPairs.length > 0) {
             output += `Matching items:\n`;
@@ -7288,6 +7530,32 @@
             lines.push(`[Course: ${courseCode}]`);
         }
         lines.push(`Question: ${qData.qText || ''}`);
+
+        // Handle Gapselect / Inline Dropdowns
+        if (qData.isGapSelect || (que && que.querySelectorAll('select').length > 0 && (!qData.choices || qData.choices.length === 0))) {
+            const selects = que ? Array.from(que.querySelectorAll('select')) : [];
+            lines.push(`[Dropdown Pick / Fill Blank]`);
+            if (selects.length > 0) {
+                selects.forEach((sel, idx) => {
+                    const options = Array.from(sel.querySelectorAll('option'))
+                        .map(o => (o.innerText || o.textContent || '').trim())
+                        .filter(o => o && !o.toLowerCase().includes('choose'));
+                    if (options.length > 0) {
+                        lines.push(`Dropdown ${idx + 1} options: ${options.join(', ')}`);
+                    }
+                });
+            } else if (qData.gapSelectOptions && qData.gapSelectOptions.length > 0) {
+                qData.gapSelectOptions.forEach(g => {
+                    lines.push(`Dropdown ${g.index} options: ${g.options.join(', ')}`);
+                });
+            }
+            if (selects.length <= 1) {
+                lines.push(`Reply with ONLY the exact option text that completes the statement. No explanation.`);
+            } else {
+                lines.push(`Reply with the exact option text for each dropdown (e.g. "Dropdown 1: OptionText, Dropdown 2: OptionText"). No explanation.`);
+            }
+            return lines.join('\n');
+        }
 
         // Handle Short Answer / Fill-in-the-Blank text inputs
         if (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0)) {
@@ -7982,7 +8250,7 @@
         const cachedAns = getCachedAiAnswer(qData);
         if (cachedAns && cachedAns.choiceText) {
             const textInput = que.querySelector('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"], textarea');
-            if (textInput && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0))) {
+            if (textInput && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0)) && !qData.isGapSelect) {
                 textInput.value = cachedAns.choiceText;
                 applyAiTextHighlight(que, textInput, cachedAns.choiceText);
                 setLog(`[AI Cache] Reusing previously solved answer for Question #${qData ? qData.qNum : ''} (0 API requests)`, "var(--accent-purple)");
@@ -7991,6 +8259,37 @@
                     await onSuccess({ choiceText: cachedAns.choiceText, input: textInput });
                 }
                 return;
+            }
+
+            const selectInputs = Array.from(que.querySelectorAll('select'));
+            if (selectInputs.length > 0 && (!qData.choices || qData.choices.length === 0)) {
+                let reselected = 0;
+                selectInputs.forEach((sel, sIdx) => {
+                    const options = Array.from(sel.options);
+                    const matchOpt = options.find(opt => {
+                        if (!opt.value || opt.value === '0' || opt.text.toLowerCase().includes('choose')) return false;
+                        const optNorm = normalizeText(opt.text);
+                        const targetNorm = normalizeText(cachedAns.choiceText);
+                        return optNorm === targetNorm || (targetNorm.length > 2 && optNorm.includes(targetNorm)) || (optNorm.length > 2 && targetNorm.includes(optNorm));
+                    });
+                    if (matchOpt) {
+                        sel.value = matchOpt.value;
+                        sel.dispatchEvent(new Event('input', { bubbles: true }));
+                        sel.dispatchEvent(new Event('change', { bubbles: true }));
+                        sel.dispatchEvent(new Event('blur', { bubbles: true }));
+                        sel.style.outline = '2px solid #a855f7';
+                        sel.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+                        reselected++;
+                    }
+                });
+                if (reselected > 0) {
+                    setLog(`[AI Cache] Reusing previously solved dropdown option for Question #${qData ? qData.qNum : ''} (0 API requests)`, "var(--accent-purple)");
+                    showToast(`Reused cached AI dropdown choice for #${qData ? qData.qNum : ''}.`, 2000);
+                    if (typeof onSuccess === 'function') {
+                        await onSuccess({ choiceText: cachedAns.choiceText, selects: selectInputs });
+                    }
+                    return;
+                }
             }
             const matched = matchAiAnswerToChoice(cachedAns.choiceText, que, qData);
             if (matched && matched.row && !isChoiceRowEliminated(matched.row)) {
@@ -8196,6 +8495,63 @@
                     showToast(`Gemini suggested: "${cleaned}" for #${qData ? qData.qNum : ''}.`, 3000);
                     if (typeof onSuccess === 'function') {
                         await onSuccess({ choiceText: cleaned, input: textInput });
+                    }
+                    return;
+                }
+            }
+
+            // Check for Dropdown / Select elements (gapselect / matching)
+            const selectInputs = Array.from(que.querySelectorAll('select'));
+            if (selectInputs.length > 0 && (!qData.choices || qData.choices.length === 0)) {
+                const cleaned = answerText
+                    .replace(/^Answer:\s*/i, '')
+                    .replace(/^The correct answer is:\s*/i, '')
+                    .replace(/^[a-e][.)]\s*/i, '')
+                    .replace(/^["']|["']$/g, '')
+                    .trim();
+                let selectedCount = 0;
+                selectInputs.forEach((sel, sIdx) => {
+                    const options = Array.from(sel.options);
+                    let targetText = cleaned;
+                    if (selectInputs.length > 1) {
+                        const lines = cleaned.split(/[\n,;]+/).map(s => s.trim());
+                        for (const line of lines) {
+                            const matchPrefix = line.match(/(?:dropdown|blank)\s*(\d+)[:\-\s]+(.*)/i);
+                            if (matchPrefix && parseInt(matchPrefix[1], 10) === sIdx + 1) {
+                                targetText = matchPrefix[2].trim();
+                                break;
+                            }
+                        }
+                        if (!targetText && lines[sIdx]) {
+                            targetText = lines[sIdx].replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
+                        }
+                    }
+
+                    const matchOpt = options.find(opt => {
+                        if (!opt.value || opt.value === '0' || opt.text.toLowerCase().includes('choose')) return false;
+                        const optNorm = normalizeText(opt.text);
+                        const targetNorm = normalizeText(targetText);
+                        return optNorm === targetNorm || (targetNorm.length > 2 && optNorm.includes(targetNorm)) || (optNorm.length > 2 && targetNorm.includes(optNorm));
+                    });
+
+                    if (matchOpt) {
+                        sel.value = matchOpt.value;
+                        sel.dispatchEvent(new Event('input', { bubbles: true }));
+                        sel.dispatchEvent(new Event('change', { bubbles: true }));
+                        sel.dispatchEvent(new Event('blur', { bubbles: true }));
+                        selectedCount++;
+                        sel.style.outline = '2px solid #a855f7';
+                        sel.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+                    }
+                });
+
+                if (selectedCount > 0) {
+                    saveAiAnswerToCache(qData, { choiceText: cleaned });
+                    recordAttemptAnswerEvidence(que, cleaned, 'ai_inference');
+                    setLog(`[AI Suggestion] Gemini selected <b>${selectedCount}</b> dropdown option(s) for #${qData ? qData.qNum : ''}.`, "var(--accent-purple)");
+                    showToast(`Gemini selected dropdown option for #${qData ? qData.qNum : ''}.`, 3000);
+                    if (typeof onSuccess === 'function') {
+                        await onSuccess({ choiceText: cleaned, selects: selectInputs });
                     }
                     return;
                 }
@@ -11383,18 +11739,34 @@
                     addLine(`[${item.time}] ${item.text}`, 'var(--text-secondary)');
                 });
             }
+        } else if (c === 'unknown' || c === 'unknowns') {
+            const list = getUnknownQuestionTypes();
+            if (list.length === 0) {
+                addLine('No unknown question types recorded in storage.', 'var(--text-muted)');
+            } else {
+                addLine(`Recorded Unknown Question Types (${list.length} total):`, 'var(--accent-purple)');
+                list.forEach((item, i) => {
+                    addLine(`[${i + 1}] ${item.classes.join(', ') || 'No classes'} | Signature: ${item.signature}`, 'var(--text-secondary)');
+                    if (item.snippet) addLine(`    "${item.snippet}"`, 'var(--text-muted)');
+                });
+                addLine(`Type 'clearunknowns' to reset recorded unknown types.`, 'var(--text-muted)');
+            }
+        } else if (c === 'clearunknowns') {
+            clearUnknownQuestionTypes();
+            addLine('Cleared unknown question types store.', 'var(--accent-green)');
         } else if (c === 'clear') {
             out.innerHTML = '';
             addLine('Terminal buffer cleared.', 'var(--text-muted)');
         } else if (c === 'help') {
             addLine('Admin Command Suite:', 'var(--accent-purple)');
-            addLine('• status - System health, active course context & relay status', 'var(--text-secondary)');
-            addLine('• ping   - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
-            addLine('• users  - Shows privacy status (active-user telemetry disabled)', 'var(--text-secondary)');
-            addLine('• cache  - Question bank statistics and stored course codes', 'var(--text-secondary)');
-            addLine('• logs   - Dumps recent audit events directly in console', 'var(--text-secondary)');
-            addLine('• clear  - Clears terminal output screen buffer', 'var(--text-secondary)');
-            addLine('• help   - Displays this command reference list', 'var(--text-secondary)');
+            addLine('• status  - System health, active course context & relay status', 'var(--text-secondary)');
+            addLine('• ping    - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
+            addLine('• users   - Shows privacy status (active-user telemetry disabled)', 'var(--text-secondary)');
+            addLine('• cache   - Question bank statistics and stored course codes', 'var(--text-secondary)');
+            addLine('• logs    - Dumps recent audit events directly in console', 'var(--text-secondary)');
+            addLine('• unknown - Lists all recorded unknown question type signatures', 'var(--text-secondary)');
+            addLine('• clear   - Clears terminal output screen buffer', 'var(--text-secondary)');
+            addLine('• help    - Displays this command reference list', 'var(--text-secondary)');
         } else {
             addLine(`Unknown command: '${cmd}'. Type 'help' for available commands.`, 'var(--accent-amber)');
         }
@@ -14025,8 +14397,8 @@
 
 
         // If on quiz attempt page, the unified runAutoQuizSolver handles highlighting, auto-picking & auto-next.
-        // On review page or other pages, highlight visually without auto-select.
-        if (autoHighlightQuiz && isQuiz && cachedQuestions && !checkIsQuizAttemptPage()) {
+        // Never highlight over graded review pages.
+        if (autoHighlightQuiz && isQuiz && cachedQuestions && !checkIsQuizAttemptPage() && !checkIsReviewPage()) {
             setTimeout(() => {
                 const res = highlightQuizAnswers(cachedQuestions, false);
                 if (res.matched > 0) {
@@ -14377,6 +14749,7 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
                 const screenSize = (typeof window !== 'undefined' && window.screen) ? `${window.screen.width}x${window.screen.height}` : 'Unknown';
                 const currentUrl = (typeof window !== 'undefined' && window.location) ? window.location.href : 'Unknown';
                 const cachedCount = (typeof getCachedAnswers === 'function' && subCode) ? (getCachedAnswers(subCode) || []).length : 0;
+                const unknownTypes = typeof getUnknownQuestionTypes === 'function' ? getUnknownQuestionTypes() : [];
 
                 const diagnosticHeader = [
                     `=== AMAES MOODLE TOOLKIT DIAGNOSTIC AUDIT LOG ===`,
@@ -14390,6 +14763,12 @@ setupPersistentAccordion('mod-marker-header', 'mod-marker-body', 'mod-marker-arr
                     `Active Mode: ${autoQuizMode ? 'Auto-Quiz' : 'Passive'} (Personality: ${quizPersonality})`,
                     `Cloud Sync: ${localStorage.getItem('amaes_auto_cloud_sync') !== 'false'}`,
                     `Cached DB Questions: ${cachedCount}`,
+                    `Recorded Unknown Question Types: ${unknownTypes.length}`,
+                    ...(unknownTypes.length > 0 ? [
+                        ``,
+                        `--- RECORDED UNKNOWN QUESTION TYPES JSON ---`,
+                        JSON.stringify(unknownTypes, null, 2)
+                    ] : []),
                     ``,
                     `--- ACTIVITY LOG TIMELINE ---`
                 ].join('\n');
