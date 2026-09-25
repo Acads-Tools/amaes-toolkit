@@ -4480,6 +4480,33 @@ test("Gapselect / Dropdown Pick Support, Unknown Question Type JSON Store, and R
     assert.ok(script.includes("c === 'unknown' || c === 'unknowns'"), "Developer console must support 'unknown' command");
 });
 
+// --------------------------------------------------
+// 103. Question Card Type Badges & Database Tab Unknown Telemetry Widget
+// --------------------------------------------------
+test("Question Card Type Badges & Database Tab Unknown Telemetry Widget: renders visible question type badge on card toolbar, and interactive telemetry accordion in Database tab with 1-click JSON copy and clear", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Question card type pill
+    assert.ok(script.includes("amaes-que-type-pill"), "Question toolbar must render amaes-que-type-pill");
+    assert.ok(script.includes("Dropdown Pick"), "Type pill must map gapselect to 'Dropdown Pick'");
+    assert.ok(script.includes("Short Answer"), "Type pill must map shortanswer to 'Short Answer'");
+    assert.ok(script.includes("Multiple Choice"), "Type pill must map multichoice to 'Multiple Choice'");
+    assert.ok(script.includes("True / False"), "Type pill must map truefalse to 'True / False'");
+    assert.ok(script.includes("⚠️ Unknown Type (Logged)"), "Type pill must map unknown to '⚠️ Unknown Type (Logged)'");
+
+    // 2. Database Tab Accordion & Actions
+    assert.ok(script.includes("id=\"amaes-unknown-types-accordion\""), "Database tab must include amaes-unknown-types-accordion");
+    assert.ok(script.includes("id=\"amaes-unknown-count-badge\""), "Database tab must include amaes-unknown-count-badge");
+    assert.ok(script.includes("id=\"amaes-unknown-types-list\""), "Database tab must include amaes-unknown-types-list");
+    assert.ok(script.includes("id=\"btn-copy-unknown-json\""), "Database tab must include btn-copy-unknown-json");
+    assert.ok(script.includes("id=\"btn-clear-unknown-json\""), "Database tab must include btn-clear-unknown-json");
+
+    // 3. Event-driven telemetry updates
+    assert.ok(script.includes("amaes-unknown-question-recorded"), "Must dispatch and listen to amaes-unknown-question-recorded custom event");
+    assert.ok(script.includes("function updateUnknownTypesUI()"), "Must define updateUnknownTypesUI to populate telemetry accordion");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

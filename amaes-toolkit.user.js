@@ -1505,6 +1505,8 @@
         globe: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
         bell: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`,
         volume: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`,
+        trash: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>`,
+        terminal: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`,
     };
 
     // Web Audio API Procedural Sound Engine (Zero external dependencies)
@@ -6593,6 +6595,11 @@
             if (list.length > 25) list.splice(0, list.length - 25);
             localStorage.setItem('amaes_unknown_question_types', JSON.stringify(list));
             logDebug(`Recorded unknown question type signature: ${signature}`);
+            if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+                try {
+                    window.dispatchEvent(new CustomEvent('amaes-unknown-question-recorded', { detail: entry }));
+                } catch (_) {}
+            }
         } catch (e) {
             logDebug('Failed to record unknown question type:', e && e.message);
         }
@@ -7275,7 +7282,7 @@
             toolbar.style.cssText = `
                 display: flex;
                 align-items: center;
-                justify-content: flex-end;
+                justify-content: space-between;
                 width: 100%;
                 align-self: stretch;
                 gap: 6px;
@@ -7285,6 +7292,76 @@
                 font-size: 11px;
                 box-sizing: border-box;
             `;
+
+            const qType = identifyQuestionType(que);
+            const typePill = document.createElement('span');
+            typePill.className = 'amaes-que-type-pill';
+            let typeLabel = 'Question';
+            let typeBg = 'rgba(59, 130, 246, 0.12)';
+            let typeColor = '#60a5fa';
+            let typeBorder = 'rgba(59, 130, 246, 0.3)';
+
+            if (qType === 'gapselect') {
+                typeLabel = 'Dropdown Pick';
+                typeBg = 'rgba(168, 85, 247, 0.12)';
+                typeColor = '#c084fc';
+                typeBorder = 'rgba(168, 85, 247, 0.3)';
+            } else if (qType === 'shortanswer') {
+                typeLabel = 'Short Answer';
+                typeBg = 'rgba(6, 182, 212, 0.12)';
+                typeColor = '#22d3ee';
+                typeBorder = 'rgba(6, 182, 212, 0.3)';
+            } else if (qType === 'truefalse') {
+                typeLabel = 'True / False';
+                typeBg = 'rgba(16, 185, 129, 0.12)';
+                typeColor = '#34d399';
+                typeBorder = 'rgba(16, 185, 129, 0.3)';
+            } else if (qType === 'multichoice') {
+                typeLabel = 'Multiple Choice';
+                typeBg = 'rgba(59, 130, 246, 0.12)';
+                typeColor = '#60a5fa';
+                typeBorder = 'rgba(59, 130, 246, 0.3)';
+            } else if (qType === 'match') {
+                typeLabel = 'Matching';
+                typeBg = 'rgba(245, 158, 11, 0.12)';
+                typeColor = '#fbbf24';
+                typeBorder = 'rgba(245, 158, 11, 0.3)';
+            } else if (qType === 'dragdrop') {
+                typeLabel = 'Drag & Drop';
+                typeBg = 'rgba(249, 115, 22, 0.12)';
+                typeColor = '#fb923c';
+                typeBorder = 'rgba(249, 115, 22, 0.3)';
+            } else if (qType === 'essay') {
+                typeLabel = 'Essay';
+                typeBg = 'rgba(148, 163, 184, 0.12)';
+                typeColor = '#cbd5e1';
+                typeBorder = 'rgba(148, 163, 184, 0.3)';
+            } else if (qType === 'unknown') {
+                typeLabel = '⚠️ Unknown Type (Logged)';
+                typeBg = 'rgba(239, 68, 68, 0.15)';
+                typeColor = '#f87171';
+                typeBorder = 'rgba(239, 68, 68, 0.35)';
+            }
+
+            typePill.style.cssText = `
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                padding: 2px 7px;
+                font-size: 9px;
+                font-weight: 700;
+                border-radius: 4px;
+                background: ${typeBg};
+                color: ${typeColor};
+                border: 1px solid ${typeBorder};
+                margin-right: auto;
+                text-transform: uppercase;
+                letter-spacing: 0.3px;
+                user-select: none;
+            `;
+            typePill.textContent = typeLabel;
+            typePill.title = `Question Type: ${typeLabel} (Class: ${Array.from(que.classList || []).join(' ')})`;
+            toolbar.appendChild(typePill);
 
             const stopBtn = document.createElement('button');
             stopBtn.type = 'button';
@@ -12580,6 +12657,33 @@
                             <span style="font-weight: 600; color: var(--accent-green);">Share verified review answers anonymously</span>
                         </label>
                     </div>
+
+                    <!-- Unknown Question Telemetry Accordion -->
+                    <details id="amaes-unknown-types-accordion" style="border: 1px solid var(--border-subtle); border-radius: 6px; padding: 5px 7px; background: rgba(0,0,0,0.15);">
+                        <summary style="font-size: 10px; font-weight: 700; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;">
+                            <span style="display: flex; align-items: center; gap: 5px;">
+                                ${ICONS.terminal} <span>Unknown Question Telemetry</span>
+                                <span id="amaes-unknown-count-badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; font-size: 9px; padding: 1px 5px; border-radius: 4px; font-weight: 800;">0</span>
+                            </span>
+                            <span style="font-size: 9px; color: var(--text-muted);">Expand</span>
+                        </summary>
+                        <div id="amaes-unknown-types-content" style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px; font-size: 10px;">
+                            <div style="font-size: 9px; color: var(--text-muted); line-height: 1.35;">
+                                Unhandled or non-standard question DOM structures are auto-logged here without interrupting quizzes. Copy and report them to support new question formats!
+                            </div>
+                            <div id="amaes-unknown-types-list" style="max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; font-family: monospace; font-size: 9px; color: var(--text-muted);">
+                                <!-- Populated dynamically -->
+                            </div>
+                            <div style="display: flex; gap: 4px;">
+                                <button id="btn-copy-unknown-json" type="button" class="amaes-btn amaes-btn-outline" style="flex: 1; padding: 4px; font-size: 9.5px; font-weight: 600; justify-content: center; gap: 4px;" title="Copy recorded unknown question signatures to clipboard">
+                                    ${ICONS.copy} <span>Copy Telemetry JSON</span>
+                                </button>
+                                <button id="btn-clear-unknown-json" type="button" class="amaes-btn amaes-btn-outline" style="padding: 4px 8px; font-size: 9.5px; font-weight: 600; justify-content: center; color: var(--accent-red);" title="Clear recorded unknown question signatures">
+                                    ${ICONS.trash} <span>Clear</span>
+                                </button>
+                            </div>
+                        </div>
+                    </details>
                 </div>
 
                 <!-- TAB PANE 3: Course Automation Tools -->
@@ -14392,6 +14496,89 @@
         }
         if (chkAutoScrapeAmauoedQuiz) {
             chkAutoScrapeAmauoedQuiz.onchange = (e) => handleAutoScrapeToggle(e.target.checked);
+        }
+
+        // Unknown Question Telemetry UI & handlers
+        function updateUnknownTypesUI() {
+            const listEl = document.getElementById('amaes-unknown-types-list');
+            const countBadge = document.getElementById('amaes-unknown-count-badge');
+            const unkList = getUnknownQuestionTypes();
+            if (countBadge) {
+                countBadge.textContent = unkList.length;
+                if (unkList.length > 0) {
+                    countBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+                    countBadge.style.color = '#f87171';
+                } else {
+                    countBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+                    countBadge.style.color = '#fbbf24';
+                }
+            }
+            if (listEl) {
+                if (unkList.length === 0) {
+                    listEl.innerHTML = '<div style="color: var(--text-muted); font-style: italic; padding: 4px 0;">No unknown question types recorded. All questions recognized!</div>';
+                } else {
+                    listEl.innerHTML = unkList.map((item, idx) => `
+                        <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 4px 6px; margin-bottom: 2px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; color: var(--accent-amber); font-weight: 700;">
+                                <span>#${idx + 1} [${item.classes ? item.classes.join(' ') : 'que'}]</span>
+                                <span style="font-size: 8px; color: var(--text-muted);">${item.timestamp ? item.timestamp.split('T')[0] : ''}</span>
+                            </div>
+                            <div style="color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;" title="${escapeHtml(item.snippet || '')}">
+                                ${escapeHtml(item.snippet || 'No text snippet')}
+                            </div>
+                            <div style="font-size: 8px; color: var(--text-muted); margin-top: 2px;">
+                                Inputs: ${item.inputCount || 0} (${escapeHtml((item.inputsSummary || []).join(', '))})
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        updateUnknownTypesUI();
+
+        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+            window.addEventListener('amaes-unknown-question-recorded', () => {
+                updateUnknownTypesUI();
+            });
+        }
+
+        const unkAccordion = document.getElementById('amaes-unknown-types-accordion');
+        if (unkAccordion) {
+            unkAccordion.addEventListener('toggle', () => {
+                if (unkAccordion.open) {
+                    updateUnknownTypesUI();
+                }
+            });
+        }
+
+        const btnCopyUnknownJson = document.getElementById('btn-copy-unknown-json');
+        if (btnCopyUnknownJson) {
+            btnCopyUnknownJson.onclick = async () => {
+                const unkList = getUnknownQuestionTypes();
+                if (unkList.length === 0) {
+                    showToast("No unknown questions recorded yet.");
+                    return;
+                }
+                const json = exportUnknownQuestionTypesJson();
+                const success = await copyToClipboard(json);
+                if (success) {
+                    showToast(`Copied ${unkList.length} unknown question signatures to clipboard!`);
+                    setLog(`Copied <b>${unkList.length}</b> unknown question signatures to clipboard.`, "var(--accent-green)");
+                } else {
+                    showToast("Failed to copy unknown question types.");
+                }
+            };
+        }
+
+        const btnClearUnknownJson = document.getElementById('btn-clear-unknown-json');
+        if (btnClearUnknownJson) {
+            btnClearUnknownJson.onclick = () => {
+                clearUnknownQuestionTypes();
+                updateUnknownTypesUI();
+                showToast("Cleared unknown question telemetry store.");
+                setLog("Cleared unknown question types JSON store.", "var(--text-muted)");
+            };
         }
 
 
