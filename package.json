@@ -1,0 +1,25 @@
+{
+  "name": "amaes-toolkit",
+  "version": "1.8.0",
+  "description": "Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals.",
+  "main": "amaes-toolkit.user.js",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "node scripts/build.js && node test_toolkit.js",
+    "syntax": "node -c amaes-toolkit.user.js"
+  },
+  "keywords": [
+    "moodle",
+    "amaes",
+    "amauoed",
+    "userscript",
+    "tampermonkey",
+    "violentmonkey"
+  ],
+  "author": "Academic Contributor",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Acads-Tools/amaes-toolkit.git"
+  }
+}

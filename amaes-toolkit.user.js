@@ -313,6 +313,60 @@
     const TOOLKIT_LOGO_URL = "https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/assets/amaes-toolkit-logo.png";
 
     // ==========================================
+    // Unified Network Request Helper (Promise-based GM_xmlhttpRequest / fetch)
+    // ==========================================
+    function requestNetwork({ url, method = 'GET', headers = {}, data = null, responseType = 'text', timeout = 10000 }) {
+        return new Promise((resolve, reject) => {
+            const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
+                          (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
+            if (gmReq) {
+                try {
+                    gmReq({
+                        method,
+                        url,
+                        headers,
+                        data,
+                        responseType,
+                        timeout,
+                        onload: (res) => resolve(res),
+                        onerror: (err) => reject(new Error(err && err.statusText ? err.statusText : 'Network request failed')),
+                        ontimeout: () => reject(new Error('Network request timed out'))
+                    });
+                } catch (e) {
+                    reject(e);
+                }
+            } else {
+                const fetchOptions = {
+                    method,
+                    headers,
+                    body: (method !== 'GET' && method !== 'HEAD') ? data : undefined
+                };
+                const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+                let timer = null;
+                if (controller && timeout) {
+                    fetchOptions.signal = controller.signal;
+                    timer = setTimeout(() => controller.abort(), timeout);
+                }
+                fetch(url, fetchOptions)
+                    .then(async (res) => {
+                        if (timer) clearTimeout(timer);
+                        const text = (responseType === 'blob') ? await res.blob() : await res.text();
+                        resolve({
+                            status: res.status,
+                            statusText: res.statusText,
+                            responseText: typeof text === 'string' ? text : '',
+                            response: text
+                        });
+                    })
+                    .catch((err) => {
+                        if (timer) clearTimeout(timer);
+                        reject(err);
+                    });
+            }
+        });
+    }
+
+    // ==========================================
     // Update Checker & Release Notifier
     // ==========================================
 
