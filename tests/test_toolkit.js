@@ -4764,6 +4764,26 @@ test("Bug Report Privacy Guarantee & Dev Console 'logs -c': links SECURITY.md, g
     assert.ok(script.includes("Copied <b>${activityHistory.length}</b> activity log entries to clipboard."), "User-facing Copy Log button must not claim system diagnostics copied");
 });
 
+// --------------------------------------------------
+// 111. Toolkit Logo Website Navigation (New Tab)
+// --------------------------------------------------
+test("Toolkit Logo Website Navigation: clicking logo opens official website in a new tab", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Anchor link wrapping logo
+    assert.ok(script.includes('id="amaes-logo-link"'), "Logo must be wrapped in #amaes-logo-link anchor");
+    assert.ok(script.includes('href="${WEBSITE_URL}"') || script.includes('href="https://acads-tools.github.io/amaes-toolkit/"'), "Logo link must navigate to WEBSITE_URL");
+    assert.ok(script.includes('target="_blank"'), "Logo link must open in a new tab");
+    assert.ok(script.includes('rel="noopener noreferrer"'), "Logo link must specify rel='noopener noreferrer' for security");
+
+    // 2. Contains logo img
+    assert.ok(script.includes('id="amaes-logo-img"'), "Must contain #amaes-logo-img inside header");
+
+    // 3. Styling & Hover transition
+    assert.ok(script.includes("#amaes-logo-link:hover #amaes-logo-img"), "Must have hover effect for logo link");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

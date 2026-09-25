@@ -13677,7 +13677,9 @@
             <div id="amaes-header">
                 <div id="amaes-brand">
                     <div id="amaes-title-group" style="display: flex; align-items: center; gap: 4px;">
-                        <img id="amaes-logo-img" src="${TOOLKIT_LOGO_URL}" alt="" aria-hidden="true">
+                        <a id="amaes-logo-link" href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" title="Visit Official Website: ${WEBSITE_URL}" style="display: inline-flex; align-items: center; text-decoration: none;">
+                            <img id="amaes-logo-img" src="${TOOLKIT_LOGO_URL}" alt="AMAES Logo">
+                        </a>
                         <span id="amaes-title">AMAES</span>
                         <span id="amaes-version-pill" title="${SCRIPT_VERSION}" style="display: inline-flex; align-items: center; max-width: 100%; overflow: visible; white-space: nowrap; font-size: 9px; font-weight: 700; color: var(--accent-blue, #3b82f6); background: rgba(59,130,246,0.12); padding: 1px 4px; border-radius: 4px; border: 1px solid rgba(59,130,246,0.25); cursor: pointer; user-select: none;">${SCRIPT_VERSION}</span>
                     </div>
@@ -14864,12 +14866,29 @@
                     flex-shrink: 1;
                 }
 
+                #amaes-logo-link {
+                    display: inline-flex;
+                    align-items: center;
+                    text-decoration: none;
+                    cursor: pointer;
+                    flex-shrink: 0;
+                    border-radius: 4px;
+                    outline: none;
+                }
+
+                #amaes-logo-link:hover #amaes-logo-img,
+                #amaes-logo-link:focus-visible #amaes-logo-img {
+                    transform: scale(1.08);
+                    filter: drop-shadow(0 2px 6px rgba(16, 185, 129, 0.45));
+                }
+
                 #amaes-logo-img {
                     height: 24px;
                     width: auto;
                     display: block;
                     flex-shrink: 0;
                     filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25));
+                    transition: transform 0.15s ease, filter 0.15s ease;
                 }
 
                 #amaes-title-group {
