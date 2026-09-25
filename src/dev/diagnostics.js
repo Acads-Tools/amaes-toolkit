@@ -677,6 +677,63 @@
         }
     }
 
+    function recordSessionQuizCompleted() {
+        try {
+            sessionQuizzesSolved = (sessionQuizzesSolved || 0) + 1;
+            sessionStorage.setItem('amaes_session_quizzes_solved', String(sessionQuizzesSolved));
+            dispatchUsageTelemetry('quiz_completed');
+        } catch (_) {}
+    }
+
+    function dispatchUsageTelemetry(eventType = 'heartbeat') {
+        try {
+            const now = Date.now();
+            const lastPing = parseInt(localStorage.getItem('amaes_last_telemetry_ping') || '0', 10);
+            if (eventType === 'heartbeat' && now - lastPing < 6 * 60 * 60 * 1000) {
+                return;
+            }
+
+            const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
+            if (!relayUrl) return;
+
+            const payload = {
+                anon_id: getAnonymousInstallId(),
+                version: SCRIPT_VERSION.replace(/^v/i, ''),
+                event: eventType,
+                session_quizzes_solved: sessionQuizzesSolved || 0,
+                fast_mode_enabled: Boolean(fastQuizMode)
+            };
+
+            const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
+                          (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
+
+            if (gmReq) {
+                gmReq({
+                    method: 'POST',
+                    url: `${relayUrl}/telemetry`,
+                    headers: { 'Content-Type': 'application/json' },
+                    data: JSON.stringify(payload),
+                    timeout: 8000,
+                    onload: () => {
+                        if (eventType === 'heartbeat') {
+                            localStorage.setItem('amaes_last_telemetry_ping', String(now));
+                        }
+                    }
+                });
+            } else if (typeof fetch !== 'undefined') {
+                fetch(`${relayUrl}/telemetry`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(() => {
+                    if (eventType === 'heartbeat') {
+                        localStorage.setItem('amaes_last_telemetry_ping', String(now));
+                    }
+                }).catch(() => {});
+            }
+        } catch (_) {}
+    }
+
     function getUnknownQuestionTypes() {
         try {
             const raw = localStorage.getItem('amaes_unknown_question_types');

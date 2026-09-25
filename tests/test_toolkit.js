@@ -4784,6 +4784,51 @@ test("Toolkit Logo Website Navigation: clicking logo opens official website in a
     assert.ok(script.includes("#amaes-logo-link:hover #amaes-logo-img"), "Must have hover effect for logo link");
 });
 
+// --------------------------------------------------
+// 112. Fast Answer (Turbo) Mode
+// --------------------------------------------------
+test("Fast Answer (Turbo) Mode: accelerates next-page transitions, batch-fills visible verified choices, and parallelizes AI", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Settings card & HUD controls
+    assert.ok(script.includes('id="chk-fast-quiz-mode"'), "Panel must include Fast Answer Mode checkbox");
+    assert.ok(script.includes('⚡ Fast Answer Mode'), "Must display non-techy friendly label 'Fast Answer Mode'");
+    assert.ok(script.includes('id="btn-hud-fast-quiz"'), "HUD must include Fast Mode toggle button");
+    assert.ok(script.includes('Fast Co-Pilot ⚡'), "HUD status badge must indicate Fast Co-Pilot when active");
+
+    // 2. 1-Click Fill Verified Answers
+    assert.ok(script.includes('id="btn-fill-all-page"'), "Must provide 1-click 'Fill Verified Answers' button on multi-question pages");
+
+    // 3. Fast transitions timing & F shortcut
+    assert.ok(script.includes("effectiveDelay = fastQuizMode ? Math.min(delayMs, 200) : delayMs;"), "Must accelerate auto-advance delay in Fast Mode");
+    assert.ok(script.includes("key === 'F'"), "Must support 'F' hotkey to toggle Fast Answer Mode");
+});
+
+// --------------------------------------------------
+// 113. Privacy-Safe Session Telemetry Pipeline
+// --------------------------------------------------
+test("Privacy-Safe Session Telemetry: tracks session-only quiz count, dispatches anonymous UUID telemetry, and provides stats console command", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    const workerScript = fs.readFileSync('../database/relay/worker.js', 'utf8');
+
+    // 1. Session-only quiz count
+    assert.ok(script.includes("sessionStorage.getItem('amaes_session_quizzes_solved')"), "Must track quizzes solved within session only");
+    assert.ok(script.includes("session_quizzes_solved: sessionQuizzesSolved || 0"), "Telemetry payload must report session_quizzes_solved");
+
+    // 2. Anonymous UUID without PII
+    assert.ok(script.includes("getAnonymousInstallId"), "Must generate anonymous installation UUID");
+    assert.ok(script.includes("dispatchUsageTelemetry"), "Must define dispatchUsageTelemetry");
+
+    // 3. Cloudflare worker telemetry and stats routes
+    assert.ok(workerScript.includes('path === "/telemetry"'), "Relay worker must route /telemetry");
+    assert.ok(workerScript.includes('path === "/telemetry/stats"'), "Relay worker must route /telemetry/stats");
+
+    // 4. Developer Console stats integration
+    assert.ok(script.includes("c === 'stats' || c === 'telemetry'"), "Developer console must support 'stats' command");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

@@ -1,13 +1,45 @@
-        // --- MODULE 1: Autonomous Quiz Controls ---
         const btnMasterAutoQuiz = document.getElementById('btn-master-auto-quiz');
         const btnCopyCurrQ = document.getElementById('btn-copy-curr-q');
         const btnCopyAllQ = document.getElementById('btn-copy-all-q');
+        const btnFillAllPage = document.getElementById('btn-fill-all-page');
+        const chkFastQuizMode = document.getElementById('chk-fast-quiz-mode');
         const chkAutoPick = document.getElementById('chk-auto-pick');
         const chkAutoNextVerified = document.getElementById('chk-auto-next-verified');
         const chkAutoNext = document.getElementById('chk-auto-next');
         const chkAiPromptHint = document.getElementById('chk-ai-prompt-hint');
         const chkAutoHlQuiz = document.getElementById('chk-auto-hl-quiz');
         const chkCopyConfidence = document.getElementById('chk-copy-confidence');
+
+        if (chkFastQuizMode) {
+            chkFastQuizMode.onchange = () => {
+                fastQuizMode = chkFastQuizMode.checked;
+                localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
+                if (typeof syncFastQuizUI === 'function') syncFastQuizUI();
+                showToast(`Fast Answer Mode: ${fastQuizMode ? 'ON (Turbo)' : 'OFF'}`);
+                setLog(`Fast Answer (Turbo): <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)", fastQuizMode ? "Answers visible questions instantly & accelerates transitions" : "Paced mode");
+                if (fastQuizMode && checkIsQuizAttemptPage()) {
+                    runAutoQuizSolver(true);
+                }
+            };
+        }
+
+        if (btnFillAllPage) {
+            btnFillAllPage.onclick = () => {
+                if (!checkIsQuizAttemptPage()) {
+                    showToast("Open a quiz attempt to fill verified answers!");
+                    return;
+                }
+                const cached = getCachedAnswers(subCode);
+                if (!cached || cached.length === 0) {
+                    showToast("No verified answers found in database for this subject.");
+                    return;
+                }
+                const res = highlightQuizAnswers(cached, true, true);
+                showToast(`Filled ${res.matched || 0} verified answers!`, 2500);
+                setLog(`<b>1-Click Fill:</b> Selected <b>${res.matched || 0}</b> verified answers on page!`, "var(--accent-green)");
+                playToolkitSound('success');
+            };
+        }
 
         if (btnMasterAutoQuiz) {
             btnMasterAutoQuiz.onclick = () => {

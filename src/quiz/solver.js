@@ -407,17 +407,19 @@
         if (!isManualAnswer && !autoNextVerified && !allowAiAutoNext) return;
         if (!checkIsQuizAttemptPage()) return;
 
+        const effectiveDelay = fastQuizMode ? Math.min(delayMs, 200) : delayMs;
         const nextOnPage = findNextUnansweredOnCurrentPage(sourceQue);
         if (nextOnPage) {
             clearTimeout(autoNextTimer);
-            setLog("<b>Question Answered:</b> Moving to the next unanswered question in <b>0.8s</b>...", "var(--accent-blue)");
-            showToast("Answer recorded! Moving to the next question...", 1200);
+            const secText = (effectiveDelay / 1000).toFixed(1) + 's' + (fastQuizMode ? ' (Fast Mode)' : '');
+            setLog(`<b>Question Answered:</b> Moving to the next unanswered question in <b>${secText}</b>...`, fastQuizMode ? "var(--accent-amber)" : "var(--accent-blue)");
+            showToast("Answer recorded! Moving to next...", 1000);
             autoNextTimer = setTimeout(() => {
                 if (!autoQuizMode) return;
                 setActiveQuestion(nextOnPage, false);
                 nextOnPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 runAutoQuizSolver();
-            }, delayMs);
+            }, effectiveDelay);
             return;
         }
 
@@ -432,19 +434,25 @@
         clearTimeout(autoNextTimer);
 
         if (isFinish) {
-            setLog("<b>All Questions Answered!</b> Advancing to summary in <b>1.0s</b>...", "var(--accent-green)");
-            showToast("All questions answered! Advancing to summary in 1s...", 1500);
+            const finishDelay = fastQuizMode ? 200 : 1000;
+            setLog(`<b>All Questions Answered!</b> Advancing to summary in <b>${(finishDelay / 1000).toFixed(1)}s</b>...`, "var(--accent-green)");
+            showToast("All questions answered! Advancing to summary...", 1200);
             playToolkitSound('quest_done');
+            autoNextTimer = setTimeout(() => {
+                if (!autoQuizMode) return;
+                if (isManualAnswer && !autoNextQuiz) return;
+                clickQuizNextButton(nextBtn, true);
+            }, finishDelay);
         } else {
-            setLog("<b>Question Answered:</b> Advancing to next page in <b>0.8s</b>...", "var(--accent-blue)");
-            showToast("Answer selected! Advancing to next page...", 1200);
+            const pageDelay = effectiveDelay;
+            setLog(`<b>Question Answered:</b> Advancing to next page in <b>${(pageDelay / 1000).toFixed(1)}s${fastQuizMode ? ' (Fast Mode)' : ''}</b>...`, fastQuizMode ? "var(--accent-amber)" : "var(--accent-blue)");
+            showToast("Answer selected! Advancing to next page...", 1000);
+            autoNextTimer = setTimeout(() => {
+                if (!autoQuizMode) return;
+                if (isManualAnswer && !autoNextQuiz) return;
+                clickQuizNextButton(nextBtn, true);
+            }, pageDelay);
         }
-
-        autoNextTimer = setTimeout(() => {
-            if (!autoQuizMode) return;
-            if (isManualAnswer && !autoNextQuiz) return;
-            clickQuizNextButton(nextBtn, true);
-        }, delayMs);
     }
 
     // Bind event listeners to question inputs to trigger auto-next immediately when choices are selected
@@ -659,14 +667,15 @@
                             const isFinish = btnText.includes('finish') || btnText.includes('submit');
 
                             clearTimeout(autoNextTimer);
+                            const navDelay = fastQuizMode ? 200 : (isFinish ? 1200 : 1000);
                             if (isFinish) {
-                                if (autoSubmitQuiz) {
-                                    setLog(`<b>All Questions Answered!</b> Advancing to summary in 1.2s...`, "var(--accent-green)");
-                                    showToast("Finishing attempt...", 3000);
+                                if (autoSubmitQuiz || fastQuizMode) {
+                                    setLog(`<b>All Questions Answered!</b> Advancing to summary in ${(navDelay / 1000).toFixed(1)}s...`, "var(--accent-green)");
+                                    showToast("Finishing attempt...", navDelay + 1000);
                                     autoNextTimer = setTimeout(() => {
                                         if (!autoQuizMode) return;
                                         clickQuizNextButton(nextBtn);
-                                    }, 1200);
+                                    }, navDelay);
                                 } else {
                                     setLog("<b>Last Question Answered!</b> Paused for review before final submit.", "var(--accent-green)");
                                     showToast("Last question answered! Review before submitting.", 4000);
@@ -675,11 +684,11 @@
                                 return;
                             }
 
-                            setLog(`[Auto-Next] <b>Auto-Next:</b> Advancing to next question in <b>1.0s</b>...`, "var(--accent-blue)");
+                            setLog(`[Auto-Next] <b>Auto-Next:</b> Advancing to next question in <b>${(navDelay / 1000).toFixed(1)}s${fastQuizMode ? ' (Fast Mode)' : ''}</b>...`, fastQuizMode ? "var(--accent-amber)" : "var(--accent-blue)");
                             autoNextTimer = setTimeout(() => {
                                 if (!autoQuizMode) return;
                                 clickQuizNextButton(nextBtn);
-                            }, 1000);
+                            }, navDelay);
                         }
                     } else {
                         // Verified choices highlighted, but not all picked (e.g. auto-pick disabled)
@@ -855,6 +864,36 @@
                             }
                         }
                     });
+
+                    // In Fast Mode on multi-question pages: concurrently solve other visible unknown questions
+                    if (fastQuizMode && queContainers.length > 1 && unverifiedQuestions.length > 1) {
+                        const otherQue = unverifiedQuestions.slice(1, 3);
+                        otherQue.forEach(oQue => {
+                            if (oQue.querySelector('.amaes-ai-suggested-choice') || isQuestionAnswered(oQue)) return;
+                            const oQData = extractQuestionData(oQue);
+                            if (oQData && (oQData.questionType === 'multichoice' || oQData.questionType === 'truefalse')) {
+                                const oPrompt = buildGeminiCompactPrompt(oQData, courseCode, oQue);
+                                handleGeminiQuestionInference({
+                                    que: oQue,
+                                    qData: oQData,
+                                    promptText: oPrompt,
+                                    onSuccess: async (oMatched) => {
+                                        if (oMatched && oMatched.choiceText) {
+                                            recordAttemptAnswerEvidence(oQue, oMatched.choiceText, 'ai_inference');
+                                        }
+                                        oQue.querySelectorAll('.amaes-blockage-hud, .amaes-unanswered-hint').forEach(el => el.remove());
+                                        oQue.style.outline = '2px solid rgba(139, 92, 246, 0.7)';
+                                        oQue.style.borderRadius = '8px';
+                                        setQuestionAiTag(oQue, true);
+                                        if (aiAutoSelect && oMatched && oMatched.input) {
+                                            oMatched.input.checked = true;
+                                            oMatched.input.click();
+                                        }
+                                    }
+                                }).catch(() => {});
+                            }
+                        });
+                    }
 
                     // If AI successfully resolved and highlighted a choice, finish here without showing redundant blockage HUD!
                     if (firstBlockedQue.querySelector('.amaes-ai-suggested-choice')) {
@@ -1065,8 +1104,38 @@
         if (!sessionStorage.getItem('amaes_summary_ding_' + window.location.href)) {
             sessionStorage.setItem('amaes_summary_ding_' + window.location.href, 'true');
             playToolkitSound('quest_done');
+            if (typeof recordSessionQuizCompleted === 'function') {
+                recordSessionQuizCompleted();
+            }
         }
         logDebug("Quiz Summary reached. Student reviews at their own pace (Auto-submit disabled by design).");
+    }
+
+    function syncFastQuizUI() {
+        const chk = document.getElementById('chk-fast-quiz-mode');
+        if (chk) chk.checked = fastQuizMode;
+        const card = document.getElementById('amaes-fast-answer-card');
+        if (card) {
+            card.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255, 255, 255, 0.04)';
+            card.style.borderColor = fastQuizMode ? 'rgba(245, 158, 11, 0.35)' : 'var(--border-subtle)';
+        }
+        const pill = document.getElementById('amaes-fast-quiz-pill');
+        if (pill) {
+            pill.style.background = fastQuizMode ? '#f59e0b' : 'var(--border-subtle)';
+            pill.style.color = fastQuizMode ? '#000' : 'var(--text-muted)';
+        }
+        const hudFastBtn = document.getElementById('btn-hud-fast-quiz');
+        if (hudFastBtn) {
+            hudFastBtn.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255,255,255,0.08)';
+            hudFastBtn.style.color = fastQuizMode ? '#f59e0b' : '#94a3b8';
+            hudFastBtn.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(255,255,255,0.15)';
+            hudFastBtn.innerHTML = `⚡ ${fastQuizMode ? 'Turbo ON' : 'Turbo'}`;
+        }
+        const hudModeText = document.getElementById('hud-mode-text');
+        if (hudModeText && autoQuizMode && !isWaitingForUserAnswer) {
+            hudModeText.textContent = fastQuizMode ? 'Fast Co-Pilot ⚡' : 'Co-Pilot';
+            hudModeText.style.color = fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--accent-blue, #3b82f6)';
+        }
     }
 
     // Unified Synchronizer for UI states (Floating HUD + Panel Button)
@@ -1232,8 +1301,8 @@
             <div style="display: flex; align-items: center; gap: 6px;">
                 <span id="hud-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: ${!autoQuizMode ? '#64748b' : (isWaitingForUserAnswer ? '#f59e0b' : '#3b82f6')}; box-shadow: 0 0 8px ${!autoQuizMode ? 'transparent' : (isWaitingForUserAnswer ? '#f59e0b' : '#3b82f6')};"></span>
                 <span style="font-weight: 700;">Auto-Quiz:</span>
-                <span id="hud-mode-text" style="color: ${!autoQuizMode ? '#94a3b8' : (isWaitingForUserAnswer ? 'var(--accent-amber, #f59e0b)' : 'var(--accent-blue, #3b82f6)')}; font-weight: 700;">
-                    ${!autoQuizMode ? 'Paused' : (isWaitingForUserAnswer ? 'Waiting on Q' : 'Co-Pilot')}
+                <span id="hud-mode-text" style="color: ${!autoQuizMode ? '#94a3b8' : (isWaitingForUserAnswer ? 'var(--accent-amber, #f59e0b)' : (fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--accent-blue, #3b82f6)'))}; font-weight: 700;">
+                    ${!autoQuizMode ? 'Paused' : (isWaitingForUserAnswer ? 'Waiting on Q' : (fastQuizMode ? 'Fast Co-Pilot ⚡' : 'Co-Pilot'))}
                 </span>
             </div>
 
@@ -1258,6 +1327,11 @@
             <!-- Pause / Resume Button -->
             <button id="btn-hud-toggle-quiz" class="amaes-inline-btn" style="padding: 3px 10px; font-size: 10px; background: ${autoQuizMode ? 'rgba(239,68,68,0.25); color:#ef4444; border:1px solid #ef4444' : 'rgba(16,185,129,0.25); color:#10b981; border:1px solid #10b981'}; border-radius: 12px; cursor: pointer; font-weight: 600;">
                 ${autoQuizMode ? 'Pause' : 'Resume Auto-Quiz'}
+            </button>
+
+            <!-- Fast Mode HUD Toggle -->
+            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700;" title="Toggle Fast Answer (Turbo) Mode">
+                ⚡ ${fastQuizMode ? 'Turbo ON' : 'Turbo'}
             </button>
 
             <!-- Toggle Toolkit Panel -->
@@ -1286,9 +1360,23 @@
         document.body.appendChild(hud);
 
         const _el__btn_hud_toggle_quiz_ = document.getElementById('btn-hud-toggle-quiz');
-        if (_el__btn_hud_toggle_quiz_) _el__btn_hud_toggle_quiz_.onclick = () => {;
+        if (_el__btn_hud_toggle_quiz_) _el__btn_hud_toggle_quiz_.onclick = () => {
             toggleAutoQuizMode();
         };
+
+        const hudFastBtn = document.getElementById('btn-hud-fast-quiz');
+        if (hudFastBtn) {
+            hudFastBtn.onclick = () => {
+                fastQuizMode = !fastQuizMode;
+                localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
+                syncFastQuizUI();
+                showToast(`Fast Answer Mode: ${fastQuizMode ? 'ON (Turbo)' : 'OFF'}`);
+                setLog(`Fast Answer (Turbo): <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
+                if (fastQuizMode && checkIsQuizAttemptPage()) {
+                    runAutoQuizSolver(true);
+                }
+            };
+        }
 
         const hudPanelBtn = document.getElementById('btn-hud-expand-panel');
         if (hudPanelBtn) {
@@ -1691,6 +1779,20 @@
                     showToast("Shortcut: Next Page");
                     setLog("Keyboard shortcut triggered: <b>Next Page</b>", "var(--accent-blue)");
                     nextBtn.click();
+                }
+                return;
+            }
+
+            // Fast Answer Mode Toggle: 'F'
+            if (key === 'F') {
+                e.preventDefault();
+                fastQuizMode = !fastQuizMode;
+                localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
+                syncFastQuizUI();
+                showToast(`Fast Answer Mode: ${fastQuizMode ? 'ON (Turbo)' : 'OFF'}`);
+                setLog(`Fast Answer (Turbo): <b>${fastQuizMode ? 'ON' : 'OFF'}</b> via <b>F</b> key.`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
+                if (fastQuizMode && checkIsQuizAttemptPage()) {
+                    runAutoQuizSolver(true);
                 }
                 return;
             }

@@ -154,6 +154,10 @@ The toolkit offers two distinct operational modes depending on your preference:
 * **Autonomous Auto-Quiz Solver:** Selects verified answers and clicks "Next page" automatically.
   * **How to Enable:** In the **Quiz** tab, toggle **Auto-Quiz Mode: ON** (or press keyboard shortcut `P`).
   * **Safety Gate:** If a question has no confirmed answer, the solver pauses automatically, brings up the in-question toolbar, and sounds an intervention chime.
+* **⚡ Fast Answer (Turbo) Mode:**
+  * **What it does:** Designed for students with reliable internet connections who want swift answering. Reduces the page transition delay from ~1000ms down to **200ms**, and enables instant 1-click batch solving for multi-question pages.
+  * **Multi-Question Pages:** Adds a 1-click **"Fill Verified Answers"** button that selects all verified answers on the current page simultaneously in 0.1s. If unknown questions remain and AI is enabled, it resolves them concurrently in parallel.
+  * **How to Toggle:** Toggle **⚡ Fast Answer Mode** in the Quiz tab, click the **⚡ Turbo** button in the floating HUD, or press keyboard shortcut **`F`**.
 
 ### Activity Auto-Marker & Passable Grade Guard (≥ 80%)
 Located in the **Course Tools** tab under **Activity Auto-Marker**, this utility automates course completion tracking while strictly enforcing academic safety:
@@ -218,6 +222,7 @@ Shared AI fallback is enabled by default in the setup window. If Google temporar
 | `C` | 1-Click Copy Formatted Question for AI |
 | `V` | Paste AI Answer (Auto-Selects Matching Choice) |
 | `P` | Pause / Resume Autonomous Auto-Quiz Progression |
+| `F` | Toggle Fast Answer (Turbo) Mode |
 | `1` – `4` / `A` – `D` | Select Choice Option 1 through 4 |
 | `H` | Highlight Answers Immediately |
 | `?` / `K` | Open Quick Guide & Shortcuts Modal |

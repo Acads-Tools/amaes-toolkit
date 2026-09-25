@@ -1949,6 +1949,9 @@
         if (!sessionStorage.getItem(`amaes_review_ding_${attemptId}`)) {
             sessionStorage.setItem(`amaes_review_ding_${attemptId}`, '1');
             playToolkitSound('quest_done');
+            if (typeof recordSessionQuizCompleted === 'function') {
+                recordSessionQuizCompleted();
+            }
         }
 
         // Check for multi-page review pagination: expand to show all questions on one page if available

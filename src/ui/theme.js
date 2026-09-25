@@ -55,6 +55,7 @@
     let autoHighlightQuiz = localStorage.getItem('amaes_auto_highlight_quiz') !== 'false'; // default true
     let autoCopyQuizForAI = localStorage.getItem('amaes_auto_copy_ai') !== 'false'; // default true
     let autoQuizMode = localStorage.getItem('amaes_auto_quiz_mode') === 'true'; // default false (Master autonomous switch)
+    let fastQuizMode = localStorage.getItem('amaes_fast_quiz_mode') === 'true'; // default false (⚡ Fast Answer / Turbo Mode)
     let autoPickQuiz = localStorage.getItem('amaes_auto_pick_quiz') !== 'false'; // default true: auto-select verified answers
     let autoNextVerified = localStorage.getItem('amaes_auto_next_verified') !== 'false'; // default true: auto-advance when solver answers verified question
     let autoNextQuiz = localStorage.getItem('amaes_auto_next_quiz') === 'true'; // default false: manual answers do NOT auto-advance by default (safe review)
@@ -62,6 +63,24 @@
     const autoSubmitQuiz = false; // Permanently disabled by design: safe manual review before final submission
     let autoNextTimer = null;
     let pageLoadSolverTimer = null;
+
+    let sessionQuizzesSolved = parseInt(sessionStorage.getItem('amaes_session_quizzes_solved') || '0', 10);
+    if (isNaN(sessionQuizzesSolved)) sessionQuizzesSolved = 0;
+
+    function getAnonymousInstallId() {
+        let anonId = localStorage.getItem('amaes_anon_install_id');
+        if (!anonId || typeof anonId !== 'string' || anonId.length < 10) {
+            try {
+                anonId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+                    ? crypto.randomUUID()
+                    : 'anon-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 10);
+            } catch (_) {
+                anonId = 'anon-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 10);
+            }
+            localStorage.setItem('amaes_anon_install_id', anonId);
+        }
+        return anonId;
+    }
     let smartSkipQuiz = localStorage.getItem('amaes_smart_skip_quiz') !== 'false'; // default true: skip answered questions
     let autoCloudSync = localStorage.getItem('amaes_auto_cloud_sync') !== 'false'; // default true
     let autoScrapeAmauoed = localStorage.getItem('amaes_auto_scrape_amauoed') !== 'false'; // default true

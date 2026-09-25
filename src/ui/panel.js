@@ -154,11 +154,28 @@
                     </div>
                     ` : ''}
 
-                    <!-- Batch AI action: per-question cards provide targeted Copy/Paste actions (only visible when in a quiz question) -->
+                    <!-- Batch actions on multi-question pages -->
                     <div id="amaes-batch-copy-container" style="display: ${isQuiz && Boolean(document.querySelector('.que')) ? 'flex' : 'none'}; gap: 4px; margin-top: 2px;">
+                        <button id="btn-fill-all-page" class="amaes-btn" style="flex: 1; justify-content: center; padding: 5px 6px; cursor: pointer; font-size: 10px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: 700; border: none; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" title="1-Click: Automatically selects all verified answers for questions on this page">
+                            ${ICONS.zap} <span>Fill Verified Answers</span>
+                        </button>
                         <button id="btn-copy-all-q" class="amaes-btn amaes-btn-outline" style="flex: 1; justify-content: center; padding: 5px 4px; cursor: pointer; font-size: 10px;" title="Copy all questions on current page formatted for AI batch prompt">
                             ${ICONS.copy} <span>Copy All</span>
                         </button>
+                    </div>
+
+                    <!-- Fast Answer (Turbo) Setting - Friendly & Understandable for Non-Techy Users -->
+                    <div id="amaes-fast-answer-card" style="background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255, 255, 255, 0.04)'}; border: 1px solid ${fastQuizMode ? 'rgba(245, 158, 11, 0.35)' : 'var(--border-subtle)'}; border-radius: 6px; padding: 5px 8px; transition: all 0.2s ease;">
+                        <label style="display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; font-size: 10.5px; cursor: pointer;">
+                            <div style="display: flex; align-items: flex-start; gap: 6px;">
+                                <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
+                                <div>
+                                    <span style="font-weight: 700; color: ${fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--text-primary)'};">⚡ Fast Answer Mode</span>
+                                    <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Answers visible questions instantly & speeds up moving to the next page</div>
+                                </div>
+                            </div>
+                            <span id="amaes-fast-quiz-pill" style="font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 4px; background: ${fastQuizMode ? '#f59e0b' : 'var(--border-subtle)'}; color: ${fastQuizMode ? '#000' : 'var(--text-muted)'};">TURBO</span>
+                        </label>
                     </div>
 
                     <!-- Primary Core Settings (The 3-Step Pipeline) -->

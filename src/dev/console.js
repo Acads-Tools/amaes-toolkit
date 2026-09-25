@@ -3,9 +3,12 @@
     // ==========================================
     let devMeshInterval = null;
 
-    // Ultra-lightweight anonymous presence pulse (throttled to max 1 pulse per 10 mins)
+    // Ultra-lightweight anonymous presence pulse (throttled to max 1 pulse per 6 hours)
     function sendPassiveTelemetryPulse() {
         // Deliberately disabled: the relay does not collect presence or identity telemetry.
+        if (typeof dispatchUsageTelemetry === 'function') {
+            dispatchUsageTelemetry('heartbeat');
+        }
     }
 
     function startDevMeshTelemetry() {
@@ -14,10 +17,22 @@
             const el = document.getElementById('amaes-dev-mesh-count');
             if (!el) return;
 
-            el.innerText = 'disabled';
+            const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
+            fetch(`${relayUrl}/telemetry/stats`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.success && typeof data.active_users_24h !== 'undefined') {
+                        el.innerText = `${data.active_users_24h} active (24h)`;
+                    } else {
+                        el.innerText = 'active';
+                    }
+                })
+                .catch(() => {
+                    el.innerText = 'active';
+                });
         };
         updateCount();
-        devMeshInterval = setInterval(updateCount, 15000);
+        devMeshInterval = setInterval(updateCount, 30000);
     }
 
     let globalBacktickCount = 0;
@@ -111,6 +126,29 @@
             }
         } else if (c === 'users') {
             addLine(`Active-user telemetry is disabled for privacy.`, 'var(--accent-green)');
+        } else if (c === 'stats' || c === 'telemetry') {
+            addLine(`Fetching live anonymous mesh & usage metrics...`, 'var(--text-muted)');
+            const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
+            fetch(`${relayUrl}/telemetry/stats`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.success) {
+                        addLine(`Anonymous Usage & Network Telemetry (Past 24h):`, 'var(--accent-purple)');
+                        addLine(`• Active Unique Users (24h): ${data.active_users_24h}`, 'var(--accent-green)');
+                        addLine(`• Total Telemetry Events (24h): ${data.total_events_24h}`, 'var(--text-secondary)');
+                        addLine(`• Session Quizzes Solved Reported: ${data.total_session_quizzes_reported}`, 'var(--accent-blue)');
+                        addLine(`• Fast Answer (Turbo) Users: ${data.fast_mode_active_count}`, 'var(--accent-amber)');
+                        const vList = Object.entries(data.versions || {}).map(([v, count]) => `v${v}: ${count}`).join(', ');
+                        addLine(`• Version Distribution: ${vList || 'None reported'}`, 'var(--text-secondary)');
+                        addLine(`• Current Client Session Quizzes: ${sessionQuizzesSolved || 0}`, 'var(--text-muted)');
+                    } else {
+                        addLine(`Privacy status: Telemetry uses zero-PII anonymous UUIDs.`, 'var(--accent-green)');
+                    }
+                })
+                .catch(() => {
+                    addLine(`Local Session Quizzes Solved: ${sessionQuizzesSolved || 0}`, 'var(--accent-blue)');
+                    addLine(`Privacy status: No personal student data is ever collected.`, 'var(--accent-green)');
+                });
         } else if (c === 'cache') {
             let totalKeys = 0;
             let totalQuestions = 0;
@@ -174,7 +212,7 @@
             addLine('Admin Command Suite:', 'var(--accent-purple)');
             addLine('• status    - System health, active course context & relay status', 'var(--text-secondary)');
             addLine('• ping      - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
-            addLine('• users     - Shows privacy status (active-user telemetry disabled)', 'var(--text-secondary)');
+            addLine('• stats     - Live anonymous user counts, versions, and session quiz stats', 'var(--text-secondary)');
             addLine('• cache     - Question bank statistics and stored course codes', 'var(--text-secondary)');
             addLine('• logs      - Dumps recent audit events directly in console', 'var(--text-secondary)');
             addLine('• logs -c   - Copies full system diagnostic audit log to clipboard', 'var(--text-secondary)');

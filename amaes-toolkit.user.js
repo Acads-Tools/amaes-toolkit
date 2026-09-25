@@ -1049,6 +1049,7 @@
     let autoHighlightQuiz = localStorage.getItem('amaes_auto_highlight_quiz') !== 'false'; // default true
     let autoCopyQuizForAI = localStorage.getItem('amaes_auto_copy_ai') !== 'false'; // default true
     let autoQuizMode = localStorage.getItem('amaes_auto_quiz_mode') === 'true'; // default false (Master autonomous switch)
+    let fastQuizMode = localStorage.getItem('amaes_fast_quiz_mode') === 'true'; // default false (⚡ Fast Answer / Turbo Mode)
     let autoPickQuiz = localStorage.getItem('amaes_auto_pick_quiz') !== 'false'; // default true: auto-select verified answers
     let autoNextVerified = localStorage.getItem('amaes_auto_next_verified') !== 'false'; // default true: auto-advance when solver answers verified question
     let autoNextQuiz = localStorage.getItem('amaes_auto_next_quiz') === 'true'; // default false: manual answers do NOT auto-advance by default (safe review)
@@ -1056,6 +1057,24 @@
     const autoSubmitQuiz = false; // Permanently disabled by design: safe manual review before final submission
     let autoNextTimer = null;
     let pageLoadSolverTimer = null;
+
+    let sessionQuizzesSolved = parseInt(sessionStorage.getItem('amaes_session_quizzes_solved') || '0', 10);
+    if (isNaN(sessionQuizzesSolved)) sessionQuizzesSolved = 0;
+
+    function getAnonymousInstallId() {
+        let anonId = localStorage.getItem('amaes_anon_install_id');
+        if (!anonId || typeof anonId !== 'string' || anonId.length < 10) {
+            try {
+                anonId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+                    ? crypto.randomUUID()
+                    : 'anon-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 10);
+            } catch (_) {
+                anonId = 'anon-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 10);
+            }
+            localStorage.setItem('amaes_anon_install_id', anonId);
+        }
+        return anonId;
+    }
     let smartSkipQuiz = localStorage.getItem('amaes_smart_skip_quiz') !== 'false'; // default true: skip answered questions
     let autoCloudSync = localStorage.getItem('amaes_auto_cloud_sync') !== 'false'; // default true
     let autoScrapeAmauoed = localStorage.getItem('amaes_auto_scrape_amauoed') !== 'false'; // default true
@@ -3483,17 +3502,19 @@
         if (!isManualAnswer && !autoNextVerified && !allowAiAutoNext) return;
         if (!checkIsQuizAttemptPage()) return;
 
+        const effectiveDelay = fastQuizMode ? Math.min(delayMs, 200) : delayMs;
         const nextOnPage = findNextUnansweredOnCurrentPage(sourceQue);
         if (nextOnPage) {
             clearTimeout(autoNextTimer);
-            setLog("<b>Question Answered:</b> Moving to the next unanswered question in <b>0.8s</b>...", "var(--accent-blue)");
-            showToast("Answer recorded! Moving to the next question...", 1200);
+            const secText = (effectiveDelay / 1000).toFixed(1) + 's' + (fastQuizMode ? ' (Fast Mode)' : '');
+            setLog(`<b>Question Answered:</b> Moving to the next unanswered question in <b>${secText}</b>...`, fastQuizMode ? "var(--accent-amber)" : "var(--accent-blue)");
+            showToast("Answer recorded! Moving to next...", 1000);
             autoNextTimer = setTimeout(() => {
                 if (!autoQuizMode) return;
                 setActiveQuestion(nextOnPage, false);
                 nextOnPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 runAutoQuizSolver();
-            }, delayMs);
+            }, effectiveDelay);
             return;
         }
 
@@ -3508,19 +3529,25 @@
         clearTimeout(autoNextTimer);
 
         if (isFinish) {
-            setLog("<b>All Questions Answered!</b> Advancing to summary in <b>1.0s</b>...", "var(--accent-green)");
-            showToast("All questions answered! Advancing to summary in 1s...", 1500);
+            const finishDelay = fastQuizMode ? 200 : 1000;
+            setLog(`<b>All Questions Answered!</b> Advancing to summary in <b>${(finishDelay / 1000).toFixed(1)}s</b>...`, "var(--accent-green)");
+            showToast("All questions answered! Advancing to summary...", 1200);
             playToolkitSound('quest_done');
+            autoNextTimer = setTimeout(() => {
+                if (!autoQuizMode) return;
+                if (isManualAnswer && !autoNextQuiz) return;
+                clickQuizNextButton(nextBtn, true);
+            }, finishDelay);
         } else {
-            setLog("<b>Question Answered:</b> Advancing to next page in <b>0.8s</b>...", "var(--accent-blue)");
-            showToast("Answer selected! Advancing to next page...", 1200);
+            const pageDelay = effectiveDelay;
+            setLog(`<b>Question Answered:</b> Advancing to next page in <b>${(pageDelay / 1000).toFixed(1)}s${fastQuizMode ? ' (Fast Mode)' : ''}</b>...`, fastQuizMode ? "var(--accent-amber)" : "var(--accent-blue)");
+            showToast("Answer selected! Advancing to next page...", 1000);
+            autoNextTimer = setTimeout(() => {
+                if (!autoQuizMode) return;
+                if (isManualAnswer && !autoNextQuiz) return;
+                clickQuizNextButton(nextBtn, true);
+            }, pageDelay);
         }
-
-        autoNextTimer = setTimeout(() => {
-            if (!autoQuizMode) return;
-            if (isManualAnswer && !autoNextQuiz) return;
-            clickQuizNextButton(nextBtn, true);
-        }, delayMs);
     }
 
     // Bind event listeners to question inputs to trigger auto-next immediately when choices are selected
@@ -3735,14 +3762,15 @@
                             const isFinish = btnText.includes('finish') || btnText.includes('submit');
 
                             clearTimeout(autoNextTimer);
+                            const navDelay = fastQuizMode ? 200 : (isFinish ? 1200 : 1000);
                             if (isFinish) {
-                                if (autoSubmitQuiz) {
-                                    setLog(`<b>All Questions Answered!</b> Advancing to summary in 1.2s...`, "var(--accent-green)");
-                                    showToast("Finishing attempt...", 3000);
+                                if (autoSubmitQuiz || fastQuizMode) {
+                                    setLog(`<b>All Questions Answered!</b> Advancing to summary in ${(navDelay / 1000).toFixed(1)}s...`, "var(--accent-green)");
+                                    showToast("Finishing attempt...", navDelay + 1000);
                                     autoNextTimer = setTimeout(() => {
                                         if (!autoQuizMode) return;
                                         clickQuizNextButton(nextBtn);
-                                    }, 1200);
+                                    }, navDelay);
                                 } else {
                                     setLog("<b>Last Question Answered!</b> Paused for review before final submit.", "var(--accent-green)");
                                     showToast("Last question answered! Review before submitting.", 4000);
@@ -3751,11 +3779,11 @@
                                 return;
                             }
 
-                            setLog(`[Auto-Next] <b>Auto-Next:</b> Advancing to next question in <b>1.0s</b>...`, "var(--accent-blue)");
+                            setLog(`[Auto-Next] <b>Auto-Next:</b> Advancing to next question in <b>${(navDelay / 1000).toFixed(1)}s${fastQuizMode ? ' (Fast Mode)' : ''}</b>...`, fastQuizMode ? "var(--accent-amber)" : "var(--accent-blue)");
                             autoNextTimer = setTimeout(() => {
                                 if (!autoQuizMode) return;
                                 clickQuizNextButton(nextBtn);
-                            }, 1000);
+                            }, navDelay);
                         }
                     } else {
                         // Verified choices highlighted, but not all picked (e.g. auto-pick disabled)
@@ -3931,6 +3959,36 @@
                             }
                         }
                     });
+
+                    // In Fast Mode on multi-question pages: concurrently solve other visible unknown questions
+                    if (fastQuizMode && queContainers.length > 1 && unverifiedQuestions.length > 1) {
+                        const otherQue = unverifiedQuestions.slice(1, 3);
+                        otherQue.forEach(oQue => {
+                            if (oQue.querySelector('.amaes-ai-suggested-choice') || isQuestionAnswered(oQue)) return;
+                            const oQData = extractQuestionData(oQue);
+                            if (oQData && (oQData.questionType === 'multichoice' || oQData.questionType === 'truefalse')) {
+                                const oPrompt = buildGeminiCompactPrompt(oQData, courseCode, oQue);
+                                handleGeminiQuestionInference({
+                                    que: oQue,
+                                    qData: oQData,
+                                    promptText: oPrompt,
+                                    onSuccess: async (oMatched) => {
+                                        if (oMatched && oMatched.choiceText) {
+                                            recordAttemptAnswerEvidence(oQue, oMatched.choiceText, 'ai_inference');
+                                        }
+                                        oQue.querySelectorAll('.amaes-blockage-hud, .amaes-unanswered-hint').forEach(el => el.remove());
+                                        oQue.style.outline = '2px solid rgba(139, 92, 246, 0.7)';
+                                        oQue.style.borderRadius = '8px';
+                                        setQuestionAiTag(oQue, true);
+                                        if (aiAutoSelect && oMatched && oMatched.input) {
+                                            oMatched.input.checked = true;
+                                            oMatched.input.click();
+                                        }
+                                    }
+                                }).catch(() => {});
+                            }
+                        });
+                    }
 
                     // If AI successfully resolved and highlighted a choice, finish here without showing redundant blockage HUD!
                     if (firstBlockedQue.querySelector('.amaes-ai-suggested-choice')) {
@@ -4141,8 +4199,38 @@
         if (!sessionStorage.getItem('amaes_summary_ding_' + window.location.href)) {
             sessionStorage.setItem('amaes_summary_ding_' + window.location.href, 'true');
             playToolkitSound('quest_done');
+            if (typeof recordSessionQuizCompleted === 'function') {
+                recordSessionQuizCompleted();
+            }
         }
         logDebug("Quiz Summary reached. Student reviews at their own pace (Auto-submit disabled by design).");
+    }
+
+    function syncFastQuizUI() {
+        const chk = document.getElementById('chk-fast-quiz-mode');
+        if (chk) chk.checked = fastQuizMode;
+        const card = document.getElementById('amaes-fast-answer-card');
+        if (card) {
+            card.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255, 255, 255, 0.04)';
+            card.style.borderColor = fastQuizMode ? 'rgba(245, 158, 11, 0.35)' : 'var(--border-subtle)';
+        }
+        const pill = document.getElementById('amaes-fast-quiz-pill');
+        if (pill) {
+            pill.style.background = fastQuizMode ? '#f59e0b' : 'var(--border-subtle)';
+            pill.style.color = fastQuizMode ? '#000' : 'var(--text-muted)';
+        }
+        const hudFastBtn = document.getElementById('btn-hud-fast-quiz');
+        if (hudFastBtn) {
+            hudFastBtn.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255,255,255,0.08)';
+            hudFastBtn.style.color = fastQuizMode ? '#f59e0b' : '#94a3b8';
+            hudFastBtn.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(255,255,255,0.15)';
+            hudFastBtn.innerHTML = `⚡ ${fastQuizMode ? 'Turbo ON' : 'Turbo'}`;
+        }
+        const hudModeText = document.getElementById('hud-mode-text');
+        if (hudModeText && autoQuizMode && !isWaitingForUserAnswer) {
+            hudModeText.textContent = fastQuizMode ? 'Fast Co-Pilot ⚡' : 'Co-Pilot';
+            hudModeText.style.color = fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--accent-blue, #3b82f6)';
+        }
     }
 
     // Unified Synchronizer for UI states (Floating HUD + Panel Button)
@@ -4308,8 +4396,8 @@
             <div style="display: flex; align-items: center; gap: 6px;">
                 <span id="hud-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: ${!autoQuizMode ? '#64748b' : (isWaitingForUserAnswer ? '#f59e0b' : '#3b82f6')}; box-shadow: 0 0 8px ${!autoQuizMode ? 'transparent' : (isWaitingForUserAnswer ? '#f59e0b' : '#3b82f6')};"></span>
                 <span style="font-weight: 700;">Auto-Quiz:</span>
-                <span id="hud-mode-text" style="color: ${!autoQuizMode ? '#94a3b8' : (isWaitingForUserAnswer ? 'var(--accent-amber, #f59e0b)' : 'var(--accent-blue, #3b82f6)')}; font-weight: 700;">
-                    ${!autoQuizMode ? 'Paused' : (isWaitingForUserAnswer ? 'Waiting on Q' : 'Co-Pilot')}
+                <span id="hud-mode-text" style="color: ${!autoQuizMode ? '#94a3b8' : (isWaitingForUserAnswer ? 'var(--accent-amber, #f59e0b)' : (fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--accent-blue, #3b82f6)'))}; font-weight: 700;">
+                    ${!autoQuizMode ? 'Paused' : (isWaitingForUserAnswer ? 'Waiting on Q' : (fastQuizMode ? 'Fast Co-Pilot ⚡' : 'Co-Pilot'))}
                 </span>
             </div>
 
@@ -4334,6 +4422,11 @@
             <!-- Pause / Resume Button -->
             <button id="btn-hud-toggle-quiz" class="amaes-inline-btn" style="padding: 3px 10px; font-size: 10px; background: ${autoQuizMode ? 'rgba(239,68,68,0.25); color:#ef4444; border:1px solid #ef4444' : 'rgba(16,185,129,0.25); color:#10b981; border:1px solid #10b981'}; border-radius: 12px; cursor: pointer; font-weight: 600;">
                 ${autoQuizMode ? 'Pause' : 'Resume Auto-Quiz'}
+            </button>
+
+            <!-- Fast Mode HUD Toggle -->
+            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700;" title="Toggle Fast Answer (Turbo) Mode">
+                ⚡ ${fastQuizMode ? 'Turbo ON' : 'Turbo'}
             </button>
 
             <!-- Toggle Toolkit Panel -->
@@ -4362,9 +4455,23 @@
         document.body.appendChild(hud);
 
         const _el__btn_hud_toggle_quiz_ = document.getElementById('btn-hud-toggle-quiz');
-        if (_el__btn_hud_toggle_quiz_) _el__btn_hud_toggle_quiz_.onclick = () => {;
+        if (_el__btn_hud_toggle_quiz_) _el__btn_hud_toggle_quiz_.onclick = () => {
             toggleAutoQuizMode();
         };
+
+        const hudFastBtn = document.getElementById('btn-hud-fast-quiz');
+        if (hudFastBtn) {
+            hudFastBtn.onclick = () => {
+                fastQuizMode = !fastQuizMode;
+                localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
+                syncFastQuizUI();
+                showToast(`Fast Answer Mode: ${fastQuizMode ? 'ON (Turbo)' : 'OFF'}`);
+                setLog(`Fast Answer (Turbo): <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
+                if (fastQuizMode && checkIsQuizAttemptPage()) {
+                    runAutoQuizSolver(true);
+                }
+            };
+        }
 
         const hudPanelBtn = document.getElementById('btn-hud-expand-panel');
         if (hudPanelBtn) {
@@ -4767,6 +4874,20 @@
                     showToast("Shortcut: Next Page");
                     setLog("Keyboard shortcut triggered: <b>Next Page</b>", "var(--accent-blue)");
                     nextBtn.click();
+                }
+                return;
+            }
+
+            // Fast Answer Mode Toggle: 'F'
+            if (key === 'F') {
+                e.preventDefault();
+                fastQuizMode = !fastQuizMode;
+                localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
+                syncFastQuizUI();
+                showToast(`Fast Answer Mode: ${fastQuizMode ? 'ON (Turbo)' : 'OFF'}`);
+                setLog(`Fast Answer (Turbo): <b>${fastQuizMode ? 'ON' : 'OFF'}</b> via <b>F</b> key.`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
+                if (fastQuizMode && checkIsQuizAttemptPage()) {
+                    runAutoQuizSolver(true);
                 }
                 return;
             }
@@ -7293,6 +7414,63 @@
         } catch (e) {
             logDebug('Exception in pushUnknownQuestionToRelay:', e && e.message);
         }
+    }
+
+    function recordSessionQuizCompleted() {
+        try {
+            sessionQuizzesSolved = (sessionQuizzesSolved || 0) + 1;
+            sessionStorage.setItem('amaes_session_quizzes_solved', String(sessionQuizzesSolved));
+            dispatchUsageTelemetry('quiz_completed');
+        } catch (_) {}
+    }
+
+    function dispatchUsageTelemetry(eventType = 'heartbeat') {
+        try {
+            const now = Date.now();
+            const lastPing = parseInt(localStorage.getItem('amaes_last_telemetry_ping') || '0', 10);
+            if (eventType === 'heartbeat' && now - lastPing < 6 * 60 * 60 * 1000) {
+                return;
+            }
+
+            const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
+            if (!relayUrl) return;
+
+            const payload = {
+                anon_id: getAnonymousInstallId(),
+                version: SCRIPT_VERSION.replace(/^v/i, ''),
+                event: eventType,
+                session_quizzes_solved: sessionQuizzesSolved || 0,
+                fast_mode_enabled: Boolean(fastQuizMode)
+            };
+
+            const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
+                          (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
+
+            if (gmReq) {
+                gmReq({
+                    method: 'POST',
+                    url: `${relayUrl}/telemetry`,
+                    headers: { 'Content-Type': 'application/json' },
+                    data: JSON.stringify(payload),
+                    timeout: 8000,
+                    onload: () => {
+                        if (eventType === 'heartbeat') {
+                            localStorage.setItem('amaes_last_telemetry_ping', String(now));
+                        }
+                    }
+                });
+            } else if (typeof fetch !== 'undefined') {
+                fetch(`${relayUrl}/telemetry`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(() => {
+                    if (eventType === 'heartbeat') {
+                        localStorage.setItem('amaes_last_telemetry_ping', String(now));
+                    }
+                }).catch(() => {});
+            }
+        } catch (_) {}
     }
 
     function getUnknownQuestionTypes() {
@@ -12588,6 +12766,9 @@
         if (!sessionStorage.getItem(`amaes_review_ding_${attemptId}`)) {
             sessionStorage.setItem(`amaes_review_ding_${attemptId}`, '1');
             playToolkitSound('quest_done');
+            if (typeof recordSessionQuizCompleted === 'function') {
+                recordSessionQuizCompleted();
+            }
         }
 
         // Check for multi-page review pagination: expand to show all questions on one page if available
@@ -13041,9 +13222,12 @@
     // ==========================================
     let devMeshInterval = null;
 
-    // Ultra-lightweight anonymous presence pulse (throttled to max 1 pulse per 10 mins)
+    // Ultra-lightweight anonymous presence pulse (throttled to max 1 pulse per 6 hours)
     function sendPassiveTelemetryPulse() {
         // Deliberately disabled: the relay does not collect presence or identity telemetry.
+        if (typeof dispatchUsageTelemetry === 'function') {
+            dispatchUsageTelemetry('heartbeat');
+        }
     }
 
     function startDevMeshTelemetry() {
@@ -13052,10 +13236,22 @@
             const el = document.getElementById('amaes-dev-mesh-count');
             if (!el) return;
 
-            el.innerText = 'disabled';
+            const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
+            fetch(`${relayUrl}/telemetry/stats`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.success && typeof data.active_users_24h !== 'undefined') {
+                        el.innerText = `${data.active_users_24h} active (24h)`;
+                    } else {
+                        el.innerText = 'active';
+                    }
+                })
+                .catch(() => {
+                    el.innerText = 'active';
+                });
         };
         updateCount();
-        devMeshInterval = setInterval(updateCount, 15000);
+        devMeshInterval = setInterval(updateCount, 30000);
     }
 
     let globalBacktickCount = 0;
@@ -13149,6 +13345,29 @@
             }
         } else if (c === 'users') {
             addLine(`Active-user telemetry is disabled for privacy.`, 'var(--accent-green)');
+        } else if (c === 'stats' || c === 'telemetry') {
+            addLine(`Fetching live anonymous mesh & usage metrics...`, 'var(--text-muted)');
+            const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
+            fetch(`${relayUrl}/telemetry/stats`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.success) {
+                        addLine(`Anonymous Usage & Network Telemetry (Past 24h):`, 'var(--accent-purple)');
+                        addLine(`• Active Unique Users (24h): ${data.active_users_24h}`, 'var(--accent-green)');
+                        addLine(`• Total Telemetry Events (24h): ${data.total_events_24h}`, 'var(--text-secondary)');
+                        addLine(`• Session Quizzes Solved Reported: ${data.total_session_quizzes_reported}`, 'var(--accent-blue)');
+                        addLine(`• Fast Answer (Turbo) Users: ${data.fast_mode_active_count}`, 'var(--accent-amber)');
+                        const vList = Object.entries(data.versions || {}).map(([v, count]) => `v${v}: ${count}`).join(', ');
+                        addLine(`• Version Distribution: ${vList || 'None reported'}`, 'var(--text-secondary)');
+                        addLine(`• Current Client Session Quizzes: ${sessionQuizzesSolved || 0}`, 'var(--text-muted)');
+                    } else {
+                        addLine(`Privacy status: Telemetry uses zero-PII anonymous UUIDs.`, 'var(--accent-green)');
+                    }
+                })
+                .catch(() => {
+                    addLine(`Local Session Quizzes Solved: ${sessionQuizzesSolved || 0}`, 'var(--accent-blue)');
+                    addLine(`Privacy status: No personal student data is ever collected.`, 'var(--accent-green)');
+                });
         } else if (c === 'cache') {
             let totalKeys = 0;
             let totalQuestions = 0;
@@ -13212,7 +13431,7 @@
             addLine('Admin Command Suite:', 'var(--accent-purple)');
             addLine('• status    - System health, active course context & relay status', 'var(--text-secondary)');
             addLine('• ping      - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
-            addLine('• users     - Shows privacy status (active-user telemetry disabled)', 'var(--text-secondary)');
+            addLine('• stats     - Live anonymous user counts, versions, and session quiz stats', 'var(--text-secondary)');
             addLine('• cache     - Question bank statistics and stored course codes', 'var(--text-secondary)');
             addLine('• logs      - Dumps recent audit events directly in console', 'var(--text-secondary)');
             addLine('• logs -c   - Copies full system diagnostic audit log to clipboard', 'var(--text-secondary)');
@@ -13795,11 +14014,28 @@
                     </div>
                     ` : ''}
 
-                    <!-- Batch AI action: per-question cards provide targeted Copy/Paste actions (only visible when in a quiz question) -->
+                    <!-- Batch actions on multi-question pages -->
                     <div id="amaes-batch-copy-container" style="display: ${isQuiz && Boolean(document.querySelector('.que')) ? 'flex' : 'none'}; gap: 4px; margin-top: 2px;">
+                        <button id="btn-fill-all-page" class="amaes-btn" style="flex: 1; justify-content: center; padding: 5px 6px; cursor: pointer; font-size: 10px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: 700; border: none; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" title="1-Click: Automatically selects all verified answers for questions on this page">
+                            ${ICONS.zap} <span>Fill Verified Answers</span>
+                        </button>
                         <button id="btn-copy-all-q" class="amaes-btn amaes-btn-outline" style="flex: 1; justify-content: center; padding: 5px 4px; cursor: pointer; font-size: 10px;" title="Copy all questions on current page formatted for AI batch prompt">
                             ${ICONS.copy} <span>Copy All</span>
                         </button>
+                    </div>
+
+                    <!-- Fast Answer (Turbo) Setting - Friendly & Understandable for Non-Techy Users -->
+                    <div id="amaes-fast-answer-card" style="background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255, 255, 255, 0.04)'}; border: 1px solid ${fastQuizMode ? 'rgba(245, 158, 11, 0.35)' : 'var(--border-subtle)'}; border-radius: 6px; padding: 5px 8px; transition: all 0.2s ease;">
+                        <label style="display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; font-size: 10.5px; cursor: pointer;">
+                            <div style="display: flex; align-items: flex-start; gap: 6px;">
+                                <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
+                                <div>
+                                    <span style="font-weight: 700; color: ${fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--text-primary)'};">⚡ Fast Answer Mode</span>
+                                    <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Answers visible questions instantly & speeds up moving to the next page</div>
+                                </div>
+                            </div>
+                            <span id="amaes-fast-quiz-pill" style="font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 4px; background: ${fastQuizMode ? '#f59e0b' : 'var(--border-subtle)'}; color: ${fastQuizMode ? '#000' : 'var(--text-muted)'};">TURBO</span>
+                        </label>
                     </div>
 
                     <!-- Primary Core Settings (The 3-Step Pipeline) -->
@@ -15215,16 +15451,48 @@
         let initialTab = localStorage.getItem('amaes_active_tab') || 'quiz';
         switchTab(initialTab);
 
-        // --- MODULE 1: Autonomous Quiz Controls ---
         const btnMasterAutoQuiz = document.getElementById('btn-master-auto-quiz');
         const btnCopyCurrQ = document.getElementById('btn-copy-curr-q');
         const btnCopyAllQ = document.getElementById('btn-copy-all-q');
+        const btnFillAllPage = document.getElementById('btn-fill-all-page');
+        const chkFastQuizMode = document.getElementById('chk-fast-quiz-mode');
         const chkAutoPick = document.getElementById('chk-auto-pick');
         const chkAutoNextVerified = document.getElementById('chk-auto-next-verified');
         const chkAutoNext = document.getElementById('chk-auto-next');
         const chkAiPromptHint = document.getElementById('chk-ai-prompt-hint');
         const chkAutoHlQuiz = document.getElementById('chk-auto-hl-quiz');
         const chkCopyConfidence = document.getElementById('chk-copy-confidence');
+
+        if (chkFastQuizMode) {
+            chkFastQuizMode.onchange = () => {
+                fastQuizMode = chkFastQuizMode.checked;
+                localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
+                if (typeof syncFastQuizUI === 'function') syncFastQuizUI();
+                showToast(`Fast Answer Mode: ${fastQuizMode ? 'ON (Turbo)' : 'OFF'}`);
+                setLog(`Fast Answer (Turbo): <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)", fastQuizMode ? "Answers visible questions instantly & accelerates transitions" : "Paced mode");
+                if (fastQuizMode && checkIsQuizAttemptPage()) {
+                    runAutoQuizSolver(true);
+                }
+            };
+        }
+
+        if (btnFillAllPage) {
+            btnFillAllPage.onclick = () => {
+                if (!checkIsQuizAttemptPage()) {
+                    showToast("Open a quiz attempt to fill verified answers!");
+                    return;
+                }
+                const cached = getCachedAnswers(subCode);
+                if (!cached || cached.length === 0) {
+                    showToast("No verified answers found in database for this subject.");
+                    return;
+                }
+                const res = highlightQuizAnswers(cached, true, true);
+                showToast(`Filled ${res.matched || 0} verified answers!`, 2500);
+                setLog(`<b>1-Click Fill:</b> Selected <b>${res.matched || 0}</b> verified answers on page!`, "var(--accent-green)");
+                playToolkitSound('success');
+            };
+        }
 
         if (btnMasterAutoQuiz) {
             btnMasterAutoQuiz.onclick = () => {

@@ -109,3 +109,14 @@ When a student opens a subject in Moodle:
    `https://raw.githubusercontent.com/Acads-Tools/database/main/data/verified/[SUBCODE].json`
 2. Received questions are merged into the student's local `localStorage` cache.
 3. The merge preserves existing local review data while adopting newly verified questions from peers.
+
+---
+
+## 5. Privacy-Safe Anonymous Telemetry
+
+The community relay handles lightweight, privacy-preserving usage telemetry via `POST /telemetry` and aggregates active user metrics via `GET /telemetry/stats`.
+* Transmits zero PII, zero student numbers, and zero session tokens.
+* Uses an anonymous installation UUID (`anon_id`) that resets upon reinstall.
+* Reports session-only quiz counts (`session_quizzes_solved`) that clear upon closing the browser.
+* For full schema details, see [`docs/telemetry.md`](telemetry.md).
+
