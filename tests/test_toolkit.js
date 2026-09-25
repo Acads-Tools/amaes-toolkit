@@ -4626,6 +4626,26 @@ test("In-Question AI Tools Collapsible Drawer & Auto-Unminimize Lifecycle: minim
     assert.ok(script.includes("que.dataset.amaesAiFailed"), "Must track AI failure state to unminimize drawer");
 });
 
+// --------------------------------------------------
+// 146. Reinstall Toolkit Button & Auto-Refresh Lifecycle
+// --------------------------------------------------
+test("Reinstall Toolkit Button & Auto-Refresh Lifecycle: provides 1-click reinstall in Quick Start modal links row and panel header actions, auto-detects focus return, and reloads page", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Definition and handlers
+    assert.ok(script.includes("function triggerScriptReinstall()"), "Must define triggerScriptReinstall function");
+    assert.ok(script.includes("id=\"welcome-btn-reinstall\""), "Welcome modal must include welcome-btn-reinstall button in links row");
+    assert.ok(script.includes("id=\"amaes-reinstall-btn\""), "Main panel actions must include amaes-reinstall-btn");
+    assert.ok(script.includes("welcomeReinstallBtn.onclick"), "welcome-btn-reinstall must be wired to triggerScriptReinstall");
+    assert.ok(script.includes("reinstallBtn.onclick"), "amaes-reinstall-btn must be wired to triggerScriptReinstall");
+
+    // 2. Lifecycle storage keys and auto-reload detection
+    assert.ok(script.includes("localStorage.setItem('amaes_pending_reinstall', '1')"), "Must track pending reinstall in localStorage");
+    assert.ok(script.includes("sessionStorage.setItem('amaes_reinstall_confirmed', '1')"), "Must set reinstall confirmed flag before reload");
+    assert.ok(script.includes("Toolkit successfully reinstalled"), "Must display success message after reload from reinstall");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);
@@ -4635,3 +4655,4 @@ console.log("==================================================");
 if (failed > 0) {
     process.exit(1);
 }
+

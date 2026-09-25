@@ -1026,6 +1026,14 @@
             });
         }
 
+        // Header Reinstall Button Handler
+        const reinstallBtn = document.getElementById('amaes-reinstall-btn');
+        if (reinstallBtn) {
+            reinstallBtn.onclick = () => {
+                triggerScriptReinstall();
+            };
+        }
+
         // Header Reset Settings Button Handler
         const resetBtn = document.getElementById('amaes-reset-btn');
         if (resetBtn) {

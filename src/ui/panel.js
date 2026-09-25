@@ -44,6 +44,10 @@
                 </div>
                 
                 <div id="amaes-actions">
+                    <button id="amaes-reinstall-btn" class="amaes-icon-btn" title="Reinstall Toolkit in Violentmonkey (${SCRIPT_VERSION})">
+                        ${ICONS.download}
+                    </button>
+
                     <button id="amaes-reset-btn" class="amaes-icon-btn" title="Reset installation: clear toolkit data and reopen welcome setup">
                         ${ICONS.rotateCcw}
                     </button>

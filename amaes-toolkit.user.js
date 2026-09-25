@@ -420,6 +420,34 @@
         }, 6000);
     }
 
+    function triggerScriptReinstall() {
+        const ver = SCRIPT_VERSION;
+        try {
+            localStorage.setItem('amaes_pending_reinstall', '1');
+            localStorage.setItem('amaes_pending_update_time', String(Date.now()));
+            localStorage.setItem('amaes_update_in_progress', '1');
+        } catch (e) {}
+        showToast(`Opening ${ver} in Violentmonkey... After confirming reinstall, page will auto-refresh!`, 6500);
+        try {
+            window.open(SCRIPT_RAW_URL, '_blank');
+        } catch (e) {
+            window.location.href = SCRIPT_RAW_URL;
+        }
+
+        // Fallback auto-refresh: In case student confirms reinstall without switching focus (e.g. mobile popup), auto-refresh after 6s
+        setTimeout(() => {
+            const isReinstalling = localStorage.getItem('amaes_pending_reinstall');
+            if (isReinstalling && document.visibilityState === 'visible') {
+                localStorage.removeItem('amaes_pending_reinstall');
+                sessionStorage.setItem('amaes_reinstall_confirmed', '1');
+                showToast(`Reinstall confirmed! Refreshing page...`, 2000);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            }
+        }, 6000);
+    }
+
     function injectTopNavUpdateNotification(latestVersion) {
         if (!latestVersion || !isNewerVersion(latestVersion, SCRIPT_VERSION)) return;
 
@@ -546,6 +574,14 @@
                 }, 600);
             }
 
+            if (sessionStorage.getItem('amaes_reinstall_confirmed')) {
+                sessionStorage.removeItem('amaes_reinstall_confirmed');
+                setTimeout(() => {
+                    showToast(`Toolkit successfully reinstalled (${SCRIPT_VERSION})!`, 5000);
+                    setLog(`Toolkit successfully reinstalled (<b>${SCRIPT_VERSION}</b>).`, "var(--accent-green)");
+                }, 600);
+            }
+
             localStorage.setItem('amaes_last_seen_version', SCRIPT_VERSION);
         } catch (e) {
             logDebug(`Error checking pending update: ${e.message}`);
@@ -558,6 +594,25 @@
         const handleReturnFocus = () => {
             try {
                 if (isReloading) return;
+
+                const isReinstalling = localStorage.getItem('amaes_pending_reinstall');
+                if (isReinstalling) {
+                    const now = Date.now();
+                    const updateTime = Number(localStorage.getItem('amaes_pending_update_time') || 0);
+                    const elapsed = now - updateTime;
+
+                    if (elapsed >= 1000) {
+                        isReloading = true;
+                        localStorage.removeItem('amaes_pending_reinstall');
+                        sessionStorage.setItem('amaes_reinstall_confirmed', '1');
+                        showToast(`Reinstall detected! Refreshing page to apply...`, 2500);
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                        return;
+                    }
+                }
+
                 const pendingRaw = localStorage.getItem('amaes_pending_update_install');
                 const pending = pendingRaw && isNewerVersion(pendingRaw, SCRIPT_VERSION) ? pendingRaw : null;
                 const latestKnown = normalizeVersion(localStorage.getItem('amaes_latest_version_seen'));
@@ -12892,11 +12947,12 @@
                         </div>
                     </div>
 
-                    <!-- Links with Equal Flex-Grid Widths: GitHub, Greasy Fork, Website -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
-                        <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 6px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 6px; text-align: center;">${ICONS.github} <span>GitHub</span></a>
-                        <a href="${GREASYFORK_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 6px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 6px; text-align: center;">${ICONS.greasyfork} <span>Greasy Fork</span></a>
-                        <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 6px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 6px; text-align: center;">${ICONS.globe} <span>Website</span></a>
+                    <!-- Links with Equal Flex-Grid Widths: GitHub, Greasy Fork, Website, Reinstall -->
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                        <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 4px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 5px; text-align: center;">${ICONS.github} <span>GitHub</span></a>
+                        <a href="${GREASYFORK_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 4px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 5px; text-align: center;">${ICONS.greasyfork} <span>Greasy Fork</span></a>
+                        <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 4px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 5px; text-align: center;">${ICONS.globe} <span>Website</span></a>
+                        <button id="welcome-btn-reinstall" type="button" class="amaes-btn" style="font-size: 11px; padding: 7px 4px; justify-content: center; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 6px; color: #a7f3d0; cursor: pointer; display: flex; align-items: center; gap: 5px; text-align: center; font-weight: 700;" title="Reinstall current toolkit in Violentmonkey / Tampermonkey">${ICONS.download} <span>Reinstall</span></button>
                     </div>
 
                     <!-- Agreement with High-Contrast Link -->
@@ -13014,6 +13070,14 @@
         if (welcomeAiBtn) {
             welcomeAiBtn.onclick = () => {
                 showGeminiSetupModal();
+            };
+        }
+
+        const welcomeReinstallBtn = document.getElementById('welcome-btn-reinstall');
+        if (welcomeReinstallBtn) {
+            welcomeReinstallBtn.onclick = (e) => {
+                e.preventDefault();
+                triggerScriptReinstall();
             };
         }
 
@@ -13168,6 +13232,10 @@
                 </div>
                 
                 <div id="amaes-actions">
+                    <button id="amaes-reinstall-btn" class="amaes-icon-btn" title="Reinstall Toolkit in Violentmonkey (${SCRIPT_VERSION})">
+                        ${ICONS.download}
+                    </button>
+
                     <button id="amaes-reset-btn" class="amaes-icon-btn" title="Reset installation: clear toolkit data and reopen welcome setup">
                         ${ICONS.rotateCcw}
                     </button>
@@ -15642,6 +15710,14 @@
             advDetails.addEventListener('toggle', () => {
                 if (hint) hint.textContent = advDetails.open ? 'Click to collapse' : 'Click to expand';
             });
+        }
+
+        // Header Reinstall Button Handler
+        const reinstallBtn = document.getElementById('amaes-reinstall-btn');
+        if (reinstallBtn) {
+            reinstallBtn.onclick = () => {
+                triggerScriptReinstall();
+            };
         }
 
         // Header Reset Settings Button Handler

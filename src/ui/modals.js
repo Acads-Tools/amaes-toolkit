@@ -181,11 +181,12 @@
                         </div>
                     </div>
 
-                    <!-- Links with Equal Flex-Grid Widths: GitHub, Greasy Fork, Website -->
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
-                        <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 6px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 6px; text-align: center;">${ICONS.github} <span>GitHub</span></a>
-                        <a href="${GREASYFORK_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 6px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 6px; text-align: center;">${ICONS.greasyfork} <span>Greasy Fork</span></a>
-                        <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 6px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 6px; text-align: center;">${ICONS.globe} <span>Website</span></a>
+                    <!-- Links with Equal Flex-Grid Widths: GitHub, Greasy Fork, Website, Reinstall -->
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                        <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 4px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 5px; text-align: center;">${ICONS.github} <span>GitHub</span></a>
+                        <a href="${GREASYFORK_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 4px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 5px; text-align: center;">${ICONS.greasyfork} <span>Greasy Fork</span></a>
+                        <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 4px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 5px; text-align: center;">${ICONS.globe} <span>Website</span></a>
+                        <button id="welcome-btn-reinstall" type="button" class="amaes-btn" style="font-size: 11px; padding: 7px 4px; justify-content: center; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 6px; color: #a7f3d0; cursor: pointer; display: flex; align-items: center; gap: 5px; text-align: center; font-weight: 700;" title="Reinstall current toolkit in Violentmonkey / Tampermonkey">${ICONS.download} <span>Reinstall</span></button>
                     </div>
 
                     <!-- Agreement with High-Contrast Link -->
@@ -303,6 +304,14 @@
         if (welcomeAiBtn) {
             welcomeAiBtn.onclick = () => {
                 showGeminiSetupModal();
+            };
+        }
+
+        const welcomeReinstallBtn = document.getElementById('welcome-btn-reinstall');
+        if (welcomeReinstallBtn) {
+            welcomeReinstallBtn.onclick = (e) => {
+                e.preventDefault();
+                triggerScriptReinstall();
             };
         }
 
