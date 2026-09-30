@@ -4003,6 +4003,15 @@
                 }
 
                 // If reaching here: either question is ineligible for AI (e.g. text/drag), AI is not enabled, or AI failed
+                // IMPORTANT: If AI was triggered and is still processing (thinking indicator visible), do NOT show
+                // the "WAITING FOR ANSWER" HUD — it would conflict with the AI thinking indicator.
+                const aiIsHandling = firstBlockedQue.querySelector('.amaes-ai-thinking-indicator');
+                const aiAlreadySolved = firstBlockedQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-text-badge');
+                if (aiIsHandling || aiAlreadySolved) {
+                    isSolverRunning = false;
+                    return;
+                }
+
                 firstBlockedQue.dataset.amaesAiFailed = 'true';
                 if (typeof updateQuestionAiDrawerState === 'function') {
                     updateQuestionAiDrawerState(firstBlockedQue, true);
@@ -9123,6 +9132,43 @@
         // Handle Short Answer / Fill-in-the-Blank text inputs
         if (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0)) {
             lines.push(`[Fill-in-the-Blank / Short Answer]`);
+
+            // Include confirmed wrong answers so AI won't re-suggest them
+            const shortEliminatedSet = getEliminatedChoicesForQuestion(que, qData, courseCode);
+            if (shortEliminatedSet && shortEliminatedSet.size > 0) {
+                const wrongList = Array.from(shortEliminatedSet).join('", "');
+                lines.push(`[CONFIRMED WRONG - DO NOT USE THESE]: "${wrongList}"`);
+                lines.push(`CRITICAL: Do NOT suggest any answer in the list above. They have been tested and confirmed incorrect.`);
+            }
+
+            // Include verified answer hint from DB if available and not eliminated
+            if (que) {
+                const courseInfoSA = detectCourseInfo();
+                const subCodeSA = courseInfoSA.subjectCode || courseCode || 'GENERAL';
+                const cachedSA = getCachedAnswers(subCodeSA);
+                if (cachedSA && cachedSA.length > 0) {
+                    const mQNorm = normalizeText(qData.qText || '');
+                    const candsSA = cachedSA.filter(c => questionTextMatches(c.qNorm || c.qRaw || c.question, mQNorm));
+                    const verifiedSA = candsSA.filter(c => {
+                        if (c.isAiSuggestion) return false;
+                        const src = (c.source || '').toLowerCase();
+                        if (src.includes('gemini') || src.includes('ai assistant')) return false;
+                        const ansN = c.ansNorm || normalizeChoice(c.ansRaw || c.answer || '');
+                        if (!ansN) return false;
+                        // Only suggest if not in confirmed wrong list
+                        return !shortEliminatedSet.has(ansN) && !shortEliminatedSet.has(unscriptDigits(ansN));
+                    });
+                    if (verifiedSA.length > 0) {
+                        verifiedSA.sort((a, b) => ((b.verified ? 10 : 0) + (b.confirmations || 1)) - ((a.verified ? 10 : 0) + (a.confirmations || 1)));
+                        const bestSA = verifiedSA[0];
+                        const hintAns = bestSA.ansRaw || bestSA.answer;
+                        if (hintAns) {
+                            lines.push(`[DATABASE HINT: Strong evidence suggests the answer is "${hintAns}" — verify this is correct before accepting]`);
+                        }
+                    }
+                }
+            }
+
             lines.push(`Reply with ONLY the exact, concise word or phrase (typically 1 to 3 words) that directly answers the question or fills the blank. No explanation. No quotes.`);
             return lines.join('\n');
         }
@@ -13608,7 +13654,6 @@
                     <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 8px; padding: 12px 14px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
                             <h3 style="margin: 0; font-size: 13.5px; color: #60a5fa; display: flex; align-items: center; gap: 6px;">${ICONS.checkCircle} Smart Auto-Answer & Highlighter</h3>
-                            <span style="font-size: 9px; font-family: monospace; color: #93c5fd; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.35); padding: 1px 6px; border-radius: 3px;">Background Capable</span>
                         </div>
                         <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically recognizes your subject, finds verified answers shared by students, and highlights the right choices. Auto-Quiz runs autonomously in the background while you switch tabs or multitask in other applications.</p>
                     </div>
@@ -14122,14 +14167,16 @@
                         </div>
                     </div>
 
-                    <!-- Background Multitasking Capability Notice -->
+                    <!-- Background Multitasking Status (only during active quiz) -->
+                    ${isQuiz ? `
                     <div id="amaes-autoquiz-bg-notice" style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px; padding: 4px 8px; font-size: 9.5px; display: flex; align-items: center; justify-content: space-between; gap: 6px;" title="Auto-Quiz operates autonomously across questions and pages even when you minimize or switch to other windows">
                         <div style="display: flex; align-items: center; gap: 5px;">
                             <span id="amaes-autoquiz-bg-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${autoQuizMode ? 'var(--accent-green, #10b981)' : 'var(--text-muted, #94a3b8)'}; ${autoQuizMode ? 'box-shadow: 0 0 6px #10b981;' : ''}"></span>
-                            <span style="font-weight: 600; color: var(--text-primary);">Background Capable:</span>
-                            <span id="amaes-autoquiz-bg-text" style="color: var(--text-secondary);">${autoQuizMode ? 'Active in background (safe to switch tabs/apps)' : 'Runs while multitasking in other windows'}</span>
+                            <span style="font-weight: 600; color: var(--text-primary);">${autoQuizMode ? 'Running in background' : 'Runs in background'}:</span>
+                            <span id="amaes-autoquiz-bg-text" style="color: var(--text-secondary);">${autoQuizMode ? 'Safe to switch tabs or apps' : 'Works even when minimized'}</span>
                         </div>
                     </div>
+                    ` : ''}
 
                     ${!isQuiz ? `
                     <div id="amaes-quiz-not-attempt-msg" style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px; padding: 6px 9px; font-size: 10px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
@@ -14148,7 +14195,7 @@
                         </button>
                     </div>
 
-                    <!-- Fast Answer (Turbo) Setting - Sleek, Highlighted & Cohesive -->
+                    <!-- Fast Answer (Speed) Setting -->
                     <div id="amaes-fast-answer-card" style="background: ${fastQuizMode ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(217, 119, 6, 0.08) 100%)' : 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%)'}; border: 1px solid ${fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.25)'}; border-radius: 8px; padding: 7px 9px; box-shadow: ${fastQuizMode ? '0 0 10px rgba(245, 158, 11, 0.15)' : 'none'}; transition: all 0.2s ease;">
                         <label style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; font-size: 10.5px; cursor: pointer;">
                             <div style="display: flex; align-items: flex-start; gap: 7px;">
@@ -14157,11 +14204,11 @@
                                     <div style="display: flex; align-items: center; gap: 5px;">
                                         <span id="amaes-fast-quiz-icon" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 4px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.12)'}; color: #f59e0b; flex-shrink: 0; transition: all 0.2s ease;">${ICONS.zap}</span>
                                         <span id="amaes-fast-quiz-title" style="font-weight: 700; color: ${fastQuizMode ? '#f59e0b' : 'var(--text-primary)'}; font-size: 11px; transition: color 0.2s ease;">Fast Answer Mode</span>
+                                        ${fastQuizMode ? `<span id="amaes-fast-quiz-pill" style="font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4);">ON</span>` : ''}
                                     </div>
                                     <div style="font-size: 9px; color: var(--text-secondary); font-weight: normal; margin-top: 2px; line-height: 1.35;">Answers visible questions instantly & speeds up moving to the next page</div>
                                 </div>
                             </div>
-                            <span id="amaes-fast-quiz-pill" style="font-size: 8px; font-weight: 800; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 4px; background: ${fastQuizMode ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(245, 158, 11, 0.12)'}; color: ${fastQuizMode ? '#000' : '#f59e0b'}; border: 1px solid ${fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.3)'}; transition: all 0.2s ease; text-transform: uppercase;">TURBO</span>
                         </label>
                     </div>
 
@@ -14194,7 +14241,7 @@
                     <details id="amaes-ai-quiz-settings-block" style="display: ${geminiApiKey ? 'block' : 'none'}; margin-top: 2px; border: 1px solid rgba(168, 85, 247, 0.28); border-radius: 6px; background: rgba(168, 85, 247, 0.05); overflow: hidden;">
                         <summary style="cursor: pointer; padding: 5px 8px; font-size: 10px; font-weight: 700; color: #c084fc; display: flex; align-items: center; justify-content: space-between; user-select: none;">
                             <span style="display: flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.5px; font-size: 9.5px;">
-                                <span>Google Gemini AI (Experimental)</span>
+                                <span>Google Gemini AI</span>
                             </span>
                             <div style="display: flex; align-items: center; gap: 6px;">
                                 <span id="amaes-ai-quiz-status-pill" style="font-size: 8.5px; font-weight: 700; color: #34d399; background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.3); border-radius: 3px; padding: 1px 5px;">Active</span>
@@ -14241,10 +14288,10 @@
                                 </select>
                             </div>
                             <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
-                                <span style="font-size: 10px; color: #e9d5ff; font-weight: 600;">API Plan Tier:</span>
+                                <span style="font-size: 10px; color: #e9d5ff; font-weight: 600;">Request Speed:</span>
                                 <select id="sel-ai-plan-tier" style="background: rgba(0,0,0,0.35); border: 1px solid #a855f7; border-radius: 4px; color: #f3e8ff; font-size: 10px; padding: 2px 6px; cursor: pointer;">
-                                    <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
-                                    <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
+                                    <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Standard (Free tier)</option>
+                                    <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Fast (Paid API key)</option>
                                 </select>
                             </div>
                         </div>
