@@ -5155,7 +5155,7 @@
                 el.style.backgroundColor = '';
                 el.style.borderRadius = '';
             });
-            que.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-select-elim-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag').forEach(b => b.remove());
+            que.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-select-elim-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag, .amaes-pool-changed-hint').forEach(b => b.remove());
 
             // Safety: collect all verified/confirmed answers for this question
             const verifiedNorms = new Set();
@@ -5298,6 +5298,55 @@
                 allWrongList.sort((a, b) => (b.count || 1) - (a.count || 1));
                 allWrongList.splice(choiceRows.length - 1);
             }
+
+            // ── Choice Pool Mismatch Detection ──────────────────────────────────
+            // If the DB has stored choices for this question but NONE of them match the
+            // live Moodle choices, it means the question pool was updated (new choices
+            // swapped in). Warn the student and fall back to elimination-only mode.
+            if (choiceRows.length >= 2 && candidates.length > 0) {
+                const liveChoiceNorms = Array.from(choiceRows).map(r => {
+                    const lbl = r.querySelector('label') || r;
+                    return normalizeChoice(cleanDOMToAI(lbl));
+                }).filter(Boolean);
+
+                // Check if the top verified candidate's stored answer appears in the live choices
+                const topCand = candidates[0];
+                const storedChoices = Array.isArray(topCand.choices) ? topCand.choices : [];
+                const storedAnsNorm = topCand.ansNorm || normalizeChoice(topCand.ansRaw || topCand.answer || '');
+
+                // Pool mismatch: stored answer exists but doesn't match any live choice
+                const storedAnsInLive = liveChoiceNorms.some(ln =>
+                    ln === storedAnsNorm || unscriptDigits(ln) === unscriptDigits(storedAnsNorm)
+                );
+                // Only flag if the stored answer is non-empty AND not found in live choices
+                const poolChanged = storedAnsNorm && !storedAnsInLive && liveChoiceNorms.length > 0;
+
+                if (poolChanged && !que.querySelector('.amaes-pool-changed-hint')) {
+                    const formulation = que.querySelector('.formulation, .content') || que;
+                    const warn = document.createElement('div');
+                    warn.className = 'amaes-pool-changed-hint';
+                    warn.style.cssText = `
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 6px;
+                        margin-bottom: 8px;
+                        padding: 5px 11px;
+                        background: rgba(245, 158, 11, 0.12);
+                        border: 1px solid rgba(245, 158, 11, 0.45);
+                        border-left: 3px solid #f59e0b;
+                        border-radius: 6px;
+                        font-size: 10.5px;
+                        color: #d97706;
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    `;
+                    warn.innerHTML = `
+                        <span style="background: rgba(245,158,11,0.22); color: #d97706; padding: 1px 5px; border-radius: 4px; font-weight: 800; font-size: 9px; letter-spacing: 0.5px;">⚠ POOL CHANGED</span>
+                        <span>Stored answer not in current choices — question pool may have been updated. Using elimination hints only.</span>
+                    `;
+                    formulation.insertBefore(warn, formulation.firstChild);
+                }
+            }
+            // ────────────────────────────────────────────────────────────────────
 
             const isRadio = que.querySelector('.answer input[type="radio"]') !== null;
             let foundMatchForQuestion = false;
@@ -5618,7 +5667,8 @@
                         }], 'Elimination Deduction');
                     }
                 } else if (uneliminated.length > 1 && uneliminated.length < choiceRows.length) {
-                    // Partial elimination: display remaining candidate note
+                    // Partial elimination: display remaining probability based on elimination count
+                    const elimPct = Math.round(100 / uneliminated.length);
                     uneliminated.forEach(candRow => {
                         candRow.style.outline = '1.5px dashed #0284c7';
                         candRow.style.backgroundColor = 'rgba(2, 132, 199, 0.07)';
@@ -5639,7 +5689,8 @@
                                 align-items: center;
                                 gap: 4px;
                             `;
-                            pHint.innerHTML = `${ICONS.target} <span>Possible Option</span>`;
+                            pHint.title = `${uneliminated.length} of ${choiceRows.length} choices remain after elimination`;
+                            pHint.innerHTML = `${ICONS.target} <span>~${elimPct}% chance</span>`;
                             candRow.appendChild(pHint);
                         }
                     });
