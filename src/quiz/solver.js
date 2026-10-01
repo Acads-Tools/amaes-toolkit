@@ -330,6 +330,7 @@
                 ansRaw: String(answer).trim(),
                 ansNorm: normalizeChoice(answer),
                 choices: qData.choices || [],
+                questionType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : (Array.isArray(qData.choices) && qData.choices.length > 0 ? 'multichoice' : 'shortanswer')),
                 source,
                 isAiSuggestion: source === 'ai_inference',
                 recordedAt: Date.now()
@@ -908,6 +909,15 @@
                 }
 
                 // If reaching here: either question is ineligible for AI (e.g. text/drag), AI is not enabled, or AI failed
+                // IMPORTANT: If AI was triggered and is still processing (thinking indicator visible), do NOT show
+                // the "WAITING FOR ANSWER" HUD — it would conflict with the AI thinking indicator.
+                const aiIsHandling = firstBlockedQue.querySelector('.amaes-ai-thinking-indicator');
+                const aiAlreadySolved = firstBlockedQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-text-badge');
+                if (aiIsHandling || aiAlreadySolved) {
+                    isSolverRunning = false;
+                    return;
+                }
+
                 firstBlockedQue.dataset.amaesAiFailed = 'true';
                 if (typeof updateQuestionAiDrawerState === 'function') {
                     updateQuestionAiDrawerState(firstBlockedQue, true);
@@ -1342,8 +1352,8 @@
             </button>
 
             <!-- Fast Mode HUD Toggle -->
-            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Toggle Fast Answer (Turbo) Mode">
-                ${ICONS.zap} <span>${fastQuizMode ? 'Turbo ON' : 'Turbo'}</span>
+            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Toggle Fast Answer Mode">
+                ${ICONS.zap} <span>${fastQuizMode ? 'Speed ON' : 'Speed'}</span>
             </button>
 
             <!-- Toggle Toolkit Panel -->
@@ -1393,11 +1403,13 @@
         const hudPanelBtn = document.getElementById('btn-hud-expand-panel');
         if (hudPanelBtn) {
             hudPanelBtn.onclick = () => {
+                const panel = document.getElementById('amaes-toolkit-panel');
                 const bodyEl = document.getElementById('amaes-panel-body');
                 const minBtn = document.getElementById('amaes-min-btn');
                 if (!bodyEl) return;
                 const isHidden = bodyEl.style.display === 'none';
                 bodyEl.style.display = isHidden ? 'block' : 'none';
+                if (panel) panel.classList.toggle('amaes-minimized', !isHidden);
                 if (minBtn) minBtn.innerHTML = isHidden ? ICONS.minimize : `
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -1708,6 +1720,7 @@
                 }
 
                 // If no modal open, minimize or expand the toolkit panel
+                const panel = document.getElementById('amaes-toolkit-panel');
                 const bodyEl = document.getElementById('amaes-panel-body');
                 const lockOverlay = document.getElementById('amaes-panel-lock-overlay');
                 const minBtn = document.getElementById('amaes-min-btn');
@@ -1719,6 +1732,7 @@
                     if (targetEl && targetEl.style.display !== 'none') {
                         if (bodyEl) bodyEl.style.display = 'none';
                         if (lockOverlay) lockOverlay.style.display = 'none';
+                        if (panel) panel.classList.add('amaes-minimized');
                         if (minBtn) {
                             minBtn.innerHTML = `
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -1737,6 +1751,7 @@
                             if (lockOverlay) lockOverlay.style.display = 'none';
                             if (bodyEl) bodyEl.style.display = 'block';
                         }
+                        if (panel) panel.classList.remove('amaes-minimized');
                         if (minBtn) minBtn.innerHTML = ICONS.minimize;
                         localStorage.setItem('amaes_pref_minimized', 'false');
                         showToast("Toolkit Expanded (Esc)");
@@ -2060,7 +2075,7 @@
                 el.style.backgroundColor = '';
                 el.style.borderRadius = '';
             });
-            que.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-select-elim-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag').forEach(b => b.remove());
+            que.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-select-elim-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag, .amaes-pool-changed-hint').forEach(b => b.remove());
 
             // Safety: collect all verified/confirmed answers for this question
             const verifiedNorms = new Set();
@@ -2203,6 +2218,55 @@
                 allWrongList.sort((a, b) => (b.count || 1) - (a.count || 1));
                 allWrongList.splice(choiceRows.length - 1);
             }
+
+            // ── Choice Pool Mismatch Detection ──────────────────────────────────
+            // If the DB has stored choices for this question but NONE of them match the
+            // live Moodle choices, it means the question pool was updated (new choices
+            // swapped in). Warn the student and fall back to elimination-only mode.
+            if (choiceRows.length >= 2 && candidates.length > 0) {
+                const liveChoiceNorms = Array.from(choiceRows).map(r => {
+                    const lbl = r.querySelector('label') || r;
+                    return normalizeChoice(cleanDOMToAI(lbl));
+                }).filter(Boolean);
+
+                // Check if the top verified candidate's stored answer appears in the live choices
+                const topCand = candidates[0];
+                const storedChoices = Array.isArray(topCand.choices) ? topCand.choices : [];
+                const storedAnsNorm = topCand.ansNorm || normalizeChoice(topCand.ansRaw || topCand.answer || '');
+
+                // Pool mismatch: stored answer exists but doesn't match any live choice
+                const storedAnsInLive = liveChoiceNorms.some(ln =>
+                    ln === storedAnsNorm || unscriptDigits(ln) === unscriptDigits(storedAnsNorm)
+                );
+                // Only flag if the stored answer is non-empty AND not found in live choices
+                const poolChanged = storedAnsNorm && !storedAnsInLive && liveChoiceNorms.length > 0;
+
+                if (poolChanged && !que.querySelector('.amaes-pool-changed-hint')) {
+                    const formulation = que.querySelector('.formulation, .content') || que;
+                    const warn = document.createElement('div');
+                    warn.className = 'amaes-pool-changed-hint';
+                    warn.style.cssText = `
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 6px;
+                        margin-bottom: 8px;
+                        padding: 5px 11px;
+                        background: rgba(245, 158, 11, 0.12);
+                        border: 1px solid rgba(245, 158, 11, 0.45);
+                        border-left: 3px solid #f59e0b;
+                        border-radius: 6px;
+                        font-size: 10.5px;
+                        color: #d97706;
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    `;
+                    warn.innerHTML = `
+                        <span style="background: rgba(245,158,11,0.22); color: #d97706; padding: 1px 5px; border-radius: 4px; font-weight: 800; font-size: 9px; letter-spacing: 0.5px;">⚠ POOL CHANGED</span>
+                        <span>Stored answer not in current choices — question pool may have been updated. Using elimination hints only.</span>
+                    `;
+                    formulation.insertBefore(warn, formulation.firstChild);
+                }
+            }
+            // ────────────────────────────────────────────────────────────────────
 
             const isRadio = que.querySelector('.answer input[type="radio"]') !== null;
             let foundMatchForQuestion = false;
@@ -2523,7 +2587,8 @@
                         }], 'Elimination Deduction');
                     }
                 } else if (uneliminated.length > 1 && uneliminated.length < choiceRows.length) {
-                    // Partial elimination: display remaining candidate note
+                    // Partial elimination: display remaining probability based on elimination count
+                    const elimPct = Math.round(100 / uneliminated.length);
                     uneliminated.forEach(candRow => {
                         candRow.style.outline = '1.5px dashed #0284c7';
                         candRow.style.backgroundColor = 'rgba(2, 132, 199, 0.07)';
@@ -2544,7 +2609,8 @@
                                 align-items: center;
                                 gap: 4px;
                             `;
-                            pHint.innerHTML = `${ICONS.target} <span>Possible Option</span>`;
+                            pHint.title = `${uneliminated.length} of ${choiceRows.length} choices remain after elimination`;
+                            pHint.innerHTML = `${ICONS.target} <span>~${elimPct}% chance</span>`;
                             candRow.appendChild(pHint);
                         }
                     });

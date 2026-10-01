@@ -819,10 +819,12 @@
 
             // Auto-minimize toolkit panel to floating smart pill if enabled
             if (autoMinimizeQuiz) {
+                const panel = document.getElementById('amaes-toolkit-panel');
                 const bodyEl = document.getElementById('amaes-panel-body');
                 const minBtn = document.getElementById('amaes-min-btn');
                 if (bodyEl && bodyEl.style.display !== 'none') {
                     bodyEl.style.display = 'none';
+                    if (panel) panel.classList.add('amaes-minimized');
                     if (minBtn) {
                         minBtn.innerHTML = `
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">

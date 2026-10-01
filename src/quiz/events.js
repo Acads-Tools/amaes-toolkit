@@ -1188,10 +1188,12 @@
         }
 
         // Panel Minimize State Persistence
+        const panelEl = document.getElementById('amaes-toolkit-panel');
         const savedMinimized = localStorage.getItem('amaes_pref_minimized') === 'true';
         if (savedMinimized) {
             if (bodyEl) bodyEl.style.display = 'none';
             if (lockOverlay) lockOverlay.style.display = 'none';
+            if (panelEl) panelEl.classList.add('amaes-minimized');
             minBtn.innerHTML = `
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -1199,15 +1201,18 @@
             `;
         }
 
-        if (minBtn) minBtn.onclick = () => {
+        if (minBtn) minBtn.onclick = (e) => {
+            if (e) e.stopPropagation();
             const isLocked = localStorage.getItem('amaes_terms_acknowledged') !== 'true';
             const targetEl = (isLocked && lockOverlay) ? lockOverlay : bodyEl;
             if (targetEl && targetEl.style.display === 'none') {
                 targetEl.style.display = isLocked ? 'flex' : 'block';
+                if (panelEl) panelEl.classList.remove('amaes-minimized');
                 minBtn.innerHTML = ICONS.minimize;
                 localStorage.setItem('amaes_pref_minimized', 'false');
             } else if (targetEl) {
                 targetEl.style.display = 'none';
+                if (panelEl) panelEl.classList.add('amaes-minimized');
                 minBtn.innerHTML = `
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -1216,6 +1221,22 @@
                 localStorage.setItem('amaes_pref_minimized', 'true');
             }
         };
+
+        // Click anywhere on minimized pill to expand
+        if (panelEl) {
+            panelEl.addEventListener('click', (e) => {
+                if (panelEl.classList.contains('amaes-minimized') && !e.target.closest('#amaes-min-btn')) {
+                    const isLocked = localStorage.getItem('amaes_terms_acknowledged') !== 'true';
+                    const targetEl = (isLocked && lockOverlay) ? lockOverlay : bodyEl;
+                    if (targetEl) {
+                        targetEl.style.display = isLocked ? 'flex' : 'block';
+                        panelEl.classList.remove('amaes-minimized');
+                        minBtn.innerHTML = ICONS.minimize;
+                        localStorage.setItem('amaes_pref_minimized', 'false');
+                    }
+                }
+            });
+        }
 
         // Initialize lock state
         updatePanelLockState();

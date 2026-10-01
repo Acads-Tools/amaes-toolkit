@@ -101,6 +101,43 @@
         // Handle Short Answer / Fill-in-the-Blank text inputs
         if (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0)) {
             lines.push(`[Fill-in-the-Blank / Short Answer]`);
+
+            // Include confirmed wrong answers so AI won't re-suggest them
+            const shortEliminatedSet = getEliminatedChoicesForQuestion(que, qData, courseCode);
+            if (shortEliminatedSet && shortEliminatedSet.size > 0) {
+                const wrongList = Array.from(shortEliminatedSet).join('", "');
+                lines.push(`[CONFIRMED WRONG - DO NOT USE THESE]: "${wrongList}"`);
+                lines.push(`CRITICAL: Do NOT suggest any answer in the list above. They have been tested and confirmed incorrect.`);
+            }
+
+            // Include verified answer hint from DB if available and not eliminated
+            if (que) {
+                const courseInfoSA = detectCourseInfo();
+                const subCodeSA = courseInfoSA.subjectCode || courseCode || 'GENERAL';
+                const cachedSA = getCachedAnswers(subCodeSA);
+                if (cachedSA && cachedSA.length > 0) {
+                    const mQNorm = normalizeText(qData.qText || '');
+                    const candsSA = cachedSA.filter(c => questionTextMatches(c.qNorm || c.qRaw || c.question, mQNorm));
+                    const verifiedSA = candsSA.filter(c => {
+                        if (c.isAiSuggestion) return false;
+                        const src = (c.source || '').toLowerCase();
+                        if (src.includes('gemini') || src.includes('ai assistant')) return false;
+                        const ansN = c.ansNorm || normalizeChoice(c.ansRaw || c.answer || '');
+                        if (!ansN) return false;
+                        // Only suggest if not in confirmed wrong list
+                        return !shortEliminatedSet.has(ansN) && !shortEliminatedSet.has(unscriptDigits(ansN));
+                    });
+                    if (verifiedSA.length > 0) {
+                        verifiedSA.sort((a, b) => ((b.verified ? 10 : 0) + (b.confirmations || 1)) - ((a.verified ? 10 : 0) + (a.confirmations || 1)));
+                        const bestSA = verifiedSA[0];
+                        const hintAns = bestSA.ansRaw || bestSA.answer;
+                        if (hintAns) {
+                            lines.push(`[DATABASE HINT: Strong evidence suggests the answer is "${hintAns}" — verify this is correct before accepting]`);
+                        }
+                    }
+                }
+            }
+
             lines.push(`Reply with ONLY the exact, concise word or phrase (typically 1 to 3 words) that directly answers the question or fills the blank. No explanation. No quotes.`);
             return lines.join('\n');
         }
@@ -1147,6 +1184,29 @@
                     applyAiTextHighlight(que, textInput, cleaned);
                     saveAiAnswerToCache(qData, { choiceText: cleaned });
                     recordAttemptAnswerEvidence(que, cleaned, 'ai_inference');
+                    try {
+                        const courseInfo = detectCourseInfo();
+                        const sCode = courseInfo.subjectCode || 'GENERAL';
+                        if (cleaned && qData && qData.qText) {
+                            const aiEntry = {
+                                qRaw: qData.qText,
+                                qNorm: normalizeText(qData.qText),
+                                ansRaw: cleaned,
+                                ansNorm: normalizeChoice(cleaned),
+                                questionType: 'shortanswer',
+                                choices: [],
+                                wrongAnswers: Array.from(getEliminatedChoicesForQuestion(que, qData, sCode) || []),
+                                verified: false,
+                                isAiSuggestion: true,
+                                source: 'Google Gemini AI',
+                                confirmations: 1
+                            };
+                            mergeAnswersIntoCache(sCode, [aiEntry], 'Google Gemini AI');
+                            if (typeof queueCommunityContribution === 'function') {
+                                queueCommunityContribution(sCode, [aiEntry], { source: 'gemini_ai_suggestion', isAiSuggestion: true });
+                            }
+                        }
+                    } catch (_) {}
                     setLog(`[AI Suggestion] Gemini suggested <b>${escapeHtml(cleaned)}</b> for #${qData ? qData.qNum : ''}. (Paused for review)`, "var(--accent-purple)");
                     showToast(`Gemini suggested: "${cleaned}" for #${qData ? qData.qNum : ''}.`, 3000);
                     if (typeof onSuccess === 'function') {
@@ -1265,16 +1325,23 @@
                     const sCode = courseInfo.subjectCode || 'GENERAL';
                     const rawAns = (matched.choiceText || '').replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
                     if (rawAns && qData && qData.qText) {
-                        mergeAnswersIntoCache(sCode, [{
+                        const aiEntry = {
                             qRaw: qData.qText,
                             qNorm: normalizeText(qData.qText),
                             ansRaw: rawAns,
                             ansNorm: normalizeChoice(rawAns),
-                            choices: qData.choices,
+                            questionType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : (Array.isArray(qData.choices) && qData.choices.length > 0 ? 'multichoice' : 'shortanswer')),
+                            choices: qData.choices || [],
+                            wrongAnswers: Array.from(getEliminatedChoicesForQuestion(que, qData, sCode) || []),
                             verified: false,
                             isAiSuggestion: true,
-                            source: 'Google Gemini AI'
-                        }], 'Google Gemini AI');
+                            source: 'Google Gemini AI',
+                            confirmations: 1
+                        };
+                        mergeAnswersIntoCache(sCode, [aiEntry], 'Google Gemini AI');
+                        if (typeof queueCommunityContribution === 'function') {
+                            queueCommunityContribution(sCode, [aiEntry], { source: 'gemini_ai_suggestion', isAiSuggestion: true });
+                        }
                     }
                 } catch (_) {}
 

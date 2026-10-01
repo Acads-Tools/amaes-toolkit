@@ -899,6 +899,7 @@
                     ansNorm: normalizeChoice(rightAnswer),
                     answers: rightAnswersList.length > 1 ? rightAnswersList : undefined,
                     isMultiChoice: Boolean(qData.isMultiChoice),
+                    questionType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : (Array.isArray(qData.choices) && qData.choices.length > 0 ? 'multichoice' : 'shortanswer')),
                     wrongAnswers: normalizeWrongAnswers(wrongAnswers),
                     choices: qData.choices,
                     verified: isVerified,

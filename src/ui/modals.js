@@ -39,9 +39,8 @@
                     <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 8px; padding: 12px 14px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
                             <h3 style="margin: 0; font-size: 13.5px; color: #60a5fa; display: flex; align-items: center; gap: 6px;">${ICONS.checkCircle} Smart Auto-Answer & Highlighter</h3>
-                            <span style="font-size: 9px; font-family: monospace; color: #93c5fd; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.35); padding: 1px 6px; border-radius: 3px;">Background Capable</span>
                         </div>
-                        <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically recognizes your subject, finds verified answers shared by students, and highlights the right choices. Auto-Quiz runs autonomously in the background while you switch tabs or multitask in other applications.</p>
+                        <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically recognizes your subject, finds verified answers shared by students, and highlights the right choices. Auto-Quiz runs autonomously in the background (Background Capable) while you switch tabs or multitask in other applications.</p>
                     </div>
 
                     <div style="background: rgba(167, 139, 250, 0.1); border: 1px solid rgba(167, 139, 250, 0.2); border-radius: 8px; padding: 12px 14px;">

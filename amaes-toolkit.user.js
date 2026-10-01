@@ -3425,6 +3425,7 @@
                 ansRaw: String(answer).trim(),
                 ansNorm: normalizeChoice(answer),
                 choices: qData.choices || [],
+                questionType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : (Array.isArray(qData.choices) && qData.choices.length > 0 ? 'multichoice' : 'shortanswer')),
                 source,
                 isAiSuggestion: source === 'ai_inference',
                 recordedAt: Date.now()
@@ -4446,8 +4447,8 @@
             </button>
 
             <!-- Fast Mode HUD Toggle -->
-            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Toggle Fast Answer (Turbo) Mode">
-                ${ICONS.zap} <span>${fastQuizMode ? 'Turbo ON' : 'Turbo'}</span>
+            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Toggle Fast Answer Mode">
+                ${ICONS.zap} <span>${fastQuizMode ? 'Speed ON' : 'Speed'}</span>
             </button>
 
             <!-- Toggle Toolkit Panel -->
@@ -4497,11 +4498,13 @@
         const hudPanelBtn = document.getElementById('btn-hud-expand-panel');
         if (hudPanelBtn) {
             hudPanelBtn.onclick = () => {
+                const panel = document.getElementById('amaes-toolkit-panel');
                 const bodyEl = document.getElementById('amaes-panel-body');
                 const minBtn = document.getElementById('amaes-min-btn');
                 if (!bodyEl) return;
                 const isHidden = bodyEl.style.display === 'none';
                 bodyEl.style.display = isHidden ? 'block' : 'none';
+                if (panel) panel.classList.toggle('amaes-minimized', !isHidden);
                 if (minBtn) minBtn.innerHTML = isHidden ? ICONS.minimize : `
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -4812,6 +4815,7 @@
                 }
 
                 // If no modal open, minimize or expand the toolkit panel
+                const panel = document.getElementById('amaes-toolkit-panel');
                 const bodyEl = document.getElementById('amaes-panel-body');
                 const lockOverlay = document.getElementById('amaes-panel-lock-overlay');
                 const minBtn = document.getElementById('amaes-min-btn');
@@ -4823,6 +4827,7 @@
                     if (targetEl && targetEl.style.display !== 'none') {
                         if (bodyEl) bodyEl.style.display = 'none';
                         if (lockOverlay) lockOverlay.style.display = 'none';
+                        if (panel) panel.classList.add('amaes-minimized');
                         if (minBtn) {
                             minBtn.innerHTML = `
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -4841,6 +4846,7 @@
                             if (lockOverlay) lockOverlay.style.display = 'none';
                             if (bodyEl) bodyEl.style.display = 'block';
                         }
+                        if (panel) panel.classList.remove('amaes-minimized');
                         if (minBtn) minBtn.innerHTML = ICONS.minimize;
                         localStorage.setItem('amaes_pref_minimized', 'false');
                         showToast("Toolkit Expanded (Esc)");
@@ -8966,10 +8972,12 @@
 
             // Auto-minimize toolkit panel to floating smart pill if enabled
             if (autoMinimizeQuiz) {
+                const panel = document.getElementById('amaes-toolkit-panel');
                 const bodyEl = document.getElementById('amaes-panel-body');
                 const minBtn = document.getElementById('amaes-min-btn');
                 if (bodyEl && bodyEl.style.display !== 'none') {
                     bodyEl.style.display = 'none';
+                    if (panel) panel.classList.add('amaes-minimized');
                     if (minBtn) {
                         minBtn.innerHTML = `
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -10215,6 +10223,29 @@
                     applyAiTextHighlight(que, textInput, cleaned);
                     saveAiAnswerToCache(qData, { choiceText: cleaned });
                     recordAttemptAnswerEvidence(que, cleaned, 'ai_inference');
+                    try {
+                        const courseInfo = detectCourseInfo();
+                        const sCode = courseInfo.subjectCode || 'GENERAL';
+                        if (cleaned && qData && qData.qText) {
+                            const aiEntry = {
+                                qRaw: qData.qText,
+                                qNorm: normalizeText(qData.qText),
+                                ansRaw: cleaned,
+                                ansNorm: normalizeChoice(cleaned),
+                                questionType: 'shortanswer',
+                                choices: [],
+                                wrongAnswers: Array.from(getEliminatedChoicesForQuestion(que, qData, sCode) || []),
+                                verified: false,
+                                isAiSuggestion: true,
+                                source: 'Google Gemini AI',
+                                confirmations: 1
+                            };
+                            mergeAnswersIntoCache(sCode, [aiEntry], 'Google Gemini AI');
+                            if (typeof queueCommunityContribution === 'function') {
+                                queueCommunityContribution(sCode, [aiEntry], { source: 'gemini_ai_suggestion', isAiSuggestion: true });
+                            }
+                        }
+                    } catch (_) {}
                     setLog(`[AI Suggestion] Gemini suggested <b>${escapeHtml(cleaned)}</b> for #${qData ? qData.qNum : ''}. (Paused for review)`, "var(--accent-purple)");
                     showToast(`Gemini suggested: "${cleaned}" for #${qData ? qData.qNum : ''}.`, 3000);
                     if (typeof onSuccess === 'function') {
@@ -10333,16 +10364,23 @@
                     const sCode = courseInfo.subjectCode || 'GENERAL';
                     const rawAns = (matched.choiceText || '').replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
                     if (rawAns && qData && qData.qText) {
-                        mergeAnswersIntoCache(sCode, [{
+                        const aiEntry = {
                             qRaw: qData.qText,
                             qNorm: normalizeText(qData.qText),
                             ansRaw: rawAns,
                             ansNorm: normalizeChoice(rawAns),
-                            choices: qData.choices,
+                            questionType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : (Array.isArray(qData.choices) && qData.choices.length > 0 ? 'multichoice' : 'shortanswer')),
+                            choices: qData.choices || [],
+                            wrongAnswers: Array.from(getEliminatedChoicesForQuestion(que, qData, sCode) || []),
                             verified: false,
                             isAiSuggestion: true,
-                            source: 'Google Gemini AI'
-                        }], 'Google Gemini AI');
+                            source: 'Google Gemini AI',
+                            confirmations: 1
+                        };
+                        mergeAnswersIntoCache(sCode, [aiEntry], 'Google Gemini AI');
+                        if (typeof queueCommunityContribution === 'function') {
+                            queueCommunityContribution(sCode, [aiEntry], { source: 'gemini_ai_suggestion', isAiSuggestion: true });
+                        }
                     }
                 } catch (_) {}
 
@@ -11825,6 +11863,7 @@
                     ansNorm: normalizeChoice(rightAnswer),
                     answers: rightAnswersList.length > 1 ? rightAnswersList : undefined,
                     isMultiChoice: Boolean(qData.isMultiChoice),
+                    questionType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : (Array.isArray(qData.choices) && qData.choices.length > 0 ? 'multichoice' : 'shortanswer')),
                     wrongAnswers: normalizeWrongAnswers(wrongAnswers),
                     choices: qData.choices,
                     verified: isVerified,
@@ -13655,7 +13694,7 @@
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
                             <h3 style="margin: 0; font-size: 13.5px; color: #60a5fa; display: flex; align-items: center; gap: 6px;">${ICONS.checkCircle} Smart Auto-Answer & Highlighter</h3>
                         </div>
-                        <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically recognizes your subject, finds verified answers shared by students, and highlights the right choices. Auto-Quiz runs autonomously in the background while you switch tabs or multitask in other applications.</p>
+                        <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically recognizes your subject, finds verified answers shared by students, and highlights the right choices. Auto-Quiz runs autonomously in the background (Background Capable) while you switch tabs or multitask in other applications.</p>
                     </div>
 
                     <div style="background: rgba(167, 139, 250, 0.1); border: 1px solid rgba(167, 139, 250, 0.2); border-radius: 8px; padding: 12px 14px;">
@@ -14770,7 +14809,47 @@
                     flex-direction: column;
                 }
 
-                
+                #amaes-toolkit-panel.amaes-minimized {
+                    width: auto !important;
+                    min-width: 0 !important;
+                    padding: 5px 12px !important;
+                    border-radius: 24px !important;
+                    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35) !important;
+                    cursor: pointer;
+                    background: var(--bg);
+                    border: 1px solid var(--border);
+                }
+
+                #amaes-toolkit-panel.amaes-minimized #amaes-header {
+                    gap: 8px;
+                    width: auto;
+                }
+
+                #amaes-toolkit-panel.amaes-minimized #amaes-version-pill,
+                #amaes-toolkit-panel.amaes-minimized #amaes-reset-btn,
+                #amaes-toolkit-panel.amaes-minimized #amaes-help-btn,
+                #amaes-toolkit-panel.amaes-minimized #amaes-home-btn,
+                #amaes-toolkit-panel.amaes-minimized #amaes-theme-btn,
+                #amaes-toolkit-panel.amaes-minimized #amaes-bug-btn,
+                #amaes-toolkit-panel.amaes-minimized #amaes-debug-btn {
+                    display: none !important;
+                }
+
+                #amaes-toolkit-panel.amaes-minimized .amaes-icon-btn {
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 50%;
+                }
+
+                #amaes-toolkit-panel.amaes-minimized #amaes-title {
+                    font-size: 11px;
+                    font-weight: 700;
+                }
+
+                #amaes-toolkit-panel.amaes-minimized #amaes-logo-img {
+                    width: 14px;
+                    height: 14px;
+                }
                 #amaes-nav-tabs {
                     display: grid;
                     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -16815,10 +16894,12 @@
         }
 
         // Panel Minimize State Persistence
+        const panelEl = document.getElementById('amaes-toolkit-panel');
         const savedMinimized = localStorage.getItem('amaes_pref_minimized') === 'true';
         if (savedMinimized) {
             if (bodyEl) bodyEl.style.display = 'none';
             if (lockOverlay) lockOverlay.style.display = 'none';
+            if (panelEl) panelEl.classList.add('amaes-minimized');
             minBtn.innerHTML = `
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -16826,15 +16907,18 @@
             `;
         }
 
-        if (minBtn) minBtn.onclick = () => {
+        if (minBtn) minBtn.onclick = (e) => {
+            if (e) e.stopPropagation();
             const isLocked = localStorage.getItem('amaes_terms_acknowledged') !== 'true';
             const targetEl = (isLocked && lockOverlay) ? lockOverlay : bodyEl;
             if (targetEl && targetEl.style.display === 'none') {
                 targetEl.style.display = isLocked ? 'flex' : 'block';
+                if (panelEl) panelEl.classList.remove('amaes-minimized');
                 minBtn.innerHTML = ICONS.minimize;
                 localStorage.setItem('amaes_pref_minimized', 'false');
             } else if (targetEl) {
                 targetEl.style.display = 'none';
+                if (panelEl) panelEl.classList.add('amaes-minimized');
                 minBtn.innerHTML = `
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -16843,6 +16927,22 @@
                 localStorage.setItem('amaes_pref_minimized', 'true');
             }
         };
+
+        // Click anywhere on minimized pill to expand
+        if (panelEl) {
+            panelEl.addEventListener('click', (e) => {
+                if (panelEl.classList.contains('amaes-minimized') && !e.target.closest('#amaes-min-btn')) {
+                    const isLocked = localStorage.getItem('amaes_terms_acknowledged') !== 'true';
+                    const targetEl = (isLocked && lockOverlay) ? lockOverlay : bodyEl;
+                    if (targetEl) {
+                        targetEl.style.display = isLocked ? 'flex' : 'block';
+                        panelEl.classList.remove('amaes-minimized');
+                        minBtn.innerHTML = ICONS.minimize;
+                        localStorage.setItem('amaes_pref_minimized', 'false');
+                    }
+                }
+            });
+        }
 
         // Initialize lock state
         updatePanelLockState();
