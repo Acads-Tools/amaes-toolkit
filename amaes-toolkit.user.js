@@ -14247,7 +14247,7 @@
                         <button id="btn-master-auto-quiz" class="amaes-btn" style="justify-content: center; padding: 8px 12px; font-weight: 800; font-size: 11.5px; border: none; border-radius: 6px; background: ${autoQuizMode ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #10b981, #059669)'}; color: #fff; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.25);" title="Toggle hands-free Autonomous Quiz Solver (Shortcut: P)">
                             ${autoQuizMode ? ICONS.stop + ' <span>Pause Auto-Quiz</span>' : ICONS.play + ' <span>Start Auto-Quiz</span>'}
                         </button>
-                        <div id="amaes-autoquiz-subtext" style="font-size: 9.5px; color: var(--text-muted); text-align: center;">
+                        <div id="amaes-autoquiz-subtext" style="display: none;">
                             ${autoQuizMode ? 'Auto-answering & advancing in background. Click to pause.' : 'Auto-answers & advances. Pauses & copies on unknown questions.'}
                         </div>
                     </div>
