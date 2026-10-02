@@ -45,30 +45,13 @@
                 </div>
                 
                 <div id="amaes-actions">
-                    <button id="amaes-reset-btn" class="amaes-icon-btn" title="Reset installation: clear toolkit data and reopen welcome setup">
-                        ${ICONS.rotateCcw}
-                    </button>
-
-                    <button id="amaes-help-btn" class="amaes-icon-btn" title="Quick Start Guide & Documentation">
-                        ${ICONS.help}
-                    </button>
-
                     <a id="amaes-home-btn" class="amaes-icon-btn" href="${getSemesterCoursesUrl()}" title="Dashboard (My Courses)">
                         ${ICONS.home}
                     </a>
 
-                    <button id="amaes-theme-btn" class="amaes-icon-btn" title="Toggle Dark / Light Theme">
-                        ${currentTheme === 'dark' ? ICONS.sun : ICONS.moon}
+                    <button id="amaes-help-btn" class="amaes-icon-btn" title="Quick Start Guide, Utilities & Documentation">
+                        ${ICONS.help}
                     </button>
-
-                    <button id="amaes-bug-btn" class="amaes-icon-btn" title="Report a Problem / Bug to Maintainers">
-                        ${ICONS.bug || ICONS.alertTriangle}
-                    </button>
-
-                    ${DEBUG_MODE ? `
-                    <button id="amaes-debug-btn" class="amaes-icon-btn amaes-debug-btn" title="System Diagnostics & Report (Click to copy report)">
-                        ${ICONS.debug}
-                    </button>` : ''}
 
                     <button id="amaes-min-btn" class="amaes-icon-btn" title="Minimize / Expand">
                         ${ICONS.minimize}
@@ -739,12 +722,8 @@
                 }
 
                 #amaes-toolkit-panel.amaes-minimized #amaes-version-pill,
-                #amaes-toolkit-panel.amaes-minimized #amaes-reset-btn,
                 #amaes-toolkit-panel.amaes-minimized #amaes-help-btn,
-                #amaes-toolkit-panel.amaes-minimized #amaes-home-btn,
-                #amaes-toolkit-panel.amaes-minimized #amaes-theme-btn,
-                #amaes-toolkit-panel.amaes-minimized #amaes-bug-btn,
-                #amaes-toolkit-panel.amaes-minimized #amaes-debug-btn {
+                #amaes-toolkit-panel.amaes-minimized #amaes-home-btn {
                     display: none !important;
                 }
 
@@ -1557,7 +1536,9 @@
 
             const themeBtn = document.getElementById('amaes-theme-btn');
             if (themeBtn) {
-                themeBtn.innerHTML = currentTheme === 'dark' ? ICONS.sun : ICONS.moon;
+                themeBtn.innerHTML = currentTheme === 'dark' 
+                    ? `${ICONS.sun} <span>Light Mode</span>` 
+                    : `${ICONS.moon} <span>Dark Mode</span>`;
             }
         }
 

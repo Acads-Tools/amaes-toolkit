@@ -204,6 +204,22 @@
                         <button id="welcome-btn-reinstall" type="button" class="amaes-btn" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 6px; color: #a7f3d0; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center; font-weight: 700;" title="Reinstall current toolkit in Violentmonkey / Tampermonkey">${ICONS.download} <span>Reinstall</span></button>
                     </div>
 
+                    <!-- Toolkit Utilities & Preferences (Moved from header to declutter) -->
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                        <button id="amaes-theme-btn" type="button" class="amaes-btn" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: rgba(0,0,0,0.25); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Switch between Dark and Light mode">
+                            ${currentTheme === 'dark' ? ICONS.sun + ' <span>Light Mode</span>' : ICONS.moon + ' <span>Dark Mode</span>'}
+                        </button>
+                        <button id="amaes-bug-btn" type="button" class="amaes-btn" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 6px; color: #fca5a5; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Report a problem or bug to maintainers">
+                            ${ICONS.bug || ICONS.alertTriangle} <span>Report Bug</span>
+                        </button>
+                        <button id="amaes-debug-btn" type="button" class="amaes-btn amaes-debug-btn" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 6px; color: #93c5fd; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Copy diagnostic system report to clipboard">
+                            ${ICONS.clipboard} <span>Copy Log</span>
+                        </button>
+                        <button id="amaes-reset-btn" type="button" class="amaes-btn" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 6px; color: #fcd34d; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Reset installation: clear toolkit data and reopen welcome setup">
+                            ${ICONS.rotateCcw} <span>Reset All</span>
+                        </button>
+                    </div>
+
                     <!-- Agreement Disclaimer -->
                     <label style="display: flex; align-items: flex-start; gap: 10px; background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 10px 12px; cursor: pointer; transition: all 0.2s; margin-top: 2px;" id="welcome-terms-container">
                         <input id="welcome-chk-terms" type="checkbox" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 18px; height: 18px; margin-top: 1px; cursor: pointer; accent-color: #10b981; flex-shrink: 0;" />
@@ -337,6 +353,57 @@
             welcomeReinstallBtn.onclick = (e) => {
                 e.preventDefault();
                 triggerScriptReinstall();
+            };
+        }
+
+        const themeBtn = document.getElementById('amaes-theme-btn');
+        if (themeBtn) {
+            themeBtn.onclick = () => {
+                const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                applyTheme(nextTheme);
+                showToast(`Theme switched to ${nextTheme} mode`);
+            };
+        }
+
+        const bugBtn = document.getElementById('amaes-bug-btn');
+        if (bugBtn) {
+            bugBtn.onclick = () => {
+                showBugReportModal();
+            };
+        }
+
+        const debugBtn = document.getElementById('amaes-debug-btn');
+        if (debugBtn) {
+            debugBtn.onclick = async () => {
+                logDebug("Exporting debug diagnostic report...");
+                const report = generateDebugReport();
+                try {
+                    await copyToClipboard(report);
+                    debugBtn.innerHTML = `${ICONS.check} <span>Copied!</span>`;
+                    showToast("Diagnostic log copied to clipboard!");
+                    setTimeout(() => {
+                        if (debugBtn) {
+                            debugBtn.innerHTML = `${ICONS.clipboard} <span>Copy Log</span>`;
+                        }
+                    }, 2000);
+                } catch (err) {
+                    showToast("Failed to copy log");
+                }
+            };
+        }
+
+        const resetBtn = document.getElementById('amaes-reset-btn');
+        if (resetBtn) {
+            resetBtn.onclick = () => {
+                const ok = confirm(
+                    "Reset AMAES Toolkit to a brand-new installation?\n\n" +
+                    "This clears toolkit settings, cached answer databases, anonymous sharing history, update state, and welcome-page acceptance. " +
+                    "It does not uninstall Violentmonkey or delete Moodle data.\n\n" +
+                    "The welcome setup will reopen after reset. Continue?"
+                );
+                if (ok) {
+                    resetToolkitInstallation();
+                }
             };
         }
 
