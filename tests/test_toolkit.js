@@ -4893,11 +4893,14 @@ test("Welcome Modal Minimalist Overhaul: verifies unboxed sections, collapsed se
     assert.ok(script.includes('id="amaes-debug-btn"'), "Debug copy log button must be housed inside tools grid");
     assert.ok(script.includes('id="amaes-reset-btn"'), "Reset button must be housed inside tools grid");
 
-    // 3. Uniform neutral tags (no jarring rainbow tag backgrounds)
+    // 3. Highlighted Anonymous Safety Badge & Neutral Baseline Tags
     assert.ok(script.includes('Background Capable</span>'), "Must contain Background Capable badge");
     assert.ok(script.includes('100% Anonymous</span>'), "Must contain 100% Anonymous badge");
+    assert.ok(script.includes("rgba(59, 130, 246, 0.20)"), "100% Anonymous badge must use subtle low-opacity blue background");
+    assert.ok(script.includes("#60a5fa"), "Share icon and 100% Anonymous badge text must use soft trustworthy blue");
     assert.ok(script.includes('id="welcome-btn-setup-ai"'), "Must contain Setup AI button");
     assert.ok(script.includes("'Setup AI'"), "Must contain Setup AI label fallback");
+    assert.ok(script.includes("background: #10b981; color: #fff;"), "Get Started button must retain vibrant green accent");
 
     // 4. Concise punchy descriptions
     assert.ok(script.includes('Auto-Quiz runs autonomously in the background while highlighting verified answers as you multitask.'), "Auto-Quiz description must be single punchy sentence");
