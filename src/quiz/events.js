@@ -70,6 +70,19 @@
                     setLog("Open any quiz attempt to start auto-quiz.", "var(--accent-blue)");
                     return;
                 }
+                if (checkIsQuizAttemptPage() && (isWaitingForUserAnswer || document.querySelector('.amaes-blockage-hud'))) {
+                    const currentFocus = userSelectedActiveQuestion || getActiveViewportQuestion();
+                    const nextOnPage = findNextUnansweredOnCurrentPage(currentFocus);
+                    if (nextOnPage) {
+                        setActiveQuestion(nextOnPage, true);
+                        nextOnPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        const qData = extractQuestionData(nextOnPage);
+                        showToast(`Next: Question #${qData ? qData.qNum : ''}`, 1500);
+                        setLog(`Advancing to <b>Question #${qData ? qData.qNum : ''}</b>...`, "var(--accent-blue)");
+                        runAutoQuizSolver(true);
+                        return;
+                    }
+                }
                 toggleAutoQuizMode();
             };
         }

@@ -2863,8 +2863,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.8.8'), "Userscript header must specify v1.8.8");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.8.8";'), "Constant SCRIPT_VERSION must be v1.8.8");
+    assert.ok(script.includes('@version      1.8.9'), "Userscript header must specify v1.8.9");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.8.9";'), "Constant SCRIPT_VERSION must be v1.8.9");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3997,10 +3997,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.8.8-blue.svg"), "README badge must show v1.8.8");
+    assert.ok(readme.includes("version-1.8.9-blue.svg"), "README badge must show v1.8.9");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.8.8<"), "Website must display v1.8.8 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.8.9<"), "Website must display v1.8.9 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -4961,6 +4961,26 @@ test("Question HUD & AI Retry Redundancy Elimination: verifies single-banner gua
     // 4. Simplified multi-key configuration explanation
     assert.ok(script.includes("Higher Limits with Multiple Keys"), "Setup modal must explain higher limits with multiple keys simply");
     assert.ok(script.includes("automatically rotate between your keys"), "Setup modal must explain automatic key rotation");
+});
+
+// --------------------------------------------------
+test("Multi-Question Non-Blocking Pipeline & Context-Aware Navigation (v1.8.9): accurately indexes multi-question pages, syncs active focus, expands lookahead, and prevents premature submission on N key", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Accurate multi-question currentIndex resolving
+    assert.ok(script.includes("thisPageIndices.length > 1"), "getQuizNavQuestionStates must detect multi-question pages");
+    assert.ok(script.includes("firstUnanswered = thisPageIndices.find"), "getQuizNavQuestionStates must fallback to first unanswered on current page instead of last button");
+
+    // 2. Target focus synchronization on blocked questions
+    assert.ok(script.includes("setActiveQuestion(firstBlockedQue, false);"), "runAutoQuizSolver must set active question on blocked question to sync visual outline and TARGET QUESTION badge");
+
+    // 3. Fast mode lookahead across all visible unverified questions
+    assert.ok(script.includes("const otherQue = unverifiedQuestions.slice(1);"), "Fast mode solver must look ahead at all remaining unverified questions");
+
+    // 4. Context-aware N key shortcut navigation
+    assert.ok(script.includes("const nextOnPage = findNextUnansweredOnCurrentPage(currentFocus);"), "Key N handler must check for unanswered questions on current page before clicking next page");
+    assert.ok(script.includes("Shortcut: Advance to <b>Question"), "Key N handler must log advance when navigating within page");
 });
 
 console.log("\n==================================================");

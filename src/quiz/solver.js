@@ -13,9 +13,10 @@
         const questionList = [];
         let currentIndex = -1;
 
+        const thisPageIndices = [];
         buttons.forEach((btn, idx) => {
             const isCurrent = btn.classList.contains('thispage') || btn.getAttribute('aria-current') === 'true';
-            if (isCurrent) currentIndex = idx;
+            if (isCurrent) thisPageIndices.push(idx);
 
             // In Moodle, answered questions have class .answersaved, or title/aria-label containing "Answer saved"
             const title = (btn.getAttribute('title') || '').toLowerCase();
@@ -29,10 +30,43 @@
                 btn,
                 qNum,
                 index: idx,
-                isCurrent,
+                isCurrent: false,
                 isAnswered
             });
         });
+
+        if (thisPageIndices.length === 1) {
+            currentIndex = thisPageIndices[0];
+        } else if (thisPageIndices.length > 1) {
+            // Multi-question page: resolve active question card on screen
+            let activeQue = userSelectedActiveQuestion;
+            if (!activeQue || !document.contains(activeQue)) {
+                activeQue = document.querySelector('.que.amaes-active-focus-que');
+            }
+            if (!activeQue) {
+                const blockedQue = document.querySelector('.que .amaes-blockage-hud')?.closest('.que');
+                if (blockedQue) activeQue = blockedQue;
+            }
+            if (activeQue) {
+                const qData = extractQuestionData(activeQue);
+                const qNum = qData ? qData.qNum : null;
+                if (qNum) {
+                    const matchIdx = questionList.findIndex(q => q.qNum === qNum);
+                    if (matchIdx >= 0) currentIndex = matchIdx;
+                }
+            }
+            // Fallback: first unanswered question among this page's questions, or the first question on this page
+            if (currentIndex < 0) {
+                const firstUnanswered = thisPageIndices.find(idx => !questionList[idx].isAnswered);
+                currentIndex = (firstUnanswered !== undefined) ? firstUnanswered : thisPageIndices[0];
+            }
+        } else if (questionList.length > 0) {
+            currentIndex = 0;
+        }
+
+        if (currentIndex >= 0 && currentIndex < questionList.length) {
+            questionList[currentIndex].isCurrent = true;
+        }
 
         // Find the next UNANSWERED question AFTER the current question
         let nextUnanswered = null;
@@ -716,6 +750,7 @@
                     copyQuestionWithOptionalImage(firstBlockedQue, aiPromptText).catch(() => {});
                 }
 
+                setActiveQuestion(firstBlockedQue, false);
                 firstBlockedQue.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 firstBlockedQue.style.outline = '2.5px solid #f59e0b';
                 firstBlockedQue.style.borderRadius = '8px';
@@ -866,9 +901,9 @@
 
                     // In Fast Mode on multi-question pages: concurrently solve other visible unknown questions
                     if (fastQuizMode && queContainers.length > 1 && unverifiedQuestions.length > 1) {
-                        const otherQue = unverifiedQuestions.slice(1, 3);
+                        const otherQue = unverifiedQuestions.slice(1);
                         otherQue.forEach(oQue => {
-                            if (oQue.querySelector('.amaes-ai-suggested-choice') || isQuestionAnswered(oQue)) return;
+                            if (oQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-text-badge') || isQuestionAnswered(oQue)) return;
                             const oQData = extractQuestionData(oQue);
                             if (oQData && (oQData.questionType === 'multichoice' || oQData.questionType === 'truefalse')) {
                                 const oPrompt = buildGeminiCompactPrompt(oQData, courseCode, oQue);
@@ -885,8 +920,10 @@
                                         oQue.style.borderRadius = '8px';
                                         setQuestionAiTag(oQue, true);
                                         if (aiAutoSelect && oMatched && oMatched.input) {
-                                            oMatched.input.checked = true;
-                                            oMatched.input.click();
+                                            if (oMatched.input.type === 'radio' || oMatched.input.type === 'checkbox') {
+                                                oMatched.input.checked = true;
+                                                oMatched.input.click();
+                                            }
                                         }
                                     }
                                 }).catch(() => {});
@@ -904,6 +941,42 @@
                     copyQuestionWithOptionalImage(firstBlockedQue, aiPromptText).then((res) => {
                         showToast(res && res.withImage ? `Visual snippet & Question #${qData ? qData.qNum : ''} copied to clipboard!` : `Question #${qData ? qData.qNum : ''} copied to clipboard — ready to paste!`, 3000);
                     }).catch(() => {});
+
+                    // In Fast Mode: even if first question requires manual intervention, background-solve remaining eligible questions
+                    if (fastQuizMode && queContainers.length > 1 && unverifiedQuestions.length > 1) {
+                        const activeKey = getAvailableGeminiKey();
+                        if (activeKey && aiQuizEnabled) {
+                            const courseInfo = detectCourseInfo();
+                            const courseCode = courseInfo.subjectCode || '';
+                            unverifiedQuestions.slice(1).forEach(oQue => {
+                                if (oQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-text-badge') || isQuestionAnswered(oQue)) return;
+                                const oQData = extractQuestionData(oQue);
+                                if (oQData && (oQData.questionType === 'multichoice' || oQData.questionType === 'truefalse')) {
+                                    const oPrompt = buildGeminiCompactPrompt(oQData, courseCode, oQue);
+                                    handleGeminiQuestionInference({
+                                        que: oQue,
+                                        qData: oQData,
+                                        promptText: oPrompt,
+                                        onSuccess: async (oMatched) => {
+                                            if (oMatched && oMatched.choiceText) {
+                                                recordAttemptAnswerEvidence(oQue, oMatched.choiceText, 'ai_inference');
+                                            }
+                                            oQue.querySelectorAll('.amaes-blockage-hud, .amaes-unanswered-hint').forEach(el => el.remove());
+                                            oQue.style.outline = '2px solid rgba(139, 92, 246, 0.7)';
+                                            oQue.style.borderRadius = '8px';
+                                            setQuestionAiTag(oQue, true);
+                                            if (aiAutoSelect && oMatched && oMatched.input) {
+                                                if (oMatched.input.type === 'radio' || oMatched.input.type === 'checkbox') {
+                                                    oMatched.input.checked = true;
+                                                    oMatched.input.click();
+                                                }
+                                            }
+                                        }
+                                    }).catch(() => {});
+                                }
+                            });
+                        }
+                    }
                 }
 
                 // If reaching here: either question is ineligible for AI (e.g. text/drag), AI is not enabled, or AI failed
@@ -1831,8 +1904,25 @@
 
             const key = e.key ? e.key.toUpperCase() : '';
 
-            // 1. Next Page / Submit Navigation: 'N' or 'Space' or 'Enter'
+            // 1. Next Question / Next Page / Submit Navigation: 'N' or 'Space' or 'Enter'
             if (key === 'N' || key === ' ' || key === 'ENTER') {
+                const currentFocus = userSelectedActiveQuestion || getActiveViewportQuestion();
+                const nextOnPage = findNextUnansweredOnCurrentPage(currentFocus);
+
+                if (nextOnPage) {
+                    e.preventDefault();
+                    if (active && typeof active.blur === 'function') active.blur();
+                    setActiveQuestion(nextOnPage, true);
+                    nextOnPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    const qData = extractQuestionData(nextOnPage);
+                    showToast(`Next: Question #${qData ? qData.qNum : ''}`, 1500);
+                    setLog(`Shortcut: Advance to <b>Question #${qData ? qData.qNum : ''}</b>`, "var(--accent-blue)");
+                    if (autoQuizMode) {
+                        runAutoQuizSolver();
+                    }
+                    return;
+                }
+
                 const nextBtn = findQuizNextButton();
                 if (nextBtn) {
                     e.preventDefault();
