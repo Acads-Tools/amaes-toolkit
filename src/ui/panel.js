@@ -79,7 +79,7 @@
                 <label id="amaes-lock-terms-label" style="display: flex; align-items: flex-start; gap: 8px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 10px; cursor: pointer; text-align: left; width: 100%; box-sizing: border-box; transition: border-color 0.2s;">
                     <input id="amaes-lock-chk-terms" type="checkbox" style="width: 16px; height: 16px; margin-top: 2px; cursor: pointer; accent-color: #10b981; flex-shrink: 0;" />
                     <span style="font-size: 10.5px; color: #cbd5e1; line-height: 1.35;">
-                        I understand and accept the <a href="https://github.com/Acads-Tools/amaes-toolkit#important-use-disclaimer" target="_blank" rel="noopener noreferrer" style="color: #93c5fd; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;" onclick="event.stopPropagation();">Terms of Use & Disclaimer</a>, and will use this toolkit responsibly.
+                        I understand and accept the <span style="color: #f4f4f5; font-weight: 600;">Terms of Use &amp; Disclaimer</span>, and will use this toolkit responsibly.
                     </span>
                 </label>
 

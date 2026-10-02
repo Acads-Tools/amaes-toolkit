@@ -4903,6 +4903,12 @@ test("Welcome Modal Minimalist Overhaul: verifies unboxed sections, collapsed se
     assert.ok(script.includes('Auto-Quiz runs autonomously in the background while highlighting verified answers as you multitask.'), "Auto-Quiz description must be single punchy sentence");
     assert.ok(script.includes('Completed quiz answers are shared anonymously with classmates with zero personal data collected.'), "Sync description must be single punchy sentence");
     assert.ok(script.includes('Instant in-quiz AI solver for questions not yet in the community database.'), "Gemini AI description must be single punchy sentence");
+
+    // 5. Terms agreement label must toggle directly without opening an unwanted tab
+    const termsContainerIdx = script.indexOf('id="welcome-terms-container"');
+    assert.ok(termsContainerIdx !== -1, "Must contain welcome-terms-container");
+    const termsContainerBlock = script.substring(termsContainerIdx, termsContainerIdx + 500);
+    assert.ok(!termsContainerBlock.includes('target="_blank"'), "Agreement label must not contain external link opening a new tab");
 });
 
 console.log("\n==================================================");

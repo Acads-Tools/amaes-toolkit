@@ -13929,7 +13929,7 @@
                     <!-- Agreement Disclaimer (Unboxed & Clean) -->
                     <label style="display: flex; align-items: flex-start; gap: 10px; padding: 2px 0; cursor: pointer; user-select: none;" id="welcome-terms-container">
                         <input id="welcome-chk-terms" type="checkbox" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 16px; height: 16px; margin-top: 1px; cursor: pointer; flex-shrink: 0;" />
-                        <span style="color: ${isLight ? '#52525b' : '#a1a1aa'}; font-size: 11px; line-height: 1.45;">I understand this is an independent study aid. I agree to the <a href="https://github.com/Acads-Tools/amaes-toolkit#important-use-disclaimer" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#18181b' : '#f4f4f5'}; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;" onclick="event.stopPropagation();">Terms of Use & Disclaimer</a>, will use it responsibly, and agree to share verified answers anonymously to help classmates.</span>
+                        <span style="color: ${isLight ? '#52525b' : '#a1a1aa'}; font-size: 11px; line-height: 1.45;">I understand this is an independent study aid. I agree to the <span style="color: ${isLight ? '#18181b' : '#f4f4f5'}; font-weight: 600;">Terms of Use &amp; Disclaimer</span>, will use it responsibly, and agree to share verified answers anonymously to help classmates.</span>
                     </label>
                 </div>
 
@@ -14287,7 +14287,7 @@
                 <label id="amaes-lock-terms-label" style="display: flex; align-items: flex-start; gap: 8px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 10px; cursor: pointer; text-align: left; width: 100%; box-sizing: border-box; transition: border-color 0.2s;">
                     <input id="amaes-lock-chk-terms" type="checkbox" style="width: 16px; height: 16px; margin-top: 2px; cursor: pointer; accent-color: #10b981; flex-shrink: 0;" />
                     <span style="font-size: 10.5px; color: #cbd5e1; line-height: 1.35;">
-                        I understand and accept the <a href="https://github.com/Acads-Tools/amaes-toolkit#important-use-disclaimer" target="_blank" rel="noopener noreferrer" style="color: #93c5fd; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;" onclick="event.stopPropagation();">Terms of Use & Disclaimer</a>, and will use this toolkit responsibly.
+                        I understand and accept the <span style="color: #f4f4f5; font-weight: 600;">Terms of Use &amp; Disclaimer</span>, and will use this toolkit responsibly.
                     </span>
                 </label>
 

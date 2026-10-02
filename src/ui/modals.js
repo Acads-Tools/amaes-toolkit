@@ -235,7 +235,7 @@
                     <!-- Agreement Disclaimer (Unboxed & Clean) -->
                     <label style="display: flex; align-items: flex-start; gap: 10px; padding: 2px 0; cursor: pointer; user-select: none;" id="welcome-terms-container">
                         <input id="welcome-chk-terms" type="checkbox" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 16px; height: 16px; margin-top: 1px; cursor: pointer; flex-shrink: 0;" />
-                        <span style="color: ${isLight ? '#52525b' : '#a1a1aa'}; font-size: 11px; line-height: 1.45;">I understand this is an independent study aid. I agree to the <a href="https://github.com/Acads-Tools/amaes-toolkit#important-use-disclaimer" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#18181b' : '#f4f4f5'}; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;" onclick="event.stopPropagation();">Terms of Use & Disclaimer</a>, will use it responsibly, and agree to share verified answers anonymously to help classmates.</span>
+                        <span style="color: ${isLight ? '#52525b' : '#a1a1aa'}; font-size: 11px; line-height: 1.45;">I understand this is an independent study aid. I agree to the <span style="color: ${isLight ? '#18181b' : '#f4f4f5'}; font-weight: 600;">Terms of Use &amp; Disclaimer</span>, will use it responsibly, and agree to share verified answers anonymously to help classmates.</span>
                     </label>
                 </div>
 
