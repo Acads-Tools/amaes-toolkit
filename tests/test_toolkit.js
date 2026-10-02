@@ -5000,16 +5000,27 @@ test("Activity Auto-View & Quiz Summary Auto-Submit with Completion Sound (v1.9.
     assert.ok(script.includes("function setupAutoViewBadges()"), "Must define setupAutoViewBadges to attach 1-click handler to course page badges");
     assert.ok(script.includes("badge.title = 'Click to auto-view and mark as done!';"), "setupAutoViewBadges must set helpful hover tooltip");
 
-    // 2. Batch Execution Engine Integration
+    // 2. Smart Skip Already-Completed Activities Guard
+    assert.ok(script.includes("function isActivityAlreadyComplete(container)"), "Must define isActivityAlreadyComplete helper");
+    assert.ok(script.includes("goal === 'mark_done' && isActivityAlreadyComplete(container)"), "findButtons scanBlock must smart skip already completed activities");
+    assert.ok(script.includes("isActivityAlreadyComplete(container)) return;"), "setupAutoViewBadges must smart skip binding already completed activities");
+
+    // 3. Batch Execution Engine Integration
     assert.ok(script.includes("item.isAutoView && item.autoViewUrl"), "runBatch must detect auto-view items and call autoViewActivity");
     assert.ok(script.includes("playToolkitSound('quest_done')"), "runBatch and quiz completion must play celebratory quest_done audio chime");
 
-    // 3. Quiz Summary Auto-Submit Option
+    // 4. Quiz Summary Auto-Submit Option
     assert.ok(script.includes('id="chk-auto-submit-quiz"'), "Panel markup must render chk-auto-submit-quiz checkbox under Advanced Settings");
     assert.ok(script.includes("localStorage.getItem('amaes_auto_submit_quiz') === 'true'"), "autoSubmitQuiz state must be read from localStorage");
     assert.ok(script.includes("localStorage.setItem('amaes_auto_submit_quiz', autoSubmitQuiz)"), "Checkbox toggle must persist to localStorage");
     assert.ok(script.includes("if (autoSubmitQuiz) {"), "handleQuizSummaryAutoSubmit must guard auto-submit execution with autoSubmitQuiz");
     assert.ok(script.includes(".btn-finishattempt, input[value*=\"Submit all and finish\"]"), "handleQuizSummaryAutoSubmit must locate summary submit button");
+
+    // 5. Terms of Use & Legal Safety Link
+    assert.ok(script.includes('id="welcome-terms-link"'), "Must render welcome-terms-link in disclaimer");
+    assert.ok(script.includes("https://github.com/Acads-Tools/amaes-toolkit/blob/main/docs/TERMS.md"), "Terms link must point to docs/TERMS.md on GitHub");
+    assert.ok(script.includes("termsLink.onclick = (e) => {"), "Terms link must prevent event propagation to avoid unwanted checkbox toggling");
+    assert.ok(script.includes("solely responsible for my own coursework and academic integrity"), "Disclaimer text must emphasize user sole responsibility for academic integrity");
 });
 
 console.log("\n==================================================");

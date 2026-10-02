@@ -6781,6 +6781,31 @@
         return { isPassable: false, hasGrade: false, percentage: null, source: 'no-grade' };
     }
 
+    function isActivityAlreadyComplete(container) {
+        if (!container) return false;
+
+        // 1. Direct class checks on container
+        if (container.classList.contains('completed')) return true;
+
+        // 2. Completed icons or toggled buttons
+        if (container.querySelector('.iscompleted, [data-toggled="true"], button[aria-checked="true"], button.btn-success')) return true;
+
+        // 3. Scan completion area for completion markers
+        const completionArea = container.querySelector(
+            '.activity-completion, [data-region="completion-info"], .automatic-completion-conditions, .completion-info'
+        ) || container;
+
+        if (completionArea.querySelector('.badge-success, .text-success, [data-region="completion-info"] .badge-success')) return true;
+
+        // 4. Check entire completionArea text content for "Done" or "Completed"
+        const fullText = (completionArea.innerText || completionArea.textContent || '').trim().toLowerCase();
+        if (fullText.includes('done:') || fullText.includes('done :') || fullText === 'done' || fullText.includes('completed')) {
+            return true;
+        }
+
+        return false;
+    }
+
     function findButtons(goal = 'mark_done', category = 'lecture', gradesMap = null) {
         const results = [];
         const activityElements = document.querySelectorAll(
@@ -6792,6 +6817,11 @@
 
         const scanBlock = (container) => {
             if (!container) return;
+
+            // Smart Skip: If goal is to mark done, completely skip activities that are already done
+            if (goal === 'mark_done' && isActivityAlreadyComplete(container)) {
+                return;
+            }
 
             const buttons = container.querySelectorAll(
                 'button[data-action="toggle-manual-completion"], ' +
@@ -6871,12 +6901,15 @@
                     '.activity-completion, [data-region="completion-info"], .automatic-completion-conditions, .completion-info'
                 ) || container;
 
-                const badges = completionArea.querySelectorAll('.badge, span, div');
+                const badges = completionArea.querySelectorAll('.badge, button, [data-region="completion-info"] span, .automatic-completion-conditions span');
                 let uncompletedViewBadge = null;
                 for (const badge of badges) {
+                    if (badge.closest('.badge-success, .completed, .iscompleted')) continue;
+
                     const text = (badge.innerText || badge.textContent || '').trim().toLowerCase();
-                    if ((text.includes('to do: view') || text.includes('to do:view') || text === 'view' || text === 'to do') &&
-                        !text.includes('done') && !text.includes('completed') && !badge.classList.contains('badge-success')) {
+                    const isTodoView = text.includes('to do: view') || text.includes('to do:view') || (text.includes('to do') && text.includes('view'));
+
+                    if (isTodoView && !text.includes('done') && !text.includes('completed') && !badge.classList.contains('badge-success')) {
                         uncompletedViewBadge = badge;
                         break;
                     }
@@ -6980,15 +7013,21 @@
         );
 
         containers.forEach(container => {
+            // Smart Skip: If activity is already done/completed, do not bind or view
+            if (isActivityAlreadyComplete(container)) return;
+
             const completionArea = container.querySelector(
                 '.activity-completion, [data-region="completion-info"], .automatic-completion-conditions, .completion-info'
             ) || container;
 
-            const badges = completionArea.querySelectorAll('.badge, span, div');
+            const badges = completionArea.querySelectorAll('.badge, button, [data-region="completion-info"] span, .automatic-completion-conditions span');
             for (const badge of badges) {
+                if (badge.closest('.badge-success, .completed, .iscompleted')) continue;
+
                 const text = (badge.innerText || badge.textContent || '').trim().toLowerCase();
-                if ((text.includes('to do: view') || text.includes('to do:view') || text === 'view' || text === 'to do') &&
-                    !text.includes('done') && !text.includes('completed') && !badge.classList.contains('badge-success')) {
+                const isTodoView = text.includes('to do: view') || text.includes('to do:view') || (text.includes('to do') && text.includes('view'));
+
+                if (isTodoView && !text.includes('done') && !text.includes('completed') && !badge.classList.contains('badge-success')) {
 
                     if (badge.dataset.amaesAutoViewBound) continue;
                     badge.dataset.amaesAutoViewBound = 'true';
@@ -14288,7 +14327,7 @@
                     <!-- Agreement Disclaimer (Unboxed & Clean) -->
                     <label style="display: flex; align-items: flex-start; gap: 10px; padding: 2px 0; cursor: pointer; user-select: none;" id="welcome-terms-container">
                         <input id="welcome-chk-terms" type="checkbox" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 16px; height: 16px; margin-top: 1px; cursor: pointer; flex-shrink: 0; accent-color: #10b981;" />
-                        <span style="color: ${isLight ? '#52525b' : '#a1a1aa'}; font-size: 11px; line-height: 1.45;">I understand this is an independent study aid. I agree to the <span style="color: ${isLight ? '#18181b' : '#f4f4f5'}; font-weight: 600;">Terms of Use &amp; Disclaimer</span>, will use it responsibly, and agree to share verified answers anonymously to help classmates.</span>
+                        <span style="color: ${isLight ? '#52525b' : '#a1a1aa'}; font-size: 11px; line-height: 1.45;">I understand this is an independent study aid provided "AS IS". I agree to the <a id="welcome-terms-link" href="https://github.com/Acads-Tools/amaes-toolkit/blob/main/docs/TERMS.md" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#2563eb' : '#60a5fa'}; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;">Terms of Use &amp; Disclaimer</a>, acknowledge that I am solely responsible for my own coursework and academic integrity, and agree to share verified answers anonymously to help classmates.</span>
                     </label>
                 </div>
 
@@ -14403,6 +14442,13 @@
                     showToast("Agreement unaccepted. Pausing tools and refreshing page...", 2500);
                     setTimeout(() => window.location.reload(), 500);
                 }
+            };
+        }
+
+        const termsLink = document.getElementById('welcome-terms-link');
+        if (termsLink) {
+            termsLink.onclick = (e) => {
+                e.stopPropagation();
             };
         }
 
