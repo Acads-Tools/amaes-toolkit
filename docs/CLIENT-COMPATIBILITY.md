@@ -1,6 +1,6 @@
 # Client compatibility
 
-The current AMAES Toolkit client version is **1.8.3**. The relay currently
+The current AMAES Toolkit client version is **1.8.4**. The relay currently
 allows version **1.8.2 or newer**.
 
 Clients below the configured minimum, clients with a missing or invalid
