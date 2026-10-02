@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.8.6
+// @version      1.8.7
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -15,6 +15,7 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
+// @grant        GM_notification
 // @connect      raw.githubusercontent.com
 // @connect      api.github.com
 // @connect      amauoed.com
@@ -29,7 +30,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.8.6";
+    const SCRIPT_VERSION = "v1.8.7";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -1093,54 +1094,92 @@
 
     function playToolkitSound(type) {
         if (!enableAudioAlerts) return;
+
+        // Desktop OS notification via GM_notification (bypasses browser tab autoplay suspension completely)
+        if (typeof GM_notification === 'function') {
+            try {
+                GM_notification({
+                    title: (type === 'quest_done' || type === 'complete') ? 'Quiz Completed · AMAES Toolkit' : 'Manual Input Needed · AMAES Toolkit',
+                    text: (type === 'quest_done' || type === 'complete')
+                        ? 'All questions answered and saved! Waiting for your confirmation to submit.'
+                        : 'Unknown question encountered. Paused for your input.',
+                    silent: false,
+                    timeout: 6000
+                });
+            } catch (_) {}
+        }
+
         try {
             const ctx = getAudioContext();
             if (!ctx) return;
-            const now = ctx.currentTime;
 
-            if (type === 'quest_done' || type === 'complete') {
-                // Bright, celebratory multi-tone ascending ding (D5 -> A5 -> D6 chime)
-                const notes = [
-                    { freq: 587.33, start: 0, dur: 0.25 },
-                    { freq: 880.00, start: 0.1, dur: 0.35 },
-                    { freq: 1174.66, start: 0.2, dur: 0.8 }
-                ];
-                notes.forEach(n => {
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(n.freq, now + n.start);
+            const executeAudioChime = () => {
+                const now = ctx.currentTime;
+                if (type === 'quest_done' || type === 'complete') {
+                    // Bright, celebratory multi-tone ascending ding (D5 -> A5 -> D6 chime)
+                    const notes = [
+                        { freq: 587.33, start: 0, dur: 0.25 },
+                        { freq: 880.00, start: 0.1, dur: 0.35 },
+                        { freq: 1174.66, start: 0.2, dur: 0.8 }
+                    ];
+                    notes.forEach(n => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(n.freq, now + n.start);
 
-                    gain.gain.setValueAtTime(0.0001, now + n.start);
-                    gain.gain.exponentialRampToValueAtTime(0.18, now + n.start + 0.02);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
+                        gain.gain.setValueAtTime(0.0001, now + n.start);
+                        gain.gain.exponentialRampToValueAtTime(0.18, now + n.start + 0.02);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
 
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.start(now + n.start);
-                    osc.stop(now + n.start + n.dur);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + n.start);
+                        osc.stop(now + n.start + n.dur);
+                    });
+                } else if (type === 'manual_intervention' || type === 'unknown') {
+                    // Gentle, distinctive two-tone alert chime (F5 -> D5 soft marimba tone)
+                    const notes = [
+                        { freq: 698.46, start: 0, dur: 0.14 },
+                        { freq: 587.33, start: 0.12, dur: 0.4 }
+                    ];
+                    notes.forEach(n => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(n.freq, now + n.start);
+
+                        gain.gain.setValueAtTime(0.0001, now + n.start);
+                        gain.gain.exponentialRampToValueAtTime(0.16, now + n.start + 0.02);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
+
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + n.start);
+                        osc.stop(now + n.start + n.dur);
+                    });
+                }
+            };
+
+            if (ctx.state === 'suspended') {
+                ctx.resume().then(() => {
+                    executeAudioChime();
+                }).catch(() => {
+                    let expired = false;
+                    const expireTimer = setTimeout(() => { expired = true; }, 4000);
+                    const onUserGesture = () => {
+                        window.removeEventListener('click', onUserGesture, { capture: true });
+                        window.removeEventListener('keydown', onUserGesture, { capture: true });
+                        clearTimeout(expireTimer);
+                        if (!expired && ctx.state === 'running') {
+                            executeAudioChime();
+                        }
+                    };
+                    window.addEventListener('click', onUserGesture, { capture: true, once: true });
+                    window.addEventListener('keydown', onUserGesture, { capture: true, once: true });
                 });
-            } else if (type === 'manual_intervention' || type === 'unknown') {
-                // Gentle, distinctive two-tone alert chime (F5 -> D5 soft marimba tone)
-                const notes = [
-                    { freq: 698.46, start: 0, dur: 0.14 },
-                    { freq: 587.33, start: 0.12, dur: 0.4 }
-                ];
-                notes.forEach(n => {
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(n.freq, now + n.start);
-
-                    gain.gain.setValueAtTime(0.0001, now + n.start);
-                    gain.gain.exponentialRampToValueAtTime(0.16, now + n.start + 0.02);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
-
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.start(now + n.start);
-                    osc.stop(now + n.start + n.dur);
-                });
+            } else {
+                executeAudioChime();
             }
         } catch (e) {
             logDebug("Audio notification error: " + e.message);
@@ -3599,7 +3638,6 @@
             const finishDelay = fastQuizMode ? 200 : 1000;
             setLog(`<b>All Questions Answered!</b> Advancing to summary in <b>${(finishDelay / 1000).toFixed(1)}s</b>...`, "var(--accent-green)");
             showToast("All questions answered! Advancing to summary...", 1200);
-            playToolkitSound('quest_done');
             autoNextTimer = setTimeout(() => {
                 if (!autoQuizMode) return;
                 if (isManualAnswer && !autoNextQuiz) return;
@@ -3680,7 +3718,6 @@
                     logDebug("Smart Navigation: All questions answered! Proceeding to finish attempt.");
                     setLog("<b>All Questions Answered!</b> Proceeding to summary screen...", "var(--accent-green)");
                     showToast("All questions answered! Finishing attempt...", 2500);
-                    playToolkitSound('quest_done');
                     finishBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     finishBtn.click();
                     return true;
@@ -4272,6 +4309,24 @@
     function handleQuizSummaryAutoSubmit() {
         if (!checkIsQuizSummaryPage()) return;
         promoteAttemptEvidenceFromScore();
+
+        // Update UI immediately to indicate completion and waiting for confirmation
+        syncAutoQuizUI();
+        setLog("<b>Quiz Completed:</b> All questions answered and saved. Waiting for your confirmation to submit.", "var(--accent-green)", "Review your saved answers below and click Submit all and finish");
+        showToast("✓ All questions answered! Waiting for confirmation...", 4000);
+
+        // Update document title so students multitasking in background tabs know it's ready
+        if (typeof document !== 'undefined' && document.title && !document.title.includes('(✓ Ready to Submit)')) {
+            document.title = '(✓ Ready to Submit) ' + document.title;
+        }
+
+        // Highlight Moodle's "Submit all and finish" button
+        const submitBtn = document.querySelector('.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], #region-main input[type="submit"], input[value*="Submit"]');
+        if (submitBtn) {
+            submitBtn.style.outline = '3px solid #10b981';
+            submitBtn.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.45)';
+        }
+
         if (!sessionStorage.getItem('amaes_summary_ding_' + window.location.href)) {
             sessionStorage.setItem('amaes_summary_ding_' + window.location.href, 'true');
             playToolkitSound('quest_done');
@@ -4325,7 +4380,11 @@
     function syncAutoQuizUI(isPausedOnUnknown = false) {
         const btnMasterAutoQuiz = document.getElementById('btn-master-auto-quiz');
         if (btnMasterAutoQuiz) {
-            if (isPausedOnUnknown || isWaitingForUserAnswer || (checkIsQuizAttemptPage() && document.querySelector('.amaes-blockage-hud'))) {
+            if (checkIsQuizSummaryPage()) {
+                btnMasterAutoQuiz.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                btnMasterAutoQuiz.innerHTML = `${ICONS.checkBadge || ICONS.zap} <span>Review & Submit</span>`;
+                btnMasterAutoQuiz.title = 'All questions answered! Click to scroll to submit button';
+            } else if (isPausedOnUnknown || isWaitingForUserAnswer || (checkIsQuizAttemptPage() && document.querySelector('.amaes-blockage-hud'))) {
                 btnMasterAutoQuiz.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
                 btnMasterAutoQuiz.innerHTML = `${ICONS.zap} <span>Waiting on Q (Press N)</span>`;
             } else if (autoQuizMode) {
@@ -4339,7 +4398,9 @@
 
         const subtext = document.getElementById('amaes-autoquiz-subtext');
         if (subtext) {
-            if (isPausedOnUnknown || isWaitingForUserAnswer || (checkIsQuizAttemptPage() && document.querySelector('.amaes-blockage-hud'))) {
+            if (checkIsQuizSummaryPage()) {
+                subtext.textContent = 'All questions answered and saved. Review your answers and submit when ready.';
+            } else if (isPausedOnUnknown || isWaitingForUserAnswer || (checkIsQuizAttemptPage() && document.querySelector('.amaes-blockage-hud'))) {
                 subtext.textContent = 'Paused on unknown question. Answer or press N to continue.';
             } else if (autoQuizMode) {
                 subtext.textContent = 'Auto-answering & advancing in background. Click to pause.';
@@ -4351,7 +4412,11 @@
         const bgNoticeDot = document.getElementById('amaes-autoquiz-bg-dot');
         const bgNoticeText = document.getElementById('amaes-autoquiz-bg-text');
         if (bgNoticeDot && bgNoticeText) {
-            if (autoQuizMode) {
+            if (checkIsQuizSummaryPage()) {
+                bgNoticeDot.style.background = 'var(--accent-green, #10b981)';
+                bgNoticeDot.style.boxShadow = '0 0 6px #10b981';
+                bgNoticeText.textContent = 'Completed · Waiting for your confirmation';
+            } else if (autoQuizMode) {
                 bgNoticeDot.style.background = 'var(--accent-green, #10b981)';
                 bgNoticeDot.style.boxShadow = '0 0 6px #10b981';
                 bgNoticeText.textContent = 'Active in background (safe to switch tabs/apps)';
@@ -9046,7 +9111,7 @@
         }
 
         if (checkIsQuizSummaryPage()) {
-            setTimeout(handleQuizSummaryAutoSubmit, 600);
+            handleQuizSummaryAutoSubmit();
         }
 
         // Debounced observer: updates buttons, answer listeners, and review harvesting
@@ -15887,6 +15952,17 @@
 
         if (btnMasterAutoQuiz) {
             btnMasterAutoQuiz.onclick = () => {
+                if (checkIsQuizSummaryPage()) {
+                    const submitBtn = document.querySelector('.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], #region-main input[type="submit"], input[value*="Submit"]');
+                    if (submitBtn) {
+                        submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        submitBtn.focus();
+                        submitBtn.style.outline = '3px solid #10b981';
+                        submitBtn.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.6)';
+                        showToast("Click 'Submit all and finish' to submit your attempt.", 3000);
+                        return;
+                    }
+                }
                 if (!checkIsQuizAttemptPage() && !autoQuizMode) {
                     // Check if student is on the quiz view/start page (/mod/quiz/view.php)
                     const isQuizLanding = window.location.pathname.includes('/mod/quiz/view.php');

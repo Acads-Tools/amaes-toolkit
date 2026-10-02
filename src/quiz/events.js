@@ -43,6 +43,17 @@
 
         if (btnMasterAutoQuiz) {
             btnMasterAutoQuiz.onclick = () => {
+                if (checkIsQuizSummaryPage()) {
+                    const submitBtn = document.querySelector('.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], #region-main input[type="submit"], input[value*="Submit"]');
+                    if (submitBtn) {
+                        submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        submitBtn.focus();
+                        submitBtn.style.outline = '3px solid #10b981';
+                        submitBtn.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.6)';
+                        showToast("Click 'Submit all and finish' to submit your attempt.", 3000);
+                        return;
+                    }
+                }
                 if (!checkIsQuizAttemptPage() && !autoQuizMode) {
                     // Check if student is on the quiz view/start page (/mod/quiz/view.php)
                     const isQuizLanding = window.location.pathname.includes('/mod/quiz/view.php');

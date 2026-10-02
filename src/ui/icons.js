@@ -97,54 +97,92 @@
 
     function playToolkitSound(type) {
         if (!enableAudioAlerts) return;
+
+        // Desktop OS notification via GM_notification (bypasses browser tab autoplay suspension completely)
+        if (typeof GM_notification === 'function') {
+            try {
+                GM_notification({
+                    title: (type === 'quest_done' || type === 'complete') ? 'Quiz Completed · AMAES Toolkit' : 'Manual Input Needed · AMAES Toolkit',
+                    text: (type === 'quest_done' || type === 'complete')
+                        ? 'All questions answered and saved! Waiting for your confirmation to submit.'
+                        : 'Unknown question encountered. Paused for your input.',
+                    silent: false,
+                    timeout: 6000
+                });
+            } catch (_) {}
+        }
+
         try {
             const ctx = getAudioContext();
             if (!ctx) return;
-            const now = ctx.currentTime;
 
-            if (type === 'quest_done' || type === 'complete') {
-                // Bright, celebratory multi-tone ascending ding (D5 -> A5 -> D6 chime)
-                const notes = [
-                    { freq: 587.33, start: 0, dur: 0.25 },
-                    { freq: 880.00, start: 0.1, dur: 0.35 },
-                    { freq: 1174.66, start: 0.2, dur: 0.8 }
-                ];
-                notes.forEach(n => {
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(n.freq, now + n.start);
+            const executeAudioChime = () => {
+                const now = ctx.currentTime;
+                if (type === 'quest_done' || type === 'complete') {
+                    // Bright, celebratory multi-tone ascending ding (D5 -> A5 -> D6 chime)
+                    const notes = [
+                        { freq: 587.33, start: 0, dur: 0.25 },
+                        { freq: 880.00, start: 0.1, dur: 0.35 },
+                        { freq: 1174.66, start: 0.2, dur: 0.8 }
+                    ];
+                    notes.forEach(n => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(n.freq, now + n.start);
 
-                    gain.gain.setValueAtTime(0.0001, now + n.start);
-                    gain.gain.exponentialRampToValueAtTime(0.18, now + n.start + 0.02);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
+                        gain.gain.setValueAtTime(0.0001, now + n.start);
+                        gain.gain.exponentialRampToValueAtTime(0.18, now + n.start + 0.02);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
 
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.start(now + n.start);
-                    osc.stop(now + n.start + n.dur);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + n.start);
+                        osc.stop(now + n.start + n.dur);
+                    });
+                } else if (type === 'manual_intervention' || type === 'unknown') {
+                    // Gentle, distinctive two-tone alert chime (F5 -> D5 soft marimba tone)
+                    const notes = [
+                        { freq: 698.46, start: 0, dur: 0.14 },
+                        { freq: 587.33, start: 0.12, dur: 0.4 }
+                    ];
+                    notes.forEach(n => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(n.freq, now + n.start);
+
+                        gain.gain.setValueAtTime(0.0001, now + n.start);
+                        gain.gain.exponentialRampToValueAtTime(0.16, now + n.start + 0.02);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
+
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + n.start);
+                        osc.stop(now + n.start + n.dur);
+                    });
+                }
+            };
+
+            if (ctx.state === 'suspended') {
+                ctx.resume().then(() => {
+                    executeAudioChime();
+                }).catch(() => {
+                    let expired = false;
+                    const expireTimer = setTimeout(() => { expired = true; }, 4000);
+                    const onUserGesture = () => {
+                        window.removeEventListener('click', onUserGesture, { capture: true });
+                        window.removeEventListener('keydown', onUserGesture, { capture: true });
+                        clearTimeout(expireTimer);
+                        if (!expired && ctx.state === 'running') {
+                            executeAudioChime();
+                        }
+                    };
+                    window.addEventListener('click', onUserGesture, { capture: true, once: true });
+                    window.addEventListener('keydown', onUserGesture, { capture: true, once: true });
                 });
-            } else if (type === 'manual_intervention' || type === 'unknown') {
-                // Gentle, distinctive two-tone alert chime (F5 -> D5 soft marimba tone)
-                const notes = [
-                    { freq: 698.46, start: 0, dur: 0.14 },
-                    { freq: 587.33, start: 0.12, dur: 0.4 }
-                ];
-                notes.forEach(n => {
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(n.freq, now + n.start);
-
-                    gain.gain.setValueAtTime(0.0001, now + n.start);
-                    gain.gain.exponentialRampToValueAtTime(0.16, now + n.start + 0.02);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
-
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.start(now + n.start);
-                    osc.stop(now + n.start + n.dur);
-                });
+            } else {
+                executeAudioChime();
             }
         } catch (e) {
             logDebug("Audio notification error: " + e.message);

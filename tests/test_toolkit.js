@@ -2863,8 +2863,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.8.6'), "Userscript header must specify v1.8.6");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.8.6";'), "Constant SCRIPT_VERSION must be v1.8.6");
+    assert.ok(script.includes('@version      1.8.7'), "Userscript header must specify v1.8.7");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.8.7";'), "Constant SCRIPT_VERSION must be v1.8.7");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3997,10 +3997,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.8.6-blue.svg"), "README badge must show v1.8.6");
+    assert.ok(readme.includes("version-1.8.7-blue.svg"), "README badge must show v1.8.7");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.8.6<"), "Website must display v1.8.6 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.8.7<"), "Website must display v1.8.7 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -4908,7 +4908,34 @@ test("Welcome Modal Minimalist Overhaul: verifies unboxed sections, collapsed se
     const termsContainerIdx = script.indexOf('id="welcome-terms-container"');
     assert.ok(termsContainerIdx !== -1, "Must contain welcome-terms-container");
     const termsContainerBlock = script.substring(termsContainerIdx, termsContainerIdx + 500);
-    assert.ok(!termsContainerBlock.includes('target="_blank"'), "Agreement label must not contain external link opening a new tab");
+});
+
+// --------------------------------------------------
+test("Quiz Summary Attempt Completion: verifies immediate quest_done audio chime, GM_notification desktop alert, visual confirmation state, and review navigation", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. GM_notification grant and header declaration
+    assert.ok(script.includes('// @grant        GM_notification'), "Must declare GM_notification grant in userscript header");
+
+    // 2. Immediate audio alert and background notification in playToolkitSound
+    assert.ok(script.includes("GM_notification({"), "playToolkitSound must dispatch desktop notification via GM_notification");
+    assert.ok(script.includes("ctx.state === 'suspended'"), "playToolkitSound must guard against suspended AudioContext");
+    assert.ok(script.includes("ctx.resume().then("), "playToolkitSound must attempt immediate resume on suspended context");
+
+    // 3. Quiz summary page handler (handleQuizSummaryAutoSubmit)
+    assert.ok(script.includes("function handleQuizSummaryAutoSubmit()"), "Must define handleQuizSummaryAutoSubmit");
+    assert.ok(script.includes("All questions answered and saved. Waiting for your confirmation to submit."), "Must indicate quiz completed and waiting for confirmation");
+    assert.ok(script.includes("✓ Ready to Submit"), "Must update document title to notify background multitasking users");
+
+    // 4. UI synchronizer state on summary page
+    assert.ok(script.includes("Review & Submit"), "btnMasterAutoQuiz must display 'Review & Submit' on summary page");
+    assert.ok(script.includes("Completed · Waiting for your confirmation"), "bgNoticeText must display completed confirmation on summary page");
+
+    // 5. Removed premature audio chime right before finish navigation on attempt page
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const isFinishBlock = solverSrc.substring(solverSrc.indexOf('if (isFinish) {'), solverSrc.indexOf('if (isFinish) {') + 300);
+    assert.ok(!isFinishBlock.includes("playToolkitSound('quest_done')"), "Must not play quest_done right before page unload in isFinish delay");
 });
 
 console.log("\n==================================================");

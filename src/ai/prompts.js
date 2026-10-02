@@ -859,7 +859,7 @@
         }
 
         if (checkIsQuizSummaryPage()) {
-            setTimeout(handleQuizSummaryAutoSubmit, 600);
+            handleQuizSummaryAutoSubmit();
         }
 
         // Debounced observer: updates buttons, answer listeners, and review harvesting

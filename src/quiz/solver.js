@@ -438,7 +438,6 @@
             const finishDelay = fastQuizMode ? 200 : 1000;
             setLog(`<b>All Questions Answered!</b> Advancing to summary in <b>${(finishDelay / 1000).toFixed(1)}s</b>...`, "var(--accent-green)");
             showToast("All questions answered! Advancing to summary...", 1200);
-            playToolkitSound('quest_done');
             autoNextTimer = setTimeout(() => {
                 if (!autoQuizMode) return;
                 if (isManualAnswer && !autoNextQuiz) return;
@@ -519,7 +518,6 @@
                     logDebug("Smart Navigation: All questions answered! Proceeding to finish attempt.");
                     setLog("<b>All Questions Answered!</b> Proceeding to summary screen...", "var(--accent-green)");
                     showToast("All questions answered! Finishing attempt...", 2500);
-                    playToolkitSound('quest_done');
                     finishBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     finishBtn.click();
                     return true;
@@ -1111,6 +1109,24 @@
     function handleQuizSummaryAutoSubmit() {
         if (!checkIsQuizSummaryPage()) return;
         promoteAttemptEvidenceFromScore();
+
+        // Update UI immediately to indicate completion and waiting for confirmation
+        syncAutoQuizUI();
+        setLog("<b>Quiz Completed:</b> All questions answered and saved. Waiting for your confirmation to submit.", "var(--accent-green)", "Review your saved answers below and click Submit all and finish");
+        showToast("✓ All questions answered! Waiting for confirmation...", 4000);
+
+        // Update document title so students multitasking in background tabs know it's ready
+        if (typeof document !== 'undefined' && document.title && !document.title.includes('(✓ Ready to Submit)')) {
+            document.title = '(✓ Ready to Submit) ' + document.title;
+        }
+
+        // Highlight Moodle's "Submit all and finish" button
+        const submitBtn = document.querySelector('.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], #region-main input[type="submit"], input[value*="Submit"]');
+        if (submitBtn) {
+            submitBtn.style.outline = '3px solid #10b981';
+            submitBtn.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.45)';
+        }
+
         if (!sessionStorage.getItem('amaes_summary_ding_' + window.location.href)) {
             sessionStorage.setItem('amaes_summary_ding_' + window.location.href, 'true');
             playToolkitSound('quest_done');
@@ -1164,7 +1180,11 @@
     function syncAutoQuizUI(isPausedOnUnknown = false) {
         const btnMasterAutoQuiz = document.getElementById('btn-master-auto-quiz');
         if (btnMasterAutoQuiz) {
-            if (isPausedOnUnknown || isWaitingForUserAnswer || (checkIsQuizAttemptPage() && document.querySelector('.amaes-blockage-hud'))) {
+            if (checkIsQuizSummaryPage()) {
+                btnMasterAutoQuiz.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                btnMasterAutoQuiz.innerHTML = `${ICONS.checkBadge || ICONS.zap} <span>Review & Submit</span>`;
+                btnMasterAutoQuiz.title = 'All questions answered! Click to scroll to submit button';
+            } else if (isPausedOnUnknown || isWaitingForUserAnswer || (checkIsQuizAttemptPage() && document.querySelector('.amaes-blockage-hud'))) {
                 btnMasterAutoQuiz.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
                 btnMasterAutoQuiz.innerHTML = `${ICONS.zap} <span>Waiting on Q (Press N)</span>`;
             } else if (autoQuizMode) {
@@ -1178,7 +1198,9 @@
 
         const subtext = document.getElementById('amaes-autoquiz-subtext');
         if (subtext) {
-            if (isPausedOnUnknown || isWaitingForUserAnswer || (checkIsQuizAttemptPage() && document.querySelector('.amaes-blockage-hud'))) {
+            if (checkIsQuizSummaryPage()) {
+                subtext.textContent = 'All questions answered and saved. Review your answers and submit when ready.';
+            } else if (isPausedOnUnknown || isWaitingForUserAnswer || (checkIsQuizAttemptPage() && document.querySelector('.amaes-blockage-hud'))) {
                 subtext.textContent = 'Paused on unknown question. Answer or press N to continue.';
             } else if (autoQuizMode) {
                 subtext.textContent = 'Auto-answering & advancing in background. Click to pause.';
@@ -1190,7 +1212,11 @@
         const bgNoticeDot = document.getElementById('amaes-autoquiz-bg-dot');
         const bgNoticeText = document.getElementById('amaes-autoquiz-bg-text');
         if (bgNoticeDot && bgNoticeText) {
-            if (autoQuizMode) {
+            if (checkIsQuizSummaryPage()) {
+                bgNoticeDot.style.background = 'var(--accent-green, #10b981)';
+                bgNoticeDot.style.boxShadow = '0 0 6px #10b981';
+                bgNoticeText.textContent = 'Completed · Waiting for your confirmation';
+            } else if (autoQuizMode) {
                 bgNoticeDot.style.background = 'var(--accent-green, #10b981)';
                 bgNoticeDot.style.boxShadow = '0 0 6px #10b981';
                 bgNoticeText.textContent = 'Active in background (safe to switch tabs/apps)';
