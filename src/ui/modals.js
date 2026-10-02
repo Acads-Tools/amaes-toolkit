@@ -81,9 +81,9 @@
 
                     <!-- Community Sync Options (Compact Collapsible) -->
                     <details style="background: ${isLight ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.05)'}; border: 1px solid ${isLight ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)'}; border-radius: 8px; padding: 8px 12px;">
-                        <summary style="font-size: 11px; font-weight: 700; color: ${isLight ? '#059669' : '#34d399'}; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;">
-                            <span>⚙️ Community Sync Settings</span>
-                            <span style="font-size: 10px; color: ${isLight ? '#64748b' : '#94a3b8'}; font-weight: 400;">Configure options</span>
+                        <summary style="font-size: 11px; font-weight: 700; color: ${isLight ? '#059669' : '#34d399'}; cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
+                            ${ICONS.gear || '⚙️'} <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                            <span>Community Sync Settings</span>
                         </summary>
                         <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid ${isLight ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.15)'};">
                             <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: ${isLight ? '#334155' : '#cbd5e1'}; cursor: pointer;">
@@ -109,7 +109,8 @@
                     <details style="background: ${isLight ? 'rgba(245, 158, 11, 0.08)' : 'rgba(245, 158, 11, 0.05)'}; border: 1px solid ${isLight ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)'}; border-radius: 8px; padding: 8px 12px;" id="welcome-shortcuts-section">
                         <summary id="welcome-shortcuts-title" style="font-size: 11px; font-weight: 700; color: ${isLight ? '#d97706' : '#fcd34d'}; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;" title="Double-click to toggle Developer Console">
                             <span style="display: flex; align-items: center; gap: 6px;">
-                                ⌨️ <span>Keyboard Shortcuts Cheatsheet (Comprehensive)</span>
+                                ${ICONS.keyboard} <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                                <span>Keyboard Shortcuts Cheatsheet (Comprehensive)</span>
                                 <span id="amaes-secret-cheatsheet-trigger" style="display:none;">Cheatsheet</span>
                             </span>
                             <span style="font-size: 10px; color: ${isLight ? '#64748b' : '#94a3b8'}; font-weight: 400;">Press <kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; color: ${isLight ? '#0f172a' : '#fff'}; padding: 1px 4px; border-radius: 3px; font-size: 9px;">?</kbd> or <kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; color: ${isLight ? '#0f172a' : '#fff'}; padding: 1px 4px; border-radius: 3px; font-size: 9px;">K</kbd></span>

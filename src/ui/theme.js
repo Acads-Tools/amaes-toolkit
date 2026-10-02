@@ -87,6 +87,12 @@
                 --shadow: ${t.shadow} !important;
                 --status-bg: ${t.statusBg} !important;
             }
+
+            #amaes-toolkit-panel input[type="checkbox"],
+            .amaes-modal-container input[type="checkbox"],
+            #amaes-welcome-modal input[type="checkbox"] {
+                accent-color: var(--accent-green) !important;
+            }
         `;
 
         if (document.documentElement) {

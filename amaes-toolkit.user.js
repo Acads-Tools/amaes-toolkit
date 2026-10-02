@@ -1081,6 +1081,12 @@
                 --shadow: ${t.shadow} !important;
                 --status-bg: ${t.statusBg} !important;
             }
+
+            #amaes-toolkit-panel input[type="checkbox"],
+            .amaes-modal-container input[type="checkbox"],
+            #amaes-welcome-modal input[type="checkbox"] {
+                accent-color: var(--accent-green) !important;
+            }
         `;
 
         if (document.documentElement) {
@@ -1670,6 +1676,7 @@
         target: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
         database: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`,
         tools: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`,
+        gear: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
         shield: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
         shieldCheck: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>`,
         play: `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
@@ -13768,9 +13775,9 @@
 
                     <!-- Community Sync Options (Compact Collapsible) -->
                     <details style="background: ${isLight ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.05)'}; border: 1px solid ${isLight ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)'}; border-radius: 8px; padding: 8px 12px;">
-                        <summary style="font-size: 11px; font-weight: 700; color: ${isLight ? '#059669' : '#34d399'}; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;">
-                            <span>⚙️ Community Sync Settings</span>
-                            <span style="font-size: 10px; color: ${isLight ? '#64748b' : '#94a3b8'}; font-weight: 400;">Configure options</span>
+                        <summary style="font-size: 11px; font-weight: 700; color: ${isLight ? '#059669' : '#34d399'}; cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
+                            ${ICONS.gear || '⚙️'} <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                            <span>Community Sync Settings</span>
                         </summary>
                         <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid ${isLight ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.15)'};">
                             <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: ${isLight ? '#334155' : '#cbd5e1'}; cursor: pointer;">
@@ -13796,7 +13803,8 @@
                     <details style="background: ${isLight ? 'rgba(245, 158, 11, 0.08)' : 'rgba(245, 158, 11, 0.05)'}; border: 1px solid ${isLight ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)'}; border-radius: 8px; padding: 8px 12px;" id="welcome-shortcuts-section">
                         <summary id="welcome-shortcuts-title" style="font-size: 11px; font-weight: 700; color: ${isLight ? '#d97706' : '#fcd34d'}; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;" title="Double-click to toggle Developer Console">
                             <span style="display: flex; align-items: center; gap: 6px;">
-                                ⌨️ <span>Keyboard Shortcuts Cheatsheet (Comprehensive)</span>
+                                ${ICONS.keyboard} <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                                <span>Keyboard Shortcuts Cheatsheet (Comprehensive)</span>
                                 <span id="amaes-secret-cheatsheet-trigger" style="display:none;">Cheatsheet</span>
                             </span>
                             <span style="font-size: 10px; color: ${isLight ? '#64748b' : '#94a3b8'}; font-weight: 400;">Press <kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; color: ${isLight ? '#0f172a' : '#fff'}; padding: 1px 4px; border-radius: 3px; font-size: 9px;">?</kbd> or <kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; color: ${isLight ? '#0f172a' : '#fff'}; padding: 1px 4px; border-radius: 3px; font-size: 9px;">K</kbd></span>
@@ -14231,7 +14239,7 @@
                             <img id="amaes-logo-img" src="${TOOLKIT_LOGO_URL}" alt="AMAES Logo">
                         </a>
                         <span id="amaes-title">AMAES</span>
-                        <span id="amaes-version-pill" title="${SCRIPT_VERSION}" style="display: inline-flex; align-items: center; max-width: 100%; overflow: visible; white-space: nowrap; font-size: 9px; font-weight: 700; color: var(--accent-blue, #3b82f6); background: rgba(59,130,246,0.12); padding: 1px 4px; border-radius: 4px; border: 1px solid rgba(59,130,246,0.25); cursor: pointer; user-select: none;">${SCRIPT_VERSION}</span>
+                        <span id="amaes-version-pill" title="${SCRIPT_VERSION}" style="display: inline-flex; align-items: center; max-width: 100%; overflow: visible; white-space: nowrap; font-size: 9px; font-weight: 600; color: var(--text-secondary); background: var(--surface-subtle); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border-subtle); cursor: pointer; user-select: none;">${SCRIPT_VERSION}</span>
                     </div>
                 </div>
                 
@@ -14335,22 +14343,22 @@
 
                     <!-- Primary Core Settings (The 4-Step Pipeline: Highlight -> Pick -> Next -> Speed) -->
                     <div style="margin-top: 2px; border-top: 1px solid var(--border-subtle); padding-top: 6px; display: flex; flex-direction: column; gap: 6px;">
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--accent-green); cursor: pointer; font-weight: 700;" title="Highlight verified database and study guide answers with color codes">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Highlight verified database and study guide answers with color codes">
                             <input id="chk-auto-hl-quiz" type="checkbox" ${autoHighlightQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                             <span>Show Answers</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #34d399; cursor: pointer; font-weight: 700;" title="Automatically select choice inputs when verified answers are matched">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Automatically select choice inputs when verified answers are matched">
                             <input id="chk-auto-pick" type="checkbox" ${autoPickQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                             <span>Auto-Pick Answers</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--accent-blue); cursor: pointer; font-weight: 700;" title="Advances smoothly to next question when answered; pauses on unknown questions">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Advances smoothly to next question when answered; pauses on unknown questions">
                             <input id="chk-auto-next-verified" type="checkbox" ${autoNextVerified ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                             <span>Smart Next</span>
                         </label>
-                        <label id="amaes-fast-answer-card" style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--accent-amber, #f59e0b); cursor: pointer; font-weight: 700;" title="Fast Answer Mode: Answers visible questions instantly & speeds up moving to next page">
-                            <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="accent-color: #f59e0b; cursor: pointer; margin: 0;" />
+                        <label id="amaes-fast-answer-card" style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Fast Answer Mode: Answers visible questions instantly & speeds up moving to next page">
+                            <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                             <span id="amaes-fast-quiz-title" style="display: inline-flex; align-items: center; gap: 4px;">
-                                <span id="amaes-fast-quiz-icon" style="display: inline-flex; align-items: center;">${ICONS.zap}</span>
+                                <span id="amaes-fast-quiz-icon" style="display: inline-flex; align-items: center; color: var(--text-muted);">${ICONS.zap}</span>
                                 <span>Speed Mode</span>
                             </span>
                         </label>
@@ -14358,47 +14366,47 @@
 
                     <!-- Collapsible Advanced Settings (Collapsed by default for clean UX) -->
                     <details id="amaes-advanced-quiz-settings" style="margin-top: 2px; border: 1px solid var(--border-subtle); border-radius: 6px; background: rgba(0,0,0,0.12); overflow: hidden;">
-                        <summary style="cursor: pointer; padding: 5px 8px; font-size: 10px; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; user-select: none;">
+                        <summary style="cursor: pointer; padding: 5px 8px; font-size: 10px; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 5px; user-select: none;">
                             <span style="display: flex; align-items: center; gap: 5px;">
-                                ${ICONS.tools} <span>Advanced Settings</span>
+                                ${ICONS.gear || ICONS.tools}
+                                <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                                <span>Advanced Settings</span>
                             </span>
-                            <span class="amaes-adv-toggle-hint" style="font-size: 8.5px; color: var(--text-muted);">Click to expand</span>
                         </summary>
                         <div style="display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--border-subtle); background: rgba(0,0,0,0.18);">
                             <!-- Nested Built-in AI Settings (Collapsed by default) -->
-                            <details id="amaes-ai-quiz-settings-block" style="border: 1px solid rgba(168, 85, 247, 0.28); border-radius: 6px; background: rgba(168, 85, 247, 0.05); overflow: hidden;">
-                                <summary style="cursor: pointer; padding: 5px 8px; font-size: 10px; font-weight: 700; color: #c084fc; display: flex; align-items: center; justify-content: space-between; user-select: none;">
-                                    <span style="display: flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.5px; font-size: 9.5px;">
-                                        <span>Built-in AI</span>
+                            <details id="amaes-ai-quiz-settings-block" style="border: 1px solid var(--border-subtle); border-radius: 6px; background: rgba(0,0,0,0.12); overflow: hidden;">
+                                <summary style="cursor: pointer; padding: 5px 8px; font-size: 10px; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; user-select: none;">
+                                    <span style="display: flex; align-items: center; gap: 5px;">
+                                        ${ICONS.sparkles}
+                                        <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                                        <span style="text-transform: uppercase; letter-spacing: 0.5px; font-size: 9.5px;">Built-in AI</span>
                                     </span>
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span id="amaes-ai-quiz-status-pill" style="font-size: 8.5px; font-weight: 700; color: ${geminiApiKey ? '#34d399' : 'var(--text-muted)'}; background: ${geminiApiKey ? 'rgba(52, 211, 153, 0.1)' : 'rgba(255, 255, 255, 0.05)'}; border: 1px solid ${geminiApiKey ? 'rgba(52, 211, 153, 0.3)' : 'rgba(255, 255, 255, 0.15)'}; border-radius: 3px; padding: 1px 5px;">${geminiApiKey ? 'Active' : 'Not Set'}</span>
-                                        <span class="amaes-ai-toggle-hint" style="font-size: 8.5px; color: var(--text-muted);">Click to expand</span>
-                                    </div>
+                                    <span id="amaes-ai-quiz-status-pill" style="font-size: 8.5px; font-weight: 700; color: ${geminiApiKey ? 'var(--accent-green, #10b981)' : 'var(--text-muted)'}; background: ${geminiApiKey ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 255, 255, 0.05)'}; border: 1px solid ${geminiApiKey ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.15)'}; border-radius: 3px; padding: 1px 5px;">${geminiApiKey ? 'Active' : 'Not Set'}</span>
                                 </summary>
-                                <div style="display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; border-top: 1px solid rgba(168, 85, 247, 0.2); background: rgba(0, 0, 0, 0.15);">
-                                    <button id="btn-quiz-config-ai" type="button" class="amaes-btn" style="justify-content: center; padding: 5px 8px; font-size: 10px; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; border: none; border-radius: 4px; font-weight: 700; cursor: pointer;">
+                                <div style="display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--border-subtle); background: rgba(0, 0, 0, 0.15);">
+                                    <button id="btn-quiz-config-ai" type="button" class="amaes-btn" style="justify-content: center; padding: 5px 8px; font-size: 10px; background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; font-weight: 600; cursor: pointer;">
                                         ${ICONS.sparkles} <span>${geminiApiKey ? 'Configure AI Key' : 'Setup Free AI Key'}</span>
                                     </button>
-                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #c084fc; cursor: pointer; font-weight: 700;" title="When question is not in DB, automatically ask AI for the answer">
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="When question is not in DB, automatically ask AI for the answer">
                                         <input id="chk-ai-quiz-enabled" type="checkbox" ${aiQuizEnabled ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                                         <span>Ask AI on Unknown</span>
                                     </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="Automatically checks AI choice (if off, highlights in purple for manual review)">
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically checks AI choice (if off, highlights in purple for manual review)">
                                         <input id="chk-ai-auto-select" type="checkbox" ${aiAutoSelect ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                                         <span>Auto-Select AI</span>
                                     </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="Copies question to clipboard if AI fails or times out">
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Copies question to clipboard if AI fails or times out">
                                         <input id="chk-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                                         <span>Auto-Copy on Fail</span>
                                     </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="Automatically moves to next page 1.5s after AI selects a choice">
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically moves to next page 1.5s after AI selects a choice">
                                         <input id="chk-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                                         <span>Auto-Next on AI</span>
                                     </label>
                                     <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
-                                        <span style="font-size: 10px; color: #e9d5ff; font-weight: 600;">Retries on Failure:</span>
-                                        <select id="sel-ai-retry-count" style="background: rgba(0,0,0,0.35); border: 1px solid #a855f7; border-radius: 4px; color: #f3e8ff; font-size: 10px; padding: 2px 6px; cursor: pointer;">
+                                        <span style="font-size: 10px; color: var(--text-secondary); font-weight: 500;">Retries on Failure:</span>
+                                        <select id="sel-ai-retry-count" style="background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 6px; cursor: pointer;">
                                             <option value="1" ${aiRetryCount === 1 ? 'selected' : ''}>1 retry</option>
                                             <option value="2" ${aiRetryCount === 2 ? 'selected' : ''}>2 retries (Default)</option>
                                             <option value="3" ${aiRetryCount === 3 ? 'selected' : ''}>3 retries</option>
@@ -14407,8 +14415,8 @@
                                         </select>
                                     </div>
                                     <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
-                                        <span style="font-size: 10px; color: #e9d5ff; font-weight: 600;">Request Speed:</span>
-                                        <select id="sel-ai-plan-tier" style="background: rgba(0,0,0,0.35); border: 1px solid #a855f7; border-radius: 4px; color: #f3e8ff; font-size: 10px; padding: 2px 6px; cursor: pointer;">
+                                        <span style="font-size: 10px; color: var(--text-secondary); font-weight: 500;">Request Speed:</span>
+                                        <select id="sel-ai-plan-tier" style="background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 6px; cursor: pointer;">
                                             <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Standard (Free tier)</option>
                                             <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Fast (Paid API key)</option>
                                         </select>
@@ -14418,7 +14426,7 @@
 
                             <!-- Section: Navigation & Interface -->
                             <div style="font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding-bottom: 2px; border-bottom: 1px solid rgba(255,255,255,0.06);">Navigation & Interface</div>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: #a78bfa; cursor: pointer; font-weight: 600;" title="Keyboard shortcuts: Space / N for Next page, C for Copy AI, V for Paste AI, P for Pause/Start, 1-4 / A-D to pick choices, H to Highlight">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Keyboard shortcuts: Space / N for Next page, C for Copy AI, V for Paste AI, P for Pause/Start, 1-4 / A-D to pick choices, H to Highlight">
                                 <input id="chk-keyboard-shortcuts" type="checkbox" ${enableKeyboardShortcuts ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Keyboard Shortcuts</span>
                             </label>
@@ -14430,7 +14438,7 @@
                                 <input id="chk-auto-min-quiz" type="checkbox" ${autoMinimizeQuiz ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Auto-Minimize During Quiz</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--accent-blue); cursor: pointer;" title="Smart Navigation: Bypass questions already answered and jump straight to unanswered questions">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Smart Navigation: Bypass questions already answered and jump straight to unanswered questions">
                                 <input id="chk-smart-skip" type="checkbox" ${smartSkipQuiz ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Smart Skip Unanswered</span>
                             </label>
@@ -14517,14 +14525,17 @@
 
                     <!-- Online Study Guides (AMAUOED) -->
                     <details style="border: 1px solid var(--border-subtle); border-radius: 6px; padding: 5px 7px; background: rgba(0,0,0,0.15);">
-                        <summary style="font-size: 10px; font-weight: 700; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;">
-                            <span>Online Study Guides (AMAUOED)</span>
-                            <span style="font-size: 9px; color: var(--text-muted);">Expand</span>
+                        <summary style="font-size: 10px; font-weight: 700; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 5px; user-select: none;">
+                            <span style="display: flex; align-items: center; gap: 5px;">
+                                ${ICONS.book}
+                                <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                                <span>Online Study Guides (AMAUOED)</span>
+                            </span>
                         </summary>
                         <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically check online study guides if questions are not yet in your library (Default: ON)">
                                 <input id="chk-auto-scrape-amauoed" type="checkbox" ${autoScrapeAmauoed ? 'checked' : ''} style="cursor: pointer;" />
-                                <span style="font-weight: 600; color: var(--accent-purple);">Auto-check study guides when missing</span>
+                                <span style="font-weight: 500; color: var(--text-secondary);">Auto-check study guides when missing</span>
                             </label>
 
                             <div style="display: flex; gap: 6px; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 4px 6px;">
@@ -14550,15 +14561,15 @@
                     <div style="display: flex; flex-direction: column; gap: 6px; background: var(--surface-subtle); padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border-subtle);">
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Auto-collect confirmed answers from past quizzes">
                             <input id="chk-auto-harvest-grades" type="checkbox" ${autoHarvestGrades ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span style="font-weight: 600; color: var(--accent-green);">Auto-Collect Quizzes</span>
+                            <span style="font-weight: 500; color: var(--text-secondary);">Auto-Collect Quizzes</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically download verified community answers when opening a course page">
                             <input id="chk-auto-cloud-sync" type="checkbox" ${autoCloudSync ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span style="font-weight: 600; color: var(--text-primary);">Auto-Sync Community</span>
+                            <span style="font-weight: 500; color: var(--text-secondary);">Auto-Sync Community</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Share verified review answers anonymously">
                             <input id="chk-auto-community-share" type="checkbox" ${autoCommunityShare ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span style="font-weight: 600; color: var(--accent-green);">Auto-Share Reviews</span>
+                            <span style="font-weight: 500; color: var(--text-secondary);">Auto-Share Reviews</span>
                         </label>
                     </div>
                 </div>
@@ -14865,6 +14876,29 @@
                     overflow: hidden;
                     display: flex;
                     flex-direction: column;
+                }
+
+                #amaes-toolkit-panel input[type="checkbox"],
+                .amaes-modal-container input[type="checkbox"],
+                #amaes-welcome-modal input[type="checkbox"] {
+                    accent-color: var(--accent-green, #10b981) !important;
+                }
+
+                details summary {
+                    list-style: none;
+                }
+                details summary::-webkit-details-marker {
+                    display: none;
+                }
+
+                .amaes-summary-chevron {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: transform 0.2s ease;
+                }
+                details[open] > summary .amaes-summary-chevron {
+                    transform: rotate(90deg);
                 }
 
                 #amaes-toolkit-panel.amaes-minimized {
@@ -16845,23 +16879,6 @@
             btnQuizConfigAi.onclick = () => {
                 showGeminiSetupModal();
             };
-        }
-
-        // Dynamic hint text for collapsible accordions
-        const aiBlockDetails = document.getElementById('amaes-ai-quiz-settings-block');
-        if (aiBlockDetails) {
-            const hint = aiBlockDetails.querySelector('.amaes-ai-toggle-hint');
-            aiBlockDetails.addEventListener('toggle', () => {
-                if (hint) hint.textContent = aiBlockDetails.open ? 'Click to collapse' : 'Click to expand';
-            });
-        }
-
-        const advDetails = document.getElementById('amaes-advanced-quiz-settings');
-        if (advDetails) {
-            const hint = advDetails.querySelector('.amaes-adv-toggle-hint');
-            advDetails.addEventListener('toggle', () => {
-                if (hint) hint.textContent = advDetails.open ? 'Click to collapse' : 'Click to expand';
-            });
         }
 
 

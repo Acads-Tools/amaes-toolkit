@@ -4853,6 +4853,28 @@ test("Theme Reactivity: applies theme variables dynamically, sets data-amaes-the
     assert.ok(script.includes("showWelcomeOnboardingModal(true);"), "Theme toggle button must re-render welcome onboarding modal immediately");
 });
 
+// --------------------------------------------------
+// 115. Visual Cohesion & Unified Accent Architecture
+// --------------------------------------------------
+test("Visual Cohesion & Unified Accent: neutralizes version tag and checkbox labels, enforces single accent color, and verifies gear chevron toggle", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Version tag in neutral secondary color (no bright blue competing with green button)
+    assert.ok(script.includes('id="amaes-version-pill"'), "Must include version pill");
+    assert.ok(script.includes('color: var(--text-secondary); background: var(--surface-subtle);'), "Version pill must use neutral styling");
+
+    // 2. Single accent color for active checkbox states
+    assert.ok(script.includes('accent-color: var(--accent-green, #10b981) !important;'), "Must enforce uniform single accent color for checkboxes");
+
+    // 3. Redundant 'Click to expand' text eliminated from advanced settings
+    assert.ok(!script.includes('Click to expand'), "Redundant 'Click to expand' text must be eliminated");
+    assert.ok(script.includes('amaes-summary-chevron'), "Must include chevron indicator on collapsible summary elements");
+
+    // 4. Gear icon next to Advanced Settings header
+    assert.ok(script.includes('${ICONS.gear || ICONS.tools}'), "Must feature gear icon on Advanced Settings summary");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);
