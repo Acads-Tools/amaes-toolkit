@@ -4875,6 +4875,36 @@ test("Visual Cohesion & Unified Accent: neutralizes version tag and checkbox lab
     assert.ok(script.includes('${ICONS.gear || ICONS.tools}'), "Must feature gear icon on Advanced Settings summary");
 });
 
+// --------------------------------------------------
+// 116. Welcome Onboarding Modal Minimalist Redesign
+// --------------------------------------------------
+test("Welcome Modal Minimalist Overhaul: verifies unboxed sections, collapsed secondary tools dropdown, and neutral badge styling", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Unboxed feature card and collapsible sections (borders removed, natural whitespace separation)
+    assert.ok(script.includes('id="amaes-welcome-highlight-card"'), "Must feature highlight card container");
+    assert.ok(script.includes('id="welcome-more-options"'), "Secondary actions must be collapsed inside #welcome-more-options details dropdown");
+
+    // 2. Secondary maintenance actions collapsed under More Options dropdown
+    assert.ok(script.includes('More Options & Maintenance</span>'), "Dropdown summary must provide clean More Options title");
+    assert.ok(script.includes('id="amaes-theme-btn"'), "Theme button must be housed inside tools grid");
+    assert.ok(script.includes('id="amaes-bug-btn"'), "Bug report button must be housed inside tools grid");
+    assert.ok(script.includes('id="amaes-debug-btn"'), "Debug copy log button must be housed inside tools grid");
+    assert.ok(script.includes('id="amaes-reset-btn"'), "Reset button must be housed inside tools grid");
+
+    // 3. Uniform neutral tags (no jarring rainbow tag backgrounds)
+    assert.ok(script.includes('Background Capable</span>'), "Must contain Background Capable badge");
+    assert.ok(script.includes('100% Anonymous</span>'), "Must contain 100% Anonymous badge");
+    assert.ok(script.includes('id="welcome-btn-setup-ai"'), "Must contain Setup AI button");
+    assert.ok(script.includes("'Setup AI'"), "Must contain Setup AI label fallback");
+
+    // 4. Concise punchy descriptions
+    assert.ok(script.includes('Auto-Quiz runs autonomously in the background while highlighting verified answers as you multitask.'), "Auto-Quiz description must be single punchy sentence");
+    assert.ok(script.includes('Completed quiz answers are shared anonymously with classmates with zero personal data collected.'), "Sync description must be single punchy sentence");
+    assert.ok(script.includes('Instant in-quiz AI solver for questions not yet in the community database.'), "Gemini AI description must be single punchy sentence");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

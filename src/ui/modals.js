@@ -24,128 +24,128 @@
         const isLight = currentTheme === 'light';
 
         modal.innerHTML = `
-            <div id="amaes-welcome-card" style="background: ${isLight ? '#ffffff' : '#1e293b'}; border: 1px solid ${isLight ? '#e2e8f0' : '#334155'}; border-radius: 16px; width: 100%; max-width: 500px; box-shadow: ${isLight ? '0 20px 40px -10px rgba(0,0,0,0.15)' : '0 25px 50px -12px rgba(0,0,0,0.6)'}; overflow: hidden; color: ${isLight ? '#0f172a' : '#f8fafc'}; display: flex; flex-direction: column; max-height: 88vh;">
+            <div id="amaes-welcome-card" style="background: ${isLight ? '#ffffff' : '#18181b'}; border: 1px solid ${isLight ? '#e4e4e7' : '#27272a'}; border-radius: 16px; width: 100%; max-width: 480px; box-shadow: ${isLight ? '0 20px 40px -10px rgba(0,0,0,0.12)' : '0 25px 50px -12px rgba(0,0,0,0.7)'}; overflow: hidden; color: ${isLight ? '#18181b' : '#f4f4f5'}; display: flex; flex-direction: column; max-height: 88vh;">
                 <!-- Header -->
-                <div id="amaes-welcome-header" style="padding: 16px 20px; border-bottom: 1px solid ${isLight ? '#e2e8f0' : '#334155'}; background: ${isLight ? 'linear-gradient(135deg, #ffffff, #f1f5f9)' : 'linear-gradient(135deg, #1e293b, #0f172a)'}; display: flex; justify-content: space-between; align-items: center;">
+                <div id="amaes-welcome-header" style="padding: 18px 24px 14px; border-bottom: 1px solid ${isLight ? '#f4f4f5' : '#27272a'}; display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; flex-direction: column;">
-                        <h2 id="amaes-welcome-title" style="margin: 0; font-size: 17px; font-weight: 800; color: ${isLight ? '#0f172a' : '#fff'}; display: flex; align-items: center; gap: 8px;">
+                        <h2 id="amaes-welcome-title" style="margin: 0; font-size: 16px; font-weight: 700; color: ${isLight ? '#18181b' : '#f4f4f5'}; display: flex; align-items: center; gap: 8px;">
                             ${ICONS.zap} Welcome to AMAES Toolkit
                         </h2>
-                        <span style="font-size: 11px; color: ${isLight ? '#64748b' : '#94a3b8'}; font-weight: 500; margin-top: 2px;">Your All-in-One Study & Quiz Companion</span>
+                        <span style="font-size: 11px; color: ${isLight ? '#71717a' : '#a1a1aa'}; font-weight: 400; margin-top: 2px;">Your All-in-One Study & Quiz Companion</span>
                     </div>
-                    ${force ? `<button id="btn-welcome-close" style="background:none; border:none; color:${isLight ? '#64748b' : '#94a3b8'}; font-size:22px; cursor:pointer; line-height:1; padding: 2px 6px;">&times;</button>` : ''}
+                    ${force ? `<button id="btn-welcome-close" style="background:none; border:none; color:${isLight ? '#71717a' : '#a1a1aa'}; font-size:22px; cursor:pointer; line-height:1; padding: 2px 6px;">&times;</button>` : ''}
                 </div>
                 
-                <div id="amaes-welcome-scroll-container" style="padding: 18px 20px; font-size: 12px; line-height: 1.45; display: flex; flex-direction: column; gap: 12px; overflow-y: auto;">
+                <div id="amaes-welcome-scroll-container" style="padding: 20px 24px; font-size: 12px; line-height: 1.5; display: flex; flex-direction: column; gap: 18px; overflow-y: auto;">
                     
-                    <!-- Core Highlights Summary Card -->
-                    <div id="amaes-welcome-highlight-card" style="display: flex; flex-direction: column; gap: 8px; background: ${isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.03)'}; border: 1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}; border-radius: 10px; padding: 12px 14px;">
+                    <!-- Core Highlights Feature List (Clean & Unboxed) -->
+                    <div id="amaes-welcome-highlight-card" style="display: flex; flex-direction: column; gap: 14px;">
                         <!-- Auto-Answer -->
-                        <div style="display: flex; align-items: flex-start; gap: 10px;">
-                            <span style="color: #60a5fa; margin-top: 2px;">${ICONS.checkCircle}</span>
+                        <div style="display: flex; align-items: flex-start; gap: 12px;">
+                            <span style="color: ${isLight ? '#71717a' : '#a1a1aa'}; margin-top: 2px; flex-shrink: 0;">${ICONS.checkCircle}</span>
                             <div style="flex: 1;">
-                                <div style="display: flex; align-items: center; justify-content: space-between;">
-                                    <div style="font-weight: 700; color: ${isLight ? '#0f172a' : '#f1f5f9'}; font-size: 12px;">Smart Auto-Answer & Highlighter</div>
-                                    <span style="font-size: 9px; color: #60a5fa; font-weight: 700; background: rgba(59, 130, 246, 0.15); padding: 1px 6px; border-radius: 10px;">Background Capable</span>
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                    <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Smart Auto-Answer & Highlighter</div>
+                                    <span style="font-size: 9px; color: ${isLight ? '#71717a' : '#a1a1aa'}; font-weight: 500; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.06)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; padding: 1px 6px; border-radius: 4px; white-space: nowrap;">Background Capable</span>
                                 </div>
-                                <div style="color: ${isLight ? '#64748b' : '#94a3b8'}; font-size: 11px;">Identifies subjects, highlights verified answers, and Auto-Quiz runs autonomously in the background while you switch tabs or multitask in other applications.</div>
+                                <div style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11.5px; margin-top: 2px;">Auto-Quiz runs autonomously in the background while highlighting verified answers as you multitask.</div>
                             </div>
                         </div>
 
                         <!-- Community Sharing -->
-                        <div style="display: flex; align-items: flex-start; gap: 10px; border-top: 1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.06)'}; padding-top: 8px;">
-                            <span style="color: #34d399; margin-top: 2px;">${ICONS.upload}</span>
+                        <div style="display: flex; align-items: flex-start; gap: 12px;">
+                            <span style="color: ${isLight ? '#71717a' : '#a1a1aa'}; margin-top: 2px; flex-shrink: 0;">${ICONS.upload}</span>
                             <div style="flex: 1;">
-                                <div style="display: flex; align-items: center; justify-content: space-between;">
-                                    <div style="font-weight: 700; color: ${isLight ? '#0f172a' : '#f1f5f9'}; font-size: 12px;">Collect & Share Anonymously</div>
-                                    <span style="font-size: 9px; color: #34d399; font-weight: 700; background: rgba(16, 185, 129, 0.15); padding: 1px 6px; border-radius: 10px;">100% Anonymous</span>
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                    <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Collect & Share Anonymously</div>
+                                    <span style="font-size: 9px; color: ${isLight ? '#71717a' : '#a1a1aa'}; font-weight: 500; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.06)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; padding: 1px 6px; border-radius: 4px; white-space: nowrap;">100% Anonymous</span>
                                 </div>
-                                <div style="color: ${isLight ? '#64748b' : '#94a3b8'}; font-size: 11px;">Answers from completed quizzes are shared anonymously with classmates. No personal data is ever collected.</div>
+                                <div style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11.5px; margin-top: 2px;">Completed quiz answers are shared anonymously with classmates with zero personal data collected.</div>
                             </div>
                         </div>
 
                         <!-- Built-in Gemini AI -->
-                        <div style="display: flex; align-items: flex-start; gap: 10px; border-top: 1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.06)'}; padding-top: 8px;">
-                            <span style="color: #c084fc; margin-top: 2px;">${ICONS.zap}</span>
+                        <div style="display: flex; align-items: flex-start; gap: 12px;">
+                            <span style="color: ${isLight ? '#71717a' : '#a1a1aa'}; margin-top: 2px; flex-shrink: 0;">${ICONS.zap}</span>
                             <div style="flex: 1;">
-                                <div style="display: flex; align-items: center; justify-content: space-between;">
-                                    <div style="font-weight: 700; color: ${isLight ? '#0f172a' : '#f1f5f9'}; font-size: 12px;">Built-in Google Gemini AI</div>
-                                    <button id="welcome-btn-setup-ai" type="button" class="amaes-btn" style="background: rgba(139, 92, 246, 0.2); color: ${isLight ? '#7c3aed' : '#d8b4fe'}; border: 1px solid rgba(139, 92, 246, 0.4); font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 700; cursor: pointer;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                    <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Built-in Google Gemini AI</div>
+                                    <button id="welcome-btn-setup-ai" type="button" class="amaes-btn" style="background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.06)'}; color: ${isLight ? '#52525b' : '#d4d4d8'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.1)'}; font-size: 9px; padding: 1px 6px; border-radius: 4px; font-weight: 600; cursor: pointer;">
                                         ${geminiApiKey ? 'Key Configured' : 'Setup AI'}
                                     </button>
                                 </div>
-                                <div style="color: ${isLight ? '#64748b' : '#94a3b8'}; font-size: 11px;">Instant in-quiz AI solver for questions not yet in the community database.</div>
+                                <div style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11.5px; margin-top: 2px;">Instant in-quiz AI solver for questions not yet in the community database.</div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Community Sync Options (Compact Collapsible) -->
-                    <details style="background: ${isLight ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.05)'}; border: 1px solid ${isLight ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)'}; border-radius: 8px; padding: 8px 12px;">
-                        <summary style="font-size: 11px; font-weight: 700; color: ${isLight ? '#059669' : '#34d399'}; cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
-                            ${ICONS.gear || '⚙️'} <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                    <!-- Community Sync Settings (Unboxed & Clean) -->
+                    <details style="padding: 0; margin: 0;">
+                        <summary style="font-size: 11.5px; font-weight: 600; color: ${isLight ? '#3f3f46' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
+                            <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
                             <span>Community Sync Settings</span>
                         </summary>
-                        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid ${isLight ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.15)'};">
-                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: ${isLight ? '#334155' : '#cbd5e1'}; cursor: pointer;">
-                                <input id="welcome-chk-harvest" type="checkbox" ${typeof autoHarvestGrades !== 'undefined' && autoHarvestGrades ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px; accent-color: #10b981;" />
+                        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-left: 18px;">
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: ${isLight ? '#52525b' : '#a1a1aa'}; cursor: pointer;">
+                                <input id="welcome-chk-harvest" type="checkbox" ${typeof autoHarvestGrades !== 'undefined' && autoHarvestGrades ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px;" />
                                 <span>Auto-collect confirmed answers from past quizzes</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: ${isLight ? '#334155' : '#cbd5e1'}; cursor: pointer;">
-                                <input id="welcome-chk-sync" type="checkbox" ${autoCloudSync ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px; accent-color: #10b981;" />
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: ${isLight ? '#52525b' : '#a1a1aa'}; cursor: pointer;">
+                                <input id="welcome-chk-sync" type="checkbox" ${autoCloudSync ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px;" />
                                 <span>Download verified answers when course opens</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: ${isLight ? '#334155' : '#cbd5e1'}; cursor: pointer;">
-                                <input id="welcome-chk-scrape" type="checkbox" ${autoScrapeAmauoed ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px; accent-color: #10b981;" />
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: ${isLight ? '#52525b' : '#a1a1aa'}; cursor: pointer;">
+                                <input id="welcome-chk-scrape" type="checkbox" ${autoScrapeAmauoed ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px;" />
                                 <span>Auto-check online study guides (AMAUOED)</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: ${isLight ? '#334155' : '#cbd5e1'}; cursor: pointer;">
-                                <input id="welcome-chk-share" type="checkbox" ${autoCommunityShare ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px; accent-color: #10b981;" />
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: ${isLight ? '#52525b' : '#a1a1aa'}; cursor: pointer;">
+                                <input id="welcome-chk-share" type="checkbox" ${autoCommunityShare ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px;" />
                                 <span>Share verified answers with classmates (100% anonymous)</span>
                             </label>
                         </div>
                     </details>
 
-                    <!-- Keyboard Shortcuts Cheatsheet (Comprehensive Collapsible) -->
-                    <details style="background: ${isLight ? 'rgba(245, 158, 11, 0.08)' : 'rgba(245, 158, 11, 0.05)'}; border: 1px solid ${isLight ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)'}; border-radius: 8px; padding: 8px 12px;" id="welcome-shortcuts-section">
-                        <summary id="welcome-shortcuts-title" style="font-size: 11px; font-weight: 700; color: ${isLight ? '#d97706' : '#fcd34d'}; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;" title="Double-click to toggle Developer Console">
+                    <!-- Keyboard Shortcuts Cheatsheet (Unboxed & Clean) -->
+                    <details id="welcome-shortcuts-section" style="padding: 0; margin: 0;">
+                        <summary id="welcome-shortcuts-title" style="font-size: 11.5px; font-weight: 600; color: ${isLight ? '#3f3f46' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;" title="Double-click to toggle Developer Console">
                             <span style="display: flex; align-items: center; gap: 6px;">
-                                ${ICONS.keyboard} <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                                <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
                                 <span>Keyboard Shortcuts Cheatsheet (Comprehensive)</span>
                                 <span id="amaes-secret-cheatsheet-trigger" style="display:none;">Cheatsheet</span>
                             </span>
-                            <span style="font-size: 10px; color: ${isLight ? '#64748b' : '#94a3b8'}; font-weight: 400;">Press <kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; color: ${isLight ? '#0f172a' : '#fff'}; padding: 1px 4px; border-radius: 3px; font-size: 9px;">?</kbd> or <kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; color: ${isLight ? '#0f172a' : '#fff'}; padding: 1px 4px; border-radius: 3px; font-size: 9px;">K</kbd></span>
+                            <span style="font-size: 10px; color: ${isLight ? '#71717a' : '#a1a1aa'}; font-weight: 400;">Press <kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; color: ${isLight ? '#18181b' : '#fff'}; padding: 1px 4px; border-radius: 3px; font-size: 9px; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">?</kbd> or <kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; color: ${isLight ? '#18181b' : '#fff'}; padding: 1px 4px; border-radius: 3px; font-size: 9px; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">K</kbd></span>
                         </summary>
-                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 10px; font-size: 10.5px; color: ${isLight ? '#334155' : '#cbd5e1'}; margin-top: 8px; padding-top: 8px; border-top: 1px solid ${isLight ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.15)'};">
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 10px; font-size: 10.5px; color: ${isLight ? '#52525b' : '#a1a1aa'}; margin-top: 8px; padding-left: 18px;">
                             <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#0f172a' : '#fff'}; font-family: monospace;">N</kbd> / <kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#0f172a' : '#fff'}; font-family: monospace;">Space</kbd></span>
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">N</kbd> / <kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">Space</kbd></span>
                                 <span>Next Question / Page</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#0f172a' : '#fff'}; font-family: monospace;">C</kbd></span>
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">C</kbd></span>
                                 <span>Copy AI Prompt</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#0f172a' : '#fff'}; font-family: monospace;">V</kbd></span>
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">V</kbd></span>
                                 <span>Paste AI Answer</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#0f172a' : '#fff'}; font-family: monospace;">P</kbd></span>
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">P</kbd></span>
                                 <span>Pause / Resume Auto-Quiz</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#0f172a' : '#fff'}; font-family: monospace;">1–4</kbd> / <kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#0f172a' : '#fff'}; font-family: monospace;">A–D</kbd></span>
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">1–4</kbd> / <kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">A–D</kbd></span>
                                 <span>Select Choice 1 to 4</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#0f172a' : '#fff'}; font-family: monospace;">H</kbd></span>
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">H</kbd></span>
                                 <span>Highlight Answers</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#0f172a' : '#fff'}; font-family: monospace;">?</kbd> / <kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#0f172a' : '#fff'}; font-family: monospace;">K</kbd></span>
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">?</kbd> / <kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">K</kbd></span>
                                 <span>Open Quick Guide</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#e2e8f0' : '#334155'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#0f172a' : '#fff'}; font-family: monospace;">Esc</kbd></span>
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">Esc</kbd></span>
                                 <span>Close Modal / Minimize</span>
                             </div>
                         </div>
@@ -199,43 +199,52 @@
                         </div>
                     </div>
 
-                    <!-- Links with Equal Flex-Grid Widths -->
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-                        <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: ${isLight ? '#f1f5f9' : 'rgba(0,0,0,0.25)'}; border: 1px solid ${isLight ? '#cbd5e1' : '#334155'}; border-radius: 6px; color: ${isLight ? '#334155' : '#cbd5e1'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.github} <span>GitHub</span></a>
-                        <a href="${GREASYFORK_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: ${isLight ? '#f1f5f9' : 'rgba(0,0,0,0.25)'}; border: 1px solid ${isLight ? '#cbd5e1' : '#334155'}; border-radius: 6px; color: ${isLight ? '#334155' : '#cbd5e1'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.greasyfork} <span>Greasy Fork</span></a>
-                        <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: ${isLight ? '#f1f5f9' : 'rgba(0,0,0,0.25)'}; border: 1px solid ${isLight ? '#cbd5e1' : '#334155'}; border-radius: 6px; color: ${isLight ? '#334155' : '#cbd5e1'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.globe} <span>Website</span></a>
-                        <button id="welcome-btn-reinstall" type="button" class="amaes-btn" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: ${isLight ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.12)'}; border: 1px solid ${isLight ? 'rgba(16, 185, 129, 0.4)' : 'rgba(16, 185, 129, 0.35)'}; border-radius: 6px; color: ${isLight ? '#059669' : '#a7f3d0'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center; font-weight: 700;" title="Reinstall current toolkit in Violentmonkey / Tampermonkey">${ICONS.download} <span>Reinstall</span></button>
-                    </div>
+                    <!-- Collapsed Secondary Tools & Links (Hidden by default to eliminate clutter) -->
+                    <details id="welcome-more-options" style="padding: 0; margin: 0;">
+                        <summary style="font-size: 11px; font-weight: 600; color: ${isLight ? '#71717a' : '#a1a1aa'}; cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
+                            <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
+                            <span style="display: flex; align-items: center; gap: 4px;">${ICONS.gear || ICONS.tools} More Options & Maintenance</span>
+                        </summary>
+                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding-left: 18px;">
+                            <!-- Links Grid -->
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                                <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.github} <span>GitHub</span></a>
+                                <a href="${GREASYFORK_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.greasyfork} <span>Greasy Fork</span></a>
+                                <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.globe} <span>Website</span></a>
+                                <button id="welcome-btn-reinstall" type="button" class="amaes-btn" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center; font-weight: 600;" title="Reinstall current toolkit in Violentmonkey / Tampermonkey">${ICONS.download} <span>Reinstall</span></button>
+                            </div>
 
-                    <!-- Toolkit Utilities & Preferences (Moved from header to declutter) -->
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-                        <button id="amaes-theme-btn" type="button" class="amaes-btn" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: ${isLight ? '#f1f5f9' : 'rgba(0,0,0,0.25)'}; border: 1px solid ${isLight ? '#cbd5e1' : '#334155'}; border-radius: 6px; color: ${isLight ? '#334155' : '#cbd5e1'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Switch between Dark and Light mode">
-                            ${currentTheme === 'dark' ? ICONS.sun + ' <span>Light Mode</span>' : ICONS.moon + ' <span>Dark Mode</span>'}
-                        </button>
-                        <button id="amaes-bug-btn" type="button" class="amaes-btn" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: ${isLight ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.1)'}; border: 1px solid ${isLight ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.25)'}; border-radius: 6px; color: ${isLight ? '#dc2626' : '#fca5a5'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Report a problem or bug to maintainers">
-                            ${ICONS.bug || ICONS.alertTriangle} <span>Report Bug</span>
-                        </button>
-                        <button id="amaes-debug-btn" type="button" class="amaes-btn amaes-debug-btn" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: ${isLight ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.1)'}; border: 1px solid ${isLight ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.25)'}; border-radius: 6px; color: ${isLight ? '#2563eb' : '#93c5fd'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Copy diagnostic system report to clipboard">
-                            ${ICONS.clipboard} <span>Copy Log</span>
-                        </button>
-                        <button id="amaes-reset-btn" type="button" class="amaes-btn" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: ${isLight ? 'rgba(245, 158, 11, 0.12)' : 'rgba(245, 158, 11, 0.1)'}; border: 1px solid ${isLight ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.25)'}; border-radius: 6px; color: ${isLight ? '#d97706' : '#fcd34d'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Reset installation: clear toolkit data and reopen welcome setup">
-                            ${ICONS.rotateCcw} <span>Reset All</span>
-                        </button>
-                    </div>
+                            <!-- Utilities Grid -->
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                                <button id="amaes-theme-btn" type="button" class="amaes-btn" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Switch between Dark and Light mode">
+                                    ${currentTheme === 'dark' ? ICONS.sun + ' <span>Light Mode</span>' : ICONS.moon + ' <span>Dark Mode</span>'}
+                                </button>
+                                <button id="amaes-bug-btn" type="button" class="amaes-btn" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Report a problem or bug to maintainers">
+                                    ${ICONS.bug || ICONS.alertTriangle} <span>Report Bug</span>
+                                </button>
+                                <button id="amaes-debug-btn" type="button" class="amaes-btn amaes-debug-btn" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Copy diagnostic system report to clipboard">
+                                    ${ICONS.clipboard} <span>Copy Log</span>
+                                </button>
+                                <button id="amaes-reset-btn" type="button" class="amaes-btn" style="font-size: 10px; padding: 5px 3px; justify-content: center; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.04)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; border-radius: 6px; color: ${isLight ? '#52525b' : '#d4d4d8'}; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center;" title="Reset installation: clear toolkit data and reopen welcome setup">
+                                    ${ICONS.rotateCcw} <span>Reset All</span>
+                                </button>
+                            </div>
+                        </div>
+                    </details>
 
-                    <!-- Agreement Disclaimer -->
-                    <label style="display: flex; align-items: flex-start; gap: 10px; background: ${isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.04)'}; border: 1px solid ${isLight ? '#bbf7d0' : 'rgba(16, 185, 129, 0.2)'}; border-radius: 8px; padding: 10px 12px; cursor: pointer; transition: all 0.2s; margin-top: 2px;" id="welcome-terms-container">
-                        <input id="welcome-chk-terms" type="checkbox" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 18px; height: 18px; margin-top: 1px; cursor: pointer; accent-color: #10b981; flex-shrink: 0;" />
-                        <span style="color: ${isLight ? '#1e293b' : '#cbd5e1'}; font-size: 11px; line-height: 1.4;">I understand this is an independent study aid. I agree to the <a href="https://github.com/Acads-Tools/amaes-toolkit#important-use-disclaimer" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#2563eb' : '#93c5fd'}; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;" onclick="event.stopPropagation();">Terms of Use & Disclaimer</a>, will use it responsibly, and agree to share verified answers anonymously to help classmates.</span>
+                    <!-- Agreement Disclaimer (Unboxed & Clean) -->
+                    <label style="display: flex; align-items: flex-start; gap: 10px; padding: 2px 0; cursor: pointer; user-select: none;" id="welcome-terms-container">
+                        <input id="welcome-chk-terms" type="checkbox" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 16px; height: 16px; margin-top: 1px; cursor: pointer; flex-shrink: 0;" />
+                        <span style="color: ${isLight ? '#52525b' : '#a1a1aa'}; font-size: 11px; line-height: 1.45;">I understand this is an independent study aid. I agree to the <a href="https://github.com/Acads-Tools/amaes-toolkit#important-use-disclaimer" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#18181b' : '#f4f4f5'}; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;" onclick="event.stopPropagation();">Terms of Use & Disclaimer</a>, will use it responsibly, and agree to share verified answers anonymously to help classmates.</span>
                     </label>
                 </div>
 
                 <!-- Footer Action -->
-                <div style="padding: 12px 20px; border-top: 1px solid ${isLight ? '#e2e8f0' : '#334155'}; background: ${isLight ? '#f8fafc' : '#0f172a'}; display: flex; justify-content: space-between; align-items: center;">
-                    <a href="https://github.com/Acads-Tools/amaes-toolkit#frequently-asked-questions-faqs" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#64748b' : '#94a3b8'}; font-size: 11px; text-decoration: none; display: flex; align-items: center; gap: 4px;" title="View FAQs & Guide">
+                <div style="padding: 14px 24px; border-top: 1px solid ${isLight ? '#f4f4f5' : '#27272a'}; background: ${isLight ? '#ffffff' : '#18181b'}; display: flex; justify-content: space-between; align-items: center;">
+                    <a href="https://github.com/Acads-Tools/amaes-toolkit#frequently-asked-questions-faqs" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11px; text-decoration: none; display: flex; align-items: center; gap: 4px;" title="View FAQs & Guide">
                         📖 <span>FAQs & Guide</span>
                     </a>
-                    <button id="btn-got-it-welcome" class="amaes-btn amaes-btn-green" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '' : 'disabled'} style="padding: 8px 20px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; opacity: ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '1' : '0.5'};">
+                    <button id="btn-got-it-welcome" class="amaes-btn amaes-btn-green" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '' : 'disabled'} style="padding: 8px 22px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; background: #10b981; color: #fff; border: none; opacity: ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '1' : '0.5'};">
                         ${ICONS.zap} Get Started
                     </button>
                 </div>
