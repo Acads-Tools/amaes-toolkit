@@ -4833,6 +4833,26 @@ test("Privacy-Safe Session Telemetry: tracks session-only quiz count, dispatches
     assert.ok(script.includes("users <timeframe>"), "Developer console must document users timeframe query");
 });
 
+// --------------------------------------------------
+// 114. Theme Reactivity across Panel and Welcome Modal
+// --------------------------------------------------
+test("Theme Reactivity: applies theme variables dynamically, sets data-amaes-theme attribute, and re-renders welcome onboarding modal on toggle", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Core applyTheme function is defined at top level with variable stylesheet
+    assert.ok(script.includes("function applyTheme(themeKey)"), "Must define top-level applyTheme function");
+    assert.ok(script.includes("id = 'amaes-theme-variables'"), "Must inject amaes-theme-variables style element");
+    assert.ok(script.includes("document.documentElement.setAttribute('data-amaes-theme', themeKey)"), "Must set data-amaes-theme on root element");
+
+    // 2. Panel theme synchronization hook
+    assert.ok(script.includes("window._amaesUpdatePanelTheme = updatePanelThemeStyles;"), "Must register window._amaesUpdatePanelTheme hook");
+
+    // 3. Welcome modal theme toggle reactivity
+    assert.ok(script.includes("const isLight = currentTheme === 'light';"), "Welcome modal must compute isLight state");
+    assert.ok(script.includes("showWelcomeOnboardingModal(true);"), "Theme toggle button must re-render welcome onboarding modal immediately");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

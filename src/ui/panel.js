@@ -625,10 +625,8 @@
         styleSheet.id = 'amaes-toolkit-styles';
         document.head.appendChild(styleSheet);
 
-        function applyTheme(themeKey) {
+        function updatePanelThemeStyles(themeKey) {
             const t = THEMES[themeKey] || THEMES.dark;
-            currentTheme = themeKey;
-            localStorage.setItem('amaes_toolkit_theme', themeKey);
 
             styleSheet.textContent = `
                 :root {
@@ -1542,7 +1540,8 @@
             }
         }
 
-        applyTheme(currentTheme);
+        window._amaesUpdatePanelTheme = updatePanelThemeStyles;
+        updatePanelThemeStyles(currentTheme);
 
         // UI References
         const statusEl = document.getElementById('amaes-status');

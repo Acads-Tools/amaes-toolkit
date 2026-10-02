@@ -52,6 +52,63 @@
     let currentTheme = localStorage.getItem('amaes_toolkit_theme') || 'dark';
     if (!THEMES[currentTheme]) currentTheme = 'dark';
 
+    function applyTheme(themeKey) {
+        const t = THEMES[themeKey] || THEMES.dark;
+        currentTheme = themeKey;
+        localStorage.setItem('amaes_toolkit_theme', themeKey);
+
+        let varSheet = document.getElementById('amaes-theme-variables');
+        if (!varSheet) {
+            varSheet = document.createElement('style');
+            varSheet.id = 'amaes-theme-variables';
+            (document.head || document.documentElement).appendChild(varSheet);
+        }
+
+        varSheet.textContent = `
+            :root {
+                --bg: ${t.bg} !important;
+                --surface: ${t.surface} !important;
+                --surface-subtle: ${t.surfaceSubtle} !important;
+                --border: ${t.border} !important;
+                --border-subtle: ${t.borderSubtle} !important;
+                --text-primary: ${t.textPrimary} !important;
+                --text-secondary: ${t.textSecondary} !important;
+                --text-muted: ${t.textMuted} !important;
+                --accent-blue: ${t.accentBlue} !important;
+                --accent-blue-hover: ${t.accentBlueHover} !important;
+                --accent-pink: ${t.accentPink} !important;
+                --accent-pink-hover: ${t.accentPinkHover} !important;
+                --accent-purple: ${t.accentPurple} !important;
+                --accent-purple-hover: ${t.accentPurpleHover} !important;
+                --accent-green: ${t.accentGreen} !important;
+                --accent-green-hover: ${t.accentGreenHover} !important;
+                --accent-amber: ${t.accentAmber} !important;
+                --accent-gray: ${t.accentGray} !important;
+                --shadow: ${t.shadow} !important;
+                --status-bg: ${t.statusBg} !important;
+            }
+        `;
+
+        if (document.documentElement) {
+            document.documentElement.setAttribute('data-amaes-theme', themeKey);
+        }
+
+        if (typeof window !== 'undefined' && typeof window._amaesUpdatePanelTheme === 'function') {
+            window._amaesUpdatePanelTheme(themeKey);
+        }
+
+        if (typeof ICONS !== 'undefined') {
+            document.querySelectorAll('#amaes-theme-btn').forEach(btn => {
+                btn.innerHTML = currentTheme === 'dark'
+                    ? `${ICONS.sun} <span>Light Mode</span>`
+                    : `${ICONS.moon} <span>Dark Mode</span>`;
+            });
+        }
+    }
+
+    // Apply active theme variables immediately
+    applyTheme(currentTheme);
+
     let autoHighlightQuiz = localStorage.getItem('amaes_auto_highlight_quiz') !== 'false'; // default true
     let autoCopyQuizForAI = localStorage.getItem('amaes_auto_copy_ai') !== 'false'; // default true
     let autoQuizMode = localStorage.getItem('amaes_auto_quiz_mode') === 'true'; // default false (Master autonomous switch)
