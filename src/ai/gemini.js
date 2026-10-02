@@ -58,9 +58,17 @@
             setupBtn.innerHTML = `<span>            ${isConfigured ? (keys.length > 1 ? `Configure AI keys (${keys.length})` : 'Configure AI key') : 'Setup Free AI Assistant'}</span>`;
         }
 
-        const quizAiBlock = document.getElementById('amaes-ai-quiz-settings-block');
-        if (quizAiBlock) {
-            quizAiBlock.style.display = isConfigured ? 'block' : 'none';
+        const quizAiPill = document.getElementById('amaes-ai-quiz-status-pill');
+        if (quizAiPill) {
+            quizAiPill.textContent = isConfigured ? 'Active' : 'Not Set';
+            quizAiPill.style.color = isConfigured ? '#34d399' : 'var(--text-muted)';
+            quizAiPill.style.background = isConfigured ? 'rgba(52, 211, 153, 0.1)' : 'rgba(255, 255, 255, 0.05)';
+            quizAiPill.style.borderColor = isConfigured ? 'rgba(52, 211, 153, 0.3)' : 'rgba(255, 255, 255, 0.15)';
+        }
+
+        const quizConfigBtn = document.getElementById('btn-quiz-config-ai');
+        if (quizConfigBtn) {
+            quizConfigBtn.innerHTML = `${ICONS.sparkles} <span>${isConfigured ? (keys.length > 1 ? `Configure AI Keys (${keys.length})` : 'Configure AI Key') : 'Setup Free AI Key'}</span>`;
         }
     }
 

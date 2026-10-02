@@ -1041,6 +1041,13 @@
             };
         }
 
+        const btnQuizConfigAi = document.getElementById('btn-quiz-config-ai');
+        if (btnQuizConfigAi) {
+            btnQuizConfigAi.onclick = () => {
+                showGeminiSetupModal();
+            };
+        }
+
         // Dynamic hint text for collapsible accordions
         const aiBlockDetails = document.getElementById('amaes-ai-quiz-settings-block');
         if (aiBlockDetails) {

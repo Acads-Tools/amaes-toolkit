@@ -1125,7 +1125,7 @@
         const chk = document.getElementById('chk-fast-quiz-mode');
         if (chk) chk.checked = fastQuizMode;
         const card = document.getElementById('amaes-fast-answer-card');
-        if (card) {
+        if (card && card.tagName === 'DIV') {
             card.style.background = fastQuizMode
                 ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(217, 119, 6, 0.08) 100%)'
                 : 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%)';
@@ -1134,7 +1134,7 @@
         }
         const title = document.getElementById('amaes-fast-quiz-title');
         if (title) {
-            title.style.color = fastQuizMode ? '#f59e0b' : 'var(--text-primary)';
+            title.style.color = fastQuizMode ? '#f59e0b' : 'var(--text-secondary)';
         }
         const iconBadge = document.getElementById('amaes-fast-quiz-icon');
         if (iconBadge) {
