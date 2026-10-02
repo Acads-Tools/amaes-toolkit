@@ -34,6 +34,10 @@ These components are loaded across all matched Moodle pages when logged in.
 ### C. Quick Start & Shortcuts Modal
 - **DOM ID**: `#amaes-welcome-modal`
 - **Trigger**: Appears on first installation or when pressing hotkeys <kbd>?</kbd> or <kbd>K</kbd>.
+- **Features**:
+  - Highlights core features: Auto-Answer, Anonymous Community Sharing, and Built-in Google Gemini AI.
+  - **Anonymous Safety Badge**: Styled in soft trustworthy blue (`rgba(59, 130, 246, 0.20)` / `#60a5fa`) to emphasize privacy and trust.
+  - **Terms & Legal Safety Link** (`#welcome-terms-link`): Directly links to [`docs/TERMS.md`](TERMS.md) on GitHub with `e.stopPropagation()` and explicit sole responsibility copy.
 - **Dismissal**: Closes via the top-right button, clicking the backdrop overlay, or pressing <kbd>Esc</kbd>.
 
 ### D. Top Navbar Update Notification
@@ -43,7 +47,7 @@ These components are loaded across all matched Moodle pages when logged in.
 
 ---
 
-## 3. Dashboard & Course List (`/my/` & `courses.php`)
+## 3. Dashboard & Course Pages (`/my/`, `courses.php`, `course/view.php`)
 
 ### A. Course Database Readiness Pill
 - **Class**: `.amaes-home-db-badge-wrapper` / `.amaes-home-db-badge`
@@ -60,6 +64,12 @@ These components are loaded across all matched Moodle pages when logged in.
 - **Location**: Preceded above `#region-main` or `.dashboard-card-deck`.
 - **Condition**: Renders on dashboard for new users with fewer than 50 cached questions.
 - **Dismissal**: Dismissible with a single click, saving state in `localStorage` (`amaes_guide_banner_dismissed`).
+
+### C. 1-Click Interactive Activity Completion Badges
+- **Target Element**: Uncompleted view-based badges (`To do: View`) inside course sections.
+- **Interactivity**: Dynamically styled with `cursor: pointer;`, hover scaling (`scale(1.05)`), and glow shadow.
+- **Behavior**: Clicking sends an authenticated background `fetch()` to the module URL (`credentials: 'same-origin'`). Automatically transforms into a green `Done: View` badge (`.badge-success`), sounds the completion ding chime, and triggers a confirmation toast without leaving the course page.
+- **Smart Skip**: Already completed activities (`Done: View`, `.completed`, `.badge-success`) are excluded to avoid redundant background requests.
 
 ---
 
@@ -103,6 +113,20 @@ Injections here provide real-time assistance during active assessments.
 - **Triggers**:
   - Question has no match in any database tier.
   - Multi-answer question requires student confirmation before advancing.
+
+---
+
+## 4b. Quiz Summary Pages (`summary.php`)
+
+Controls displayed on the review summary table before final submission.
+
+### A. Submission Button Pulse Highlight
+- **Target**: `.btn-finishattempt, input[value*="Submit all and finish"]`
+- **Visuals**: Emits a distinct emerald outline (`3px solid #10b981`) and soft glow to clearly identify the final submission trigger.
+
+### B. Summary Auto-Submit & Completion Chime
+- **Setting Control**: `#chk-auto-submit-quiz` (housed in the main HUD under Advanced Settings).
+- **Behavior**: When enabled, the toolkit waits 1.2s on the summary screen, triggers submission, automatically confirms Moodle's submission modal, and executes the celebratory multi-tone ascending ding (`quest_done`).
 
 ---
 

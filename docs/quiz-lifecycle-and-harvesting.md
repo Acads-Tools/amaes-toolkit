@@ -1,22 +1,24 @@
 # Quiz Lifecycle & Answer Harvesting Engine
 
-This document provides an in-depth explanation of how the **AMAES Moodle Toolkit** detects, solves, and harvests quiz questions across the Moodle quiz lifecycle.
+This document provides an in-depth explanation of how the **AMAES Moodle Toolkit** detects, solves, completes, and harvests quiz questions across the entire Moodle quiz lifecycle.
 
 ---
 
-## 1. The Three Stages of the Quiz Lifecycle
+## 1. The Four Stages of the Quiz Lifecycle
 
-The quiz workflow traverses three standard Moodle endpoints:
+The quiz workflow traverses four standard Moodle endpoints:
 
 ```
-[view.php] Landing Page ──► [attempt.php] Active Quiz Attempt ──► [review.php] Answer Harvesting & Sync
+[view.php] Landing Page ──► [attempt.php] Active Attempt ──► [summary.php] Review & Submit ──► [review.php] Harvest & Sync
 ```
 
-### Stage 1: Landing Page (`view.php`)
+### Stage 1: Landing Page (`view.php`) & Course View
 - **Subject Extraction**: The toolkit identifies the course code (e.g., `CS6204`, `ITE6100`) from breadcrumb links, course title strings, or URL parameters.
 - **Database Readiness Verification**: Local `localStorage` and the central verified GitHub cache are checked to evaluate readiness.
 - **Badge Status**: Displays the readiness pill directly on the course card (e.g., `All Terms Ready • 120 Qs`).
 - **One-Click Launch**: Pressing *"Start Auto-Quiz"* on the landing page automatically clicks *"Attempt quiz now"* or *"Re-attempt quiz"* to initiate the attempt.
+- **1-Click "To do: View" Auto-Completion**: Uncompleted view-based activities feature interactive 1-click completion (`cursor: pointer`, hover scale effect). Clicking sends an authenticated background request (`credentials: 'same-origin'`) to Moodle's `view.php`, marking it completed server-side and updating the badge to green `Done: View`.
+- **Smart Skip Guard**: Activities already completed or displaying `Done: View` are automatically excluded from batch processing and interactive bindings.
 
 ---
 
@@ -47,8 +49,17 @@ The question is evaluated against three confidence tiers:
 
 #### 4. Auto-Quiz Progression
 - **Safe Mode**: Highlights the answer and waits for user confirmation before navigating.
-- **Aggressive Mode**: Selects the verified radio button or checkbox and immediately triggers Moodle's *"Next page"* or *"Finish attempt..."* button.
-- **Unknown Question Safety Gate**: If a question has no known answer in any tier, the solver **pauses safely**. It displays a reassurance notice (*"Be the first to answer and share it!"*) and waits for the student to make a manual choice or use `[Copy AI]`.
+- **Aggressive / Fast Mode**: Selects the verified radio button or checkbox and immediately triggers Moodle's *"Next page"* or *"Finish attempt..."* button.
+- **Unknown Question Safety Gate**: If a question has no known answer in any tier, the solver **pauses safely**. It displays a single blockage banner, triggers an audible marimba chime, and waits for manual input or AI inference.
+
+---
+
+### Stage 2b: Attempt Review & Submission (`summary.php`)
+
+Upon answering the final question, Moodle navigates to the summary review table:
+- **Default Safe Review**: Auto-submit is disabled by default, giving students full control to review all answers at their own pace.
+- **Visual Submission Focus**: Highlights the *"Submit all and finish"* button with an emerald pulse.
+- **Optional Auto-Submit on Summary Review**: When enabled in Advanced Settings (`#chk-auto-submit-quiz`), the toolkit pauses 1.2s on the summary screen, triggers submission, automatically confirms Moodle's submission dialog modal, and sounds the celebratory `quest_done` ascending ding chime.
 
 ---
 
