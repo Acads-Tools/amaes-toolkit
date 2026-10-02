@@ -140,7 +140,7 @@
                         addLine(`Anonymous Active Users (${label}):`, 'var(--accent-purple)');
                         addLine(`• Unique Active Devices: ${count}`, 'var(--accent-green)');
                         addLine(`• Total Quizzes Solved: ${data.total_session_quizzes_reported || 0}`, 'var(--accent-blue)');
-                        addLine(`• Fast Answer (Turbo) Users: ${data.fast_mode_active_count || 0} (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
+                        addLine(`• Speed Mode Users: ${data.fast_mode_active_count || 0} (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
                     } else {
                         addLine(`Unable to retrieve metrics for '${tf}'.`, 'var(--accent-pink)');
                     }
@@ -160,7 +160,7 @@
                         const count = typeof data.active_users !== 'undefined' ? data.active_users : data.active_users_24h;
                         const label = data.timeframe || tf;
                         addLine(`Feature Adoption Summary (${label}):`, 'var(--accent-purple)');
-                        addLine(`• ⚡ Fast Answer (Turbo) Mode: ${data.fast_mode_active_count || 0} of ${count} users (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
+                        addLine(`• ⚡ Speed Mode: ${data.fast_mode_active_count || 0} of ${count} users (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
                         addLine(`• Auto-Quiz Completions: ${data.total_session_quizzes_reported || 0} quizzes solved`, 'var(--accent-green)');
                         if (data.events && Object.keys(data.events).length > 0) {
                             const evts = Object.entries(data.events).map(([k, v]) => `${k}: ${v}`).join(' | ');
@@ -192,7 +192,7 @@
                         addLine(`• Active Unique Users: ${count}`, 'var(--accent-green)');
                         addLine(`• Total Telemetry Events: ${eventsCount}`, 'var(--text-secondary)');
                         addLine(`• Session Quizzes Solved Reported: ${data.total_session_quizzes_reported || 0}`, 'var(--accent-blue)');
-                        addLine(`• Fast Answer (Turbo) Users: ${data.fast_mode_active_count || 0} (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
+                        addLine(`• Speed Mode Users: ${data.fast_mode_active_count || 0} (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
                         if (data.events && Object.keys(data.events).length > 0) {
                             const eList = Object.entries(data.events).map(([ev, num]) => `${ev}: ${num}`).join(', ');
                             addLine(`• Activity Breakdown: ${eList}`, 'var(--text-secondary)');

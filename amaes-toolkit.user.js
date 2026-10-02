@@ -1049,7 +1049,7 @@
     let autoHighlightQuiz = localStorage.getItem('amaes_auto_highlight_quiz') !== 'false'; // default true
     let autoCopyQuizForAI = localStorage.getItem('amaes_auto_copy_ai') !== 'false'; // default true
     let autoQuizMode = localStorage.getItem('amaes_auto_quiz_mode') === 'true'; // default false (Master autonomous switch)
-    let fastQuizMode = localStorage.getItem('amaes_fast_quiz_mode') === 'true'; // default false (⚡ Fast Answer / Turbo Mode)
+    let fastQuizMode = localStorage.getItem('amaes_fast_quiz_mode') === 'true'; // default false (⚡ Speed Mode)
     let autoPickQuiz = localStorage.getItem('amaes_auto_pick_quiz') !== 'false'; // default true: auto-select verified answers
     let autoNextVerified = localStorage.getItem('amaes_auto_next_verified') !== 'false'; // default true: auto-advance when solver answers verified question
     let autoNextQuiz = localStorage.getItem('amaes_auto_next_quiz') === 'true'; // default false: manual answers do NOT auto-advance by default (safe review)
@@ -4246,11 +4246,11 @@
             hudFastBtn.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255,255,255,0.08)';
             hudFastBtn.style.color = fastQuizMode ? '#f59e0b' : '#94a3b8';
             hudFastBtn.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(255,255,255,0.15)';
-            hudFastBtn.innerHTML = `${ICONS.zap} <span>${fastQuizMode ? 'Turbo ON' : 'Turbo'}</span>`;
+            hudFastBtn.innerHTML = `${ICONS.zap} <span>${fastQuizMode ? 'Speed ON' : 'Speed'}</span>`;
         }
         const hudModeText = document.getElementById('hud-mode-text');
         if (hudModeText && autoQuizMode && !isWaitingForUserAnswer) {
-            hudModeText.textContent = fastQuizMode ? 'Fast Co-Pilot ⚡' : 'Co-Pilot';
+            hudModeText.textContent = fastQuizMode ? 'Speed Co-Pilot ⚡' : 'Co-Pilot';
             hudModeText.style.color = fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--accent-blue, #3b82f6)';
         }
     }
@@ -4307,16 +4307,16 @@
         // Sync all in-question top toolbar stop/resume buttons
         document.querySelectorAll('.amaes-que-stop-btn').forEach(btn => {
             if (autoQuizMode) {
-                btn.innerHTML = `${ICONS.stop} <span>Stop Auto (Manual)</span>`;
-                btn.style.background = 'rgba(239, 68, 68, 0.1)';
+                btn.innerHTML = `${ICONS.stop} <span>Stop Auto</span>`;
+                btn.style.background = 'rgba(239, 68, 68, 0.08)';
                 btn.style.color = '#ef4444';
-                btn.style.border = '1px solid rgba(239, 68, 68, 0.35)';
+                btn.style.border = '1px solid rgba(239, 68, 68, 0.28)';
                 btn.title = 'Stop automation so you can answer manually without any interference';
             } else {
-                btn.innerHTML = `${ICONS.play} <span>Resume Co-Pilot</span>`;
-                btn.style.background = 'rgba(16, 185, 129, 0.1)';
+                btn.innerHTML = `${ICONS.play} <span>Resume</span>`;
+                btn.style.background = 'rgba(16, 185, 129, 0.08)';
                 btn.style.color = '#10b981';
-                btn.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+                btn.style.border = '1px solid rgba(16, 185, 129, 0.28)';
                 btn.title = 'Resume autonomous quiz solver and auto-navigation';
             }
         });
@@ -4378,19 +4378,25 @@
         if (!checkIsQuizAttemptPage()) return;
         if (document.getElementById('amaes-quiz-hud')) return;
 
-        const courseInfo = detectCourseInfo();
-        const subCode = courseInfo.subjectCode || 'CS6301';
-        const detectedQuizTerm = detectTermFromText(courseInfo.currentActivityTitle || document.title || '');
-        const cached = getCachedAnswers(subCode);
-        const hasDb = cached && cached.length > 0;
-        const verifiedCount = cached ? cached.filter(q => q.ansRaw || q.answer).length : 0;
-        const eliminatedCount = cached ? cached.reduce((acc, q) => acc + (Array.isArray(q.wrongAnswers) ? q.wrongAnswers.length : 0), 0) : 0;
-        const termStats = getSubjectTermBreakdown(subCode);
-        const termCount = detectedQuizTerm === 'Prelim' ? termStats.prelim :
-                          detectedQuizTerm === 'Midterm' ? termStats.midterm :
-                          detectedQuizTerm === 'Prefi' ? termStats.prefi :
-                          detectedQuizTerm === 'Final' ? termStats.final : 0;
         const navState = getQuizNavQuestionStates();
+        const panelEl = document.getElementById('amaes-toolkit-panel');
+        const bodyEl = document.getElementById('amaes-panel-body');
+        const isPanelMinimized = !panelEl || panelEl.classList.contains('amaes-minimized') || (bodyEl && bodyEl.style.display === 'none');
+
+        let progressHtml = '';
+        if (navState && navState.totalQuestions > 0) {
+            const currentQ = navState.currentIndex >= 0 ? (navState.currentIndex + 1) : 1;
+            const totalQ = navState.totalQuestions;
+            const pct = Math.round((navState.totalAnswered / totalQ) * 100);
+            progressHtml = `
+                <div style="display: flex; align-items: center; gap: 6px; padding: 0 4px; border-left: 1px solid rgba(255,255,255,0.12); margin-left: 2px;">
+                    <span style="font-weight: 700; color: #94a3b8; font-size: 10px;">Q ${currentQ}/${totalQ}</span>
+                    <div style="width: 32px; height: 3.5px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;" title="${navState.totalAnswered}/${totalQ} answered (${pct}%)">
+                        <div style="width: ${pct}%; height: 100%; background: #3b82f6; border-radius: 2px; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+            `;
+        }
 
         const hud = document.createElement('div');
         hud.id = 'amaes-quiz-hud';
@@ -4423,37 +4429,17 @@
                 </span>
             </div>
 
-            <!-- Course Database Badge -->
-            <div id="hud-db-indicator" style="
-                background: ${hasDb ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'};
-                color: ${hasDb ? '#10b981' : '#f87171'};
-                border: 1px solid ${hasDb ? '#10b981' : '#f87171'};
-                padding: 2px 7px;
-                border-radius: 12px;
-                font-size: 10px;
-                font-weight: 700;
-                display: flex;
-                align-items: center;
-                gap: 4px;
-            " title="${hasDb ? `${subCode} DB: ${verifiedCount} total verified answers & ${eliminatedCount} eliminated choices stored${detectedQuizTerm ? ` (${termCount} for ${detectedQuizTerm})` : ''}` : `No database answers found for ${subCode}`}">
-                <span>${hasDb ? 'DB' : 'No DB'}</span>
-                <span>${subCode}${detectedQuizTerm ? ` • ${detectedQuizTerm}` : ''}</span>
-                <span>(${termCount > 0 ? `${termCount} Qs` : `${verifiedCount} Qs`}${eliminatedCount > 0 ? ` • ${eliminatedCount} Elim` : ''})</span>
-            </div>
+            <!-- Quiz Progress -->
+            ${progressHtml}
 
-            <!-- Pause / Resume Button -->
-            <button id="btn-hud-toggle-quiz" class="amaes-inline-btn" style="padding: 3px 10px; font-size: 10px; background: ${autoQuizMode ? 'rgba(239,68,68,0.25); color:#ef4444; border:1px solid #ef4444' : 'rgba(16,185,129,0.25); color:#10b981; border:1px solid #10b981'}; border-radius: 12px; cursor: pointer; font-weight: 600;">
-                ${autoQuizMode ? 'Pause' : 'Resume Auto-Quiz'}
+            <!-- Pause / Resume Button (Adaptive: only shown when main panel is minimized) -->
+            <button id="btn-hud-toggle-quiz" class="amaes-inline-btn" style="display: ${isPanelMinimized ? 'inline-flex' : 'none'}; padding: 3px 10px; font-size: 10px; background: ${autoQuizMode ? 'rgba(239,68,68,0.25); color:#ef4444; border:1px solid #ef4444' : 'rgba(16,185,129,0.25); color:#10b981; border:1px solid #10b981'}; border-radius: 12px; cursor: pointer; font-weight: 600;">
+                ${autoQuizMode ? 'Pause' : 'Resume'}
             </button>
 
             <!-- Fast Mode HUD Toggle -->
-            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Toggle Fast Answer Mode">
+            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Fast Answer Mode">
                 ${ICONS.zap} <span>${fastQuizMode ? 'Speed ON' : 'Speed'}</span>
-            </button>
-
-            <!-- Toggle Toolkit Panel -->
-            <button id="btn-hud-expand-panel" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: rgba(255,255,255,0.08); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; cursor: pointer;" title="Toggle Full Toolkit Panel">
-                ${ICONS.minimize} <span>Panel</span>
             </button>
 
             <!-- Persistent Update Indicator -->
@@ -4487,29 +4473,11 @@
                 fastQuizMode = !fastQuizMode;
                 localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
                 syncFastQuizUI();
-                showToast(`Fast Answer Mode: ${fastQuizMode ? 'ON (Turbo)' : 'OFF'}`);
-                setLog(`Fast Answer (Turbo): <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
+                showToast(`Speed Mode: ${fastQuizMode ? 'ON' : 'OFF'}`);
+                setLog(`Speed Mode: <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
                 if (fastQuizMode && checkIsQuizAttemptPage()) {
                     runAutoQuizSolver(true);
                 }
-            };
-        }
-
-        const hudPanelBtn = document.getElementById('btn-hud-expand-panel');
-        if (hudPanelBtn) {
-            hudPanelBtn.onclick = () => {
-                const panel = document.getElementById('amaes-toolkit-panel');
-                const bodyEl = document.getElementById('amaes-panel-body');
-                const minBtn = document.getElementById('amaes-min-btn');
-                if (!bodyEl) return;
-                const isHidden = bodyEl.style.display === 'none';
-                bodyEl.style.display = isHidden ? 'block' : 'none';
-                if (panel) panel.classList.toggle('amaes-minimized', !isHidden);
-                if (minBtn) minBtn.innerHTML = isHidden ? ICONS.minimize : `
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    </svg>
-                `;
             };
         }
     }
@@ -4905,14 +4873,14 @@
                 return;
             }
 
-            // Fast Answer Mode Toggle: 'F'
+            // Speed Mode Toggle: 'F'
             if (key === 'F') {
                 e.preventDefault();
                 fastQuizMode = !fastQuizMode;
                 localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
                 syncFastQuizUI();
-                showToast(`Fast Answer Mode: ${fastQuizMode ? 'ON (Turbo)' : 'OFF'}`);
-                setLog(`Fast Answer (Turbo): <b>${fastQuizMode ? 'ON' : 'OFF'}</b> via <b>F</b> key.`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
+                showToast(`Speed Mode: ${fastQuizMode ? 'ON' : 'OFF'}`);
+                setLog(`Speed Mode: <b>${fastQuizMode ? 'ON' : 'OFF'}</b> via <b>F</b> key.`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
                 if (fastQuizMode && checkIsQuizAttemptPage()) {
                     runAutoQuizSolver(true);
                 }
@@ -8839,15 +8807,15 @@
                 align-items: center;
                 gap: 4px;
                 padding: 2px 7px;
-                font-size: 9px;
+                font-size: 8.5px;
                 font-weight: 700;
-                border-radius: 4px;
+                border-radius: 12px;
                 background: ${typeBg};
                 color: ${typeColor};
                 border: 1px solid ${typeBorder};
                 margin-right: auto;
                 text-transform: uppercase;
-                letter-spacing: 0.3px;
+                letter-spacing: 0.4px;
                 user-select: none;
             `;
             typePill.textContent = typeLabel;
@@ -8862,27 +8830,27 @@
                 margin-left: auto;
                 flex: 0 0 auto;
                 align-items: center;
-                gap: 5px;
-                padding: 3px 9px;
-                font-size: 10px;
-                font-weight: 700;
-                border-radius: 6px;
+                gap: 4px;
+                padding: 2px 8px;
+                font-size: 9.5px;
+                font-weight: 600;
+                border-radius: 12px;
                 cursor: pointer;
                 transition: all 0.15s ease;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+                box-shadow: 0 1px 2px rgba(0,0,0,0.04);
             `;
 
             if (autoQuizMode) {
-                stopBtn.innerHTML = `${ICONS.stop} <span>Stop Automation</span>`;
-                stopBtn.style.background = 'rgba(239, 68, 68, 0.1)';
+                stopBtn.innerHTML = `${ICONS.stop} <span>Stop Auto</span>`;
+                stopBtn.style.background = 'rgba(239, 68, 68, 0.08)';
                 stopBtn.style.color = '#ef4444';
-                stopBtn.style.border = '1px solid rgba(239, 68, 68, 0.35)';
+                stopBtn.style.border = '1px solid rgba(239, 68, 68, 0.28)';
                 stopBtn.title = 'Stop automation so you can answer manually without any script interference';
             } else {
-                stopBtn.innerHTML = `${ICONS.play} <span>Resume Co-Pilot</span>`;
-                stopBtn.style.background = 'rgba(16, 185, 129, 0.1)';
+                stopBtn.innerHTML = `${ICONS.play} <span>Resume</span>`;
+                stopBtn.style.background = 'rgba(16, 185, 129, 0.08)';
                 stopBtn.style.color = '#10b981';
-                stopBtn.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+                stopBtn.style.border = '1px solid rgba(16, 185, 129, 0.28)';
                 stopBtn.title = 'Resume autonomous quiz solver and auto-navigation';
             }
 
@@ -13507,7 +13475,7 @@
                         addLine(`Anonymous Active Users (${label}):`, 'var(--accent-purple)');
                         addLine(`• Unique Active Devices: ${count}`, 'var(--accent-green)');
                         addLine(`• Total Quizzes Solved: ${data.total_session_quizzes_reported || 0}`, 'var(--accent-blue)');
-                        addLine(`• Fast Answer (Turbo) Users: ${data.fast_mode_active_count || 0} (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
+                        addLine(`• Speed Mode Users: ${data.fast_mode_active_count || 0} (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
                     } else {
                         addLine(`Unable to retrieve metrics for '${tf}'.`, 'var(--accent-pink)');
                     }
@@ -13527,7 +13495,7 @@
                         const count = typeof data.active_users !== 'undefined' ? data.active_users : data.active_users_24h;
                         const label = data.timeframe || tf;
                         addLine(`Feature Adoption Summary (${label}):`, 'var(--accent-purple)');
-                        addLine(`• ⚡ Fast Answer (Turbo) Mode: ${data.fast_mode_active_count || 0} of ${count} users (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
+                        addLine(`• ⚡ Speed Mode: ${data.fast_mode_active_count || 0} of ${count} users (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
                         addLine(`• Auto-Quiz Completions: ${data.total_session_quizzes_reported || 0} quizzes solved`, 'var(--accent-green)');
                         if (data.events && Object.keys(data.events).length > 0) {
                             const evts = Object.entries(data.events).map(([k, v]) => `${k}: ${v}`).join(' | ');
@@ -13559,7 +13527,7 @@
                         addLine(`• Active Unique Users: ${count}`, 'var(--accent-green)');
                         addLine(`• Total Telemetry Events: ${eventsCount}`, 'var(--text-secondary)');
                         addLine(`• Session Quizzes Solved Reported: ${data.total_session_quizzes_reported || 0}`, 'var(--accent-blue)');
-                        addLine(`• Fast Answer (Turbo) Users: ${data.fast_mode_active_count || 0} (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
+                        addLine(`• Speed Mode Users: ${data.fast_mode_active_count || 0} (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
                         if (data.events && Object.keys(data.events).length > 0) {
                             const eList = Object.entries(data.events).map(([ev, num]) => `${ev}: ${num}`).join(', ');
                             addLine(`• Activity Breakdown: ${eList}`, 'var(--text-secondary)');
@@ -13676,146 +13644,162 @@
         `;
 
         modal.innerHTML = `
-            <div style="background: #1e293b; border: 1px solid #334155; border-radius: 16px; width: 100%; max-width: 520px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); overflow: hidden; color: #f8fafc; display: flex; flex-direction: column; max-height: 90vh;">
-                <div style="padding: 20px 24px; text-align: center; border-bottom: 1px solid #334155; background: linear-gradient(135deg, #1e293b, #0f172a); display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                        <h2 style="margin: 0; font-size: 20px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px;">
+            <div style="background: #1e293b; border: 1px solid #334155; border-radius: 16px; width: 100%; max-width: 500px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6); overflow: hidden; color: #f8fafc; display: flex; flex-direction: column; max-height: 88vh;">
+                <!-- Header -->
+                <div style="padding: 16px 20px; border-bottom: 1px solid #334155; background: linear-gradient(135deg, #1e293b, #0f172a); display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; flex-direction: column;">
+                        <h2 style="margin: 0; font-size: 17px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px;">
                             ${ICONS.zap} Welcome to AMAES Toolkit
                         </h2>
-                        <span style="font-size: 11px; color: #94a3b8; font-weight: 600; margin-top: 4px;">Your All-in-One Study & Quiz Companion</span>
+                        <span style="font-size: 11px; color: #94a3b8; font-weight: 500; margin-top: 2px;">Your All-in-One Study & Quiz Companion</span>
                     </div>
-                    ${force ? `<button id="btn-welcome-close" style="background:none; border:none; color:#94a3b8; font-size:24px; cursor:pointer; line-height:1; padding: 4px;">&times;</button>` : ''}
+                    ${force ? `<button id="btn-welcome-close" style="background:none; border:none; color:#94a3b8; font-size:22px; cursor:pointer; line-height:1; padding: 2px 6px;">&times;</button>` : ''}
                 </div>
                 
-                <div id="amaes-welcome-scroll-container" style="padding: 24px; font-size: 13px; line-height: 1.5; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;">
+                <div id="amaes-welcome-scroll-container" style="padding: 18px 20px; font-size: 12px; line-height: 1.45; display: flex; flex-direction: column; gap: 12px; overflow-y: auto;">
                     
-                    <!-- Core Features -->
-                    <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 8px; padding: 12px 14px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                            <h3 style="margin: 0; font-size: 13.5px; color: #60a5fa; display: flex; align-items: center; gap: 6px;">${ICONS.checkCircle} Smart Auto-Answer & Highlighter</h3>
+                    <!-- Core Highlights Summary Card -->
+                    <div style="display: flex; flex-direction: column; gap: 8px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 14px;">
+                        <!-- Auto-Answer -->
+                        <div style="display: flex; align-items: flex-start; gap: 10px;">
+                            <span style="color: #60a5fa; margin-top: 2px;">${ICONS.checkCircle}</span>
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <div style="font-weight: 700; color: #f1f5f9; font-size: 12px;">Smart Auto-Answer & Highlighter</div>
+                                    <span style="font-size: 9px; color: #60a5fa; font-weight: 700; background: rgba(59, 130, 246, 0.15); padding: 1px 6px; border-radius: 10px;">Background Capable</span>
+                                </div>
+                                <div style="color: #94a3b8; font-size: 11px;">Identifies subjects, highlights verified answers, and Auto-Quiz runs autonomously in the background while you switch tabs or multitask in other applications.</div>
+                            </div>
                         </div>
-                        <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically recognizes your subject, finds verified answers shared by students, and highlights the right choices. Auto-Quiz runs autonomously in the background (Background Capable) while you switch tabs or multitask in other applications.</p>
+
+                        <!-- Community Sharing -->
+                        <div style="display: flex; align-items: flex-start; gap: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;">
+                            <span style="color: #34d399; margin-top: 2px;">${ICONS.upload}</span>
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <div style="font-weight: 700; color: #f1f5f9; font-size: 12px;">Collect & Share Anonymously</div>
+                                    <span style="font-size: 9px; color: #34d399; font-weight: 700; background: rgba(16, 185, 129, 0.15); padding: 1px 6px; border-radius: 10px;">100% Anonymous</span>
+                                </div>
+                                <div style="color: #94a3b8; font-size: 11px;">Answers from completed quizzes are shared anonymously with classmates. No personal data is ever collected.</div>
+                            </div>
+                        </div>
+
+                        <!-- Built-in Gemini AI -->
+                        <div style="display: flex; align-items: flex-start; gap: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;">
+                            <span style="color: #c084fc; margin-top: 2px;">${ICONS.zap}</span>
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <div style="font-weight: 700; color: #f1f5f9; font-size: 12px;">Built-in Google Gemini AI</div>
+                                    <button id="welcome-btn-setup-ai" type="button" class="amaes-btn" style="background: rgba(139, 92, 246, 0.2); color: #d8b4fe; border: 1px solid rgba(139, 92, 246, 0.4); font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 700; cursor: pointer;">
+                                        ${geminiApiKey ? 'Key Configured' : 'Setup AI'}
+                                    </button>
+                                </div>
+                                <div style="color: #94a3b8; font-size: 11px;">Instant in-quiz AI solver for questions not yet in the community database.</div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div style="background: rgba(167, 139, 250, 0.1); border: 1px solid rgba(167, 139, 250, 0.2); border-radius: 8px; padding: 12px 14px;">
-                        <h3 style="margin: 0 0 4px; font-size: 13.5px; color: #c4b5fd; display: flex; align-items: center; gap: 6px;">${ICONS.search} Online Study Guide Backup</h3>
-                        <p style="margin: 0; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Automatically checks online student study guides (AMAUOED) to find answers whenever a question isn't in your saved library yet.</p>
-                    </div>
-
-                    <!-- Built-in Gemini AI Assistant -->
-                    <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 8px; padding: 12px 14px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                            <h3 style="margin: 0; font-size: 13.5px; color: #c084fc; display: flex; align-items: center; gap: 6px;">${ICONS.zap} Built-in Google Gemini AI</h3>
-                            <span style="font-size: 9px; font-family: monospace; color: #d8b4fe; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.35); padding: 1px 6px; border-radius: 3px;">100% Free · Experimental</span>
-                        </div>
-                        <p style="margin: 0 0 8px; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Direct in-quiz AI solving for uncertain Multiple Choice and True/False questions. Features <b>in-session answer caching</b> (0 duplicate API requests), <b>elimination safety guards</b> against known wrong choices, <b>configurable retries</b>, and <b>auto-copy on failure</b>.</p>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <button id="welcome-btn-setup-ai" type="button" class="amaes-btn" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; font-size: 11px; padding: 4px 10px; border-radius: 5px; font-weight: 700; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 4px;">
-                                <span>${geminiApiKey ? 'Configure AI key' : 'Setup Free AI Assistant'}</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Collect & Share Anonymously -->
-                    <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 12px 14px;">
-                        <h3 style="margin: 0 0 4px; font-size: 13.5px; color: #34d399; display: flex; align-items: center; gap: 6px;">${ICONS.upload} Collect & Share Anonymously</h3>
-                        <p style="margin: 0 0 6px; color: #cbd5e1; font-size: 11.5px; line-height: 1.45;">Help your fellow students! Confirmed answers from completed quizzes are automatically saved and shared <b>100% anonymously</b>. No names, IDs, or personal info are ever shared.</p>
-                        
-                        <!-- Mini Toggles with Comfortable Touch Spacing -->
-                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px; background: rgba(0, 0, 0, 0.2); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05);">
-                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #e2e8f0; cursor: pointer; padding: 1px 0;">
+                    <!-- Community Sync Options (Compact Collapsible) -->
+                    <details style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 8px 12px;">
+                        <summary style="font-size: 11px; font-weight: 700; color: #34d399; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;">
+                            <span>⚙️ Community Sync Settings</span>
+                            <span style="font-size: 10px; color: #94a3b8; font-weight: 400;">Configure options</span>
+                        </summary>
+                        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(16, 185, 129, 0.15);">
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #cbd5e1; cursor: pointer;">
                                 <input id="welcome-chk-harvest" type="checkbox" ${typeof autoHarvestGrades !== 'undefined' && autoHarvestGrades ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px; accent-color: #10b981;" />
-                                <span>Automatically save confirmed answers from completed quizzes</span>
+                                <span>Auto-collect confirmed answers from past quizzes</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #e2e8f0; cursor: pointer; padding: 1px 0;">
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #cbd5e1; cursor: pointer;">
                                 <input id="welcome-chk-sync" type="checkbox" ${autoCloudSync ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px; accent-color: #10b981;" />
-                                <span>Automatically download verified answers on course open</span>
+                                <span>Download verified answers when course opens</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #e2e8f0; cursor: pointer; padding: 1px 0;">
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #cbd5e1; cursor: pointer;">
                                 <input id="welcome-chk-scrape" type="checkbox" ${autoScrapeAmauoed ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px; accent-color: #10b981;" />
-                                <span>Auto-check online study guides when missing</span>
+                                <span>Auto-check online study guides (AMAUOED)</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #e2e8f0; cursor: pointer; padding: 1px 0;">
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #cbd5e1; cursor: pointer;">
                                 <input id="welcome-chk-share" type="checkbox" ${autoCommunityShare ? 'checked' : ''} style="cursor: pointer; width: 14px; height: 14px; accent-color: #10b981;" />
                                 <span>Share verified answers with classmates (100% anonymous)</span>
                             </label>
                         </div>
-                    </div>
+                    </details>
 
-                    <!-- Keyboard Shortcuts Cheatsheet (Comprehensive) -->
-                    <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 12px 14px;" id="welcome-shortcuts-section">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                            <h3 id="welcome-shortcuts-title" style="margin: 0; font-size: 13.5px; color: #fcd34d; display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;" title="Double-click to toggle Developer Console">
-                                ${ICONS.zap} <span>Keyboard Shortcuts</span> <span id="amaes-secret-cheatsheet-trigger" style="cursor: pointer; user-select: none; border-bottom: 1px dotted #fcd34d;" title="Double-click to toggle Developer Console">Cheatsheet</span>
-                            </h3>
-                            <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">Press <kbd style="background: #334155; color: #fff; padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 9px;">?</kbd> or <kbd style="background: #334155; color: #fff; padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 9px;">K</kbd> anywhere</span>
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 12px; font-size: 11px; color: #cbd5e1;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="min-width: 65px;"><kbd style="background: #334155; padding: 2px 5px; border-radius: 4px; font-weight: 700; color: #fff; font-family: monospace;">N</kbd> / <kbd style="background: #334155; padding: 2px 5px; border-radius: 4px; font-weight: 700; color: #fff; font-family: monospace;">Space</kbd></span>
+                    <!-- Keyboard Shortcuts Cheatsheet (Comprehensive Collapsible) -->
+                    <details style="background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 8px; padding: 8px 12px;" id="welcome-shortcuts-section">
+                        <summary id="welcome-shortcuts-title" style="font-size: 11px; font-weight: 700; color: #fcd34d; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;" title="Double-click to toggle Developer Console">
+                            <span style="display: flex; align-items: center; gap: 6px;">
+                                ⌨️ <span>Keyboard Shortcuts Cheatsheet (Comprehensive)</span>
+                                <span id="amaes-secret-cheatsheet-trigger" style="display:none;">Cheatsheet</span>
+                            </span>
+                            <span style="font-size: 10px; color: #94a3b8; font-weight: 400;">Press <kbd style="background: #334155; color: #fff; padding: 1px 4px; border-radius: 3px; font-size: 9px;">?</kbd> or <kbd style="background: #334155; color: #fff; padding: 1px 4px; border-radius: 3px; font-size: 9px;">K</kbd></span>
+                        </summary>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 10px; font-size: 10.5px; color: #cbd5e1; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(245, 158, 11, 0.15);">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: #334155; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: #fff; font-family: monospace;">N</kbd> / <kbd style="background: #334155; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: #fff; font-family: monospace;">Space</kbd></span>
                                 <span>Next Question / Page</span>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="min-width: 65px;"><kbd style="background: #334155; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: #fff; font-family: monospace;">C</kbd></span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: #334155; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: #fff; font-family: monospace;">C</kbd></span>
                                 <span>Copy AI Prompt</span>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="min-width: 65px;"><kbd style="background: #334155; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: #fff; font-family: monospace;">V</kbd></span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: #334155; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: #fff; font-family: monospace;">V</kbd></span>
                                 <span>Paste AI Answer</span>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="min-width: 65px;"><kbd style="background: #334155; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: #fff; font-family: monospace;">P</kbd></span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: #334155; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: #fff; font-family: monospace;">P</kbd></span>
                                 <span>Pause / Resume Auto-Quiz</span>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="min-width: 65px;"><kbd style="background: #334155; padding: 2px 5px; border-radius: 4px; font-weight: 700; color: #fff; font-family: monospace;">1–4</kbd> / <kbd style="background: #334155; padding: 2px 5px; border-radius: 4px; font-weight: 700; color: #fff; font-family: monospace;">A–D</kbd></span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: #334155; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: #fff; font-family: monospace;">1–4</kbd> / <kbd style="background: #334155; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: #fff; font-family: monospace;">A–D</kbd></span>
                                 <span>Select Choice 1 to 4</span>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="min-width: 65px;"><kbd style="background: #334155; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: #fff; font-family: monospace;">H</kbd></span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: #334155; padding: 1px 5px; border-radius: 3px; font-weight: 700; color: #fff; font-family: monospace;">H</kbd></span>
                                 <span>Highlight Answers</span>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="min-width: 65px;"><kbd style="background: #334155; padding: 2px 5px; border-radius: 4px; font-weight: 700; color: #fff; font-family: monospace;">?</kbd> / <kbd style="background: #334155; padding: 2px 5px; border-radius: 4px; font-weight: 700; color: #fff; font-family: monospace;">K</kbd></span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: #334155; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: #fff; font-family: monospace;">?</kbd> / <kbd style="background: #334155; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: #fff; font-family: monospace;">K</kbd></span>
                                 <span>Open Quick Guide</span>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="min-width: 65px;"><kbd style="background: #334155; padding: 2px 5px; border-radius: 4px; font-weight: 700; color: #fff; font-family: monospace;">Esc</kbd></span>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: #334155; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: #fff; font-family: monospace;">Esc</kbd></span>
                                 <span>Close Modal / Minimize</span>
                             </div>
                         </div>
-                    </div>
+                    </details>
 
-                    <!-- Developer & Diagnostic Console Section (Zero Emojis, Direct Terminal Access, Placed Directly Below Cheatsheet) -->
-                    <div id="amaes-quick-dev-section" style="display: none; background: #15102a; border: 2px solid #a855f7; border-radius: 8px; padding: 14px; flex-direction: column; gap: 10px; box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);">
+                    <!-- Developer & Diagnostic Console Section -->
+                    <div id="amaes-quick-dev-section" style="display: none; background: #15102a; border: 2px solid #a855f7; border-radius: 8px; padding: 12px; flex-direction: column; gap: 8px; box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);">
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <div style="display: flex; align-items: center; gap: 6px;">
-                                <h3 style="margin: 0; font-size: 13px; color: #c084fc; display: flex; align-items: center; gap: 6px;">
+                                <h3 style="margin: 0; font-size: 12px; color: #c084fc; display: flex; align-items: center; gap: 6px;">
                                     ${ICONS.debug} <span>Developer & Diagnostics Console</span>
                                 </h3>
                                 <span style="font-size: 9px; font-family: monospace; background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 1px 5px; border-radius: 3px;">Active</span>
                             </div>
-                            <button id="amaes-dev-btn-close" type="button" class="amaes-btn amaes-btn-outline" style="font-size: 9.5px; padding: 2px 8px; color: #94a3b8; border-color: #475569; cursor: pointer;" title="Collapse console">
+                            <button id="amaes-dev-btn-close" type="button" class="amaes-btn amaes-btn-outline" style="font-size: 9px; padding: 2px 7px; color: #94a3b8; border-color: #475569; cursor: pointer;" title="Collapse console">
                                 Collapse
                             </button>
                         </div>
 
                         <!-- Community Mesh Telemetry Card -->
-                        <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between;">
+                        <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between;">
                             <div>
-                                <div style="font-size: 9px; font-family: monospace; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Active Mesh Telemetry</div>
-                                <div style="display: flex; align-items: baseline; gap: 5px; margin-top: 2px;">
-                                    <span id="amaes-dev-mesh-count" style="font-size: 18px; font-weight: 800; font-family: monospace; color: #c084fc;">--</span>
-                                    <span style="font-size: 10.5px; color: #94a3b8;">peers active</span>
+                                <div style="font-size: 9px; font-family: monospace; color: #94a3b8; text-transform: uppercase;">Active Mesh Telemetry</div>
+                                <div style="display: flex; align-items: baseline; gap: 4px; margin-top: 1px;">
+                                    <span id="amaes-dev-mesh-count" style="font-size: 16px; font-weight: 800; font-family: monospace; color: #c084fc;">--</span>
+                                    <span style="font-size: 10px; color: #94a3b8;">peers active</span>
                                 </div>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #a855f7; box-shadow: 0 0 6px #a855f7;"></span>
-                                <span style="font-size: 9.5px; color: #cbd5e1; font-family: monospace;">Mesh Connected</span>
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #a855f7; box-shadow: 0 0 6px #a855f7;"></span>
+                                <span style="font-size: 9px; color: #cbd5e1; font-family: monospace;">Mesh Connected</span>
                             </div>
                         </div>
 
-                        <!-- Diagnostic Terminal Box (Admin Friendly, Spacious Monospace) -->
+                        <!-- Diagnostic Terminal Box -->
                         <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 5px;">
                             <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9px; color: #94a3b8; font-family: monospace; text-transform: uppercase;">
                                 <span>Terminal Command Line</span>
@@ -13823,34 +13807,38 @@
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <span style="font-family: monospace; font-size: 11px; font-weight: 700; color: #c084fc;">&gt;</span>
-                                <input id="amaes-dev-cmd-input" type="text" placeholder="status, ping, users, cache, logs, clear..." style="flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid #475569; border-radius: 4px; padding: 4px 7px; font-family: monospace; font-size: 10.5px; color: #fff; outline: none;" />
-                                <button id="amaes-dev-cmd-run" type="button" class="amaes-btn" style="padding: 4px 10px; font-size: 10px; font-family: monospace; cursor: pointer; background: #9333ea; color: #fff; border: none; border-radius: 4px; font-weight: 600;">
+                                <input id="amaes-dev-cmd-input" type="text" placeholder="status, ping, users, cache, logs, clear..." style="flex: 1; background: rgba(0, 0, 0, 0.3); border: 1px solid #475569; border-radius: 4px; padding: 3px 6px; font-family: monospace; font-size: 10px; color: #fff; outline: none;" />
+                                <button id="amaes-dev-cmd-run" type="button" class="amaes-btn" style="padding: 3px 8px; font-size: 10px; font-family: monospace; cursor: pointer; background: #9333ea; color: #fff; border: none; border-radius: 4px; font-weight: 600;">
                                     Run
                                 </button>
                             </div>
-                            <div id="amaes-dev-cmd-output" style="background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 4px; padding: 7px 9px; height: 260px; min-height: 240px; overflow-y: auto; font-family: monospace; font-size: 10.5px; line-height: 1.5; color: #cbd5e1; display: flex; flex-direction: column; gap: 3px; user-select: text;">
+                            <div id="amaes-dev-cmd-output" style="background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 4px; padding: 7px 9px; height: 260px; min-height: 240px; overflow-y: auto; font-family: monospace; font-size: 10px; line-height: 1.45; color: #cbd5e1; display: flex; flex-direction: column; gap: 2px; user-select: text;">
                                 <div style="color: #64748b;">Developer diagnostic terminal ready. Type 'help' for command suite.</div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Links with Equal Flex-Grid Widths: GitHub, Greasy Fork, Website, Reinstall -->
+                    <!-- Links with Equal Flex-Grid Widths -->
                     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-                        <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 4px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 5px; text-align: center;">${ICONS.github} <span>GitHub</span></a>
-                        <a href="${GREASYFORK_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 4px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 5px; text-align: center;">${ICONS.greasyfork} <span>Greasy Fork</span></a>
-                        <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 11px; padding: 7px 4px; justify-content: center; background: rgba(0,0,0,0.3); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 5px; text-align: center;">${ICONS.globe} <span>Website</span></a>
-                        <button id="welcome-btn-reinstall" type="button" class="amaes-btn" style="font-size: 11px; padding: 7px 4px; justify-content: center; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 6px; color: #a7f3d0; cursor: pointer; display: flex; align-items: center; gap: 5px; text-align: center; font-weight: 700;" title="Reinstall current toolkit in Violentmonkey / Tampermonkey">${ICONS.download} <span>Reinstall</span></button>
+                        <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: rgba(0,0,0,0.25); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.github} <span>GitHub</span></a>
+                        <a href="${GREASYFORK_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: rgba(0,0,0,0.25); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.greasyfork} <span>Greasy Fork</span></a>
+                        <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: rgba(0,0,0,0.25); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 4px; text-align: center;">${ICONS.globe} <span>Website</span></a>
+                        <button id="welcome-btn-reinstall" type="button" class="amaes-btn" style="font-size: 10.5px; padding: 6px 4px; justify-content: center; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 6px; color: #a7f3d0; cursor: pointer; display: flex; align-items: center; gap: 4px; text-align: center; font-weight: 700;" title="Reinstall current toolkit in Violentmonkey / Tampermonkey">${ICONS.download} <span>Reinstall</span></button>
                     </div>
 
-                    <!-- Agreement with High-Contrast Link -->
-                    <label style="display: flex; align-items: flex-start; gap: 12px; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 14px; cursor: pointer; transition: all 0.2s; margin-top: 2px;" id="welcome-terms-container">
-                        <input id="welcome-chk-terms" type="checkbox" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer; accent-color: #10b981; flex-shrink: 0;" />
-                        <span style="color: #e2e8f0; font-size: 11.5px; line-height: 1.45;">I understand this is an independent study aid. I agree to the <a href="https://github.com/Acads-Tools/amaes-toolkit#important-use-disclaimer" target="_blank" rel="noopener noreferrer" style="color: #93c5fd; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;" onclick="event.stopPropagation();">Terms of Use & Disclaimer</a>, will use it responsibly, and agree to share verified answers anonymously to help classmates.</span>
+                    <!-- Agreement Disclaimer -->
+                    <label style="display: flex; align-items: flex-start; gap: 10px; background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 10px 12px; cursor: pointer; transition: all 0.2s; margin-top: 2px;" id="welcome-terms-container">
+                        <input id="welcome-chk-terms" type="checkbox" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 18px; height: 18px; margin-top: 1px; cursor: pointer; accent-color: #10b981; flex-shrink: 0;" />
+                        <span style="color: #cbd5e1; font-size: 11px; line-height: 1.4;">I understand this is an independent study aid. I agree to the <a href="https://github.com/Acads-Tools/amaes-toolkit#important-use-disclaimer" target="_blank" rel="noopener noreferrer" style="color: #93c5fd; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;" onclick="event.stopPropagation();">Terms of Use & Disclaimer</a>, will use it responsibly, and agree to share verified answers anonymously to help classmates.</span>
                     </label>
                 </div>
 
-                <div style="padding: 16px 24px; border-top: 1px solid #334155; background: #0f172a; display: flex; justify-content: flex-end; gap: 12px;">
-                    <button id="btn-got-it-welcome" class="amaes-btn amaes-btn-green" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '' : 'disabled'} style="padding: 10px 24px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; opacity: ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '1' : '0.5'};">
+                <!-- Footer Action -->
+                <div style="padding: 12px 20px; border-top: 1px solid #334155; background: #0f172a; display: flex; justify-content: space-between; align-items: center;">
+                    <a href="https://github.com/Acads-Tools/amaes-toolkit#frequently-asked-questions-faqs" target="_blank" rel="noopener noreferrer" style="color: #94a3b8; font-size: 11px; text-decoration: none; display: flex; align-items: center; gap: 4px;" title="View FAQs & Guide">
+                        📖 <span>FAQs & Guide</span>
+                    </a>
+                    <button id="btn-got-it-welcome" class="amaes-btn amaes-btn-green" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '' : 'disabled'} style="padding: 8px 20px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; opacity: ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '1' : '0.5'};">
                         ${ICONS.zap} Get Started
                     </button>
                 </div>
@@ -14234,45 +14222,33 @@
                         </button>
                     </div>
 
-                    <!-- Fast Answer (Speed) Setting -->
-                    <div id="amaes-fast-answer-card" style="background: ${fastQuizMode ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(217, 119, 6, 0.08) 100%)' : 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%)'}; border: 1px solid ${fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.25)'}; border-radius: 8px; padding: 7px 9px; box-shadow: ${fastQuizMode ? '0 0 10px rgba(245, 158, 11, 0.15)' : 'none'}; transition: all 0.2s ease;">
-                        <label style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; font-size: 10.5px; cursor: pointer;">
-                            <div style="display: flex; align-items: flex-start; gap: 7px;">
-                                <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="accent-color: #f59e0b; cursor: pointer; margin-top: 2px;" />
-                                <div>
-                                    <div style="display: flex; align-items: center; gap: 5px;">
-                                        <span id="amaes-fast-quiz-icon" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 4px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.12)'}; color: #f59e0b; flex-shrink: 0; transition: all 0.2s ease;">${ICONS.zap}</span>
-                                        <span id="amaes-fast-quiz-title" style="font-weight: 700; color: ${fastQuizMode ? '#f59e0b' : 'var(--text-primary)'}; font-size: 11px; transition: color 0.2s ease;">Fast Answer Mode</span>
-                                        ${fastQuizMode ? `<span id="amaes-fast-quiz-pill" style="font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4);">ON</span>` : ''}
-                                    </div>
-                                    <div style="font-size: 9px; color: var(--text-secondary); font-weight: normal; margin-top: 2px; line-height: 1.35;">Answers visible questions instantly & speeds up moving to the next page</div>
+                    <!-- Speed Mode Setting -->
+                    <div id="amaes-fast-answer-card" style="background: var(--surface-subtle); border: 1px solid ${fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--border-subtle)'}; border-radius: 8px; padding: 7px 9px; transition: border-color 0.2s ease;">
+                        <label style="display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10.5px; cursor: pointer;" title="Answers visible questions instantly & speeds up moving to the next page">
+                            <div style="display: flex; align-items: center; gap: 7px;">
+                                <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="accent-color: #f59e0b; cursor: pointer; margin: 0;" />
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <span id="amaes-fast-quiz-icon" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 4px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.08)'}; color: #f59e0b; flex-shrink: 0; transition: all 0.2s ease;">${ICONS.zap}</span>
+                                    <span id="amaes-fast-quiz-title" style="font-weight: 700; color: ${fastQuizMode ? '#f59e0b' : 'var(--text-primary)'}; font-size: 11px; transition: color 0.2s ease;">Speed Mode</span>
+                                    ${fastQuizMode ? `<span id="amaes-fast-quiz-pill" style="font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3);">ON</span>` : ''}
                                 </div>
                             </div>
                         </label>
                     </div>
 
                     <!-- Primary Core Settings (The 3-Step Pipeline) -->
-                    <div style="margin-top: 2px; border-top: 1px solid var(--border-subtle); padding-top: 6px; display: flex; flex-direction: column; gap: 5px;">
-                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: var(--accent-green); cursor: pointer; font-weight: 700;" title="Automatically highlight verified database and study guide answers">
-                            <input id="chk-auto-hl-quiz" type="checkbox" ${autoHighlightQuiz ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
-                            <div>
-                                <span>Highlight Answers (Library & Study Guides)</span>
-                                <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Color-coded verified answers, study guides & eliminated choices</div>
-                            </div>
+                    <div style="margin-top: 2px; border-top: 1px solid var(--border-subtle); padding-top: 6px; display: flex; flex-direction: column; gap: 6px;">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--accent-green); cursor: pointer; font-weight: 700;" title="Highlight verified database and study guide answers with color codes">
+                            <input id="chk-auto-hl-quiz" type="checkbox" ${autoHighlightQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                            <span>Show Answers</span>
                         </label>
-                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #34d399; cursor: pointer; font-weight: 700;" title="Automatically selects choice inputs when verified answers are matched">
-                            <input id="chk-auto-pick" type="checkbox" ${autoPickQuiz ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
-                            <div>
-                                <span>Auto-Pick verified choices on quiz attempts</span>
-                                <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Picks radio, checkbox, or dropdown option if answer is verified</div>
-                            </div>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #34d399; cursor: pointer; font-weight: 700;" title="Automatically select choice inputs when verified answers are matched">
+                            <input id="chk-auto-pick" type="checkbox" ${autoPickQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                            <span>Auto-Pick Answers</span>
                         </label>
-                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: var(--accent-blue); cursor: pointer; font-weight: 700;" title="When enabled, advances smoothly to next question when answered (Default: ON)">
-                            <input id="chk-auto-next-verified" type="checkbox" ${autoNextVerified ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
-                            <div>
-                                <span>Auto-Next when Answered (Smart Next)</span>
-                                <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Advances automatically when answered; pauses on unknown questions</div>
-                            </div>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--accent-blue); cursor: pointer; font-weight: 700;" title="Advances smoothly to next question when answered; pauses on unknown questions">
+                            <input id="chk-auto-next-verified" type="checkbox" ${autoNextVerified ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                            <span>Smart Next</span>
                         </label>
                     </div>
 
@@ -14287,34 +14263,22 @@
                                 <span class="amaes-ai-toggle-hint" style="font-size: 8.5px; color: var(--text-muted);">Click to expand</span>
                             </div>
                         </summary>
-                        <div style="display: flex; flex-direction: column; gap: 5px; padding: 6px 8px; border-top: 1px solid rgba(168, 85, 247, 0.2); background: rgba(0, 0, 0, 0.15);">
-                            <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #c084fc; cursor: pointer; font-weight: 700;" title="When question is not in DB, automatically ask Google Gemini 1.5 Flash for the answer">
-                                <input id="chk-ai-quiz-enabled" type="checkbox" ${aiQuizEnabled ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
-                                <div>
-                                    <span>Get Answers from AI on Unknown Questions</span>
-                                    <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Auto-answers uncertain multiple choice and true/false questions</div>
-                                </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; border-top: 1px solid rgba(168, 85, 247, 0.2); background: rgba(0, 0, 0, 0.15);">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #c084fc; cursor: pointer; font-weight: 700;" title="When question is not in DB, automatically ask Google Gemini for the answer">
+                                <input id="chk-ai-quiz-enabled" type="checkbox" ${aiQuizEnabled ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Ask AI on Unknown</span>
                             </label>
-                            <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="When enabled, automatically selects the option suggested by AI. When disabled, only highlights it with a purple badge">
-                                <input id="chk-ai-auto-select" type="checkbox" ${aiAutoSelect ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
-                                <div>
-                                    <span>Auto-Select AI Answers</span>
-                                    <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Automatically checks AI choice (if off, highlights in purple for manual review)</div>
-                                </div>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="Automatically checks AI choice (if off, highlights in purple for manual review)">
+                                <input id="chk-ai-auto-select" type="checkbox" ${aiAutoSelect ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Auto-Select AI</span>
                             </label>
-                            <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="When enabled, automatically copies unknown questions to clipboard if AI cannot solve or times out">
-                                <input id="chk-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
-                                <div>
-                                    <span>Auto-Copy on AI Failure</span>
-                                    <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Copies question to clipboard if AI fails or times out (Default: ON)</div>
-                                </div>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="Copies question to clipboard if AI fails or times out">
+                                <input id="chk-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Auto-Copy on Fail</span>
                             </label>
-                            <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="When enabled, automatically moves to the next page 1.5s after AI selects a choice">
-                                <input id="chk-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer; margin-top: 2px;" />
-                                <div>
-                                    <span>Auto-Advance After AI Answer</span>
-                                    <div style="font-size: 9px; color: var(--text-muted); font-weight: normal; margin-top: 1px;">Automatically moves to next page 1.5s after AI selects a choice (Default: ON)</div>
-                                </div>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #e9d5ff; cursor: pointer; font-weight: 600;" title="Automatically moves to next page 1.5s after AI selects a choice">
+                                <input id="chk-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Auto-Next on AI</span>
                             </label>
                             <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
                                 <span style="font-size: 10px; color: #e9d5ff; font-weight: 600;">Retry Attempts on Failure:</span>
@@ -14479,18 +14443,18 @@
                     </details>
 
                     <!-- Auto Settings for Sync & Sharing -->
-                    <div style="display: flex; flex-direction: column; gap: 4px; background: var(--surface-subtle); padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border-subtle);">
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically scan and collect verified answers from completed quizzes on course or grade report load (Default: ON)">
-                            <input id="chk-auto-harvest-grades" type="checkbox" ${autoHarvestGrades ? 'checked' : ''} style="cursor: pointer;" />
-                            <span style="font-weight: 600; color: var(--accent-green);">Auto-collect confirmed answers from past quizzes</span>
+                    <div style="display: flex; flex-direction: column; gap: 6px; background: var(--surface-subtle); padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border-subtle);">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Auto-collect confirmed answers from past quizzes">
+                            <input id="chk-auto-harvest-grades" type="checkbox" ${autoHarvestGrades ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                            <span style="font-weight: 600; color: var(--accent-green);">Auto-Collect Quizzes</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically download verified community answers when opening a course page">
-                            <input id="chk-auto-cloud-sync" type="checkbox" ${autoCloudSync ? 'checked' : ''} style="cursor: pointer;" />
-                            <span style="font-weight: 600; color: var(--text-primary);">Automatically download verified answers on course open</span>
+                            <input id="chk-auto-cloud-sync" type="checkbox" ${autoCloudSync ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                            <span style="font-weight: 600; color: var(--text-primary);">Auto-Sync Community</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically & anonymously share verified correct answers to the community database on quiz review (Default: ON)">
-                            <input id="chk-auto-community-share" type="checkbox" ${autoCommunityShare ? 'checked' : ''} style="cursor: pointer;" />
-                            <span style="font-weight: 600; color: var(--accent-green);">Share verified review answers anonymously</span>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Share verified review answers anonymously">
+                            <input id="chk-auto-community-share" type="checkbox" ${autoCommunityShare ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                            <span style="font-weight: 600; color: var(--accent-green);">Auto-Share Reviews</span>
                         </label>
                     </div>
                 </div>
@@ -14508,42 +14472,34 @@
                     </div>
 
                     <div id="mod-marker-body" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
-                        <div class="amaes-subcard">
-                            <div id="sub-done-header" class="amaes-subcard-header">
-                                <span class="sub-label" style="color: var(--accent-green);">${ICONS.check} Mark as Done</span>
-                                <span id="sub-done-arrow" class="arrow-container">${ICONS.chevronRight}</span>
-                            </div>
-                            <div id="sub-done-body" style="display: none; padding: 6px; flex-direction: column; gap: 5px;">
-                                <button id="btn-mark-lec" class="amaes-btn amaes-btn-blue">
-                                    ${ICONS.book} <span>Mark Lectures & Vids</span>
-                                </button>
-                                <button id="btn-mark-quiz" class="amaes-btn amaes-btn-pink" title="Mark quizzes & exams with a passable grade (≥80%) as done (skips unattempted or failed quizzes)">
-                                    ${ICONS.edit} <span>Mark Quizzes / Exams Only</span>
-                                </button>
-                                <button id="btn-mark-all" class="amaes-btn amaes-btn-gray" title="Mark all activities as done (quizzes must meet the passing grade threshold ≥80%)">
-                                    ${ICONS.zap} <span>Mark ALL as Done</span>
-                                </button>
-                            </div>
+                        <div style="font-size: 9.5px; font-weight: 700; color: var(--accent-green); display: flex; align-items: center; gap: 4px;">
+                            ${ICONS.check} <span>Mark Complete:</span>
                         </div>
-
-                        <div class="amaes-subcard">
-                            <div id="sub-undo-header" class="amaes-subcard-header">
-                                <span class="sub-label" style="color: var(--accent-amber);">${ICONS.undo} Undo / Reset</span>
-                                <span id="sub-undo-arrow" class="arrow-container">${ICONS.chevronRight}</span>
-                            </div>
-                            <div id="sub-undo-body" style="display: none; padding: 6px; flex-direction: column; gap: 5px;">
-                                <button id="btn-undo-lec" class="amaes-btn amaes-btn-outline amaes-text-blue">
-                                    ${ICONS.book} <span>Undo Lectures & Vids</span>
-                                </button>
-                                <button id="btn-undo-quiz" class="amaes-btn amaes-btn-outline amaes-text-pink">
-                                    ${ICONS.edit} <span>Undo Quizzes / Exams</span>
-                                </button>
-                                <button id="btn-undo-all" class="amaes-btn amaes-btn-outline">
-                                    ${ICONS.zap} <span>Undo ALL</span>
-                                </button>
-                            </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
+                            <button id="btn-mark-lec" class="amaes-btn amaes-btn-blue" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Mark Lectures & Videos as done">
+                                ${ICONS.book} <span>Lectures</span>
+                            </button>
+                            <button id="btn-mark-quiz" class="amaes-btn amaes-btn-pink" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Mark quizzes & exams with a passable grade (≥80%) as done">
+                                ${ICONS.edit} <span>Quizzes</span>
+                            </button>
+                            <button id="btn-mark-all" class="amaes-btn amaes-btn-gray" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Mark all eligible activities as done">
+                                ${ICONS.zap} <span>All</span>
+                            </button>
                         </div>
-
+                        <div style="font-size: 9.5px; font-weight: 700; color: var(--accent-amber); display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+                            ${ICONS.undo} <span>Undo Complete:</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
+                            <button id="btn-undo-lec" class="amaes-btn amaes-btn-outline amaes-text-blue" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Undo completion for Lectures & Videos">
+                                ${ICONS.book} <span>Lectures</span>
+                            </button>
+                            <button id="btn-undo-quiz" class="amaes-btn amaes-btn-outline amaes-text-pink" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Undo completion for Quizzes">
+                                ${ICONS.edit} <span>Quizzes</span>
+                            </button>
+                            <button id="btn-undo-all" class="amaes-btn amaes-btn-outline" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Undo all completions">
+                                ${ICONS.zap} <span>All</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
                     <!-- MODULE 2: Activity Highlighter (Quiz / Lec / Vid) -->
@@ -14632,7 +14588,6 @@
                         <div style="display: flex; align-items: center; gap: 6px;">
                             <span style="font-weight: 700; color: #a855f7;">AI</span>
                             <span class="header-label">Smart AI Assistant</span>
-                            <span style="font-size: 8.5px; font-weight: 800; background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); padding: 1px 5px; border-radius: 4px;">EXPERIMENTAL</span>
                         </div>
                         <span id="mod-ai-arrow" class="arrow-container">${ICONS.chevronRight}</span>
                     </div>
@@ -14669,7 +14624,7 @@
                                 </select>
                             </div>
                             <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <span style="font-size: 10px; color: var(--text-secondary);">AI Plan Tier:</span>
+                                <span style="font-size: 10px; color: var(--text-secondary);">API Mode:</span>
                                 <select id="sel-course-ai-plan-tier" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 5px; cursor: pointer;">
                                     <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
                                     <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
@@ -14684,6 +14639,7 @@
                         </div>
                     </div>
                 </div>
+            </div>
 
                 <!-- Stop Button -->
                 <button id="amaes-stop-btn" class="amaes-btn amaes-btn-stop" style="display: none; margin-bottom: 6px;">
@@ -14788,8 +14744,8 @@
                 #amaes-toolkit-panel {
                     position: fixed;
                     top: auto;
-                    bottom: 20px;
-                    right: 20px;
+                    bottom: 26px;
+                    right: 24px;
                     z-index: 999999;
                     background: var(--bg);
                     color: var(--text-primary);
@@ -14812,17 +14768,44 @@
                 #amaes-toolkit-panel.amaes-minimized {
                     width: auto !important;
                     min-width: 0 !important;
-                    padding: 5px 12px !important;
-                    border-radius: 24px !important;
+                    height: 32px !important;
+                    min-height: 32px !important;
+                    padding: 0 12px !important;
+                    border-radius: 20px !important;
                     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35) !important;
                     cursor: pointer;
                     background: var(--bg);
                     border: 1px solid var(--border);
+                    display: inline-flex !important;
+                    flex-direction: row !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    box-sizing: border-box !important;
                 }
 
                 #amaes-toolkit-panel.amaes-minimized #amaes-header {
-                    gap: 8px;
-                    width: auto;
+                    display: inline-flex !important;
+                    flex-direction: row !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 8px !important;
+                    width: auto !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    border-bottom: none !important;
+                }
+
+                #amaes-toolkit-panel.amaes-minimized #amaes-brand,
+                #amaes-toolkit-panel.amaes-minimized #amaes-title-group,
+                #amaes-toolkit-panel.amaes-minimized #amaes-actions {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+
+                #amaes-toolkit-panel.amaes-minimized #amaes-title-group {
+                    gap: 6px !important;
                 }
 
                 #amaes-toolkit-panel.amaes-minimized #amaes-version-pill,
@@ -14836,19 +14819,28 @@
                 }
 
                 #amaes-toolkit-panel.amaes-minimized .amaes-icon-btn {
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 50%;
+                    width: 22px !important;
+                    height: 22px !important;
+                    border-radius: 50% !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
                 }
 
                 #amaes-toolkit-panel.amaes-minimized #amaes-title {
                     font-size: 11px;
                     font-weight: 700;
+                    line-height: 1;
+                    display: inline-block;
+                    margin: 0;
                 }
 
                 #amaes-toolkit-panel.amaes-minimized #amaes-logo-img {
                     width: 14px;
                     height: 14px;
+                    display: block;
                 }
                 #amaes-nav-tabs {
                     display: grid;
@@ -15199,13 +15191,13 @@
                 .amaes-web-ai-row {
                     display: inline-flex !important;
                     flex-wrap: wrap !important;
-                    gap: 6px !important;
+                    gap: 5px !important;
                     align-items: center !important;
-                    margin: 4px 0 10px 0 !important;
-                    padding: 3px 6px !important;
-                    background: rgba(241, 245, 249, 0.7) !important;
-                    border: 1px solid rgba(226, 232, 240, 0.8) !important;
-                    border-radius: 6px !important;
+                    margin: 2px 0 6px 0 !important;
+                    padding: 2px 6px !important;
+                    background: rgba(148, 163, 184, 0.08) !important;
+                    border: 1px solid rgba(148, 163, 184, 0.18) !important;
+                    border-radius: 14px !important;
                     box-sizing: border-box !important;
                 }
 
@@ -15213,9 +15205,9 @@
                     display: inline-flex !important;
                     align-items: center !important;
                     gap: 4px !important;
-                    font-size: 9.5px !important;
+                    font-size: 9px !important;
                     font-weight: 700 !important;
-                    color: #64748b !important;
+                    color: #94a3b8 !important;
                     text-transform: uppercase !important;
                     letter-spacing: 0.5px !important;
                     user-select: none !important;
@@ -15226,10 +15218,10 @@
                 .amaes-web-ai-item {
                     display: inline-flex !important;
                     align-items: center !important;
-                    gap: 5px !important;
-                    padding: 3px 8px !important;
-                    border-radius: 5px !important;
-                    font-size: 11px !important;
+                    gap: 4px !important;
+                    padding: 2px 7px !important;
+                    border-radius: 10px !important;
+                    font-size: 10px !important;
                     font-weight: 600 !important;
                     cursor: pointer !important;
                     transition: all 0.15s ease !important;
@@ -15238,15 +15230,15 @@
                     touch-action: manipulation !important;
                     line-height: 1.3 !important;
                     white-space: nowrap !important;
-                    background: #ffffff !important;
-                    border: 1px solid #cbd5e1 !important;
-                    color: #334155 !important;
+                    background: rgba(255, 255, 255, 0.9) !important;
+                    border: 1px solid rgba(203, 213, 225, 0.7) !important;
+                    color: #475569 !important;
                     box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
                 }
 
                 .amaes-web-ai-item svg {
-                    width: 12px !important;
-                    height: 12px !important;
+                    width: 11px !important;
+                    height: 11px !important;
                     flex-shrink: 0 !important;
                 }
 
@@ -15721,8 +15713,8 @@
                 fastQuizMode = chkFastQuizMode.checked;
                 localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
                 if (typeof syncFastQuizUI === 'function') syncFastQuizUI();
-                showToast(`Fast Answer Mode: ${fastQuizMode ? 'ON (Turbo)' : 'OFF'}`);
-                setLog(`Fast Answer (Turbo): <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)", fastQuizMode ? "Answers visible questions instantly & accelerates transitions" : "Paced mode");
+                showToast(`Speed Mode: ${fastQuizMode ? 'ON' : 'OFF'}`);
+                setLog(`Speed Mode: <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)", fastQuizMode ? "Answers visible questions instantly & accelerates transitions" : "Paced mode");
                 if (fastQuizMode && checkIsQuizAttemptPage()) {
                     runAutoQuizSolver(true);
                 }
@@ -16895,6 +16887,13 @@
 
         // Panel Minimize State Persistence
         const panelEl = document.getElementById('amaes-toolkit-panel');
+        const updateHudPauseBtnVisibility = () => {
+            const hudPauseBtn = document.getElementById('btn-hud-toggle-quiz');
+            if (hudPauseBtn && panelEl) {
+                const isMin = panelEl.classList.contains('amaes-minimized') || (bodyEl && bodyEl.style.display === 'none');
+                hudPauseBtn.style.display = isMin ? 'inline-flex' : 'none';
+            }
+        };
         const savedMinimized = localStorage.getItem('amaes_pref_minimized') === 'true';
         if (savedMinimized) {
             if (bodyEl) bodyEl.style.display = 'none';
@@ -16905,6 +16904,7 @@
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
                 </svg>
             `;
+            updateHudPauseBtnVisibility();
         }
 
         if (minBtn) minBtn.onclick = (e) => {
@@ -16916,6 +16916,7 @@
                 if (panelEl) panelEl.classList.remove('amaes-minimized');
                 minBtn.innerHTML = ICONS.minimize;
                 localStorage.setItem('amaes_pref_minimized', 'false');
+                updateHudPauseBtnVisibility();
             } else if (targetEl) {
                 targetEl.style.display = 'none';
                 if (panelEl) panelEl.classList.add('amaes-minimized');
@@ -16925,6 +16926,7 @@
                     </svg>
                 `;
                 localStorage.setItem('amaes_pref_minimized', 'true');
+                updateHudPauseBtnVisibility();
             }
         };
 
@@ -16939,6 +16941,7 @@
                         panelEl.classList.remove('amaes-minimized');
                         minBtn.innerHTML = ICONS.minimize;
                         localStorage.setItem('amaes_pref_minimized', 'false');
+                        updateHudPauseBtnVisibility();
                     }
                 }
             });

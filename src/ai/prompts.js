@@ -686,15 +686,15 @@
                 align-items: center;
                 gap: 4px;
                 padding: 2px 7px;
-                font-size: 9px;
+                font-size: 8.5px;
                 font-weight: 700;
-                border-radius: 4px;
+                border-radius: 12px;
                 background: ${typeBg};
                 color: ${typeColor};
                 border: 1px solid ${typeBorder};
                 margin-right: auto;
                 text-transform: uppercase;
-                letter-spacing: 0.3px;
+                letter-spacing: 0.4px;
                 user-select: none;
             `;
             typePill.textContent = typeLabel;
@@ -709,27 +709,27 @@
                 margin-left: auto;
                 flex: 0 0 auto;
                 align-items: center;
-                gap: 5px;
-                padding: 3px 9px;
-                font-size: 10px;
-                font-weight: 700;
-                border-radius: 6px;
+                gap: 4px;
+                padding: 2px 8px;
+                font-size: 9.5px;
+                font-weight: 600;
+                border-radius: 12px;
                 cursor: pointer;
                 transition: all 0.15s ease;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+                box-shadow: 0 1px 2px rgba(0,0,0,0.04);
             `;
 
             if (autoQuizMode) {
-                stopBtn.innerHTML = `${ICONS.stop} <span>Stop Automation</span>`;
-                stopBtn.style.background = 'rgba(239, 68, 68, 0.1)';
+                stopBtn.innerHTML = `${ICONS.stop} <span>Stop Auto</span>`;
+                stopBtn.style.background = 'rgba(239, 68, 68, 0.08)';
                 stopBtn.style.color = '#ef4444';
-                stopBtn.style.border = '1px solid rgba(239, 68, 68, 0.35)';
+                stopBtn.style.border = '1px solid rgba(239, 68, 68, 0.28)';
                 stopBtn.title = 'Stop automation so you can answer manually without any script interference';
             } else {
-                stopBtn.innerHTML = `${ICONS.play} <span>Resume Co-Pilot</span>`;
-                stopBtn.style.background = 'rgba(16, 185, 129, 0.1)';
+                stopBtn.innerHTML = `${ICONS.play} <span>Resume</span>`;
+                stopBtn.style.background = 'rgba(16, 185, 129, 0.08)';
                 stopBtn.style.color = '#10b981';
-                stopBtn.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+                stopBtn.style.border = '1px solid rgba(16, 185, 129, 0.28)';
                 stopBtn.title = 'Resume autonomous quiz solver and auto-navigation';
             }
 

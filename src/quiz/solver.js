@@ -1151,11 +1151,11 @@
             hudFastBtn.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255,255,255,0.08)';
             hudFastBtn.style.color = fastQuizMode ? '#f59e0b' : '#94a3b8';
             hudFastBtn.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(255,255,255,0.15)';
-            hudFastBtn.innerHTML = `${ICONS.zap} <span>${fastQuizMode ? 'Turbo ON' : 'Turbo'}</span>`;
+            hudFastBtn.innerHTML = `${ICONS.zap} <span>${fastQuizMode ? 'Speed ON' : 'Speed'}</span>`;
         }
         const hudModeText = document.getElementById('hud-mode-text');
         if (hudModeText && autoQuizMode && !isWaitingForUserAnswer) {
-            hudModeText.textContent = fastQuizMode ? 'Fast Co-Pilot ⚡' : 'Co-Pilot';
+            hudModeText.textContent = fastQuizMode ? 'Speed Co-Pilot ⚡' : 'Co-Pilot';
             hudModeText.style.color = fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--accent-blue, #3b82f6)';
         }
     }
@@ -1212,16 +1212,16 @@
         // Sync all in-question top toolbar stop/resume buttons
         document.querySelectorAll('.amaes-que-stop-btn').forEach(btn => {
             if (autoQuizMode) {
-                btn.innerHTML = `${ICONS.stop} <span>Stop Auto (Manual)</span>`;
-                btn.style.background = 'rgba(239, 68, 68, 0.1)';
+                btn.innerHTML = `${ICONS.stop} <span>Stop Auto</span>`;
+                btn.style.background = 'rgba(239, 68, 68, 0.08)';
                 btn.style.color = '#ef4444';
-                btn.style.border = '1px solid rgba(239, 68, 68, 0.35)';
+                btn.style.border = '1px solid rgba(239, 68, 68, 0.28)';
                 btn.title = 'Stop automation so you can answer manually without any interference';
             } else {
-                btn.innerHTML = `${ICONS.play} <span>Resume Co-Pilot</span>`;
-                btn.style.background = 'rgba(16, 185, 129, 0.1)';
+                btn.innerHTML = `${ICONS.play} <span>Resume</span>`;
+                btn.style.background = 'rgba(16, 185, 129, 0.08)';
                 btn.style.color = '#10b981';
-                btn.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+                btn.style.border = '1px solid rgba(16, 185, 129, 0.28)';
                 btn.title = 'Resume autonomous quiz solver and auto-navigation';
             }
         });
@@ -1283,19 +1283,25 @@
         if (!checkIsQuizAttemptPage()) return;
         if (document.getElementById('amaes-quiz-hud')) return;
 
-        const courseInfo = detectCourseInfo();
-        const subCode = courseInfo.subjectCode || 'CS6301';
-        const detectedQuizTerm = detectTermFromText(courseInfo.currentActivityTitle || document.title || '');
-        const cached = getCachedAnswers(subCode);
-        const hasDb = cached && cached.length > 0;
-        const verifiedCount = cached ? cached.filter(q => q.ansRaw || q.answer).length : 0;
-        const eliminatedCount = cached ? cached.reduce((acc, q) => acc + (Array.isArray(q.wrongAnswers) ? q.wrongAnswers.length : 0), 0) : 0;
-        const termStats = getSubjectTermBreakdown(subCode);
-        const termCount = detectedQuizTerm === 'Prelim' ? termStats.prelim :
-                          detectedQuizTerm === 'Midterm' ? termStats.midterm :
-                          detectedQuizTerm === 'Prefi' ? termStats.prefi :
-                          detectedQuizTerm === 'Final' ? termStats.final : 0;
         const navState = getQuizNavQuestionStates();
+        const panelEl = document.getElementById('amaes-toolkit-panel');
+        const bodyEl = document.getElementById('amaes-panel-body');
+        const isPanelMinimized = !panelEl || panelEl.classList.contains('amaes-minimized') || (bodyEl && bodyEl.style.display === 'none');
+
+        let progressHtml = '';
+        if (navState && navState.totalQuestions > 0) {
+            const currentQ = navState.currentIndex >= 0 ? (navState.currentIndex + 1) : 1;
+            const totalQ = navState.totalQuestions;
+            const pct = Math.round((navState.totalAnswered / totalQ) * 100);
+            progressHtml = `
+                <div style="display: flex; align-items: center; gap: 6px; padding: 0 4px; border-left: 1px solid rgba(255,255,255,0.12); margin-left: 2px;">
+                    <span style="font-weight: 700; color: #94a3b8; font-size: 10px;">Q ${currentQ}/${totalQ}</span>
+                    <div style="width: 32px; height: 3.5px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;" title="${navState.totalAnswered}/${totalQ} answered (${pct}%)">
+                        <div style="width: ${pct}%; height: 100%; background: #3b82f6; border-radius: 2px; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+            `;
+        }
 
         const hud = document.createElement('div');
         hud.id = 'amaes-quiz-hud';
@@ -1328,37 +1334,17 @@
                 </span>
             </div>
 
-            <!-- Course Database Badge -->
-            <div id="hud-db-indicator" style="
-                background: ${hasDb ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'};
-                color: ${hasDb ? '#10b981' : '#f87171'};
-                border: 1px solid ${hasDb ? '#10b981' : '#f87171'};
-                padding: 2px 7px;
-                border-radius: 12px;
-                font-size: 10px;
-                font-weight: 700;
-                display: flex;
-                align-items: center;
-                gap: 4px;
-            " title="${hasDb ? `${subCode} DB: ${verifiedCount} total verified answers & ${eliminatedCount} eliminated choices stored${detectedQuizTerm ? ` (${termCount} for ${detectedQuizTerm})` : ''}` : `No database answers found for ${subCode}`}">
-                <span>${hasDb ? 'DB' : 'No DB'}</span>
-                <span>${subCode}${detectedQuizTerm ? ` • ${detectedQuizTerm}` : ''}</span>
-                <span>(${termCount > 0 ? `${termCount} Qs` : `${verifiedCount} Qs`}${eliminatedCount > 0 ? ` • ${eliminatedCount} Elim` : ''})</span>
-            </div>
+            <!-- Quiz Progress -->
+            ${progressHtml}
 
-            <!-- Pause / Resume Button -->
-            <button id="btn-hud-toggle-quiz" class="amaes-inline-btn" style="padding: 3px 10px; font-size: 10px; background: ${autoQuizMode ? 'rgba(239,68,68,0.25); color:#ef4444; border:1px solid #ef4444' : 'rgba(16,185,129,0.25); color:#10b981; border:1px solid #10b981'}; border-radius: 12px; cursor: pointer; font-weight: 600;">
-                ${autoQuizMode ? 'Pause' : 'Resume Auto-Quiz'}
+            <!-- Pause / Resume Button (Adaptive: only shown when main panel is minimized) -->
+            <button id="btn-hud-toggle-quiz" class="amaes-inline-btn" style="display: ${isPanelMinimized ? 'inline-flex' : 'none'}; padding: 3px 10px; font-size: 10px; background: ${autoQuizMode ? 'rgba(239,68,68,0.25); color:#ef4444; border:1px solid #ef4444' : 'rgba(16,185,129,0.25); color:#10b981; border:1px solid #10b981'}; border-radius: 12px; cursor: pointer; font-weight: 600;">
+                ${autoQuizMode ? 'Pause' : 'Resume'}
             </button>
 
             <!-- Fast Mode HUD Toggle -->
-            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Toggle Fast Answer Mode">
+            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Fast Answer Mode">
                 ${ICONS.zap} <span>${fastQuizMode ? 'Speed ON' : 'Speed'}</span>
-            </button>
-
-            <!-- Toggle Toolkit Panel -->
-            <button id="btn-hud-expand-panel" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: rgba(255,255,255,0.08); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; cursor: pointer;" title="Toggle Full Toolkit Panel">
-                ${ICONS.minimize} <span>Panel</span>
             </button>
 
             <!-- Persistent Update Indicator -->
@@ -1392,29 +1378,11 @@
                 fastQuizMode = !fastQuizMode;
                 localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
                 syncFastQuizUI();
-                showToast(`Fast Answer Mode: ${fastQuizMode ? 'ON (Turbo)' : 'OFF'}`);
-                setLog(`Fast Answer (Turbo): <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
+                showToast(`Speed Mode: ${fastQuizMode ? 'ON' : 'OFF'}`);
+                setLog(`Speed Mode: <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
                 if (fastQuizMode && checkIsQuizAttemptPage()) {
                     runAutoQuizSolver(true);
                 }
-            };
-        }
-
-        const hudPanelBtn = document.getElementById('btn-hud-expand-panel');
-        if (hudPanelBtn) {
-            hudPanelBtn.onclick = () => {
-                const panel = document.getElementById('amaes-toolkit-panel');
-                const bodyEl = document.getElementById('amaes-panel-body');
-                const minBtn = document.getElementById('amaes-min-btn');
-                if (!bodyEl) return;
-                const isHidden = bodyEl.style.display === 'none';
-                bodyEl.style.display = isHidden ? 'block' : 'none';
-                if (panel) panel.classList.toggle('amaes-minimized', !isHidden);
-                if (minBtn) minBtn.innerHTML = isHidden ? ICONS.minimize : `
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    </svg>
-                `;
             };
         }
     }
@@ -1810,14 +1778,14 @@
                 return;
             }
 
-            // Fast Answer Mode Toggle: 'F'
+            // Speed Mode Toggle: 'F'
             if (key === 'F') {
                 e.preventDefault();
                 fastQuizMode = !fastQuizMode;
                 localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
                 syncFastQuizUI();
-                showToast(`Fast Answer Mode: ${fastQuizMode ? 'ON (Turbo)' : 'OFF'}`);
-                setLog(`Fast Answer (Turbo): <b>${fastQuizMode ? 'ON' : 'OFF'}</b> via <b>F</b> key.`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
+                showToast(`Speed Mode: ${fastQuizMode ? 'ON' : 'OFF'}`);
+                setLog(`Speed Mode: <b>${fastQuizMode ? 'ON' : 'OFF'}</b> via <b>F</b> key.`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
                 if (fastQuizMode && checkIsQuizAttemptPage()) {
                     runAutoQuizSolver(true);
                 }

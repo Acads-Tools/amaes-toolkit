@@ -55,7 +55,7 @@
     let autoHighlightQuiz = localStorage.getItem('amaes_auto_highlight_quiz') !== 'false'; // default true
     let autoCopyQuizForAI = localStorage.getItem('amaes_auto_copy_ai') !== 'false'; // default true
     let autoQuizMode = localStorage.getItem('amaes_auto_quiz_mode') === 'true'; // default false (Master autonomous switch)
-    let fastQuizMode = localStorage.getItem('amaes_fast_quiz_mode') === 'true'; // default false (⚡ Fast Answer / Turbo Mode)
+    let fastQuizMode = localStorage.getItem('amaes_fast_quiz_mode') === 'true'; // default false (⚡ Speed Mode)
     let autoPickQuiz = localStorage.getItem('amaes_auto_pick_quiz') !== 'false'; // default true: auto-select verified answers
     let autoNextVerified = localStorage.getItem('amaes_auto_next_verified') !== 'false'; // default true: auto-advance when solver answers verified question
     let autoNextQuiz = localStorage.getItem('amaes_auto_next_quiz') === 'true'; // default false: manual answers do NOT auto-advance by default (safe review)

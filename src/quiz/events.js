@@ -15,8 +15,8 @@
                 fastQuizMode = chkFastQuizMode.checked;
                 localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
                 if (typeof syncFastQuizUI === 'function') syncFastQuizUI();
-                showToast(`Fast Answer Mode: ${fastQuizMode ? 'ON (Turbo)' : 'OFF'}`);
-                setLog(`Fast Answer (Turbo): <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)", fastQuizMode ? "Answers visible questions instantly & accelerates transitions" : "Paced mode");
+                showToast(`Speed Mode: ${fastQuizMode ? 'ON' : 'OFF'}`);
+                setLog(`Speed Mode: <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)", fastQuizMode ? "Answers visible questions instantly & accelerates transitions" : "Paced mode");
                 if (fastQuizMode && checkIsQuizAttemptPage()) {
                     runAutoQuizSolver(true);
                 }
@@ -1189,6 +1189,13 @@
 
         // Panel Minimize State Persistence
         const panelEl = document.getElementById('amaes-toolkit-panel');
+        const updateHudPauseBtnVisibility = () => {
+            const hudPauseBtn = document.getElementById('btn-hud-toggle-quiz');
+            if (hudPauseBtn && panelEl) {
+                const isMin = panelEl.classList.contains('amaes-minimized') || (bodyEl && bodyEl.style.display === 'none');
+                hudPauseBtn.style.display = isMin ? 'inline-flex' : 'none';
+            }
+        };
         const savedMinimized = localStorage.getItem('amaes_pref_minimized') === 'true';
         if (savedMinimized) {
             if (bodyEl) bodyEl.style.display = 'none';
@@ -1199,6 +1206,7 @@
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
                 </svg>
             `;
+            updateHudPauseBtnVisibility();
         }
 
         if (minBtn) minBtn.onclick = (e) => {
@@ -1210,6 +1218,7 @@
                 if (panelEl) panelEl.classList.remove('amaes-minimized');
                 minBtn.innerHTML = ICONS.minimize;
                 localStorage.setItem('amaes_pref_minimized', 'false');
+                updateHudPauseBtnVisibility();
             } else if (targetEl) {
                 targetEl.style.display = 'none';
                 if (panelEl) panelEl.classList.add('amaes-minimized');
@@ -1219,6 +1228,7 @@
                     </svg>
                 `;
                 localStorage.setItem('amaes_pref_minimized', 'true');
+                updateHudPauseBtnVisibility();
             }
         };
 
@@ -1233,6 +1243,7 @@
                         panelEl.classList.remove('amaes-minimized');
                         minBtn.innerHTML = ICONS.minimize;
                         localStorage.setItem('amaes_pref_minimized', 'false');
+                        updateHudPauseBtnVisibility();
                     }
                 }
             });
