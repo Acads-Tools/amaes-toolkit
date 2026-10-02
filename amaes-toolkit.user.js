@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.8.9
+// @version      1.9.0
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -30,7 +30,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.8.9";
+    const SCRIPT_VERSION = "v1.9.0";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -1799,7 +1799,7 @@
     let autoNextVerified = localStorage.getItem('amaes_auto_next_verified') !== 'false'; // default true: auto-advance when solver answers verified question
     let autoNextQuiz = localStorage.getItem('amaes_auto_next_quiz') === 'true'; // default false: manual answers do NOT auto-advance by default (safe review)
     let isWaitingForUserAnswer = false; // session state: true when paused on an unknown question waiting for student input
-    const autoSubmitQuiz = false; // Permanently disabled by design: safe manual review before final submission
+    let autoSubmitQuiz = localStorage.getItem('amaes_auto_submit_quiz') === 'true'; // default false: safe manual review before final submission
     let autoNextTimer = null;
     let pageLoadSolverTimer = null;
 
@@ -4449,7 +4449,24 @@
                 recordSessionQuizCompleted();
             }
         }
-        logDebug("Quiz Summary reached. Student reviews at their own pace (Auto-submit disabled by design).");
+
+        if (autoSubmitQuiz) {
+            setLog("<b>Auto-Submit:</b> Submitting attempt in 1.2s...", "var(--accent-green)");
+            showToast("Auto-submitting attempt in 1.2s...", 2000);
+            setTimeout(() => {
+                const sBtn = document.querySelector('.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], #region-main input[type="submit"], input[value*="Submit"]');
+                if (sBtn) {
+                    sBtn.click();
+                    setTimeout(() => {
+                        const confirmBtn = document.querySelector('.moodle-dialogue-bd input[type="button"][value*="Submit"], .modal-dialog button.btn-primary, .modal-footer .btn-primary, input.btn-finishattempt, input[value="Submit all and finish"]');
+                        if (confirmBtn) confirmBtn.click();
+                        playToolkitSound('quest_done');
+                    }, 400);
+                }
+            }, 1200);
+        } else {
+            logDebug("Quiz Summary reached. Student reviews at their own pace (Auto-submit disabled by design).");
+        }
     }
 
     function syncFastQuizUI() {
@@ -6771,8 +6788,11 @@
         );
 
         const processedButtons = new Set();
+        const processedContainers = new Set();
 
         const scanBlock = (container) => {
+            if (!container) return;
+
             const buttons = container.querySelectorAll(
                 'button[data-action="toggle-manual-completion"], ' +
                 'button[data-toggletype], ' +
@@ -6782,6 +6802,7 @@
                 'button'
             );
 
+            let foundManualButton = false;
             for (const btn of buttons) {
                 if (processedButtons.has(btn)) continue;
 
@@ -6810,6 +6831,8 @@
 
                 if (matchesGoal) {
                     processedButtons.add(btn);
+                    foundManualButton = true;
+                    processedContainers.add(container);
                     const classification = classifyActivity(container);
                     const titleElem = container.querySelector('.instancename, .activityname, a.aal_link, .activity-title');
                     const title = titleElem ? titleElem.innerText.trim() : (container.innerText.split('\n')[0] || 'Activity');
@@ -6835,8 +6858,56 @@
                             container,
                             title,
                             classification,
+                            isAutoView: false,
                             gradePct: gradeInfo ? gradeInfo.percentage : null
                         });
+                    }
+                }
+            }
+
+            // 2. Automatic "To do: View" completion detection (activities requiring view to complete)
+            if (!foundManualButton && goal === 'mark_done' && !processedContainers.has(container)) {
+                const completionArea = container.querySelector(
+                    '.activity-completion, [data-region="completion-info"], .automatic-completion-conditions, .completion-info'
+                ) || container;
+
+                const badges = completionArea.querySelectorAll('.badge, span, div');
+                let uncompletedViewBadge = null;
+                for (const badge of badges) {
+                    const text = (badge.innerText || badge.textContent || '').trim().toLowerCase();
+                    if ((text.includes('to do: view') || text.includes('to do:view') || text === 'view' || text === 'to do') &&
+                        !text.includes('done') && !text.includes('completed') && !badge.classList.contains('badge-success')) {
+                        uncompletedViewBadge = badge;
+                        break;
+                    }
+                }
+
+                if (uncompletedViewBadge) {
+                    const linkElem = container.querySelector('a.aal_link, a[href*="/mod/"], a.activityname');
+                    const activityUrl = linkElem ? linkElem.href : null;
+                    if (activityUrl) {
+                        const classification = classifyActivity(container);
+                        const titleElem = container.querySelector('.instancename, .activityname, a.aal_link, .activity-title');
+                        const title = titleElem ? titleElem.innerText.trim() : (container.innerText.split('\n')[0] || 'Activity');
+
+                        let matchesCategory = false;
+                        if (category === 'all') matchesCategory = true;
+                        else if (category === 'lecture' && (classification.type === 'lecture' || classification.type === 'video')) matchesCategory = true;
+                        else if (category === 'quiz' && classification.type === 'quiz') matchesCategory = true;
+
+                        if (matchesCategory) {
+                            processedContainers.add(container);
+                            results.push({
+                                button: null,
+                                autoViewUrl: activityUrl,
+                                badgeElem: uncompletedViewBadge,
+                                container,
+                                title,
+                                classification,
+                                isAutoView: true,
+                                gradePct: null
+                            });
+                        }
                     }
                 }
             }
@@ -6853,6 +6924,122 @@
         }
 
         return results;
+    }
+
+    async function autoViewActivity(url, badgeElem = null, container = null) {
+        if (!url) return false;
+
+        let originalBadgeText = '';
+        if (badgeElem) {
+            originalBadgeText = badgeElem.innerText || badgeElem.textContent || '';
+            badgeElem.dataset.originalText = originalBadgeText;
+            badgeElem.textContent = 'Viewing...';
+            badgeElem.style.opacity = '0.7';
+            badgeElem.style.cursor = 'wait';
+        }
+
+        try {
+            await fetch(url, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+        } catch (err) {
+            // Even if fetch throws (e.g. cross-origin redirect on URL module), Moodle logged course_module_viewed
+            logDebug(`Auto-view fetch handled for ${url}: ${err.message}`);
+        }
+
+        if (badgeElem) {
+            badgeElem.textContent = 'Done: View';
+            badgeElem.style.opacity = '1';
+            badgeElem.style.cursor = 'default';
+            badgeElem.classList.remove('badge-secondary', 'badge-light', 'badge-info', 'badge-warning', 'badge-danger');
+            badgeElem.classList.add('badge-success');
+            badgeElem.style.backgroundColor = '#198754';
+            badgeElem.style.color = '#ffffff';
+            badgeElem.style.borderColor = '#198754';
+            badgeElem.removeAttribute('title');
+        }
+
+        if (container) {
+            container.classList.add('completed');
+            const compIcon = container.querySelector('.iscompleted, .activity-completion');
+            if (compIcon) compIcon.classList.add('completed');
+        }
+
+        return true;
+    }
+
+    function setupAutoViewBadges() {
+        if (typeof checkIsCoursePage === 'function' && !checkIsCoursePage()) return;
+
+        const containers = document.querySelectorAll(
+            'li.activity, .activity-item, .course-section .activity, div[data-region="activity-card"], .activity-instance'
+        );
+
+        containers.forEach(container => {
+            const completionArea = container.querySelector(
+                '.activity-completion, [data-region="completion-info"], .automatic-completion-conditions, .completion-info'
+            ) || container;
+
+            const badges = completionArea.querySelectorAll('.badge, span, div');
+            for (const badge of badges) {
+                const text = (badge.innerText || badge.textContent || '').trim().toLowerCase();
+                if ((text.includes('to do: view') || text.includes('to do:view') || text === 'view' || text === 'to do') &&
+                    !text.includes('done') && !text.includes('completed') && !badge.classList.contains('badge-success')) {
+
+                    if (badge.dataset.amaesAutoViewBound) continue;
+                    badge.dataset.amaesAutoViewBound = 'true';
+
+                    const linkElem = container.querySelector('a.aal_link, a[href*="/mod/"], a.activityname');
+                    const activityUrl = linkElem ? linkElem.href : null;
+                    if (!activityUrl) continue;
+
+                    // Style badge to indicate 1-click completion
+                    badge.style.cursor = 'pointer';
+                    badge.style.transition = 'all 0.2s ease';
+                    badge.title = 'Click to auto-view and mark as done!';
+                    badge.setAttribute('role', 'button');
+
+                    // Hover effects
+                    badge.addEventListener('mouseenter', () => {
+                        if (!badge.textContent.includes('Done')) {
+                            badge.style.transform = 'scale(1.05)';
+                            badge.style.boxShadow = '0 0 6px rgba(46, 204, 113, 0.6)';
+                        }
+                    });
+                    badge.addEventListener('mouseleave', () => {
+                        badge.style.transform = '';
+                        badge.style.boxShadow = '';
+                    });
+
+                    badge.addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        if (badge.dataset.amaesAutoViewing === 'true') return;
+                        badge.dataset.amaesAutoViewing = 'true';
+
+                        const titleElem = container.querySelector('.instancename, .activityname, a.aal_link, .activity-title');
+                        const title = titleElem ? titleElem.innerText.trim() : 'Activity';
+
+                        showToast(`Auto-viewing "${title.substring(0, 24)}"...`, 1500);
+                        setLog(`Auto-Viewing: <b>${title.substring(0, 30)}...</b>`, "var(--accent-blue)");
+
+                        await autoViewActivity(activityUrl, badge, container);
+
+                        playToolkitSound('quest_done');
+                        showToast(`Marked "${title.substring(0, 24)}" as viewed & complete!`, 3000);
+                        setLog(`Auto-Viewed: <b>${title.substring(0, 30)}...</b> Completed!`, "var(--accent-green)");
+                        badge.dataset.amaesAutoViewing = 'false';
+                    });
+
+                    break;
+                }
+            }
+        });
     }
 
     // ==========================================
@@ -14627,6 +14814,10 @@
                                 <input id="chk-auto-next" type="checkbox" ${autoNextQuiz ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Auto-Advance on Manual Click</span>
                             </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Auto-submit attempt from review/summary page and play completion chime">
+                                <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Auto-Submit on Summary Review</span>
+                            </label>
 
                             <!-- Section: AI Prompt Formatting -->
                             <div style="font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding-top: 4px; padding-bottom: 2px; border-bottom: 1px solid rgba(255,255,255,0.06);">AI Prompt Formatting</div>
@@ -16190,6 +16381,16 @@
             };
         }
 
+        const chkAutoSubmitQuiz = document.getElementById('chk-auto-submit-quiz');
+        if (chkAutoSubmitQuiz) {
+            chkAutoSubmitQuiz.onchange = () => {
+                autoSubmitQuiz = chkAutoSubmitQuiz.checked;
+                localStorage.setItem('amaes_auto_submit_quiz', autoSubmitQuiz);
+                showToast(`Auto-Submit on Summary: ${autoSubmitQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-Submit on Summary Review: <b>${autoSubmitQuiz ? 'ON' : 'OFF'}</b>`, autoSubmitQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoSubmitQuiz ? "Auto-submits from summary page & plays completion chime" : "Safe manual submission");
+            };
+        }
+
         const chkKeyboardShortcuts = document.getElementById('chk-keyboard-shortcuts');
         if (chkKeyboardShortcuts) {
             chkKeyboardShortcuts.onchange = () => {
@@ -17417,14 +17618,27 @@
                 const gradeSuffix = item.gradePct !== null && item.gradePct !== undefined ? ` [${item.gradePct}%]` : '';
                 setLog(`[${i + 1}/${items.length}] ${actionLabel}: <b>${item.title.substring(0, 22)}...</b>${gradeSuffix}`);
 
-                item.button.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                item.button.click();
+                const targetElem = item.button || item.badgeElem || item.container;
+                if (targetElem && typeof targetElem.scrollIntoView === 'function') {
+                    targetElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+
+                if (item.isAutoView && item.autoViewUrl) {
+                    if (typeof autoViewActivity === 'function') {
+                        await autoViewActivity(item.autoViewUrl, item.badgeElem, item.container);
+                    }
+                } else if (item.button) {
+                    item.button.click();
+                }
                 processedCount++;
 
                 await new Promise(r => setTimeout(r, 450));
             }
 
             if (!shouldStop) {
+                if (typeof playToolkitSound === 'function') {
+                    playToolkitSound('quest_done');
+                }
                 showToast(`Finished ${actionLabel.toLowerCase()} ${processedCount} items!`);
                 if (goal === 'mark_done' && (category === 'quiz' || category === 'all')) {
                     setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items! Any quizzes without a passable grade (≥80%) remained untouched.`, "var(--accent-green)");
@@ -17501,6 +17715,22 @@
         setupQuizAutomation();
         setupQuizKeyboardShortcuts();
         setupBreadcrumbListeners();
+        if (typeof setupAutoViewBadges === 'function') {
+            setupAutoViewBadges();
+            if (typeof checkIsCoursePage === 'function' && checkIsCoursePage()) {
+                let courseViewDebounce = null;
+                const courseViewObs = new MutationObserver(() => {
+                    if (courseViewDebounce) clearTimeout(courseViewDebounce);
+                    courseViewDebounce = setTimeout(() => {
+                        setupAutoViewBadges();
+                    }, 400);
+                });
+                const mainTarget = document.getElementById('region-main') || document.querySelector('.course-content') || document.body;
+                if (mainTarget) {
+                    courseViewObs.observe(mainTarget, { childList: true, subtree: true });
+                }
+            }
+        }
         showWelcomeOnboardingModal(false);
         injectDashboardCourseBadges();
         injectDashboardGuideBanner();

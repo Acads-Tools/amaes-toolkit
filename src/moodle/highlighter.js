@@ -294,8 +294,11 @@
         );
 
         const processedButtons = new Set();
+        const processedContainers = new Set();
 
         const scanBlock = (container) => {
+            if (!container) return;
+
             const buttons = container.querySelectorAll(
                 'button[data-action="toggle-manual-completion"], ' +
                 'button[data-toggletype], ' +
@@ -305,6 +308,7 @@
                 'button'
             );
 
+            let foundManualButton = false;
             for (const btn of buttons) {
                 if (processedButtons.has(btn)) continue;
 
@@ -333,6 +337,8 @@
 
                 if (matchesGoal) {
                     processedButtons.add(btn);
+                    foundManualButton = true;
+                    processedContainers.add(container);
                     const classification = classifyActivity(container);
                     const titleElem = container.querySelector('.instancename, .activityname, a.aal_link, .activity-title');
                     const title = titleElem ? titleElem.innerText.trim() : (container.innerText.split('\n')[0] || 'Activity');
@@ -358,8 +364,56 @@
                             container,
                             title,
                             classification,
+                            isAutoView: false,
                             gradePct: gradeInfo ? gradeInfo.percentage : null
                         });
+                    }
+                }
+            }
+
+            // 2. Automatic "To do: View" completion detection (activities requiring view to complete)
+            if (!foundManualButton && goal === 'mark_done' && !processedContainers.has(container)) {
+                const completionArea = container.querySelector(
+                    '.activity-completion, [data-region="completion-info"], .automatic-completion-conditions, .completion-info'
+                ) || container;
+
+                const badges = completionArea.querySelectorAll('.badge, span, div');
+                let uncompletedViewBadge = null;
+                for (const badge of badges) {
+                    const text = (badge.innerText || badge.textContent || '').trim().toLowerCase();
+                    if ((text.includes('to do: view') || text.includes('to do:view') || text === 'view' || text === 'to do') &&
+                        !text.includes('done') && !text.includes('completed') && !badge.classList.contains('badge-success')) {
+                        uncompletedViewBadge = badge;
+                        break;
+                    }
+                }
+
+                if (uncompletedViewBadge) {
+                    const linkElem = container.querySelector('a.aal_link, a[href*="/mod/"], a.activityname');
+                    const activityUrl = linkElem ? linkElem.href : null;
+                    if (activityUrl) {
+                        const classification = classifyActivity(container);
+                        const titleElem = container.querySelector('.instancename, .activityname, a.aal_link, .activity-title');
+                        const title = titleElem ? titleElem.innerText.trim() : (container.innerText.split('\n')[0] || 'Activity');
+
+                        let matchesCategory = false;
+                        if (category === 'all') matchesCategory = true;
+                        else if (category === 'lecture' && (classification.type === 'lecture' || classification.type === 'video')) matchesCategory = true;
+                        else if (category === 'quiz' && classification.type === 'quiz') matchesCategory = true;
+
+                        if (matchesCategory) {
+                            processedContainers.add(container);
+                            results.push({
+                                button: null,
+                                autoViewUrl: activityUrl,
+                                badgeElem: uncompletedViewBadge,
+                                container,
+                                title,
+                                classification,
+                                isAutoView: true,
+                                gradePct: null
+                            });
+                        }
                     }
                 }
             }
@@ -376,6 +430,122 @@
         }
 
         return results;
+    }
+
+    async function autoViewActivity(url, badgeElem = null, container = null) {
+        if (!url) return false;
+
+        let originalBadgeText = '';
+        if (badgeElem) {
+            originalBadgeText = badgeElem.innerText || badgeElem.textContent || '';
+            badgeElem.dataset.originalText = originalBadgeText;
+            badgeElem.textContent = 'Viewing...';
+            badgeElem.style.opacity = '0.7';
+            badgeElem.style.cursor = 'wait';
+        }
+
+        try {
+            await fetch(url, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+        } catch (err) {
+            // Even if fetch throws (e.g. cross-origin redirect on URL module), Moodle logged course_module_viewed
+            logDebug(`Auto-view fetch handled for ${url}: ${err.message}`);
+        }
+
+        if (badgeElem) {
+            badgeElem.textContent = 'Done: View';
+            badgeElem.style.opacity = '1';
+            badgeElem.style.cursor = 'default';
+            badgeElem.classList.remove('badge-secondary', 'badge-light', 'badge-info', 'badge-warning', 'badge-danger');
+            badgeElem.classList.add('badge-success');
+            badgeElem.style.backgroundColor = '#198754';
+            badgeElem.style.color = '#ffffff';
+            badgeElem.style.borderColor = '#198754';
+            badgeElem.removeAttribute('title');
+        }
+
+        if (container) {
+            container.classList.add('completed');
+            const compIcon = container.querySelector('.iscompleted, .activity-completion');
+            if (compIcon) compIcon.classList.add('completed');
+        }
+
+        return true;
+    }
+
+    function setupAutoViewBadges() {
+        if (typeof checkIsCoursePage === 'function' && !checkIsCoursePage()) return;
+
+        const containers = document.querySelectorAll(
+            'li.activity, .activity-item, .course-section .activity, div[data-region="activity-card"], .activity-instance'
+        );
+
+        containers.forEach(container => {
+            const completionArea = container.querySelector(
+                '.activity-completion, [data-region="completion-info"], .automatic-completion-conditions, .completion-info'
+            ) || container;
+
+            const badges = completionArea.querySelectorAll('.badge, span, div');
+            for (const badge of badges) {
+                const text = (badge.innerText || badge.textContent || '').trim().toLowerCase();
+                if ((text.includes('to do: view') || text.includes('to do:view') || text === 'view' || text === 'to do') &&
+                    !text.includes('done') && !text.includes('completed') && !badge.classList.contains('badge-success')) {
+
+                    if (badge.dataset.amaesAutoViewBound) continue;
+                    badge.dataset.amaesAutoViewBound = 'true';
+
+                    const linkElem = container.querySelector('a.aal_link, a[href*="/mod/"], a.activityname');
+                    const activityUrl = linkElem ? linkElem.href : null;
+                    if (!activityUrl) continue;
+
+                    // Style badge to indicate 1-click completion
+                    badge.style.cursor = 'pointer';
+                    badge.style.transition = 'all 0.2s ease';
+                    badge.title = 'Click to auto-view and mark as done!';
+                    badge.setAttribute('role', 'button');
+
+                    // Hover effects
+                    badge.addEventListener('mouseenter', () => {
+                        if (!badge.textContent.includes('Done')) {
+                            badge.style.transform = 'scale(1.05)';
+                            badge.style.boxShadow = '0 0 6px rgba(46, 204, 113, 0.6)';
+                        }
+                    });
+                    badge.addEventListener('mouseleave', () => {
+                        badge.style.transform = '';
+                        badge.style.boxShadow = '';
+                    });
+
+                    badge.addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        if (badge.dataset.amaesAutoViewing === 'true') return;
+                        badge.dataset.amaesAutoViewing = 'true';
+
+                        const titleElem = container.querySelector('.instancename, .activityname, a.aal_link, .activity-title');
+                        const title = titleElem ? titleElem.innerText.trim() : 'Activity';
+
+                        showToast(`Auto-viewing "${title.substring(0, 24)}"...`, 1500);
+                        setLog(`Auto-Viewing: <b>${title.substring(0, 30)}...</b>`, "var(--accent-blue)");
+
+                        await autoViewActivity(activityUrl, badge, container);
+
+                        playToolkitSound('quest_done');
+                        showToast(`Marked "${title.substring(0, 24)}" as viewed & complete!`, 3000);
+                        setLog(`Auto-Viewed: <b>${title.substring(0, 30)}...</b> Completed!`, "var(--accent-green)");
+                        badge.dataset.amaesAutoViewing = 'false';
+                    });
+
+                    break;
+                }
+            }
+        });
     }
 
     // ==========================================

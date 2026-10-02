@@ -1249,7 +1249,24 @@
                 recordSessionQuizCompleted();
             }
         }
-        logDebug("Quiz Summary reached. Student reviews at their own pace (Auto-submit disabled by design).");
+
+        if (autoSubmitQuiz) {
+            setLog("<b>Auto-Submit:</b> Submitting attempt in 1.2s...", "var(--accent-green)");
+            showToast("Auto-submitting attempt in 1.2s...", 2000);
+            setTimeout(() => {
+                const sBtn = document.querySelector('.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], #region-main input[type="submit"], input[value*="Submit"]');
+                if (sBtn) {
+                    sBtn.click();
+                    setTimeout(() => {
+                        const confirmBtn = document.querySelector('.moodle-dialogue-bd input[type="button"][value*="Submit"], .modal-dialog button.btn-primary, .modal-footer .btn-primary, input.btn-finishattempt, input[value="Submit all and finish"]');
+                        if (confirmBtn) confirmBtn.click();
+                        playToolkitSound('quest_done');
+                    }, 400);
+                }
+            }, 1200);
+        } else {
+            logDebug("Quiz Summary reached. Student reviews at their own pace (Auto-submit disabled by design).");
+        }
     }
 
     function syncFastQuizUI() {

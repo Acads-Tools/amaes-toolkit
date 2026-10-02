@@ -176,6 +176,16 @@
             };
         }
 
+        const chkAutoSubmitQuiz = document.getElementById('chk-auto-submit-quiz');
+        if (chkAutoSubmitQuiz) {
+            chkAutoSubmitQuiz.onchange = () => {
+                autoSubmitQuiz = chkAutoSubmitQuiz.checked;
+                localStorage.setItem('amaes_auto_submit_quiz', autoSubmitQuiz);
+                showToast(`Auto-Submit on Summary: ${autoSubmitQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-Submit on Summary Review: <b>${autoSubmitQuiz ? 'ON' : 'OFF'}</b>`, autoSubmitQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoSubmitQuiz ? "Auto-submits from summary page & plays completion chime" : "Safe manual submission");
+            };
+        }
+
         const chkKeyboardShortcuts = document.getElementById('chk-keyboard-shortcuts');
         if (chkKeyboardShortcuts) {
             chkKeyboardShortcuts.onchange = () => {
@@ -1403,14 +1413,27 @@
                 const gradeSuffix = item.gradePct !== null && item.gradePct !== undefined ? ` [${item.gradePct}%]` : '';
                 setLog(`[${i + 1}/${items.length}] ${actionLabel}: <b>${item.title.substring(0, 22)}...</b>${gradeSuffix}`);
 
-                item.button.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                item.button.click();
+                const targetElem = item.button || item.badgeElem || item.container;
+                if (targetElem && typeof targetElem.scrollIntoView === 'function') {
+                    targetElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+
+                if (item.isAutoView && item.autoViewUrl) {
+                    if (typeof autoViewActivity === 'function') {
+                        await autoViewActivity(item.autoViewUrl, item.badgeElem, item.container);
+                    }
+                } else if (item.button) {
+                    item.button.click();
+                }
                 processedCount++;
 
                 await new Promise(r => setTimeout(r, 450));
             }
 
             if (!shouldStop) {
+                if (typeof playToolkitSound === 'function') {
+                    playToolkitSound('quest_done');
+                }
                 showToast(`Finished ${actionLabel.toLowerCase()} ${processedCount} items!`);
                 if (goal === 'mark_done' && (category === 'quiz' || category === 'all')) {
                     setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items! Any quizzes without a passable grade (≥80%) remained untouched.`, "var(--accent-green)");

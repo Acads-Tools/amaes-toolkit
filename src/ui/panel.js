@@ -247,6 +247,10 @@
                                 <input id="chk-auto-next" type="checkbox" ${autoNextQuiz ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Auto-Advance on Manual Click</span>
                             </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Auto-submit attempt from review/summary page and play completion chime">
+                                <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Auto-Submit on Summary Review</span>
+                            </label>
 
                             <!-- Section: AI Prompt Formatting -->
                             <div style="font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding-top: 4px; padding-bottom: 2px; border-bottom: 1px solid rgba(255,255,255,0.06);">AI Prompt Formatting</div>

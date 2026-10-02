@@ -34,6 +34,22 @@
         setupQuizAutomation();
         setupQuizKeyboardShortcuts();
         setupBreadcrumbListeners();
+        if (typeof setupAutoViewBadges === 'function') {
+            setupAutoViewBadges();
+            if (typeof checkIsCoursePage === 'function' && checkIsCoursePage()) {
+                let courseViewDebounce = null;
+                const courseViewObs = new MutationObserver(() => {
+                    if (courseViewDebounce) clearTimeout(courseViewDebounce);
+                    courseViewDebounce = setTimeout(() => {
+                        setupAutoViewBadges();
+                    }, 400);
+                });
+                const mainTarget = document.getElementById('region-main') || document.querySelector('.course-content') || document.body;
+                if (mainTarget) {
+                    courseViewObs.observe(mainTarget, { childList: true, subtree: true });
+                }
+            }
+        }
         showWelcomeOnboardingModal(false);
         injectDashboardCourseBadges();
         injectDashboardGuideBanner();

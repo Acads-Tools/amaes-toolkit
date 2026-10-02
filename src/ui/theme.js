@@ -123,7 +123,7 @@
     let autoNextVerified = localStorage.getItem('amaes_auto_next_verified') !== 'false'; // default true: auto-advance when solver answers verified question
     let autoNextQuiz = localStorage.getItem('amaes_auto_next_quiz') === 'true'; // default false: manual answers do NOT auto-advance by default (safe review)
     let isWaitingForUserAnswer = false; // session state: true when paused on an unknown question waiting for student input
-    const autoSubmitQuiz = false; // Permanently disabled by design: safe manual review before final submission
+    let autoSubmitQuiz = localStorage.getItem('amaes_auto_submit_quiz') === 'true'; // default false: safe manual review before final submission
     let autoNextTimer = null;
     let pageLoadSolverTimer = null;
 

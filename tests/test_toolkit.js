@@ -2863,8 +2863,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.8.9'), "Userscript header must specify v1.8.9");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.8.9";'), "Constant SCRIPT_VERSION must be v1.8.9");
+    assert.ok(script.includes('@version      1.9.0'), "Userscript header must specify v1.9.0");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.9.0";'), "Constant SCRIPT_VERSION must be v1.9.0");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3997,10 +3997,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.8.9-blue.svg"), "README badge must show v1.8.9");
+    assert.ok(readme.includes("version-1.9.0-blue.svg"), "README badge must show v1.9.0");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.8.9<"), "Website must display v1.8.9 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.9.0<"), "Website must display v1.9.0 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -4981,6 +4981,32 @@ test("Multi-Question Non-Blocking Pipeline & Context-Aware Navigation (v1.8.9): 
     // 4. Context-aware N key shortcut navigation
     assert.ok(script.includes("const nextOnPage = findNextUnansweredOnCurrentPage(currentFocus);"), "Key N handler must check for unanswered questions on current page before clicking next page");
     assert.ok(script.includes("Shortcut: Advance to <b>Question"), "Key N handler must log advance when navigating within page");
+});
+
+// --------------------------------------------------
+test("Activity Auto-View & Quiz Summary Auto-Submit with Completion Sound (v1.9.0): enables 1-click & batch auto-view completion, configurable summary auto-submit, and quest_done audio chime", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Auto-View Activity Detection and Execution
+    assert.ok(script.includes("isAutoView: true"), "findButtons must tag uncompleted view-based activities with isAutoView: true");
+    assert.ok(script.includes("autoViewUrl: activityUrl"), "findButtons must capture activityUrl for background fetch");
+    assert.ok(script.includes("function autoViewActivity(url, badgeElem = null, container = null)"), "Must define autoViewActivity function");
+    assert.ok(script.includes("credentials: 'same-origin'"), "autoViewActivity must include same-origin credentials for authenticated Moodle session");
+    assert.ok(script.includes("'X-Requested-With': 'XMLHttpRequest'"), "autoViewActivity must pass XMLHttpRequest header");
+    assert.ok(script.includes("function setupAutoViewBadges()"), "Must define setupAutoViewBadges to attach 1-click handler to course page badges");
+    assert.ok(script.includes("badge.title = 'Click to auto-view and mark as done!';"), "setupAutoViewBadges must set helpful hover tooltip");
+
+    // 2. Batch Execution Engine Integration
+    assert.ok(script.includes("item.isAutoView && item.autoViewUrl"), "runBatch must detect auto-view items and call autoViewActivity");
+    assert.ok(script.includes("playToolkitSound('quest_done')"), "runBatch and quiz completion must play celebratory quest_done audio chime");
+
+    // 3. Quiz Summary Auto-Submit Option
+    assert.ok(script.includes('id="chk-auto-submit-quiz"'), "Panel markup must render chk-auto-submit-quiz checkbox under Advanced Settings");
+    assert.ok(script.includes("localStorage.getItem('amaes_auto_submit_quiz') === 'true'"), "autoSubmitQuiz state must be read from localStorage");
+    assert.ok(script.includes("localStorage.setItem('amaes_auto_submit_quiz', autoSubmitQuiz)"), "Checkbox toggle must persist to localStorage");
+    assert.ok(script.includes("if (autoSubmitQuiz) {"), "handleQuizSummaryAutoSubmit must guard auto-submit execution with autoSubmitQuiz");
+    assert.ok(script.includes(".btn-finishattempt, input[value*=\"Submit all and finish\"]"), "handleQuizSummaryAutoSubmit must locate summary submit button");
 });
 
 console.log("\n==================================================");
