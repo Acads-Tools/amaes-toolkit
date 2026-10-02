@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.8.7
+// @version      1.8.8
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -30,7 +30,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.8.7";
+    const SCRIPT_VERSION = "v1.8.8";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -4128,8 +4128,9 @@
 
                 if (!firstBlockedQue.querySelector('.amaes-blockage-hud')) {
                     // The solver HUD is the full unknown-answer notice. Remove
-                    // the compact matcher hint so the same warning is not shown twice.
+                    // compact matcher hints and fallback bars so the same warning is not shown twice.
                     firstBlockedQue.querySelectorAll('.amaes-unanswered-hint').forEach(hint => hint.remove());
+                    firstBlockedQue.querySelectorAll('.amaes-ai-fallback-bar').forEach(bar => bar.remove());
                     setQuestionAiTag(firstBlockedQue, false);
                     if (!firstBlockedQue.dataset.amaesInterventionAlertPlayed) {
                         firstBlockedQue.dataset.amaesInterventionAlertPlayed = 'true';
@@ -4139,8 +4140,8 @@
                     const hud = document.createElement('div');
                     hud.className = 'amaes-blockage-hud';
                     hud.style.cssText = `
-                        margin-bottom: 14px;
-                        padding: 10px 14px;
+                        margin-bottom: 12px;
+                        padding: 8px 12px;
                         background: #fffbeb;
                         border: 1.5px solid #f59e0b;
                         border-radius: 8px;
@@ -4156,15 +4157,12 @@
                         box-sizing: border-box;
                     `;
 
+                    const retryCount = Number(firstBlockedQue.dataset.amaesAiRetryCount) || 0;
                     hud.innerHTML = `
-                        <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 200px;">
-                            <span style="background: #f59e0b; color: #ffffff; padding: 3px 8px; border-radius: 5px; font-weight: 800; font-size: 10px; letter-spacing: 0.5px; flex-shrink: 0;">WAITING FOR ANSWER</span>
-                            <div>
-                                <div style="font-weight: 700; color: #92400e; font-size: 12px; margin-bottom: 2px;">Question #${qData ? qData.qNum : ''}: No saved answer yet (Auto-copied to clipboard)</div>
-                                <div style="color: #b45309; font-size: 11px; line-height: 1.45;">
-                                    <div><strong>1. Answer:</strong> Pick a choice, or paste an AI answer (press <b>V</b> to paste)</div>
-                                    <div><strong>2. Continue:</strong> Click <b>Next page</b> or press <b>N</b> to proceed</div>
-                                </div>
+                        <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 200px;">
+                            <span style="background: #f59e0b; color: #ffffff; padding: 2px 7px; border-radius: 4px; font-weight: 800; font-size: 10px; letter-spacing: 0.5px; flex-shrink: 0;">WAITING</span>
+                            <div style="font-size: 11.5px; line-height: 1.35;">
+                                <span style="font-weight: 700; color: #92400e;">Question #${qData ? qData.qNum : ''}:</span> No saved answer yet (Auto-copied) · <span style="color: #b45309;">Pick a choice (or press <b>V</b> to paste), then press <b>N</b> to proceed</span>
                             </div>
                         </div>
                         <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
@@ -4184,6 +4182,24 @@
                             " title="Ask Google Gemini AI to analyze and solve this question directly">
                                 ${ICONS.sparkles} <span>${firstBlockedQue.dataset.amaesAiAttempted ? 'Retry AI' : 'Ask AI'}</span>
                             </button>
+                            ${retryCount >= 2 ? `
+                            <button id="btn-blockage-config-ai" type="button" class="amaes-inline-btn" style="
+                                padding: 4px 10px;
+                                font-size: 11px;
+                                font-weight: 700;
+                                background: #ede9fe;
+                                color: #6d28d9;
+                                border: 1px solid #c4b5fd;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 4px;
+                                transition: all 0.15s ease;
+                            " title="Add another free Google Gemini API key for higher rate limits">
+                                ⚙ <span>Configure AI</span>
+                            </button>
+                            ` : ''}
                             <button id="btn-blockage-stop" type="button" class="amaes-inline-btn" style="
                                 padding: 4px 10px;
                                 font-size: 11px;
@@ -4211,7 +4227,33 @@
                         blockageAskAi.onclick = async (e) => {
                             e.preventDefault();
                             e.stopPropagation();
+                            const currentRetries = (Number(firstBlockedQue.dataset.amaesAiRetryCount) || 0) + 1;
+                            firstBlockedQue.dataset.amaesAiRetryCount = String(currentRetries);
+                            if (currentRetries >= 2 && !hud.querySelector('#btn-blockage-config-ai')) {
+                                const configBtn = document.createElement('button');
+                                configBtn.id = 'btn-blockage-config-ai';
+                                configBtn.type = 'button';
+                                configBtn.className = 'amaes-inline-btn';
+                                configBtn.style.cssText = 'padding: 4px 10px; font-size: 11px; font-weight: 700; background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s ease;';
+                                configBtn.title = 'Add another free Google Gemini API key for higher rate limits';
+                                configBtn.innerHTML = `⚙ <span>Configure AI</span>`;
+                                configBtn.onclick = (ev) => {
+                                    ev.preventDefault();
+                                    ev.stopPropagation();
+                                    showGeminiSetupModal("💡 Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
+                                };
+                                blockageAskAi.parentNode.insertBefore(configBtn, blockageAskAi.nextSibling);
+                            }
                             await manualSolveWithAi(firstBlockedQue, blockageAskAi);
+                        };
+                    }
+
+                    const blockageConfigAi = hud.querySelector('#btn-blockage-config-ai');
+                    if (blockageConfigAi) {
+                        blockageConfigAi.onclick = (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            showGeminiSetupModal("💡 Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
                         };
                     }
 
@@ -9762,6 +9804,7 @@
     // Fallback bar with dynamic failure reason, Configure Key (if auth error), Retry AI, and Copy for AI
     function showAiFallbackBar(que, qData, promptText, onRetry, { reason = '', isAuthError = false, isRateLimit = false, waitSeconds = 0 } = {}) {
         que.querySelectorAll('.amaes-ai-fallback-bar').forEach(el => el.remove());
+        que.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());
         que.dataset.amaesAiFailed = 'true';
         if (typeof updateQuestionAiDrawerState === 'function') {
             updateQuestionAiDrawerState(que, true);
@@ -9791,6 +9834,8 @@
             flex-wrap: wrap;
         `;
         const displayReason = reason || 'AI took too long or was unavailable.';
+        const retryCount = Number(que.dataset.amaesAiRetryCount) || 0;
+        const showConfig = isAuthError || retryCount >= 2;
 
         if (isRateLimit && waitSeconds > 0) {
             bar.innerHTML = `
@@ -9804,6 +9849,21 @@
                     </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                    ${showConfig ? `
+                    <button type="button" class="amaes-ai-config-btn" style="
+                        background: #ea580c;
+                        color: #ffffff;
+                        border: none;
+                        padding: 4px 10px;
+                        border-radius: 5px;
+                        font-size: 10.5px;
+                        font-weight: 700;
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 3px;
+                    " title="Add another free Google Gemini API key for higher rate limits">⚙ Configure AI</button>
+                    ` : ''}
                     <button type="button" class="amaes-ai-retry-btn" style="
                         background: #ea580c;
                         color: #ffffff;
@@ -9831,38 +9891,19 @@
                         align-items: center;
                         gap: 3px;
                     ">Copy for AI</button>
-                    <button type="button" class="amaes-ai-fallback-web-btn" data-provider="chatgpt" style="
-                        background: #ecfdf5;
-                        color: #065f46;
-                        border: 1px solid #a7f3d0;
-                        padding: 4px 8px;
-                        border-radius: 5px;
-                        font-size: 10.5px;
-                        font-weight: 700;
-                        cursor: pointer;
-                    " title="Open question in ChatGPT">ChatGPT ↗</button>
-                    <button type="button" class="amaes-ai-fallback-web-btn" data-provider="perplexity" style="
-                        background: #f0fdfa;
-                        color: #115e59;
-                        border: 1px solid #99f6e4;
-                        padding: 4px 8px;
-                        border-radius: 5px;
-                        font-size: 10.5px;
-                        font-weight: 700;
-                        cursor: pointer;
-                    " title="Open question in Perplexity">Perplexity ↗</button>
                 </div>
             `;
 
             formulation.insertBefore(bar, formulation.firstChild);
 
-            bar.querySelectorAll('.amaes-ai-fallback-web-btn').forEach(btn => {
-                btn.onclick = (e) => {
+            const configBtn = bar.querySelector('.amaes-ai-config-btn');
+            if (configBtn) {
+                configBtn.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    openExternalAi(btn.dataset.provider, que);
+                    showGeminiSetupModal("💡 Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
                 };
-            });
+            }
 
             let secLeft = waitSeconds;
             const timerEl = bar.querySelector('#amaes-ratelimit-countdown');
@@ -9913,28 +9954,13 @@
             return;
         }
 
-        // Standard fallback bar
+        // Standard fallback bar (Clean, single-line alert without redundant web AI pills)
         bar.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px;">
-                <span style="font-weight: 700;">Warning</span>
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 200px;">
+                <span style="background: #a21caf; color: #ffffff; padding: 2px 7px; border-radius: 4px; font-weight: 800; font-size: 10px; letter-spacing: 0.5px; flex-shrink: 0;">AI WARNING</span>
                 <span style="font-weight: 600;">${displayReason}</span>
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
-                ${isAuthError ? `
-                <button type="button" class="amaes-ai-config-btn" style="
-                    background: #7c3aed;
-                    color: #ffffff;
-                    border: none;
-                    padding: 4px 10px;
-                    border-radius: 5px;
-                    font-size: 10.5px;
-                    font-weight: 700;
-                    cursor: pointer;
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 3px;
-                ">⚙ Configure Key</button>
-                ` : ''}
                 <button type="button" class="amaes-ai-retry-btn" style="
                     background: #a21caf;
                     color: #ffffff;
@@ -9948,6 +9974,21 @@
                     align-items: center;
                     gap: 3px;
                 ">Retry AI</button>
+                ${showConfig ? `
+                <button type="button" class="amaes-ai-config-btn" style="
+                    background: #7c3aed;
+                    color: #ffffff;
+                    border: none;
+                    padding: 4px 10px;
+                    border-radius: 5px;
+                    font-size: 10.5px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 3px;
+                " title="Add another free Google Gemini API key for higher rate limits">⚙ Configure AI</button>
+                ` : ''}
                 <button type="button" class="amaes-ai-copy-btn" style="
                     background: #fae8ff;
                     color: #86198f;
@@ -9961,45 +10002,17 @@
                     align-items: center;
                     gap: 3px;
                 ">Copy for AI</button>
-                <button type="button" class="amaes-ai-fallback-web-btn" data-provider="chatgpt" style="
-                    background: #ecfdf5;
-                    color: #065f46;
-                    border: 1px solid #a7f3d0;
-                    padding: 4px 8px;
-                    border-radius: 5px;
-                    font-size: 10.5px;
-                    font-weight: 700;
-                    cursor: pointer;
-                " title="Open question in ChatGPT">ChatGPT ↗</button>
-                <button type="button" class="amaes-ai-fallback-web-btn" data-provider="perplexity" style="
-                    background: #f0fdfa;
-                    color: #115e59;
-                    border: 1px solid #99f6e4;
-                    padding: 4px 8px;
-                    border-radius: 5px;
-                    font-size: 10.5px;
-                    font-weight: 700;
-                    cursor: pointer;
-                " title="Open question in Perplexity">Perplexity ↗</button>
             </div>
         `;
 
         formulation.insertBefore(bar, formulation.firstChild);
-
-        bar.querySelectorAll('.amaes-ai-fallback-web-btn').forEach(btn => {
-            btn.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                openExternalAi(btn.dataset.provider, que);
-            };
-        });
 
         const configBtn = bar.querySelector('.amaes-ai-config-btn');
         if (configBtn) {
             configBtn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                showGeminiSetupModal();
+                showGeminiSetupModal("💡 Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
             };
         }
 
@@ -10008,6 +10021,7 @@
             retryBtn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                que.dataset.amaesAiRetryCount = String((Number(que.dataset.amaesAiRetryCount) || 0) + 1);
                 bar.remove();
                 onRetry();
             };
@@ -10626,6 +10640,7 @@
         }
 
         que.dataset.amaesAiAttempted = 'true';
+        que.dataset.amaesAiRetryCount = String((Number(que.dataset.amaesAiRetryCount) || 0) + 1);
 
         // Update button text to loading state
         const cardAiBtn = que.querySelector('.amaes-ask-ai-card-btn');
@@ -10645,7 +10660,7 @@
                 if (matched && matched.choiceText) {
                     recordAttemptAnswerEvidence(que, matched.choiceText, 'ai_inference');
                 }
-                que.querySelectorAll('.amaes-blockage-hud, .amaes-unanswered-hint').forEach(el => el.remove());
+                que.querySelectorAll('.amaes-blockage-hud, .amaes-ai-fallback-bar, .amaes-unanswered-hint').forEach(el => el.remove());
                 que.querySelectorAll('.amaes-que-top-toolbar').forEach(toolbar => {
                     toolbar.style.display = 'flex';
                 });
@@ -10799,9 +10814,9 @@
                             <div style="flex: 1;">
                                 <span style="font-weight: 600; color: #f8fafc;">Paste your key(s) here:</span>
                                 <!-- Speed explanation box -->
-                                <div id="amaes-multikey-explain" style="margin: 6px 0; padding: 7px 10px; background: rgba(124,58,237,0.10); border: 1px solid rgba(168,85,247,0.35); border-radius: 6px; font-size: 10px; color: #c4b5fd; line-height: 1.5;">
-                                    <b style="color:#e9d5ff;">Optional backup key</b><br>
-                                    You normally need only one key. Add another key that you own if Google temporarily limits the first one. The toolkit tries keys one at a time and respects Google's limits; adding keys is optional and does not bypass Google's rules.
+                                <div id="amaes-multikey-explain" style="margin: 6px 0; padding: 8px 12px; background: rgba(124,58,237,0.12); border: 1px solid rgba(168,85,247,0.4); border-radius: 8px; font-size: 11px; color: #e9d5ff; line-height: 1.5;">
+                                    <b style="color: #ffffff; font-size: 11.5px;">💡 Higher Limits with Multiple Keys</b><br>
+                                    Hit a rate limit or busy error? Google provides 15 free AI requests per minute per account. You can create an extra free API key using a secondary Google account and add it here. The toolkit will automatically rotate between your keys to double your capacity and eliminate wait times!
                                 </div>
                                 <!-- Dynamic key rows rendered by JS -->
                                 <div id="amaes-gemini-key-rows" style="display: flex; flex-direction: column; gap: 5px; margin-top: 4px;"></div>

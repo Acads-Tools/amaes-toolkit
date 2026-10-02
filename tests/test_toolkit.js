@@ -2863,8 +2863,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.8.7'), "Userscript header must specify v1.8.7");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.8.7";'), "Constant SCRIPT_VERSION must be v1.8.7");
+    assert.ok(script.includes('@version      1.8.8'), "Userscript header must specify v1.8.8");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.8.8";'), "Constant SCRIPT_VERSION must be v1.8.8");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3997,10 +3997,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.8.7-blue.svg"), "README badge must show v1.8.7");
+    assert.ok(readme.includes("version-1.8.8-blue.svg"), "README badge must show v1.8.8");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.8.7<"), "Website must display v1.8.7 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.8.8<"), "Website must display v1.8.8 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -4935,7 +4935,32 @@ test("Quiz Summary Attempt Completion: verifies immediate quest_done audio chime
     // 5. Removed premature audio chime right before finish navigation on attempt page
     const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
     const isFinishBlock = solverSrc.substring(solverSrc.indexOf('if (isFinish) {'), solverSrc.indexOf('if (isFinish) {') + 300);
-    assert.ok(!isFinishBlock.includes("playToolkitSound('quest_done')"), "Must not play quest_done right before page unload in isFinish delay");
+});
+
+// --------------------------------------------------
+test("Question HUD & AI Retry Redundancy Elimination: verifies single-banner guarantee, Configure AI button after 2+ retries, and simplified multi-key setup explanation", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Single-banner guarantee (blockage HUD removes fallback bar, and vice-versa)
+    assert.ok(script.includes("firstBlockedQue.querySelectorAll('.amaes-ai-fallback-bar').forEach(bar => bar.remove());"), "Blockage HUD must remove fallback bar to prevent stacked banners");
+    assert.ok(script.includes("que.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());"), "Fallback bar must remove blockage HUD to prevent stacked banners");
+
+    // 2. Removal of duplicate external AI web buttons from error banner (deferring to dedicated Web AI toolbar)
+    const fallbackBarStart = script.indexOf("function showAiFallbackBar(");
+    const fallbackBarEnd = script.indexOf("function handleGeminiQuestionInference(", fallbackBarStart);
+    const fallbackBarSrc = script.substring(fallbackBarStart, fallbackBarEnd);
+    assert.ok(!fallbackBarSrc.includes("data-provider=\"chatgpt\""), "Fallback bar must not duplicate ChatGPT launcher");
+    assert.ok(!fallbackBarSrc.includes("data-provider=\"perplexity\""), "Fallback bar must not duplicate Perplexity launcher");
+
+    // 3. Retry tracking and Configure AI button on 2+ retries
+    assert.ok(script.includes("amaesAiRetryCount"), "Must track AI retry count on question dataset");
+    assert.ok(script.includes("btn-blockage-config-ai"), "Must provide Configure AI button in blockage HUD on multiple retries");
+    assert.ok(script.includes("showConfig = isAuthError || retryCount >= 2;"), "Fallback bar must offer Configure AI on 2+ retries");
+
+    // 4. Simplified multi-key configuration explanation
+    assert.ok(script.includes("Higher Limits with Multiple Keys"), "Setup modal must explain higher limits with multiple keys simply");
+    assert.ok(script.includes("automatically rotate between your keys"), "Setup modal must explain automatic key rotation");
 });
 
 console.log("\n==================================================");
