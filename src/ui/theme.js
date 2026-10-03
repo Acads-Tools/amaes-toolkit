@@ -160,6 +160,7 @@
     const communityDbBaseUrl = 'https://raw.githubusercontent.com/Acads-Tools/database/main/data/community/';
     const CLOUD_DB_FALLBACK_URL = 'https://raw.githubusercontent.com/Acads-Tools/database/main/data/';
     const CLOUD_DB_AMAUOED_URL = 'https://raw.githubusercontent.com/Acads-Tools/database/main/data/amauoed/';
+    const CLOUD_DB_JENNYSONLINE_URL = 'https://raw.githubusercontent.com/Acads-Tools/database/main/data/jennysonline/';
     const DEFAULT_COMMUNITY_RELAY_URL = COMMUNITY_RELAY_URL;
     let storedRelayUrl = localStorage.getItem('amaes_community_relay_url');
     if (storedRelayUrl && (!storedRelayUrl.includes('acads-tools.workers.dev') || storedRelayUrl === 'https://amaes-community-relay.workers.dev')) {
@@ -643,4 +644,3 @@
         }
         return eliminatedTexts;
     }
-

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.9.4
+// @version      1.10.0
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -19,6 +19,8 @@
 // @connect      raw.githubusercontent.com
 // @connect      api.github.com
 // @connect      amauoed.com
+// @connect      jennysonline.blogspot.com
+// @connect      docs.google.com
 // @connect      amaes-community-relay.acads-tools.workers.dev
 // @connect      generativelanguage.googleapis.com
 // @run-at       document-end
@@ -26,4 +28,3 @@
 // @homepageURL  https://github.com/Acads-Tools/amaes-toolkit
 // @supportURL   https://github.com/Acads-Tools/amaes-toolkit/issues
 // ==/UserScript==
-

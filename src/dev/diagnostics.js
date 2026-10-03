@@ -1168,8 +1168,8 @@
             qText = cleanDOMToAI(clone);
         }
 
-        // Clean question text of leading "Question 1" or prompt remnants
-        qText = qText.replace(/^Question\s*\d+[\s:.]*/i, '').trim();
+        // Clean question text of leading "Question 1", "Question No. 1", "Question #1", "(1)", or prompt remnants
+        qText = qText.replace(/^(?:(?:question|item|q)\s*(?:no\.?|#)?\s*\d+[\s:.-]*|\(?\d+\)?[\s:.)-]+)/i, '').trim();
         // Also strip leading instruction preambles for cleaner AI prompts
         const preambleCleanRegex = /^(?:(?:direction|directions|instruction|instructions)\s*[:.\-–]\s*)?(?:read\s+(?:each\s+|the\s+)?(?:statement|question|passage)s?\s+(?:carefully\s+)?(?:and\s+)?)?(?:choose|select|pick|identify|mark)\s+(?:the\s+)?(?:best|correct|appropriate|right)\s+(?:answer|choice|option)[.:?!;\s–-]*/i;
         while (preambleCleanRegex.test(qText)) {

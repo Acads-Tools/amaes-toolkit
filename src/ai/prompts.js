@@ -417,6 +417,7 @@
                 btnText.className = 'amaes-copy-ai-card-btn';
                 btnText.title = 'Copy question and choices (copies visual snippet + text for images and drag & drop)';
                 btnText.innerHTML = `${ICONS.copy || ICONS.sparkles} <span>Copy AI</span>`;
+                btnText.style.display = autoQuizMode ? 'none' : '';
 
                 btnText.onclick = async (e) => {
                     e.preventDefault();
@@ -883,4 +884,3 @@
             observer.observe(target, { childList: true, subtree: true });
         }
     }
-

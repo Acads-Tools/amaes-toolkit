@@ -103,18 +103,20 @@
                 if (sc && sc !== 'GENERAL' && sc !== 'DEFAULT' && !sessionStorage.getItem(`amaes_cloud_synced_${sc}`)) {
                     sessionStorage.setItem(`amaes_cloud_synced_${sc}`, '1');
                     setLog(`Auto-syncing community database for <b>${sc}</b>...`, "var(--accent-blue)");
-                    syncAnswersFromCloud(sc).then(async (res) => {
+                    syncAnswersFromCloud(sc, null, cInfo.subjectName || '').then(async (res) => {
                         if (res && res.count > 0) {
-                            showToast(`Auto-synced ${res.count} community answers for ${sc}!`);
-                            setLog(`Auto-synced <b>${res.count}</b> answers for <b>${sc}</b> from Cloud Hub.`, "var(--accent-green)");
+                            const jennyCount = res.jennysonlineCount || 0;
+                            showToast(`Loaded ${res.cachedCount || 0} cached entries and ${jennyCount} unconfirmed Jenny suggestions for ${sc}.`);
+                            setLog(`Loaded <b>${res.cachedCount || 0}</b> cached entries and <b>${jennyCount}</b> locally cached, unconfirmed Jenny suggestions for <b>${sc}</b>.`, "var(--accent-green)");
                             const fresh = getCachedAnswers(sc);
                             const lbl = document.getElementById('fetch-btn-label');
                             if (lbl && fresh) lbl.innerText = `Refresh Answers (${fresh.length} cached)`;
                             if (checkIsQuizPage()) {
-                                highlightQuizAnswers(fresh, false);
+                                const jennyAnswers = jennyCount > 0 ? await loadJennysonlineAnswersForCourse(sc, cInfo.subjectName || '') : [];
+                                highlightQuizAnswers((fresh || []).concat(jennyAnswers), false);
                             }
                         } else if (autoScrapeAmauoed) {
-                            const link = await autoFindAmauoedLink(sc);
+                            const link = await autoFindAmauoedLink(sc, cInfo.subjectName || '');
                             if (link) {
                                 const scraped = await loadAllAmauoedAnswers(link);
                                 if (scraped && scraped.length > 0) {
@@ -133,7 +135,7 @@
                     }).catch(async (err) => {
                         logDebug(`Auto cloud sync note for ${sc}: ${err.message}`);
                         if (autoScrapeAmauoed) {
-                            const link = await autoFindAmauoedLink(sc);
+                            const link = await autoFindAmauoedLink(sc, cInfo.subjectName || '');
                             if (link) {
                                 const scraped = await loadAllAmauoedAnswers(link);
                                 if (scraped && scraped.length > 0) {
@@ -164,14 +166,14 @@
                         dashCourses.forEach(c => {
                             if (c.code && !sessionStorage.getItem(`amaes_cloud_synced_${c.code}`)) {
                                 sessionStorage.setItem(`amaes_cloud_synced_${c.code}`, '1');
-                                syncAnswersFromCloud(c.code).then(res => {
+                                syncAnswersFromCloud(c.code, null, c.title || '').then(res => {
                                     if (res && res.count > 0) {
                                         injectDashboardCourseBadges();
                                     }
                                 }).catch(async (e) => {
                                     logDebug(`Dashboard auto-sync note for ${c.code}: ${e.message}`);
                                     if (autoScrapeAmauoed) {
-                                        const link = await autoFindAmauoedLink(c.code);
+                                        const link = await autoFindAmauoedLink(c.code, c.title || '');
                                         if (link) {
                                             const scraped = await loadAllAmauoedAnswers(link);
                                             if (scraped && scraped.length > 0) {
@@ -202,14 +204,14 @@
                         dashCourses.forEach(c => {
                             if (c.code && !sessionStorage.getItem(`amaes_cloud_synced_${c.code}`)) {
                                 sessionStorage.setItem(`amaes_cloud_synced_${c.code}`, '1');
-                                syncAnswersFromCloud(c.code).then(res => {
+                                syncAnswersFromCloud(c.code, null, c.title || '').then(res => {
                                     if (res && res.count > 0) {
                                         injectDashboardCourseBadges();
                                     }
                                 }).catch(async (e) => {
                                     logDebug(`Dashboard observer auto-sync note for ${c.code}: ${e.message}`);
                                     if (autoScrapeAmauoed) {
-                                        const link = await autoFindAmauoedLink(c.code);
+                                        const link = await autoFindAmauoedLink(c.code, c.title || '');
                                         if (link) {
                                             const scraped = await loadAllAmauoedAnswers(link);
                                             if (scraped && scraped.length > 0) {

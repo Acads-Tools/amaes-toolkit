@@ -58,6 +58,7 @@
                     wrongAnswers: incomingWrong,
                     confirmations: ansRaw ? 1 : 0,
                     source: newItem.source || sourceLabel,
+                    evidenceType: newItem.evidenceType || '',
                     sources: [sourceLabel]
                 };
 
@@ -82,6 +83,7 @@
                 const cur = existing[idx];
                 cur.sources = cur.sources || [];
                 if (!cur.sources.includes(sourceLabel)) cur.sources.push(sourceLabel);
+                if (newItem.evidenceType) cur.evidenceType = newItem.evidenceType;
                 if ((!cur.period || cur.period === 'General') && newItem.period && newItem.period !== 'General') {
                     cur.period = newItem.period;
                 }
@@ -443,11 +445,18 @@
     }
 
     // Multi-Tier Cloud Database Synchronization (Verified + AMAUOED Tiers)
-    async function syncAnswersFromCloud(subCode, cloudUrl = null) {
+    async function syncAnswersFromCloud(subCode, cloudUrl = null, courseTitle = '') {
         if (!subCode || subCode.toUpperCase() === 'DEFAULT' || subCode.toUpperCase() === 'GENERAL') {
             throw new Error('Please select or specify a valid subject code (e.g. CS6301, ITE6301)');
         }
         const cleanSubCode = subCode.trim().toUpperCase();
+        let resolvedCourseTitle = String(courseTitle || '').trim();
+        if (!resolvedCourseTitle && typeof detectCourseInfo === 'function') {
+            const info = detectCourseInfo();
+            if (String(info.subjectCode || '').toUpperCase() === cleanSubCode) {
+                resolvedCourseTitle = info.subjectName || '';
+            }
+        }
 
         const req = (typeof GM_xmlhttpRequest === 'function') ? GM_xmlhttpRequest :
                     (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
@@ -488,6 +497,7 @@
         let verifiedCount = 0;
         let communityCount = 0;
         let amauoedCount = 0;
+        let jennysonlineCount = 0;
 
         // 1. Fetch Verified Tier (Audited Gold Standard)
         try {
@@ -549,23 +559,39 @@
             logDebug(`AMAUOED tier note for ${cleanSubCode}: ${e.message}`);
         }
 
-        const totalSynced = verifiedCount + communityCount + amauoedCount;
-        if (totalSynced === 0) {
+        // Jenny's Online rows are unconfirmed local suggestions, never merged
+        // into the shared verified, community, or study-guide tiers.
+        try {
+            const jennyAnswers = await loadJennysonlineAnswersForCourse(cleanSubCode, resolvedCourseTitle);
+            jennysonlineCount = jennyAnswers.length;
+        } catch (e) {
+            logDebug(`Jenny's Online tier note for ${cleanSubCode}: ${e.message}`);
+        }
+
+        const cachedCount = verifiedCount + communityCount + amauoedCount;
+        const totalAvailable = cachedCount + jennysonlineCount;
+        if (totalAvailable === 0) {
             throw new Error(`No answer databases found for ${cleanSubCode}`);
         }
 
         return {
             success: true,
-            count: totalSynced,
+            count: totalAvailable,
+            cachedCount,
             verifiedCount,
             communityCount,
-            amauoedCount
+            amauoedCount,
+            jennysonlineCount
         };
     }
 
     async function autoFetchCloudAnswersIfMissing(code) {
         if (!code || code === 'DEFAULT' || code === 'GENERAL') return false;
         try {
+            const courseInfo = typeof detectCourseInfo === 'function' ? detectCourseInfo() : null;
+            const courseTitle = courseInfo && String(courseInfo.subjectCode || '').toUpperCase() === String(code).toUpperCase()
+                ? courseInfo.subjectName || ''
+                : '';
             // 1. Check local cache: If answers already exist locally, avoid unnecessary scraping or network calls
             const existing = getCachedAnswers(code) || [];
             if (existing.length > 0) {
@@ -573,7 +599,7 @@
             }
 
             // 2. Fetch from Cloud / GitHub community database
-            const res = await syncAnswersFromCloud(code);
+            const res = await syncAnswersFromCloud(code, null, courseTitle);
             if (res && res.count > 0) {
                 return true;
             }
@@ -581,7 +607,7 @@
             // 3. Fallback: Auto-discover AMAUOED link dynamically or use stored (if autoScrapeAmauoed is enabled)
             if (autoScrapeAmauoed) {
                 const amauoedUrl = (typeof autoFindAmauoedLink === 'function')
-                    ? await autoFindAmauoedLink(code)
+                    ? await autoFindAmauoedLink(code, courseTitle)
                     : getStoredAmauoedUrl(code);
                 const alreadyScraped = localStorage.getItem(`amaes_amauoed_scraped_${code}`);
                 if (amauoedUrl && !alreadyScraped && typeof loadAllAmauoedAnswers === 'function') {
@@ -2400,4 +2426,3 @@
         document.body.appendChild(modal);
         renderModal();
     }
-

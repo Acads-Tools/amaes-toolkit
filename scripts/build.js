@@ -28,6 +28,7 @@ const BUILD_MANIFEST = [
     'ui/theme.js',
     'moodle/detector.js',
     'sync/amauoed.js',
+    'sync/jennysonline.js',
     'quiz/solver.js',
     'moodle/highlighter.js',
     'dev/diagnostics.js',

@@ -2668,21 +2668,21 @@ test("AMAUOED Links & Universal Auto-Pick: links directly to amauoed course page
     assert.ok(unansweredSection.includes("rgba(245, 158, 11"), "Unanswered hint must use amber background styling");
 
     // 2. Clickable link to amauoed on verified badges and suggested headers
-    assert.ok(script.includes("document.createElement(isAmauoed && !hasVerifiedSource ? 'a' : 'span')"), "AMAUOED-only badge must render as link");
+    assert.ok(script.includes("document.createElement(isStudyGuide && studyGuide.url ? 'a' : 'span')"), "Study-guide badges with a source URL must render as links");
     assert.ok(script.includes("badge.target = '_blank';"), "AMAUOED badge link must open in new tab");
-    assert.ok(script.includes("Suggested (amauoed.com):</a>"), "Suggested AMAUOED headers must link to course study guide");
+    assert.ok(script.includes("Suggested (${studyGuide.label}, unconfirmed):</a>"), "Unconfirmed study-guide headers must link to their source");
 
     // 3. Universal Auto-Pick across all question types
-    assert.ok(script.includes("canSelectAnswer = isManualSelect || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode));"), "Radio auto-select must support autoPickQuiz and gate on autoSelect/mode");
+    assert.ok(script.includes("(isManualSelect && hasVerifiedSource)") && script.includes("(hasVerifiedSource || (hasStudyGuideSource && !hasStudyGuideConflict) || (hasAiSource && aiAutoSelect))"), "Radio auto-select may use confirmed answers or non-conflicting study-guide suggestions, with AI separately gated");
     assert.ok(script.includes("input.dispatchEvent(new Event('change', { bubbles: true }));"), "Radio auto-select must dispatch change event");
-    assert.ok(script.includes("canAutoFill = isManualSelect || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode));"), "Short answer must support autoPickQuiz and gate on autoSelect/mode");
-    assert.ok(script.includes("canAutoPick = isManualSelect || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode));"), "Dropdown & drag/drop must support autoPickQuiz and gate on autoSelect/mode");
+    assert.ok(script.includes("hasStudyGuideSuggestion") && script.includes("(isConfirmedCandidate(bestCand) || (hasStudyGuideSuggestion && !hasStudyGuideConflict))"), "Text inputs may auto-fill confirmed answers or non-conflicting study-guide suggestions");
+    assert.ok(script.includes("(isConfirmedCandidate(bestCand) || (hasStudyGuideSuggestion && !hasStudyGuideConflict)) && !isDeducedSelect"), "Dropdown Auto-Pick must pause on conflicting guide suggestions");
 
     // 4. Fallback warning badge when candidates exist but choices differ
     assert.ok(script.includes("if (!foundMatchForQuestion) {"), "Must embed unanswered warning when no choice matches known candidates");
 
     // 5. User Manual Override Protection: Never overwrite active student answer
-    assert.ok(script.includes("!anyRadioChecked || isManualSelect"), "Must never overwrite user's manual radio selection with auto-picked choice");
+    assert.ok(script.includes("!anyRadioChecked || hasVerifiedSource || (hasStudyGuideSource && !hasStudyGuideConflict) || isManualSelect"), "Only confirmed answers or non-conflicting study-guide candidates may override a prechecked radio");
 });
 
 // --------------------------------------------------
@@ -2863,8 +2863,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.9.4'), "Userscript header must specify v1.9.4");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.9.4";'), "Constant SCRIPT_VERSION must be v1.9.4");
+    assert.ok(script.includes('@version      1.10.0'), "Userscript header must specify v1.10.0");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.10.0";'), "Constant SCRIPT_VERSION must be v1.10.0");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3268,7 +3268,7 @@ test("Evidence sources remain visible while verified answers win auto-pick", () 
     assert.ok(script.includes("const hasAnyVerifiedCandidate = candidates.some"), "Question matching must detect verified candidates");
     assert.ok(script.includes("Never auto-pick a lower-trust AMAUOED/community answer"), "Auto-pick must prefer verified evidence");
     assert.ok(script.includes("sourceLabels.map"), "Choice badges must be able to show multiple evidence sources");
-    assert.ok(script.includes("hasVerifiedSource") && script.includes("hasAmauoedSource"), "Choice display must distinguish verified and AMAUOED evidence");
+    assert.ok(script.includes("hasVerifiedSource") && script.includes("hasStudyGuideSource"), "Choice display must distinguish verified and study-guide evidence");
     assert.ok(script.includes("getAnonymousContributorId"), "Contributions must use an anonymous stable contributor token");
     assert.ok(script.includes("contributorId: getAnonymousContributorId()"), "Contributor token must be sent to the relay");
 });
@@ -3749,7 +3749,7 @@ test("Review Screen Ground Truth Override, Jargon Elimination & Clutter Removal:
     assert.ok(script.includes("verifiedNorms.delete(txt)"), "highlightQuizAnswers must delete debunked choices from verifiedNorms");
 
     // Jargon replacement
-    assert.ok(script.includes("'Web Study Guide'"), "Must use user-friendly 'Web Study Guide' instead of AMAUOED probability jargon");
+    assert.ok(script.includes("Web Study Guide ("), "Must identify unconfirmed study-guide sources without calling them verified");
     assert.ok(script.includes("'Incorrect Choice'"), "Must use 'Incorrect Choice' instead of '0% Prob'");
     assert.ok(!script.includes("'UPLOADED TO DB'"), "Must eliminate shouting all-caps 'UPLOADED TO DB'");
     assert.ok(!script.includes("'ELIMINATED IN DB'"), "Must eliminate shouting all-caps 'ELIMINATED IN DB'");
@@ -3997,10 +3997,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.9.4-blue.svg"), "README badge must show v1.9.4");
+    assert.ok(readme.includes("version-1.10.0-blue.svg"), "README badge must show v1.10.0");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.9.4<"), "Website must display v1.9.4 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.10.0<"), "Website must display v1.10.0 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -5052,7 +5052,7 @@ test("Monotone Course Tools Design, Non-Reviewed Quiz Intelligence & Admin Kills
     assert.ok(script.includes("function saveUnreviewedAttemptEvidence"), "Must define saveUnreviewedAttemptEvidence helper");
     assert.ok(script.includes("[PREVIOUS UNREVIEWED ATTEMPT]"), "Prompt builder must include prior unreviewed attempt context");
     assert.ok(script.includes("amaes-unreviewed-history-note"), "Must define unreviewed attempt history notice class");
-    assert.ok(script.includes("Try Alternative"), "Must offer Try Alternative action on unreviewed attempt questions");
+    assert.ok(script.includes("Test Another Choice"), "Must offer an explicitly speculative alternative action on unreviewed attempts");
 
     // 5. Remote Admin Feature Flags & Killswitch
     assert.ok(script.includes("function getRemoteFeatureFlags"), "Must define getRemoteFeatureFlags helper");
@@ -5063,15 +5063,15 @@ test("Monotone Course Tools Design, Non-Reviewed Quiz Intelligence & Admin Kills
 });
 
 // --------------------------------------------------
-// 104. Adaptive Choice Rotation & Blind Solver for Non-Reviewable Quizzes
+// 104. Evidence-Gated Adaptive Choice Probe for Non-Reviewable Quizzes
 // --------------------------------------------------
-test("Adaptive Choice Rotation & Blind Solver for Non-Reviewable Quizzes: rotates suspect answers across attempts, flips binary choices, and preserves flipped state", () => {
+test("Evidence-Gated Adaptive Choice Probe for Non-Reviewable Quizzes: only probes on question-level failure evidence and never promotes aggregate-score guesses", () => {
     const fs = require('fs');
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Suspect Question Eligibility & Probe Activation
     assert.ok(script.includes("const isQuestionSuspect = !hasAnyVerifiedCandidate || hasPriorFailedAttempt;"), "Must consider questions suspect if prior attempt scored < 100%");
-    assert.ok(script.includes("isQuestionSuspect && isAdaptiveProbeActive"), "Adaptive probe must activate on suspect questions even if database candidates exist");
+    assert.ok(script.includes("isQuestionSuspect && hasQuestionLevelFailureEvidence"), "Adaptive probe must require per-question failure evidence, not only an overall score");
 
     // 2. Binary Choice Flip & Untried Rotation
     assert.ok(script.includes("vr.norm !== prevChoiceNorm && unscriptDigits(vr.norm) !== unscriptDigits(prevChoiceNorm)"), "Must flip binary choice to opposite candidate");
@@ -5080,7 +5080,9 @@ test("Adaptive Choice Rotation & Blind Solver for Non-Reviewable Quizzes: rotate
     assert.ok(script.includes("que.dataset.amaesProbeFlipped = 'true'"), "Must mark question as probe-flipped to prevent database overwrite");
 
     // 3. Evidence Synchronization & Robust Attempt Scoring
-    assert.ok(script.includes("localStorage.setItem('amaes_attempt_evidence_latest'"), "Must persist attempt evidence to localStorage for cross-tab resilience");
+    assert.ok(script.includes("sessionStorage.setItem(key, JSON.stringify(next.slice(-100)))"), "Must persist attempt evidence under the active attempt key");
+    assert.ok(script.includes("amaes_current_attempt_${quizId}"), "Must map summary-page scores back to the matching Moodle attempt");
+    assert.ok(script.includes("sessionStorage.getItem(getAttemptEvidenceKey()) || '[]'"), "Must not promote stale evidence from another attempt");
     assert.ok(script.includes("const slashMatch = text.match("), "Must support direct slash-in-cell score parsing");
     assert.ok(script.includes("gradeMatch = feedbackText.match("), "Must parse overall feedback fallback score");
 
@@ -5119,39 +5121,184 @@ test("Strict Confirmed Verification & Manual Prior Attempt Handling: separates v
     // 2. Pure Unit Verification Logic: isConfirmedCandidate
     function isConfirmedCandidate(item) {
         if (!item) return false;
-        if (item.deduced === true) return true;
         const src = String(item.source || '').toLowerCase();
         const evType = String(item.evidenceType || '').toLowerCase();
+        const trustedSource = ['review_screen', 'moodle_review', 'moodle_review_verified', 'moodle_100_percent', 'verified_db'].includes(src);
+        const trustedEvidence = ['moodle_review', '100_percent', 'moodle_100_percent', 'moodle_review_elimination'].includes(evType);
+        const unconfirmedSource = /community|gemini|(^|[^a-z])ai([^a-z]|$)|amauoed|jennysonline/.test(src);
 
-        if (src.includes('community') || src.includes('gemini') || src.includes('ai') || src.includes('amauoed') || item.isAiSuggestion) {
+        if ((unconfirmedSource || item.isAiSuggestion) && !trustedEvidence) {
             return false;
         }
-
-        if (src.includes('review') && !src.includes('not permitted') && !src.includes('95-percent')) return true;
-        if (src.includes('100_percent') || src.includes('deduction') || src.includes('elimination') || src === 'verified_db') return true;
-        if (evType.includes('review') || evType.includes('100_percent')) return true;
-
-        if (item.verified === true && !src) return true;
-        return false;
+        if (item.verified !== true) return false;
+        return trustedSource || trustedEvidence;
     }
 
     // Ground-truth verified items
     assert.strictEqual(isConfirmedCandidate({ source: 'review_screen', verified: true }), true, "review_screen must be confirmed");
     assert.strictEqual(isConfirmedCandidate({ source: 'moodle_100_percent', verified: true }), true, "moodle_100_percent must be confirmed");
-    assert.strictEqual(isConfirmedCandidate({ source: 'Review', verified: true }), true, "Review must be confirmed");
     assert.strictEqual(isConfirmedCandidate({ source: 'moodle_review_verified', verified: true }), true, "moodle_review_verified must be confirmed");
     assert.strictEqual(isConfirmedCandidate({ source: 'verified_db', verified: true }), true, "verified_db must be confirmed");
-    assert.strictEqual(isConfirmedCandidate({ deduced: true, verified: true }), true, "deduced must be confirmed");
+    assert.strictEqual(isConfirmedCandidate({ source: 'Elimination Deduction', evidenceType: 'moodle_review_elimination', deduced: true, verified: true }), true, "Review-backed elimination must be confirmed");
 
     // Unconfirmed community & AI submissions
     assert.strictEqual(isConfirmedCandidate({ source: 'community_contribution', verified: true }), false, "community_contribution must be unconfirmed even if verified: true");
     assert.strictEqual(isConfirmedCandidate({ source: 'Google Gemini AI', verified: false }), false, "Gemini AI must be unconfirmed");
     assert.strictEqual(isConfirmedCandidate({ source: 'amauoed-cs6301', verified: true }), false, "amauoed must be unconfirmed");
+    assert.strictEqual(isConfirmedCandidate({ source: 'Jennysonline.blogspot.com', verified: true }), false, "Jenny's Online must be unconfirmed even if legacy data marks it verified");
+    assert.strictEqual(isConfirmedCandidate({ source: 'moodle_100_percent', verified: false }), false, "A 100 percent label without verified evidence must not be trusted");
+    assert.strictEqual(isConfirmedCandidate({ source: 'Review', evidenceType: 'moodle_review', verified: true }), true, "Legacy Review cache records with explicit Moodle review evidence remain trusted");
+    assert.strictEqual(isConfirmedCandidate({ source: "Jenny's Online", evidenceType: 'moodle_100_percent', verified: true }), true, "A study-guide candidate independently confirmed by a perfect Moodle attempt becomes trusted");
+    assert.strictEqual(isConfirmedCandidate({ source: 'Elimination Deduction', deduced: true, verified: true }), false, "A generic deduction flag must not be treated as proof");
 
     // 3. Auto-pick Override & Pre-checked Manual Attempt Rotation
-    assert.ok(script.includes("!anyRadioChecked || hasVerifiedSource || isManualSelect"), "Verified answer must override prior pre-checked radio button");
+    assert.ok(script.includes("hasVerifiedSource || (hasStudyGuideSource && !hasStudyGuideConflict) || isManualSelect"), "Confirmed answers and non-conflicting guide candidates may override prior pre-checked radio buttons");
     assert.ok(script.includes("preCheckedRadio ? normalizeChoice"), "Adaptive probe must detect pre-checked choices from prior manual attempts");
     assert.ok(script.includes("Community Candidate (Unconfirmed)"), "Must badge unconfirmed community submissions distinctly");
+    assert.ok(script.includes("isConfirmedCandidate(bestCand)"), "Auto-fill/pick for text and non-radio answers must require confirmed evidence");
+    assert.ok(script.includes("getStudyGuideInfo(item)"), "Study guides must be identified separately from verified evidence");
+    assert.ok(script.includes("Jenny's Online (Unconfirmed)") || script.includes("Jenny's Online"), "Jenny's Online must be labeled as an unconfirmed study guide");
+    assert.ok(script.includes("sessionStorage.getItem(getAttemptEvidenceKey()) || '[]'"), "Attempt promotion must not fall back to stale evidence from another attempt");
+    assert.ok(script.includes("answers: Array.isArray(metadata.answers)"), "Attempt evidence must preserve every selected option or filled blank");
+    assert.ok(script.includes("if (textAnswers.every(Boolean))"), "Multi-blank evidence must be recorded only when all fields are filled");
+    assert.ok(!script.includes("pointsFromUnverified"), "Overall quiz scores must not be used to infer individual answer correctness");
+});
+
+// --------------------------------------------------
+// 106. Auto-Quiz Clutter Reduction & Fill-in-the-Blank Question Number Sanitization
+// --------------------------------------------------
+test("Auto-Quiz Clutter Reduction & Fill-in-the-Blank Question Number Sanitization: hides redundant batch fill/copy buttons and toolbar in auto quiz, and cleans question number prefixes from blanks", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Redundant Button & Toolbar Suppression
+    assert.ok(script.includes("if (autoQuizMode) {\n                batchCopyContainer.style.display = 'none';\n            }") || script.includes("batchCopyContainer.style.display = 'none'"), "Must hide batch fill and copy buttons while autoQuizMode is running");
+    assert.ok(script.includes("button.style.display = autoQuizMode ? 'none' : ''"), "Must hide redundant per-question Copy AI action while Auto-Quiz is actively running");
+    assert.ok(script.includes("btnText.style.display = autoQuizMode ? 'none' : ''"), "New question cards must start with the redundant copy action hidden during Auto-Quiz");
+    assert.ok(script.includes("Keep the in-question pause control visible"), "Must preserve the question toolbar's pause/resume control");
+    assert.ok(script.includes("display: ${autoQuizMode ? 'none' : 'inline-flex'}"), "Must hide per-question manual Fill button during autoQuizMode");
+
+    // 2. Question Number Sanitization Logic in Fill-in-the-Blank
+    assert.ok(script.includes("function cleanFillBlankAnswer(ans)"), "Must define cleanFillBlankAnswer helper");
+
+    function cleanFillBlankAnswer(ans) {
+        if (!ans) return '';
+        let clean = String(ans).trim();
+        clean = clean.replace(/^["'“”]+|["'“”]+$/g, '').trim();
+        clean = clean.replace(/^(?:(?:question|item|q)\s*(?:no\.?|#)?\s*\d+[\s:.-]+|\(\d+\)|\d+[.)])\s+|^answer\s*[:.-]\s*/i, '').trim();
+        return clean;
+    }
+
+    assert.strictEqual(cleanFillBlankAnswer("1. Motherboard"), "Motherboard", "Must strip leading 1. from fill blank answer");
+    assert.strictEqual(cleanFillBlankAnswer("1) Motherboard"), "Motherboard", "Must strip leading 1) from fill blank answer");
+    assert.strictEqual(cleanFillBlankAnswer("(1) Motherboard"), "Motherboard", "Must strip leading (1) from fill blank answer");
+    assert.strictEqual(cleanFillBlankAnswer("Question 1: CPU"), "CPU", "Must strip leading Question 1: from answer");
+    assert.strictEqual(cleanFillBlankAnswer("Question No. 1: RAM"), "RAM", "Must strip leading Question No. 1: from answer");
+    assert.strictEqual(cleanFillBlankAnswer("Q1: Graphics Card"), "Graphics Card", "Must strip leading Q1: from answer");
+    assert.strictEqual(cleanFillBlankAnswer("Answer: Power Supply"), "Power Supply", "Must strip leading Answer: from answer");
+    assert.strictEqual(cleanFillBlankAnswer("Plain Answer"), "Plain Answer", "Must preserve clean answers without question numbers");
+    assert.strictEqual(cleanFillBlankAnswer("1.5V"), "1.5V", "Must preserve a decimal/numeric answer instead of treating it as a question number");
+    assert.strictEqual(cleanFillBlankAnswer("-3.14"), "-3.14", "Must preserve signed numeric answers");
+});
+
+// --------------------------------------------------
+// 107. Jenny's Online Public Sheet Suggestions
+// --------------------------------------------------
+test("Jenny's Online public spreadsheet loads as locally cached unconfirmed course suggestions", () => {
+    const fs = require('fs');
+    const vm = require('vm');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    const source = fs.readFileSync('src/sync/jennysonline.js', 'utf8');
+    const harvester = fs.readFileSync('src/sync/harvester.js', 'utf8');
+    const init = fs.readFileSync('src/init.js', 'utf8');
+    const registry = JSON.parse(fs.readFileSync('../database/data/jennysonline/IT6205A.json', 'utf8'));
+
+    assert.strictEqual(registry.subjectCode, 'IT6205A');
+    assert.strictEqual(registry.verified, false, "Jenny source registry must be unverified");
+    assert.ok(registry.questions.length > 0, "Jenny's unverified rows must be centrally cached in the source-specific database tier");
+    assert.ok(registry.questions.every(row => row.verified === false && row.source === 'jennysonline'), "Every centrally cached Jenny row must remain unverified and attributed");
+    assert.ok(registry.sourceUrl.includes('information-assurance-and-security-1.html'), "Registry must link to supplied course page");
+    assert.ok(source.includes("url.hostname === 'docs.google.com'"), "Must only read an embedded public Google Sheet");
+    assert.ok(source.includes("pageUrl.hostname !== 'jennysonline.blogspot.com'"), "Must reject source URLs outside Jenny's Online");
+    assert.ok(source.includes('/feeds/posts/default') && !source.includes("jennysonline.blogspot.com/search"), "Must use Blogger's feed API and avoid its robots-disallowed /search path");
+    assert.ok(!source.includes('mergeAnswersIntoCache') && !source.includes('setCachedAnswers'), "Fetched source content must never be merged into shared databases");
+    assert.ok(script.includes('loadJennysonlineAnswersForCourse(subCode, courseName)'), "Auto-Quiz must search Jenny using the detected course name");
+    assert.ok(script.includes('hasStudyGuideSource && !hasStudyGuideConflict'), "Auto-Pick must use non-conflicting study-guide suggestions");
+    assert.ok(script.includes("source: 'jennysonline'") && script.includes("evidenceType: 'study_guide_candidate'"), "Imported sheet answers must carry an unconfirmed evidence label");
+    assert.ok(script.includes('amaes-unreviewable-retry-warning'), "Unreviewable quiz retries must show a warning");
+    assert.ok(script.includes('if (getStudyGuideInfo(item)) return 50;'), "AMAUOED and Jenny suggestions must receive equal, confidence-independent source priority");
+    assert.ok(script.includes('amaes-study-guide-conflict-note'), "Conflicting study-guide answers must pause Auto-Pick");
+    assert.ok(harvester.includes('count: totalAvailable') && harvester.includes('cachedCount'), "Cloud sync must report session-only suggestions separately from cached tiers");
+    assert.ok(init.includes('highlightQuizAnswers((fresh || []).concat(jennyAnswers), false)'), "Auto-sync highlighting must include Jenny suggestions without adding them to shared answer tiers");
+
+    const sandbox = {
+        URL,
+        localStorage: (() => {
+            const values = new Map();
+            return {
+                getItem: key => values.has(key) ? values.get(key) : null,
+                setItem: (key, value) => values.set(key, String(value)),
+                removeItem: key => values.delete(key)
+            };
+        })(),
+        Date,
+        normalizeText: value => String(value || '').toLowerCase().replace(/\s+/g, ' ').trim(),
+        normalizeChoice: value => String(value || '').toLowerCase().replace(/\s+/g, ' ').trim()
+    };
+    vm.runInNewContext(`${source}\nglobalThis.parseJennyCsv = parseJennysonlineCsv;\nglobalThis.parseJennySnapshot = parseJennysonlineSharedSnapshot;\nglobalThis.selectJennyPosts = selectJennysonlineCourseEntries;\nglobalThis.readJennyCache = readJennysonlinePersistentCache;\nglobalThis.writeJennyCache = writeJennysonlinePersistentCache;`, sandbox);
+    const sharedRows = sandbox.parseJennySnapshot(registry);
+    assert.ok(sharedRows.length > 0, "Shared Jenny snapshot must load into the runtime source tier");
+    assert.ok(sharedRows.every(row => row.verified === false && row.source === 'jennysonline' &&
+        row.evidenceType === 'study_guide_candidate'), "Shared Jenny suggestions must remain unverified in the runtime");
+    const parsed = sandbox.parseJennyCsv(
+        '"Delivery","Transmitting, or otherwise moving, the weapon to the target environment."\r\n' +
+        '"TRUE","A multi-line\nsecurity statement."\r\n' +
+        '"Delivery","Transmitting, or otherwise moving, the weapon to the target environment."\r\n',
+        registry.sourceUrl
+    );
+    assert.strictEqual(parsed.length, 2, "Parser must support quoted multiline cells and deduplicate repeated rows");
+    assert.strictEqual(parsed[0].qRaw, 'Transmitting, or otherwise moving, the weapon to the target environment.');
+    assert.strictEqual(parsed[0].ansRaw, 'Delivery');
+    assert.strictEqual(parsed[0].verified, false, "Spreadsheet entries must stay unconfirmed");
+    assert.strictEqual(parsed[1].qRaw, 'A multi-line security statement.');
+
+    const feed = {
+        feed: {
+            entry: [
+                {
+                    title: { $t: 'Information Assurance and Security 2' },
+                    content: { $t: '<iframe src="https://docs.google.com/spreadsheets/d/e/another/pubhtml"></iframe>' },
+                    link: [{ rel: 'alternate', href: 'https://jennysonline.blogspot.com/2021/07/information-assurance-security-2.html' }]
+                },
+                {
+                    title: { $t: 'Information Assurance and Security 1' },
+                    content: { $t: '<iframe src="https://docs.google.com/spreadsheets/d/e/it6205a/pubhtml"></iframe>' },
+                    link: [{ rel: 'alternate', href: registry.sourceUrl }]
+                },
+                {
+                    title: { $t: 'Information Assurance Security Overview' },
+                    content: { $t: 'IT6205A course notes, no published sheet' },
+                    link: [{ rel: 'alternate', href: 'https://jennysonline.blogspot.com/2022/01/general-security.html' }]
+                }
+            ]
+        }
+    };
+    assert.deepStrictEqual(
+        Array.from(sandbox.selectJennyPosts(feed, 'IT6205A', 'Information Assurance and Security 1')),
+        [registry.sourceUrl],
+        "Dynamic Blogger discovery must match course name/code and reject similarly named courses"
+    );
+    assert.deepStrictEqual(
+        Array.from(sandbox.selectJennyPosts(feed, 'IT6205A', 'Computer Architecture')),
+        [],
+        "Course code appearing in unrelated post content must not bypass title matching"
+    );
+    sandbox.writeJennyCache('IT6205A', parsed);
+    assert.strictEqual(sandbox.readJennyCache('IT6205A').length, 2, "Unconfirmed sheet suggestions must persist locally for subsequent page loads");
+    assert.strictEqual(sandbox.readJennyCache('IT6206'), null, "Course caches must remain isolated");
+    const cacheKey = 'amaes_jennysonline_cache_v1_IT6205A';
+    sandbox.localStorage.setItem(cacheKey, JSON.stringify({ savedAt: Date.now() - 31 * 24 * 60 * 60 * 1000, answers: parsed }));
+    assert.strictEqual(sandbox.readJennyCache('IT6205A'), null, "Expired local suggestions must be discarded after the 30-day TTL");
 });
 
 console.log("\n==================================================");
@@ -5163,4 +5310,3 @@ console.log("==================================================");
 if (failed > 0) {
     process.exit(1);
 }
-

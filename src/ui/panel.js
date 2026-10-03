@@ -154,7 +154,7 @@
                     ` : ''}
 
                     <!-- Batch actions on multi-question pages -->
-                    <div id="amaes-batch-copy-container" style="display: ${isQuiz && Boolean(document.querySelector('.que')) ? 'flex' : 'none'}; gap: 4px; margin-top: 2px;">
+                    <div id="amaes-batch-copy-container" style="display: ${isQuiz && Boolean(document.querySelector('.que')) && !autoQuizMode ? 'flex' : 'none'}; gap: 4px; margin-top: 2px;">
                         <button id="btn-fill-all-page" class="amaes-btn" style="flex: 1; justify-content: center; padding: 5px 6px; cursor: pointer; font-size: 10px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: 700; border: none; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" title="1-Click: Automatically selects all verified answers for questions on this page">
                             ${ICONS.zap} <span>Fill Verified Answers</span>
                         </button>

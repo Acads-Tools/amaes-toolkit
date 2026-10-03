@@ -225,8 +225,8 @@
         let text = doc.body.textContent || '';
         text = text.toLowerCase().trim();
         text = unscriptDigits(text);
-        // Remove question numbering like "1.", "question 1:"
-        text = text.replace(/^(question\s*\d+[\s:.]*|\d+[\s:.)]+)/, '');
+        // Remove question numbering like "1.", "(1)", "question 1:", "question no. 1", "question #1", "q1.", "item 1:"
+        text = text.replace(/^(?:(?:question|item|q)\s*(?:no\.?|#)?\s*\d+[\s:.-]*|\(?\d+\)?[\s:.)-]+)/i, '');
         // Strip common question instructions / preambles:
         // e.g. "Choose the best answer.", "Select the correct answer.", "Read the statement carefully and select the best answer."
         const preambleRegex = /^(?:(?:direction|directions|instruction|instructions)\s*[:.\-–]\s*)?(?:read\s+(?:each\s+|the\s+)?(?:statement|question|passage)s?\s+(?:carefully\s+)?(?:and\s+)?)?(?:choose|select|pick|identify|mark)\s+(?:the\s+)?(?:best|correct|appropriate|right)\s+(?:answer|choice|option)[.:?!;\s–-]*/i;

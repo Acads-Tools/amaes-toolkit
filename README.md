@@ -10,14 +10,14 @@
 </p>
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js"><img src="https://img.shields.io/badge/version-1.9.4-blue.svg" alt="Version 1.9.4"></a>
+  <a href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js"><img src="https://img.shields.io/badge/version-1.10.0-blue.svg" alt="Version 1.10.0"></a>
   <a href="https://acads-tools.github.io/amaes-toolkit/"><img src="https://img.shields.io/badge/platform-Violentmonkey%20%7C%20Tampermonkey-darkblue.svg" alt="Platform Compatibility"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="#zero-telemetry--privacy-architecture"><img src="https://img.shields.io/badge/privacy-zero--telemetry-success.svg" alt="Zero Telemetry"></a>
   <a href=".github/workflows/privacy-check.yml"><img src="https://img.shields.io/badge/privacy--audit-passing-brightgreen.svg" alt="Privacy Check Passed"></a>
 </p>
 
-> **Compatibility Notice:** Version **1.9.4** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](docs/CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
+> **Compatibility Notice:** Version **1.10.0** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](docs/CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
 
 ---
 
@@ -68,7 +68,11 @@ Before installing, ensure your environment meets the following specifications:
 ### 1. Real-Time Answer Verification & Auto-Quiz Assistance
 * **Visual Answer Highlighting:** Automatically matches quiz questions against verified ground truth and highlights correct choices in clean green indicators.
 * **Autonomous Progression (`Auto-Next`):** Automatically selects verified answers and smoothly advances to the next question.
-* **Ground-Truth Safety Gate:** On questions without a confirmed answer, the solver safely pauses, presents a reassuring notification, and lets you review manually or use AI assistance. It never guesses blindly.
+* **Ground-Truth Safety Gate:** Verified answers are auto-selected; AMAUOED and Jenny's Online may also be auto-selected as clearly labeled, unconfirmed suggestions when Auto-Pick is enabled.
+* **Source Confidence Labels:** Jenny's Online and AMAUOED are equal-priority study-guide suggestions, not verified answers; only Moodle review evidence, a matching 100% attempt, or explicit review-backed deduction can confirm an answer. An overall quiz score alone never proves which question was right or wrong.
+* **Course-Aware Guide Discovery:** For courses without a registered Jenny source, the toolkit searches Jenny's Blogger feed by course code and detected course title, then uses only title-matched posts with published sheets. AMAUOED discovery also uses the detected course name when available.
+* **Study-Guide Data Safety:** Jenny's Online and AMAUOED suggestions are centrally cached in separate, monthly refreshed source tiers, never the primary answer bank. Rows remain unconfirmed; the client prefers these snapshots and keeps a 30-day local cache. Jenny discovery uses Blogger's feed API (not its robots-disallowed `/search` path), with live lookup as fallback.
+* **Unreviewable Retry Warning:** On quiz pages that prohibit review, the toolkit warns that a later attempt may score lower and that a quiz-wide score is not evidence about individual answers.
 * **Live In-Question Controls:** Pause or resume automated assistance directly from the top banner inside any question without closing your workflow.
 
 ### 2. Comprehensive Question Type Support
@@ -241,7 +245,7 @@ Contributions, bug reports, and pull requests from students and developers are w
 * **Architecture:** Modular component architecture in `src/` with zero runtime dependencies.
 * **Styling & UI:** Pure CSS3 Variables, CSS Grid / Flexbox, SVG Vector Icons.
 * **Serverless Relay:** Cloudflare Workers, Cloudflare D1 SQL database.
-* **Automated Testing:** Node.js VM test harness (`tests/test_toolkit.js`, 143 test cases).
+* **Automated Testing:** Deterministic Node.js VM suite (`tests/test_toolkit.js`) plus an opt-in live Jenny source integration test (`tests/test_jennysonline_live.js`).
 
 ### Reporting Bugs & Feature Requests
 * **In-App 1-Click Bug Reporter:** While on Moodle, click the **Bug icon** (`#amaes-bug-btn`) in the toolkit header. Describe the issue, review attached sanitized logs, and submit directly to create a tracking issue.
@@ -274,8 +278,11 @@ cd amaes-toolkit
 # Bundle src/ into distribution file amaes-toolkit.user.js
 npm run build
 
-# Run the comprehensive 143-test regression suite
+# Run the deterministic regression suite (no external network required)
 npm test
+
+# Fetch and parse live Jenny Blogger posts/sheets for IT6205A and IT6206
+npm run test:live:jenny
 
 # Validate JavaScript syntax
 npm run syntax

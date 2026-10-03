@@ -703,7 +703,7 @@
                         try {
                             let res = null;
                             try {
-                                res = await syncAnswersFromCloud(c.code);
+                                res = await syncAnswersFromCloud(c.code, null, c.title || '');
                             } catch (e) {
                                 res = null;
                             }
@@ -712,7 +712,7 @@
                                 totalSynced += res.count;
                                 coursesProcessed++;
                             } else {
-                                const amauoedLink = await autoFindAmauoedLink(c.code);
+                                const amauoedLink = await autoFindAmauoedLink(c.code, c.title || '');
                                 if (amauoedLink) {
                                     setLog(`[${i + 1}/${dashCourses.length}] Scraping AMAUOED for <b>${c.code}</b>...`, "var(--accent-purple)", `Crawling questions from ${amauoedLink}`);
                                     const scraped = await loadAllAmauoedAnswers(amauoedLink);
@@ -728,8 +728,8 @@
                         }
                     }
 
-                    showToast(`Cloud Sync Complete! Loaded ${totalSynced} answers across ${dashCourses.length} courses.`, 4000);
-                    setLog(`Cloud Sync Complete! Loaded <b>${totalSynced}</b> answers across ${dashCourses.length} courses.`, "var(--accent-green)", "All courses indexed in local database");
+                    showToast(`Cloud Sync Complete! Found ${totalSynced} answer entries and study-guide suggestions across ${dashCourses.length} courses.`, 4000);
+                    setLog(`Cloud Sync Complete! Found <b>${totalSynced}</b> answer entries and study-guide suggestions across ${dashCourses.length} courses.`, "var(--accent-green)", "Guide suggestions remain unconfirmed and session-only");
                     btnCloudSync.classList.remove('amaes-pulse');
                     btnCloudSync.innerHTML = `${ICONS.check} <span>Synced ${totalSynced} Qs!</span>`;
                     injectDashboardCourseBadges();
@@ -763,15 +763,18 @@
                 try {
                     let res = null;
                     try {
-                        res = await syncAnswersFromCloud(targetCode);
+                        res = await syncAnswersFromCloud(targetCode, null, (detectCourseInfo().subjectName || ''));
                     } catch (cloudErr) {
                         res = null;
                     }
 
                     if (res && res.count > 0) {
                         const finalDb = getCachedAnswers(targetCode) || [];
-                        showToast(`Cloud Sync Success! (${res.count} community answers loaded)`);
-                        setLog(`Synced <b>${res.count}</b> answers for <b>${targetCode}</b>! (Total: <b>${finalDb.length}</b>)`, "var(--accent-green)", "Verified database cached and active");
+                        const jennyCount = res.jennysonlineCount || 0;
+                        const jennyAnswers = jennyCount > 0 ? await loadJennysonlineAnswersForCourse(targetCode, detectCourseInfo().subjectName || '') : [];
+                        const cachedCount = res.cachedCount || 0;
+                        showToast(`Cloud Sync Success! (${cachedCount} cached; ${jennyCount} unconfirmed Jenny suggestions)`);
+                        setLog(`Synced <b>${cachedCount}</b> cached entries and <b>${jennyCount}</b> locally cached Jenny suggestions for <b>${targetCode}</b>.`, "var(--accent-green)", "Jenny guide suggestions are unconfirmed");
                         btnCloudSync.classList.remove('amaes-pulse');
                         btnCloudSync.innerHTML = `${ICONS.check} <span>Synced ${res.count} Qs!</span>`;
 
@@ -782,7 +785,7 @@
                         updateTermCoverageUI(targetCode);
 
                         if (checkIsQuizPage()) {
-                            highlightQuizAnswers(finalDb, false);
+                            highlightQuizAnswers(finalDb.concat(jennyAnswers), false);
                         }
                     } else {
                         // Fallback to AMAUOED auto-discovery!
@@ -790,7 +793,7 @@
                         showToast(`No cloud answers found for ${targetCode}. Checking AMAUOED...`, 2500);
                         btnCloudSync.innerHTML = `${ICONS.rotateCcw} <span>Checking AMAUOED...</span>`;
 
-                        const amauoedUrl = await autoFindAmauoedLink(targetCode);
+                        const amauoedUrl = await autoFindAmauoedLink(targetCode, detectCourseInfo().subjectName || '');
                         if (amauoedUrl) {
                             btnCloudSync.innerHTML = `${ICONS.rotateCcw} <span>Scraping AMAUOED...</span>`;
                             setLog(`Auto-scraping AMAUOED study guide for <b>${targetCode}</b>...`, "var(--accent-blue)", `Crawling ${amauoedUrl}`);
@@ -1500,4 +1503,3 @@
 
         // Quiz Automation will be initialized once when document is ready
     }
-
