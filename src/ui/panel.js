@@ -28,6 +28,27 @@
                 : `${courseInfo.subjectCode} answer key`;
         }
 
+        // Reusable Component Helpers for Clean, Monotone Course Tools Design
+        function renderCardContent(id, icon, title, badge, contentHtml) {
+            return `
+                <div id="${id}-header" class="amaes-card-header">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        ${icon}
+                        <span class="header-label">${title}</span>
+                        ${badge ? `<span style="font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 600;">${badge}</span>` : ''}
+                    </div>
+                    <span id="${id}-arrow" class="arrow-container">${ICONS.chevronRight}</span>
+                </div>
+                <div id="${id}-body" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
+                    ${contentHtml}
+                </div>
+            `;
+        }
+
+        function renderToolBtn({ id, icon = '', text, title = '', variant = 'monotone', style = '' }) {
+            return `<button id="${id}" class="amaes-btn amaes-btn-${variant}" style="justify-content: center; padding: 5px 3px; font-size: 10px; ${style}" title="${title}">${icon ? icon + ' ' : ''}<span>${text}</span></button>`;
+        }
+
         const panel = document.createElement('div');
         panel.id = 'amaes-toolkit-panel';
 
@@ -381,185 +402,119 @@
 
                 <!-- TAB PANE 3: Course Automation Tools -->
                 <div id="tab-pane-course" class="amaes-tab-pane" style="display: none;">
-                    <!-- MODULE 1: Auto-Marker & Undo -->
-                <div id="mod-marker-card" class="amaes-card">
-                    <div id="mod-marker-header" class="amaes-card-header">
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            ${ICONS.check}
-                            <span class="header-label">Activity Auto-Marker</span>
-                        </div>
-                        <span id="mod-marker-arrow" class="arrow-container">${ICONS.chevronRight}</span>
-                    </div>
-
-                    <div id="mod-marker-body" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
-                        <div style="font-size: 9.5px; font-weight: 700; color: var(--accent-green); display: flex; align-items: center; gap: 4px;">
-                            ${ICONS.check} <span>Mark Complete:</span>
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
-                            <button id="btn-mark-lec" class="amaes-btn amaes-btn-blue" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Mark Lectures & Videos as done">
-                                ${ICONS.book} <span>Lectures</span>
-                            </button>
-                            <button id="btn-mark-quiz" class="amaes-btn amaes-btn-pink" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Mark quizzes & exams with a passable grade (≥80%) as done">
-                                ${ICONS.edit} <span>Quizzes</span>
-                            </button>
-                            <button id="btn-mark-all" class="amaes-btn amaes-btn-gray" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Mark all eligible activities as done">
-                                ${ICONS.zap} <span>All</span>
-                            </button>
-                        </div>
-                        <div style="font-size: 9.5px; font-weight: 700; color: var(--accent-amber); display: flex; align-items: center; gap: 4px; margin-top: 4px;">
-                            ${ICONS.undo} <span>Undo Complete:</span>
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
-                            <button id="btn-undo-lec" class="amaes-btn amaes-btn-outline amaes-text-blue" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Undo completion for Lectures & Videos">
-                                ${ICONS.book} <span>Lectures</span>
-                            </button>
-                            <button id="btn-undo-quiz" class="amaes-btn amaes-btn-outline amaes-text-pink" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Undo completion for Quizzes">
-                                ${ICONS.edit} <span>Quizzes</span>
-                            </button>
-                            <button id="btn-undo-all" class="amaes-btn amaes-btn-outline" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Undo all completions">
-                                ${ICONS.zap} <span>All</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                    <!-- MODULE 2: Activity Highlighter (Quiz / Lec / Vid) -->
-                <div id="mod-highlighter-card" class="amaes-card">
-                    <div id="mod-highlighter-header" class="amaes-card-header">
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            ${ICONS.preview}
-                            <span class="header-label">Activity Highlighter</span>
-                        </div>
-                        <span id="mod-highlighter-arrow" class="arrow-container">${ICONS.chevronRight}</span>
-                    </div>
-
-                    <div id="mod-highlighter-body" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
-                        <div style="display: flex; gap: 5px;">
-                            <button id="btn-hl-quiz" class="amaes-btn amaes-btn-outline amaes-text-pink" style="flex: 1; justify-content: center; padding: 5px 3px;" title="Highlight Quizzes & Exams">
-                                ${ICONS.edit} <span>Quiz</span>
-                            </button>
-                            <button id="btn-hl-lec" class="amaes-btn amaes-btn-outline amaes-text-blue" style="flex: 1; justify-content: center; padding: 5px 3px;" title="Highlight Lectures & Lessons">
-                                ${ICONS.book} <span>Lec</span>
-                            </button>
-                            <button id="btn-hl-vid" class="amaes-btn amaes-btn-outline amaes-text-purple" style="flex: 1; justify-content: center; padding: 5px 3px;" title="Highlight Video Lectures">
-                                ${ICONS.video} <span>Vid</span>
-                            </button>
-                        </div>
-
-                        <div style="display: flex; gap: 5px;">
-                            <button id="btn-hl-all" class="amaes-btn amaes-btn-preview" style="flex: 2; justify-content: center; padding: 5px 6px;">
-                                <span>Highlight All</span>
-                            </button>
-                            <button id="btn-hl-clear" class="amaes-btn amaes-btn-outline" style="flex: 1; justify-content: center; padding: 5px 6px;">
-                                ${ICONS.clear} <span>Clear</span>
-                            </button>
-                        </div>
-
-                        <button id="btn-hl-missing-quizzes" class="amaes-btn amaes-btn-outline amaes-text-pink" style="width: 100%; justify-content: center; padding: 5px 6px; font-size: 10.5px; font-weight: 700; margin-top: 2px;" title="Highlight unanswered, unattempted, or missing quizzes on Grades or Course page">
-                            ${ICONS.alertTriangle || ICONS.preview} <span>Highlight Missing Quizzes</span>
-                        </button>
-                    </div>
-                </div>
-                    <!-- MODULE 3: Quick Search Helper -->
-                <div id="mod-search-card" class="amaes-card">
-                    <div id="mod-search-header" class="amaes-card-header">
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            ${ICONS.search}
-                            <span class="header-label">Search Helper</span>
-                        </div>
-                        <span id="mod-search-arrow" class="arrow-container">${ICONS.chevronRight}</span>
-                    </div>
-
-                    <div id="mod-search-body" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 6px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border);">
-                            <span style="color: var(--text-muted);">Subject Code:</span>
-                            <span id="detected-code-badge" style="font-weight: 700; color: var(--accent-blue); background: var(--surface); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border);">
-                                ${courseInfo.subjectCode || "None"}
-                            </span>
-                        </div>
-
-                        <div style="display: flex; flex-direction: column; gap: 3px;">
-                            <input id="search-keyword-input" type="text" value="${initialKeyword}" placeholder="Search query" style="
-                                width: 100%;
-                                background: var(--bg);
-                                color: var(--text-primary);
-                                border: 1px solid var(--border);
-                                padding: 5px 8px;
-                                border-radius: 5px;
-                                font-size: 11px;
-                                box-sizing: border-box;
-                                outline: none;
-                            " />
-                        </div>
-
-                        <div style="display: flex; gap: 6px;">
-                            <button id="btn-copy-keyword" class="amaes-btn amaes-btn-outline" style="flex: 1; justify-content: center;">
-                                ${ICONS.copy} <span>Copy</span>
-                            </button>
-                            <button id="btn-open-google" class="amaes-btn amaes-btn-blue" style="flex: 1; justify-content: center;">
-                                ${ICONS.external} <span>Google</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- MODULE 4: Smart AI Assistant (Google Gemini) -->
-                <div id="mod-ai-card" class="amaes-card">
-                    <div id="mod-ai-header" class="amaes-card-header">
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <span style="font-weight: 700; color: #a855f7;">AI</span>
-                            <span class="header-label">Smart AI Assistant</span>
-                        </div>
-                        <span id="mod-ai-arrow" class="arrow-container">${ICONS.chevronRight}</span>
-                    </div>
-
-                    <div id="mod-ai-body" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 6px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border);">
-                            <span style="color: var(--text-muted);">Status:</span>
-                            <span id="gemini-status-badge" style="font-weight: 700; font-size: 10px; color: ${geminiApiKey ? 'var(--accent-green)' : 'var(--text-muted)'}; background: var(--surface); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border);">
-                                ${geminiApiKey ? 'Ready (Gemini 2.5 / 2.0 Flash)' : 'Not configured'}
-                            </span>
-                        </div>
-
-                        <p style="font-size: 10px; color: var(--text-secondary); line-height: 1.4; margin: 0;">
-                            Answers unknown multiple-choice & true/false questions automatically using your free Google AI Studio key. 0 tokens used on questions already in DB.
-                        </p>
-
-                        <div style="display: flex; flex-direction: column; gap: 5px; border-top: 1px solid var(--border-subtle); padding-top: 5px;">
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically copy question to clipboard if AI inference fails or times out">
-                                <input id="chk-course-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Auto-Copy Question on AI Failure (Default: ON)</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically moves to next page 1.5s after AI selects a choice">
-                                <input id="chk-course-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Auto-Advance After AI Answer (Default: ON)</span>
-                            </label>
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <span style="font-size: 10px; color: var(--text-secondary);">AI Retry Attempts:</span>
-                                <select id="sel-course-ai-retry-count" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 5px; cursor: pointer;">
-                                    <option value="1" ${aiRetryCount === 1 ? 'selected' : ''}>1 retry</option>
-                                    <option value="2" ${aiRetryCount === 2 ? 'selected' : ''}>2 retries (Default)</option>
-                                    <option value="3" ${aiRetryCount === 3 ? 'selected' : ''}>3 retries</option>
-                                    <option value="4" ${aiRetryCount === 4 ? 'selected' : ''}>4 retries</option>
-                                    <option value="5" ${aiRetryCount === 5 ? 'selected' : ''}>5 retries</option>
-                                </select>
+                    <div id="mod-marker-card" class="amaes-card">
+                        ${renderCardContent('mod-marker', ICONS.check, 'Activity Auto-Marker', '', `
+                            <div style="font-size: 9.5px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">
+                                ${ICONS.check} <span>Mark Complete:</span>
                             </div>
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <span style="font-size: 10px; color: var(--text-secondary);">API Mode:</span>
-                                <select id="sel-course-ai-plan-tier" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 5px; cursor: pointer;">
-                                    <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
-                                    <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
-                                </select>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
+                                ${renderToolBtn({ id: 'btn-mark-lec', icon: ICONS.book, text: 'Lectures', title: 'Mark Lectures & Videos as done' })}
+                                ${renderToolBtn({ id: 'btn-mark-quiz', icon: ICONS.edit, text: 'Quizzes', title: 'Mark quizzes & exams with a passable grade (≥80%) as done' })}
+                                ${renderToolBtn({ id: 'btn-mark-all', icon: ICONS.zap, text: 'All', title: 'Mark all eligible activities as done' })}
                             </div>
-                        </div>
+                            <div style="font-size: 9.5px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+                                ${ICONS.undo} <span>Undo Complete:</span>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
+                                ${renderToolBtn({ id: 'btn-undo-lec', icon: ICONS.book, text: 'Lectures', title: 'Undo completion for Lectures & Videos' })}
+                                ${renderToolBtn({ id: 'btn-undo-quiz', icon: ICONS.edit, text: 'Quizzes', title: 'Undo completion for Quizzes' })}
+                                ${renderToolBtn({ id: 'btn-undo-all', icon: ICONS.zap, text: 'All', title: 'Undo all completions' })}
+                            </div>
+                        `)}
+                    </div>
 
-                        <div style="display: flex; gap: 6px; margin-top: 2px;">
-                            <button id="btn-open-gemini-setup" type="button" class="amaes-btn" style="flex: 1; justify-content: center; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; border: none; font-weight: 700; cursor: pointer;">
-                                <span>${geminiApiKey ? 'Configure AI key' : 'Setup Free AI Assistant'}</span>
-                            </button>
-                        </div>
+                    <div id="mod-highlighter-card" class="amaes-card">
+                        ${renderCardContent('mod-highlighter', ICONS.preview, 'Activity Highlighter', '', `
+                            <div style="display: flex; gap: 4px;">
+                                ${renderToolBtn({ id: 'btn-hl-quiz', icon: ICONS.edit, text: 'Quiz', title: 'Highlight Quizzes & Exams', style: 'flex: 1;' })}
+                                ${renderToolBtn({ id: 'btn-hl-lec', icon: ICONS.book, text: 'Lec', title: 'Highlight Lectures & Lessons', style: 'flex: 1;' })}
+                                ${renderToolBtn({ id: 'btn-hl-vid', icon: ICONS.video, text: 'Vid', title: 'Highlight Video Lectures', style: 'flex: 1;' })}
+                            </div>
+                            <div style="display: flex; gap: 4px;">
+                                ${renderToolBtn({ id: 'btn-hl-all', icon: '', text: 'Highlight All', style: 'flex: 2; font-weight: 600;' })}
+                                ${renderToolBtn({ id: 'btn-hl-clear', icon: ICONS.clear, text: 'Clear', style: 'flex: 1;' })}
+                            </div>
+                            ${renderToolBtn({ id: 'btn-hl-missing-quizzes', icon: ICONS.alertTriangle || ICONS.preview, text: 'Highlight Missing Quizzes', title: 'Highlight unanswered, unattempted, or missing quizzes on Grades or Course page', style: 'width: 100%; margin-top: 2px;' })}
+                        `)}
+                    </div>
+
+                    <div id="mod-search-card" class="amaes-card">
+                        ${renderCardContent('mod-search', ICONS.search, 'Search Helper', '', `
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 6px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border);">
+                                <span style="color: var(--text-muted);">Subject Code:</span>
+                                <span id="detected-code-badge" style="font-weight: 600; color: var(--text-primary); background: var(--surface); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border);">
+                                    ${courseInfo.subjectCode || "None"}
+                                </span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 3px;">
+                                <input id="search-keyword-input" type="text" value="${initialKeyword}" placeholder="Search query" style="
+                                    width: 100%;
+                                    background: var(--bg);
+                                    color: var(--text-primary);
+                                    border: 1px solid var(--border);
+                                    padding: 5px 8px;
+                                    border-radius: 5px;
+                                    font-size: 11px;
+                                    box-sizing: border-box;
+                                    outline: none;
+                                " />
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                ${renderToolBtn({ id: 'btn-copy-keyword', icon: ICONS.copy, text: 'Copy', style: 'flex: 1;' })}
+                                ${renderToolBtn({ id: 'btn-open-google', icon: ICONS.external, text: 'Google', style: 'flex: 1;' })}
+                            </div>
+                        `)}
+                    </div>
+
+                    <div id="mod-ai-card" class="amaes-card">
+                        ${renderCardContent('mod-ai', '<span style="font-weight: 700; color: var(--accent-purple); font-size: 11px;">AI</span>', 'Smart AI Assistant', '', `
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 6px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border);">
+                                <span style="color: var(--text-muted);">Status:</span>
+                                <span id="gemini-status-badge" style="font-weight: 600; font-size: 10px; color: ${geminiApiKey ? 'var(--accent-green)' : 'var(--text-muted)'}; background: var(--surface); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border);">
+                                    ${geminiApiKey ? 'Ready (Gemini Flash)' : 'Not configured'}
+                                </span>
+                            </div>
+
+                            <p style="font-size: 10px; color: var(--text-secondary); line-height: 1.4; margin: 0;">
+                                Answers unknown questions automatically using Google AI Studio. 0 tokens used on questions already in DB.
+                            </p>
+
+                            <div style="display: flex; flex-direction: column; gap: 5px; border-top: 1px solid var(--border-subtle); padding-top: 5px;">
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically copy question to clipboard if AI inference fails or times out">
+                                    <input id="chk-course-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer;" />
+                                    <span>Auto-Copy Question on AI Failure (Default: ON)</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically moves to next page after AI selects a choice">
+                                    <input id="chk-course-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer;" />
+                                    <span>Auto-Advance After AI Answer (Default: ON)</span>
+                                </label>
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 10px; color: var(--text-secondary);">AI Retry Attempts:</span>
+                                    <select id="sel-course-ai-retry-count" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 5px; cursor: pointer;">
+                                        <option value="1" ${aiRetryCount === 1 ? 'selected' : ''}>1 retry</option>
+                                        <option value="2" ${aiRetryCount === 2 ? 'selected' : ''}>2 retries (Default)</option>
+                                        <option value="3" ${aiRetryCount === 3 ? 'selected' : ''}>3 retries</option>
+                                        <option value="4" ${aiRetryCount === 4 ? 'selected' : ''}>4 retries</option>
+                                        <option value="5" ${aiRetryCount === 5 ? 'selected' : ''}>5 retries</option>
+                                    </select>
+                                </div>
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 10px; color: var(--text-secondary);">API Mode:</span>
+                                    <select id="sel-course-ai-plan-tier" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 5px; cursor: pointer;">
+                                        <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
+                                        <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 6px; margin-top: 2px;">
+                                <button id="btn-open-gemini-setup" type="button" class="amaes-btn amaes-btn-monotone" style="flex: 1; justify-content: center; background: rgba(168, 85, 247, 0.1); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.28); font-weight: 600; cursor: pointer;">
+                                    <span>${geminiApiKey ? 'Configure AI key' : 'Setup Free AI Assistant'}</span>
+                                </button>
+                            </div>
+                        `)}
                     </div>
                 </div>
-            </div>
 
                 <!-- Stop Button -->
                 <button id="amaes-stop-btn" class="amaes-btn amaes-btn-stop" style="display: none; margin-bottom: 6px;">
@@ -1454,6 +1409,19 @@
                 }
                 .amaes-btn-preview:hover {
                     border-color: var(--text-muted);
+                }
+
+                .amaes-btn-monotone {
+                    background: var(--surface);
+                    color: var(--text-primary);
+                    border: 1px solid var(--border);
+                    font-weight: 500;
+                    border-radius: 4px;
+                }
+                .amaes-btn-monotone:hover {
+                    background: var(--surface-subtle);
+                    border-color: var(--text-muted);
+                    color: var(--text-primary);
                 }
 
                 .amaes-btn-blue {

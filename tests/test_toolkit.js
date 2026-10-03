@@ -5023,6 +5023,45 @@ test("Activity Auto-View & Quiz Summary Auto-Submit with Completion Sound (v1.9.
     assert.ok(script.includes("solely responsible for my own coursework and academic integrity"), "Disclaimer text must emphasize user sole responsibility for academic integrity");
 });
 
+// --------------------------------------------------
+// 96. Monotone Course Tools Design, Non-Reviewed Quiz Intelligence & Admin Killswitch
+// --------------------------------------------------
+test("Monotone Course Tools Design, Non-Reviewed Quiz Intelligence & Admin Killswitch", () => {
+    const fs = require('fs');
+    const path = require('path');
+    const script = fs.readFileSync(path.join(__dirname, '..', 'amaes-toolkit.user.js'), 'utf8');
+
+    // 1. Monotone & Reusable Course Tools
+    assert.ok(script.includes("function renderCardContent"), "Must define reusable renderCardContent component helper");
+    assert.ok(script.includes("function renderToolBtn"), "Must define reusable renderToolBtn component helper");
+    assert.ok(script.includes(".amaes-btn-monotone"), "Must define monotone button CSS class");
+    assert.ok(script.includes('id="mod-marker-card"'), "Course tools must render mod-marker-card");
+    assert.ok(script.includes('id="mod-highlighter-card"'), "Course tools must render mod-highlighter-card");
+    assert.ok(script.includes('id="mod-search-card"'), "Course tools must render mod-search-card");
+    assert.ok(script.includes('id="mod-ai-card"'), "Course tools must render mod-ai-card");
+
+    // 2. Subtle Green Auto-Answer & Subtle Purple Gemini
+    assert.ok(script.includes("rgba(16, 185, 129, 0.12)"), "Welcome modal must use subtle green accent for Auto-Answer badge");
+    assert.ok(script.includes("rgba(124, 58, 237, 0.08)"), "Welcome modal must use subtle purple accent for Gemini AI setup");
+
+    // 3. Removed Dashboard Guide Banner
+    assert.ok(!script.includes("<span>Auto-Sync Database Ready</span>"), "Dashboard guide banner markup must be removed from userscript");
+
+    // 4. Non-Reviewed Attempt Intelligence
+    assert.ok(script.includes("function getUnreviewedAttemptEntry"), "Must define getUnreviewedAttemptEntry helper");
+    assert.ok(script.includes("function saveUnreviewedAttemptEvidence"), "Must define saveUnreviewedAttemptEvidence helper");
+    assert.ok(script.includes("[PREVIOUS UNREVIEWED ATTEMPT]"), "Prompt builder must include prior unreviewed attempt context");
+    assert.ok(script.includes("amaes-unreviewed-history-note"), "Must define unreviewed attempt history notice class");
+    assert.ok(script.includes("Try Alternative"), "Must offer Try Alternative action on unreviewed attempt questions");
+
+    // 5. Remote Admin Feature Flags & Killswitch
+    assert.ok(script.includes("function getRemoteFeatureFlags"), "Must define getRemoteFeatureFlags helper");
+    assert.ok(script.includes("function isFeatureDisabledByAdmin"), "Must define isFeatureDisabledByAdmin helper");
+    assert.ok(script.includes("isFeatureDisabledByAdmin('autoQuiz')"), "Must guard Auto-Quiz with admin remote flag");
+    assert.ok(script.includes("isFeatureDisabledByAdmin('aiSolver')"), "Must guard AI Solver with admin remote flag");
+    assert.ok(script.includes("isFeatureDisabledByAdmin('autoMarker')"), "Must guard Auto-Marker with admin remote flag");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

@@ -42,11 +42,11 @@
                     <div id="amaes-welcome-highlight-card" style="display: flex; flex-direction: column; gap: 14px;">
                         <!-- Auto-Answer -->
                         <div style="display: flex; align-items: flex-start; gap: 12px;">
-                            <span style="color: ${isLight ? '#71717a' : '#a1a1aa'}; margin-top: 2px; flex-shrink: 0;">${ICONS.checkCircle}</span>
+                            <span style="color: ${isLight ? '#059669' : '#10b981'}; margin-top: 2px; flex-shrink: 0;">${ICONS.checkCircle}</span>
                             <div style="flex: 1;">
                                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                                     <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Smart Auto-Answer & Highlighter</div>
-                                    <span style="font-size: 9px; color: ${isLight ? '#71717a' : '#a1a1aa'}; font-weight: 500; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.06)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; padding: 1px 6px; border-radius: 4px; white-space: nowrap;">Background Capable</span>
+                                    <span style="font-size: 9px; color: ${isLight ? '#047857' : '#34d399'}; font-weight: 600; background: ${isLight ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.18)'}; border: 1px solid ${isLight ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.3)'}; padding: 1px 6px; border-radius: 4px; white-space: nowrap;">Background Capable</span>
                                 </div>
                                 <div style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11.5px; margin-top: 2px;">Auto-Quiz runs autonomously in the background while highlighting verified answers as you multitask.</div>
                             </div>
@@ -66,11 +66,11 @@
 
                         <!-- Built-in Gemini AI -->
                         <div style="display: flex; align-items: flex-start; gap: 12px;">
-                            <span style="color: ${isLight ? '#71717a' : '#a1a1aa'}; margin-top: 2px; flex-shrink: 0;">${ICONS.zap}</span>
+                            <span style="color: ${isLight ? '#7c3aed' : '#a855f7'}; margin-top: 2px; flex-shrink: 0;">${ICONS.zap}</span>
                             <div style="flex: 1;">
                                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                                     <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Built-in Google Gemini AI</div>
-                                    <button id="welcome-btn-setup-ai" type="button" class="amaes-btn" style="background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.06)'}; color: ${isLight ? '#52525b' : '#d4d4d8'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.1)'}; font-size: 9px; padding: 1px 6px; border-radius: 4px; font-weight: 600; cursor: pointer;">
+                                    <button id="welcome-btn-setup-ai" type="button" class="amaes-btn" style="background: ${isLight ? 'rgba(124, 58, 237, 0.08)' : 'rgba(168, 85, 247, 0.14)'}; color: ${isLight ? '#7c3aed' : '#c084fc'}; border: 1px solid ${isLight ? 'rgba(124, 58, 237, 0.25)' : 'rgba(168, 85, 247, 0.3)'}; font-size: 9px; padding: 1px 6px; border-radius: 4px; font-weight: 600; cursor: pointer;">
                                         ${geminiApiKey ? 'Key Configured' : 'Setup AI'}
                                     </button>
                                 </div>

@@ -191,7 +191,8 @@
         return window.location.pathname.includes('/mod/quiz/attempt.php') ||
                window.location.pathname.includes('/mod/quiz/summary.php') ||
                window.location.pathname.includes('/mod/quiz/review.php') ||
-               Boolean(document.querySelector('.que, .quizsummarytable, #region-main .summarytable'));
+               window.location.pathname.includes('/mod/quiz/view.php') ||
+               Boolean(document.querySelector('.que, .quizsummarytable, #region-main .summarytable, .quizattemptsummary'));
     }
 
     function checkIsReviewPage() {
@@ -209,6 +210,11 @@
     function checkIsQuizSummaryPage() {
         return window.location.pathname.includes('/mod/quiz/summary.php') ||
                Boolean(document.querySelector('.quizsummarytable, #region-main .summarytable'));
+    }
+
+    function checkIsQuizViewPage() {
+        return window.location.pathname.includes('/mod/quiz/view.php') ||
+               Boolean(document.querySelector('.quizattemptsummary, #region-main .generaltable, .generaltable.quizattemptsummary'));
     }
 
     // String Normalization for Question & Answer Matching

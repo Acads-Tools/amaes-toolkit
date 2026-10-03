@@ -153,6 +153,10 @@
         lines.push(`Choices:`);
 
         const eliminatedSet = getEliminatedChoicesForQuestion(que, qData, courseCode);
+        const unreviewed = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(qData.qText, courseCode) : null;
+        if (unreviewed && unreviewed.selectedAnswer) {
+            lines.push(`[PREVIOUS UNREVIEWED ATTEMPT]: In a prior attempt that scored only ${unreviewed.percentage}%, "${unreviewed.selectedAnswer}" was chosen. Because that attempt had errors and review was not permitted, that answer might be INCORRECT. Re-evaluate all options critically and choose the best alternative if "${unreviewed.selectedAnswer}" is questionable.`);
+        }
 
         if (Array.isArray(qData.choices)) {
             qData.choices.forEach((c, idx) => {
@@ -862,6 +866,13 @@
     // Handles thinking indicator, watchdog timeout, configurable retries, wrong choice elimination guard, session caching, and auto-copy on fail
     async function handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback }) {
         que.querySelectorAll('.amaes-ai-thinking-indicator, .amaes-ai-fallback-bar').forEach(el => el.remove());
+
+        if (typeof isFeatureDisabledByAdmin === 'function' && isFeatureDisabledByAdmin('aiSolver')) {
+            setLog("[Admin Notice] AI Solver is temporarily disabled by administrator.", "var(--accent-amber)");
+            showToast("AI Solver is temporarily disabled by administrator.", 4000);
+            if (typeof onFallback === 'function') onFallback({ reason: 'Disabled by administrator', isAuthError: false, isRateLimit: false });
+            return;
+        }
 
         // A retry button or cooldown callback can outlive the question's
         // fallback UI. Never spend another request after the student answered.

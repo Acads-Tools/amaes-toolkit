@@ -1364,6 +1364,12 @@
         const runBatch = async (goal, category) => {
             if (isRunning) return;
 
+            if (typeof isFeatureDisabledByAdmin === 'function' && isFeatureDisabledByAdmin('autoMarker')) {
+                showToast("Activity Auto-Marker is temporarily disabled by administrator.");
+                setLog("[Admin Notice] Activity Auto-Marker is temporarily disabled by administrator.", "var(--accent-amber)");
+                return;
+            }
+
             if (!checkIsCoursePage()) {
                 showToast("Open a course page first to use Activity Auto-Marker!");
                 setLog("<b>Action Blocked:</b> You are not on a course page. Open a course subject first.", "var(--accent-pink)");

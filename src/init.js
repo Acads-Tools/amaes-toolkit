@@ -52,8 +52,11 @@
         }
         showWelcomeOnboardingModal(false);
         injectDashboardCourseBadges();
-        injectDashboardGuideBanner();
         sendPassiveTelemetryPulse();
+
+        if (checkIsQuizViewPage() || checkIsQuizSummaryPage()) {
+            promoteAttemptEvidenceFromScore();
+        }
 
         // Auto-Harvest past quizzes: scan Grade Report once per session per course or all courses on dashboard
         if (autoHarvestGrades) {
@@ -189,7 +192,6 @@
             let debounceTimer = null;
             const obs = new MutationObserver(() => {
                 injectDashboardCourseBadges();
-                injectDashboardGuideBanner();
                 if (autoCloudSync) {
                     if (debounceTimer) clearTimeout(debounceTimer);
                     debounceTimer = setTimeout(() => {

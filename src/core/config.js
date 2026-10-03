@@ -107,6 +107,20 @@
                     }
                 } catch (_) {}
             }
+            if (policy.flags && typeof policy.flags === 'object') {
+                try {
+                    localStorage.setItem('amaes_remote_flags', JSON.stringify(policy.flags));
+                } catch (_) {}
+            }
+            if (typeof policy.announcement !== 'undefined') {
+                try {
+                    if (policy.announcement) {
+                        localStorage.setItem('amaes_remote_announcement', String(policy.announcement));
+                    } else {
+                        localStorage.removeItem('amaes_remote_announcement');
+                    }
+                } catch (_) {}
+            }
             const comparison = compareVersions(CLIENT_VERSION, minimum);
             // ONLY block if comparison succeeded and client is strictly below minimum
             if (comparison !== null && comparison < 0) {
@@ -124,6 +138,21 @@
         } finally {
             clearTimeout(timeout);
         }
+    }
+
+    function getRemoteFeatureFlags() {
+        try {
+            return JSON.parse(localStorage.getItem('amaes_remote_flags') || '{}');
+        } catch (_) {
+            return {};
+        }
+    }
+
+    function isFeatureDisabledByAdmin(featureKey) {
+        const flags = getRemoteFeatureFlags();
+        if (flags.killSwitch === true) return true;
+        if (featureKey && flags[featureKey] === false) return true;
+        return false;
     }
 
     const SCRIPT_RAW_URL = "https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js";

@@ -348,7 +348,8 @@
 
     function getAttemptEvidenceKey() {
         const params = new URLSearchParams(window.location.search);
-        return `amaes_attempt_evidence_${params.get('attempt') || params.get('quiz') || params.get('cmid') || window.location.pathname}`;
+        const id = params.get('cmid') || params.get('id') || params.get('quiz') || params.get('attempt') || 'latest';
+        return `amaes_attempt_evidence_${id}`;
     }
 
     function recordAttemptAnswerEvidence(que, answer, source = 'manual_selection') {
@@ -357,7 +358,7 @@
         if (!qData || !qData.qText) return;
         try {
             const key = getAttemptEvidenceKey();
-            const current = JSON.parse(sessionStorage.getItem(key) || '[]');
+            const current = JSON.parse(sessionStorage.getItem(key) || sessionStorage.getItem('amaes_attempt_evidence_latest') || '[]');
             const entry = {
                 qRaw: qData.qText,
                 qNorm: normalizeText(qData.qText),
@@ -372,46 +373,111 @@
             const next = current.filter(item => item.qNorm !== entry.qNorm);
             next.push(entry);
             sessionStorage.setItem(key, JSON.stringify(next.slice(-100)));
+            sessionStorage.setItem('amaes_attempt_evidence_latest', JSON.stringify(next.slice(-100)));
         } catch (err) {
             logDebug(`Attempt evidence storage note: ${err.message}`);
         }
     }
 
+    function getUnreviewedAttemptEntry(qText, subCode = '') {
+        if (!qText) return null;
+        const qNorm = normalizeText(qText);
+        const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
+        try {
+            const history = JSON.parse(localStorage.getItem(`amaes_unreviewed_history_${sCode}`) || '[]');
+            return history.find(h => questionTextMatches(h.qNorm || h.qRaw, qNorm));
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function saveUnreviewedAttemptEvidence(subCode, evidence, earned, maximum, isReviewPermitted) {
+        if (!Array.isArray(evidence) || evidence.length === 0) return;
+        const sCode = subCode || 'GENERAL';
+        const storageKey = `amaes_unreviewed_history_${sCode}`;
+        try {
+            const current = JSON.parse(localStorage.getItem(storageKey) || '[]');
+            const percentage = Math.round((earned / maximum) * 100);
+            evidence.forEach(item => {
+                const existingIndex = current.findIndex(c => questionTextMatches(c.qNorm || c.qRaw, item.qNorm));
+                const entry = {
+                    qNorm: item.qNorm,
+                    qRaw: item.qRaw,
+                    selectedAnswer: item.ansRaw,
+                    ansNorm: item.ansNorm,
+                    choices: item.choices || [],
+                    earned,
+                    maximum,
+                    percentage,
+                    isReviewPermitted,
+                    recordedAt: Date.now()
+                };
+                if (existingIndex >= 0) {
+                    current[existingIndex] = entry;
+                } else {
+                    current.push(entry);
+                }
+            });
+            localStorage.setItem(storageKey, JSON.stringify(current.slice(-200)));
+        } catch (e) {
+            logDebug(`Failed to save unreviewed attempt evidence: ${e.message}`);
+        }
+    }
+
     function promoteAttemptEvidenceFromScore() {
-        if (!checkIsQuizSummaryPage()) return;
+        if (!checkIsQuizSummaryPage() && !checkIsQuizViewPage()) return;
         let earned = null;
         let maximum = null;
+        let isReviewPermitted = true;
+
         document.querySelectorAll('table').forEach(table => {
             if (earned !== null) return;
             const rows = Array.from(table.querySelectorAll('tr'));
-            const headerRow = rows.find(row => Array.from(row.children).some(cell => /grade/i.test(cell.innerText || '')));
+            const headerRow = rows.find(row => Array.from(row.children).some(cell => /grade|marks/i.test(cell.innerText || '')));
             if (!headerRow) return;
             const headers = Array.from(headerRow.children);
             const gradeIndex = headers.findIndex(cell => /grade/i.test(cell.innerText || ''));
-            if (gradeIndex < 0) return;
-            const headerMax = (headers[gradeIndex].innerText || '').match(/\/\s*([0-9]+(?:\.[0-9]+)?)/);
+            const marksIndex = headers.findIndex(cell => /marks/i.test(cell.innerText || ''));
+            const reviewIndex = headers.findIndex(cell => /review/i.test(cell.innerText || ''));
+            if (gradeIndex < 0 && marksIndex < 0) return;
+
+            const targetIndex = gradeIndex >= 0 ? gradeIndex : marksIndex;
+            const headerMax = (headers[targetIndex].innerText || '').match(/\/\s*([0-9]+(?:\.[0-9]+)?)/);
             const attemptRows = rows.filter(row => /finished/i.test(row.innerText || ''));
+            if (attemptRows.length === 0) return;
             const latest = attemptRows[attemptRows.length - 1];
-            const gradeCell = latest && latest.children[gradeIndex];
+
+            const gradeCell = latest && latest.children[targetIndex];
             const gradeValue = gradeCell && (gradeCell.innerText || '').match(/([0-9]+(?:\.[0-9]+)?)/);
             if (gradeValue && headerMax) {
                 earned = Number(gradeValue[1]);
                 maximum = Number(headerMax[1]);
             }
+            if (reviewIndex >= 0 && latest && latest.children[reviewIndex]) {
+                const revText = (latest.children[reviewIndex].innerText || '').toLowerCase();
+                if (revText.includes('not permitted')) {
+                    isReviewPermitted = false;
+                }
+            }
         });
         if (earned === null || maximum === null) return;
         if (!Number.isFinite(earned) || !Number.isFinite(maximum) || maximum <= 0) return;
+
         let evidence = [];
         try {
-            evidence = JSON.parse(sessionStorage.getItem(getAttemptEvidenceKey()) || '[]');
+            evidence = JSON.parse(sessionStorage.getItem(getAttemptEvidenceKey()) || sessionStorage.getItem('amaes_attempt_evidence_latest') || '[]');
         } catch (_) {}
         if (!Array.isArray(evidence) || evidence.length === 0) return;
-        if (earned < maximum) {
-            setLog(`Score evidence saved (${earned}/${maximum}). Individual answers were not promoted because a partial score cannot identify which choices were correct.`, 'var(--accent-amber)');
-            return;
-        }
+
         const courseInfo = detectCourseInfo();
         const subCode = courseInfo.subjectCode || 'GENERAL';
+
+        if (earned < maximum) {
+            saveUnreviewedAttemptEvidence(subCode, evidence, earned, maximum, isReviewPermitted);
+            setLog(`Score evidence recorded (${earned}/${maximum} - ${Math.round((earned/maximum)*100)}%). Review: ${isReviewPermitted ? 'Permitted' : 'Not permitted'}. Unreviewed answers saved to help AI evaluate alternative options on re-attempt.`, 'var(--accent-amber)');
+            return;
+        }
+
         const promoted = evidence.map(item => ({
             ...item,
             verified: true,
@@ -427,6 +493,7 @@
         setLog(`100% score confirmed <b>${promoted.length}</b> recorded answers and queued them for the verified database.`, 'var(--accent-green)');
         showToast(`100% confirmed: ${promoted.length} answers saved to the study database.`, 4000);
         sessionStorage.removeItem(getAttemptEvidenceKey());
+        sessionStorage.removeItem('amaes_attempt_evidence_latest');
     }
 
     // Schedule automatic advancement to the next target on a one-page quiz,
@@ -589,6 +656,14 @@
             autoQuizMode = false;
             return;
         }
+
+        if (typeof isFeatureDisabledByAdmin === 'function' && isFeatureDisabledByAdmin('autoQuiz')) {
+            autoQuizMode = false;
+            setLog("[Admin Notice] Auto-Quiz is temporarily disabled by administrator.", "var(--accent-amber)");
+            showToast("Auto-Quiz is temporarily disabled by administrator.", 4000);
+            return;
+        }
+
         if (!checkIsQuizAttemptPage()) return;
 
         // STRICT PAUSE CHECK: If Auto-Quiz is not explicitly active or force-run, halt completely
@@ -2145,7 +2220,7 @@
 
             // Clone qtext and remove input, select, textarea, drop zones, and badges so inline blanks match AMAUOED entries cleanly
             const qClone = qtextElem.cloneNode(true);
-            qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-question-tag').forEach(el => el.remove());
+            qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-unreviewed-history-note, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-question-tag').forEach(el => el.remove());
             const moodleQRaw = qClone.innerText.trim();
             const moodleQNorm = normalizeText(moodleQRaw);
 
@@ -2153,11 +2228,64 @@
             const candidates = questionsDb.filter(item => questionTextMatches(item.qNorm || item.qRaw || item.question, moodleQNorm));
             const hasAnyVerifiedCandidate = candidates.some(item => item.verified === true || item.deduced === true);
 
-            // Clean up any prior unanswered hint
-            que.querySelectorAll('.amaes-unanswered-hint').forEach(b => b.remove());
+            // Clean up any prior hints
+            que.querySelectorAll('.amaes-unanswered-hint, .amaes-unreviewed-history-note').forEach(b => b.remove());
+
+            // Check if this question was previously answered under an unreviewed attempt (<100% score)
+            const unreviewed = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(moodleQNorm) : null;
+            if (unreviewed && unreviewed.selectedAnswer && checkIsQuizAttemptPage()) {
+                const formulation = que.querySelector('.formulation, .content') || que;
+                const note = document.createElement('div');
+                note.className = 'amaes-unreviewed-history-note';
+                note.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 8px;
+                    margin-bottom: 8px;
+                    padding: 4px 10px;
+                    background: rgba(245, 158, 11, 0.08);
+                    border: 1px solid rgba(245, 158, 11, 0.28);
+                    border-left: 3px solid #f59e0b;
+                    border-radius: 6px;
+                    font-size: 10.5px;
+                    color: var(--text-secondary);
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                `;
+                note.innerHTML = `
+                    <div>
+                        <span style="background: rgba(245, 158, 11, 0.2); color: #d97706; padding: 1px 5px; border-radius: 3px; font-weight: 700; font-size: 9px; margin-right: 4px;">UNREVIEWED ATTEMPT</span>
+                        <span>Prior attempt scored <b>${unreviewed.percentage}%</b> (Review Not Permitted). Selected: <i>"${escapeHtml(unreviewed.selectedAnswer)}"</i></span>
+                    </div>
+                    <button type="button" class="amaes-btn-try-alt" style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); border-radius: 4px; padding: 2px 7px; font-size: 9.5px; cursor: pointer; white-space: nowrap; font-weight: 600;">Try Alternative</button>
+                `;
+                const altBtn = note.querySelector('.amaes-btn-try-alt');
+                if (altBtn) {
+                    altBtn.onclick = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Eliminate previous choice row
+                        const choiceRows = que.querySelectorAll('.answer > div, .answer div.r0, .answer div.r1, .answer li, .answer tr, .answer label');
+                        choiceRows.forEach(r => {
+                            const lbl = r.querySelector('label') || r;
+                            const txt = normalizeChoice(cleanDOMToAI(lbl));
+                            if (txt && (txt === unreviewed.ansNorm || txt.includes(unreviewed.ansNorm) || unreviewed.ansNorm.includes(txt))) {
+                                r.classList.add('amaes-eliminated-row');
+                                lbl.style.textDecoration = 'line-through';
+                                lbl.style.opacity = '0.5';
+                            }
+                        });
+                        showToast('Previous choice marked. Re-evaluating alternative choice...', 3000);
+                        if (typeof manualSolveWithAi === 'function') {
+                            manualSolveWithAi(que);
+                        }
+                    };
+                }
+                formulation.insertBefore(note, formulation.firstChild);
+            }
 
             if (candidates.length === 0) {
-                if (checkIsQuizAttemptPage() && !que.querySelector('.amaes-unanswered-hint') && !que.querySelector('.amaes-blockage-hud')) {
+                if (checkIsQuizAttemptPage() && !que.querySelector('.amaes-unanswered-hint') && !que.querySelector('.amaes-unreviewed-history-note') && !que.querySelector('.amaes-blockage-hud')) {
                     const formulation = que.querySelector('.formulation, .content') || que;
                     const hint = document.createElement('div');
                     hint.className = 'amaes-unanswered-hint';

@@ -136,6 +136,20 @@
                     }
                 } catch (_) {}
             }
+            if (policy.flags && typeof policy.flags === 'object') {
+                try {
+                    localStorage.setItem('amaes_remote_flags', JSON.stringify(policy.flags));
+                } catch (_) {}
+            }
+            if (typeof policy.announcement !== 'undefined') {
+                try {
+                    if (policy.announcement) {
+                        localStorage.setItem('amaes_remote_announcement', String(policy.announcement));
+                    } else {
+                        localStorage.removeItem('amaes_remote_announcement');
+                    }
+                } catch (_) {}
+            }
             const comparison = compareVersions(CLIENT_VERSION, minimum);
             // ONLY block if comparison succeeded and client is strictly below minimum
             if (comparison !== null && comparison < 0) {
@@ -153,6 +167,21 @@
         } finally {
             clearTimeout(timeout);
         }
+    }
+
+    function getRemoteFeatureFlags() {
+        try {
+            return JSON.parse(localStorage.getItem('amaes_remote_flags') || '{}');
+        } catch (_) {
+            return {};
+        }
+    }
+
+    function isFeatureDisabledByAdmin(featureKey) {
+        const flags = getRemoteFeatureFlags();
+        if (flags.killSwitch === true) return true;
+        if (featureKey && flags[featureKey] === false) return true;
+        return false;
     }
 
     const SCRIPT_RAW_URL = "https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js";
@@ -1566,112 +1595,10 @@
         });
     }
 
-    // Displays an onboarding callout banner on the Moodle dashboard for new users
+    // Removed dashboard guide banner per user request to keep My Courses clean and unboxed
     function injectDashboardGuideBanner() {
-        if (!isUserLoggedIn()) return;
-        if (!window.location.pathname.includes('/my/') && !window.location.pathname.includes('courses.php')) return;
-        if (document.getElementById('amaes-dashboard-guide-banner')) return;
-        if (localStorage.getItem('amaes_guide_banner_dismissed') === 'true') return;
-
-        const allDbs = getAllSavedSubjectDatabases();
-        const totalCached = Object.values(allDbs).reduce((acc, list) => acc + (list ? list.length : 0), 0);
-        if (totalCached > 50) return;
-
-        const container = document.querySelector('#region-main, .course-wrapper, [data-region="courses-view"], .dashboard-card-deck') || document.body;
-        if (!container) return;
-
-        const dashCourses = detectDashboardCourses();
-        const courseCount = dashCourses.length;
-
-        const banner = document.createElement('div');
-        banner.id = 'amaes-dashboard-guide-banner';
-        banner.style.cssText = `
-            margin: 12px 0;
-            padding: 10px 14px;
-            background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95));
-            border: 1px solid rgba(59, 130, 246, 0.4);
-            border-left: 4px solid var(--accent-blue, #3b82f6);
-            border-radius: 8px;
-            color: #f8fafc;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            font-size: 11.5px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-            z-index: 10;
-        `;
-
-        banner.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
-                <span style="display: flex; align-items: center; justify-content: center; background: rgba(59, 130, 246, 0.2); color: #60a5fa; width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0;">
-                    ${ICONS.cloudDownload}
-                </span>
-                <div>
-                    <div style="font-weight: 700; color: #fff; font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                        <span>Auto-Sync Database Ready</span>
-                        <span style="font-size: 9.5px; background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 1px 6px; border-radius: 4px; font-weight: 700;">100% Autonomous</span>
-                    </div>
-                    <div style="color: #cbd5e1; font-size: 11px; margin-top: 2px;">
-                        ${courseCount > 0
-                            ? `Detected <b>${courseCount} courses</b> (${dashCourses.map(c => c.code).join(', ')}). Open any course to auto-sync answers, or click below to pull verified databases now!`
-                            : 'Open any enrolled course to automatically sync verified questions and answers from the community database!'}
-                    </div>
-                </div>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-                ${courseCount > 0 ? `
-                    <button id="btn-banner-sync-all" class="amaes-btn amaes-btn-green" style="font-size: 10.5px; padding: 5px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
-                        ${ICONS.zap} <span>Sync All Courses Now</span>
-                    </button>
-                ` : ''}
-                <button id="btn-banner-dismiss-guide" style="background: none; border: none; color: #94a3b8; font-size: 16px; cursor: pointer; padding: 2px 6px; line-height: 1;" title="Dismiss">&times;</button>
-            </div>
-        `;
-
-        if (container === document.body) {
-            banner.style.position = 'fixed';
-            banner.style.top = '60px';
-            banner.style.right = '20px';
-            banner.style.maxWidth = '460px';
-            banner.style.zIndex = '9999';
-            document.body.appendChild(banner);
-        } else {
-            container.insertBefore(banner, container.firstChild);
-        }
-
-        const dismissBtn = banner.querySelector('#btn-banner-dismiss-guide');
-        if (dismissBtn) {
-            dismissBtn.onclick = () => {
-                localStorage.setItem('amaes_guide_banner_dismissed', 'true');
-                banner.remove();
-            };
-        }
-
-        const syncAllBtn = banner.querySelector('#btn-banner-sync-all');
-        if (syncAllBtn) {
-            syncAllBtn.onclick = () => {
-                syncAllBtn.disabled = true;
-                syncAllBtn.innerHTML = `${ICONS.rotateCcw} <span>Syncing...</span>`;
-                let completed = 0;
-                let totalFound = 0;
-                dashCourses.forEach(c => {
-                    syncAnswersFromCloud(c.code).then(res => {
-                        if (res && res.count) totalFound += res.count;
-                    }).finally(() => {
-                        completed++;
-                        if (completed === dashCourses.length) {
-                            showToast(`Auto-sync complete! Loaded ${totalFound} answers across ${completed} courses.`);
-                            injectDashboardCourseBadges();
-                            syncAllBtn.innerHTML = `${ICONS.check} <span>Synced!</span>`;
-                            setTimeout(() => {
-                                banner.remove();
-                            }, 2500);
-                        }
-                    });
-                });
-            };
-        }
+        const existing = document.getElementById('amaes-dashboard-guide-banner');
+        if (existing) existing.remove();
     }
 
     // ==========================================
@@ -2510,7 +2437,8 @@
         return window.location.pathname.includes('/mod/quiz/attempt.php') ||
                window.location.pathname.includes('/mod/quiz/summary.php') ||
                window.location.pathname.includes('/mod/quiz/review.php') ||
-               Boolean(document.querySelector('.que, .quizsummarytable, #region-main .summarytable'));
+               window.location.pathname.includes('/mod/quiz/view.php') ||
+               Boolean(document.querySelector('.que, .quizsummarytable, #region-main .summarytable, .quizattemptsummary'));
     }
 
     function checkIsReviewPage() {
@@ -2528,6 +2456,11 @@
     function checkIsQuizSummaryPage() {
         return window.location.pathname.includes('/mod/quiz/summary.php') ||
                Boolean(document.querySelector('.quizsummarytable, #region-main .summarytable'));
+    }
+
+    function checkIsQuizViewPage() {
+        return window.location.pathname.includes('/mod/quiz/view.php') ||
+               Boolean(document.querySelector('.quizattemptsummary, #region-main .generaltable, .generaltable.quizattemptsummary'));
     }
 
     // String Normalization for Question & Answer Matching
@@ -3548,7 +3481,8 @@
 
     function getAttemptEvidenceKey() {
         const params = new URLSearchParams(window.location.search);
-        return `amaes_attempt_evidence_${params.get('attempt') || params.get('quiz') || params.get('cmid') || window.location.pathname}`;
+        const id = params.get('cmid') || params.get('id') || params.get('quiz') || params.get('attempt') || 'latest';
+        return `amaes_attempt_evidence_${id}`;
     }
 
     function recordAttemptAnswerEvidence(que, answer, source = 'manual_selection') {
@@ -3557,7 +3491,7 @@
         if (!qData || !qData.qText) return;
         try {
             const key = getAttemptEvidenceKey();
-            const current = JSON.parse(sessionStorage.getItem(key) || '[]');
+            const current = JSON.parse(sessionStorage.getItem(key) || sessionStorage.getItem('amaes_attempt_evidence_latest') || '[]');
             const entry = {
                 qRaw: qData.qText,
                 qNorm: normalizeText(qData.qText),
@@ -3572,46 +3506,111 @@
             const next = current.filter(item => item.qNorm !== entry.qNorm);
             next.push(entry);
             sessionStorage.setItem(key, JSON.stringify(next.slice(-100)));
+            sessionStorage.setItem('amaes_attempt_evidence_latest', JSON.stringify(next.slice(-100)));
         } catch (err) {
             logDebug(`Attempt evidence storage note: ${err.message}`);
         }
     }
 
+    function getUnreviewedAttemptEntry(qText, subCode = '') {
+        if (!qText) return null;
+        const qNorm = normalizeText(qText);
+        const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
+        try {
+            const history = JSON.parse(localStorage.getItem(`amaes_unreviewed_history_${sCode}`) || '[]');
+            return history.find(h => questionTextMatches(h.qNorm || h.qRaw, qNorm));
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function saveUnreviewedAttemptEvidence(subCode, evidence, earned, maximum, isReviewPermitted) {
+        if (!Array.isArray(evidence) || evidence.length === 0) return;
+        const sCode = subCode || 'GENERAL';
+        const storageKey = `amaes_unreviewed_history_${sCode}`;
+        try {
+            const current = JSON.parse(localStorage.getItem(storageKey) || '[]');
+            const percentage = Math.round((earned / maximum) * 100);
+            evidence.forEach(item => {
+                const existingIndex = current.findIndex(c => questionTextMatches(c.qNorm || c.qRaw, item.qNorm));
+                const entry = {
+                    qNorm: item.qNorm,
+                    qRaw: item.qRaw,
+                    selectedAnswer: item.ansRaw,
+                    ansNorm: item.ansNorm,
+                    choices: item.choices || [],
+                    earned,
+                    maximum,
+                    percentage,
+                    isReviewPermitted,
+                    recordedAt: Date.now()
+                };
+                if (existingIndex >= 0) {
+                    current[existingIndex] = entry;
+                } else {
+                    current.push(entry);
+                }
+            });
+            localStorage.setItem(storageKey, JSON.stringify(current.slice(-200)));
+        } catch (e) {
+            logDebug(`Failed to save unreviewed attempt evidence: ${e.message}`);
+        }
+    }
+
     function promoteAttemptEvidenceFromScore() {
-        if (!checkIsQuizSummaryPage()) return;
+        if (!checkIsQuizSummaryPage() && !checkIsQuizViewPage()) return;
         let earned = null;
         let maximum = null;
+        let isReviewPermitted = true;
+
         document.querySelectorAll('table').forEach(table => {
             if (earned !== null) return;
             const rows = Array.from(table.querySelectorAll('tr'));
-            const headerRow = rows.find(row => Array.from(row.children).some(cell => /grade/i.test(cell.innerText || '')));
+            const headerRow = rows.find(row => Array.from(row.children).some(cell => /grade|marks/i.test(cell.innerText || '')));
             if (!headerRow) return;
             const headers = Array.from(headerRow.children);
             const gradeIndex = headers.findIndex(cell => /grade/i.test(cell.innerText || ''));
-            if (gradeIndex < 0) return;
-            const headerMax = (headers[gradeIndex].innerText || '').match(/\/\s*([0-9]+(?:\.[0-9]+)?)/);
+            const marksIndex = headers.findIndex(cell => /marks/i.test(cell.innerText || ''));
+            const reviewIndex = headers.findIndex(cell => /review/i.test(cell.innerText || ''));
+            if (gradeIndex < 0 && marksIndex < 0) return;
+
+            const targetIndex = gradeIndex >= 0 ? gradeIndex : marksIndex;
+            const headerMax = (headers[targetIndex].innerText || '').match(/\/\s*([0-9]+(?:\.[0-9]+)?)/);
             const attemptRows = rows.filter(row => /finished/i.test(row.innerText || ''));
+            if (attemptRows.length === 0) return;
             const latest = attemptRows[attemptRows.length - 1];
-            const gradeCell = latest && latest.children[gradeIndex];
+
+            const gradeCell = latest && latest.children[targetIndex];
             const gradeValue = gradeCell && (gradeCell.innerText || '').match(/([0-9]+(?:\.[0-9]+)?)/);
             if (gradeValue && headerMax) {
                 earned = Number(gradeValue[1]);
                 maximum = Number(headerMax[1]);
             }
+            if (reviewIndex >= 0 && latest && latest.children[reviewIndex]) {
+                const revText = (latest.children[reviewIndex].innerText || '').toLowerCase();
+                if (revText.includes('not permitted')) {
+                    isReviewPermitted = false;
+                }
+            }
         });
         if (earned === null || maximum === null) return;
         if (!Number.isFinite(earned) || !Number.isFinite(maximum) || maximum <= 0) return;
+
         let evidence = [];
         try {
-            evidence = JSON.parse(sessionStorage.getItem(getAttemptEvidenceKey()) || '[]');
+            evidence = JSON.parse(sessionStorage.getItem(getAttemptEvidenceKey()) || sessionStorage.getItem('amaes_attempt_evidence_latest') || '[]');
         } catch (_) {}
         if (!Array.isArray(evidence) || evidence.length === 0) return;
-        if (earned < maximum) {
-            setLog(`Score evidence saved (${earned}/${maximum}). Individual answers were not promoted because a partial score cannot identify which choices were correct.`, 'var(--accent-amber)');
-            return;
-        }
+
         const courseInfo = detectCourseInfo();
         const subCode = courseInfo.subjectCode || 'GENERAL';
+
+        if (earned < maximum) {
+            saveUnreviewedAttemptEvidence(subCode, evidence, earned, maximum, isReviewPermitted);
+            setLog(`Score evidence recorded (${earned}/${maximum} - ${Math.round((earned/maximum)*100)}%). Review: ${isReviewPermitted ? 'Permitted' : 'Not permitted'}. Unreviewed answers saved to help AI evaluate alternative options on re-attempt.`, 'var(--accent-amber)');
+            return;
+        }
+
         const promoted = evidence.map(item => ({
             ...item,
             verified: true,
@@ -3627,6 +3626,7 @@
         setLog(`100% score confirmed <b>${promoted.length}</b> recorded answers and queued them for the verified database.`, 'var(--accent-green)');
         showToast(`100% confirmed: ${promoted.length} answers saved to the study database.`, 4000);
         sessionStorage.removeItem(getAttemptEvidenceKey());
+        sessionStorage.removeItem('amaes_attempt_evidence_latest');
     }
 
     // Schedule automatic advancement to the next target on a one-page quiz,
@@ -3789,6 +3789,14 @@
             autoQuizMode = false;
             return;
         }
+
+        if (typeof isFeatureDisabledByAdmin === 'function' && isFeatureDisabledByAdmin('autoQuiz')) {
+            autoQuizMode = false;
+            setLog("[Admin Notice] Auto-Quiz is temporarily disabled by administrator.", "var(--accent-amber)");
+            showToast("Auto-Quiz is temporarily disabled by administrator.", 4000);
+            return;
+        }
+
         if (!checkIsQuizAttemptPage()) return;
 
         // STRICT PAUSE CHECK: If Auto-Quiz is not explicitly active or force-run, halt completely
@@ -5345,7 +5353,7 @@
 
             // Clone qtext and remove input, select, textarea, drop zones, and badges so inline blanks match AMAUOED entries cleanly
             const qClone = qtextElem.cloneNode(true);
-            qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-question-tag').forEach(el => el.remove());
+            qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-unreviewed-history-note, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-question-tag').forEach(el => el.remove());
             const moodleQRaw = qClone.innerText.trim();
             const moodleQNorm = normalizeText(moodleQRaw);
 
@@ -5353,11 +5361,64 @@
             const candidates = questionsDb.filter(item => questionTextMatches(item.qNorm || item.qRaw || item.question, moodleQNorm));
             const hasAnyVerifiedCandidate = candidates.some(item => item.verified === true || item.deduced === true);
 
-            // Clean up any prior unanswered hint
-            que.querySelectorAll('.amaes-unanswered-hint').forEach(b => b.remove());
+            // Clean up any prior hints
+            que.querySelectorAll('.amaes-unanswered-hint, .amaes-unreviewed-history-note').forEach(b => b.remove());
+
+            // Check if this question was previously answered under an unreviewed attempt (<100% score)
+            const unreviewed = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(moodleQNorm) : null;
+            if (unreviewed && unreviewed.selectedAnswer && checkIsQuizAttemptPage()) {
+                const formulation = que.querySelector('.formulation, .content') || que;
+                const note = document.createElement('div');
+                note.className = 'amaes-unreviewed-history-note';
+                note.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 8px;
+                    margin-bottom: 8px;
+                    padding: 4px 10px;
+                    background: rgba(245, 158, 11, 0.08);
+                    border: 1px solid rgba(245, 158, 11, 0.28);
+                    border-left: 3px solid #f59e0b;
+                    border-radius: 6px;
+                    font-size: 10.5px;
+                    color: var(--text-secondary);
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                `;
+                note.innerHTML = `
+                    <div>
+                        <span style="background: rgba(245, 158, 11, 0.2); color: #d97706; padding: 1px 5px; border-radius: 3px; font-weight: 700; font-size: 9px; margin-right: 4px;">UNREVIEWED ATTEMPT</span>
+                        <span>Prior attempt scored <b>${unreviewed.percentage}%</b> (Review Not Permitted). Selected: <i>"${escapeHtml(unreviewed.selectedAnswer)}"</i></span>
+                    </div>
+                    <button type="button" class="amaes-btn-try-alt" style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); border-radius: 4px; padding: 2px 7px; font-size: 9.5px; cursor: pointer; white-space: nowrap; font-weight: 600;">Try Alternative</button>
+                `;
+                const altBtn = note.querySelector('.amaes-btn-try-alt');
+                if (altBtn) {
+                    altBtn.onclick = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Eliminate previous choice row
+                        const choiceRows = que.querySelectorAll('.answer > div, .answer div.r0, .answer div.r1, .answer li, .answer tr, .answer label');
+                        choiceRows.forEach(r => {
+                            const lbl = r.querySelector('label') || r;
+                            const txt = normalizeChoice(cleanDOMToAI(lbl));
+                            if (txt && (txt === unreviewed.ansNorm || txt.includes(unreviewed.ansNorm) || unreviewed.ansNorm.includes(txt))) {
+                                r.classList.add('amaes-eliminated-row');
+                                lbl.style.textDecoration = 'line-through';
+                                lbl.style.opacity = '0.5';
+                            }
+                        });
+                        showToast('Previous choice marked. Re-evaluating alternative choice...', 3000);
+                        if (typeof manualSolveWithAi === 'function') {
+                            manualSolveWithAi(que);
+                        }
+                    };
+                }
+                formulation.insertBefore(note, formulation.firstChild);
+            }
 
             if (candidates.length === 0) {
-                if (checkIsQuizAttemptPage() && !que.querySelector('.amaes-unanswered-hint') && !que.querySelector('.amaes-blockage-hud')) {
+                if (checkIsQuizAttemptPage() && !que.querySelector('.amaes-unanswered-hint') && !que.querySelector('.amaes-unreviewed-history-note') && !que.querySelector('.amaes-blockage-hud')) {
                     const formulation = que.querySelector('.formulation, .content') || que;
                     const hint = document.createElement('div');
                     hint.className = 'amaes-unanswered-hint';
@@ -9649,6 +9710,10 @@
         lines.push(`Choices:`);
 
         const eliminatedSet = getEliminatedChoicesForQuestion(que, qData, courseCode);
+        const unreviewed = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(qData.qText, courseCode) : null;
+        if (unreviewed && unreviewed.selectedAnswer) {
+            lines.push(`[PREVIOUS UNREVIEWED ATTEMPT]: In a prior attempt that scored only ${unreviewed.percentage}%, "${unreviewed.selectedAnswer}" was chosen. Because that attempt had errors and review was not permitted, that answer might be INCORRECT. Re-evaluate all options critically and choose the best alternative if "${unreviewed.selectedAnswer}" is questionable.`);
+        }
 
         if (Array.isArray(qData.choices)) {
             qData.choices.forEach((c, idx) => {
@@ -10358,6 +10423,13 @@
     // Handles thinking indicator, watchdog timeout, configurable retries, wrong choice elimination guard, session caching, and auto-copy on fail
     async function handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback }) {
         que.querySelectorAll('.amaes-ai-thinking-indicator, .amaes-ai-fallback-bar').forEach(el => el.remove());
+
+        if (typeof isFeatureDisabledByAdmin === 'function' && isFeatureDisabledByAdmin('aiSolver')) {
+            setLog("[Admin Notice] AI Solver is temporarily disabled by administrator.", "var(--accent-amber)");
+            showToast("AI Solver is temporarily disabled by administrator.", 4000);
+            if (typeof onFallback === 'function') onFallback({ reason: 'Disabled by administrator', isAuthError: false, isRateLimit: false });
+            return;
+        }
 
         // A retry button or cooldown callback can outlive the question's
         // fallback UI. Never spend another request after the student answered.
@@ -14134,11 +14206,11 @@
                     <div id="amaes-welcome-highlight-card" style="display: flex; flex-direction: column; gap: 14px;">
                         <!-- Auto-Answer -->
                         <div style="display: flex; align-items: flex-start; gap: 12px;">
-                            <span style="color: ${isLight ? '#71717a' : '#a1a1aa'}; margin-top: 2px; flex-shrink: 0;">${ICONS.checkCircle}</span>
+                            <span style="color: ${isLight ? '#059669' : '#10b981'}; margin-top: 2px; flex-shrink: 0;">${ICONS.checkCircle}</span>
                             <div style="flex: 1;">
                                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                                     <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Smart Auto-Answer & Highlighter</div>
-                                    <span style="font-size: 9px; color: ${isLight ? '#71717a' : '#a1a1aa'}; font-weight: 500; background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.06)'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.08)'}; padding: 1px 6px; border-radius: 4px; white-space: nowrap;">Background Capable</span>
+                                    <span style="font-size: 9px; color: ${isLight ? '#047857' : '#34d399'}; font-weight: 600; background: ${isLight ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.18)'}; border: 1px solid ${isLight ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.3)'}; padding: 1px 6px; border-radius: 4px; white-space: nowrap;">Background Capable</span>
                                 </div>
                                 <div style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11.5px; margin-top: 2px;">Auto-Quiz runs autonomously in the background while highlighting verified answers as you multitask.</div>
                             </div>
@@ -14158,11 +14230,11 @@
 
                         <!-- Built-in Gemini AI -->
                         <div style="display: flex; align-items: flex-start; gap: 12px;">
-                            <span style="color: ${isLight ? '#71717a' : '#a1a1aa'}; margin-top: 2px; flex-shrink: 0;">${ICONS.zap}</span>
+                            <span style="color: ${isLight ? '#7c3aed' : '#a855f7'}; margin-top: 2px; flex-shrink: 0;">${ICONS.zap}</span>
                             <div style="flex: 1;">
                                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                                     <div style="font-weight: 600; color: ${isLight ? '#18181b' : '#f4f4f5'}; font-size: 12px;">Built-in Google Gemini AI</div>
-                                    <button id="welcome-btn-setup-ai" type="button" class="amaes-btn" style="background: ${isLight ? '#f4f4f5' : 'rgba(255,255,255,0.06)'}; color: ${isLight ? '#52525b' : '#d4d4d8'}; border: 1px solid ${isLight ? '#e4e4e7' : 'rgba(255,255,255,0.1)'}; font-size: 9px; padding: 1px 6px; border-radius: 4px; font-weight: 600; cursor: pointer;">
+                                    <button id="welcome-btn-setup-ai" type="button" class="amaes-btn" style="background: ${isLight ? 'rgba(124, 58, 237, 0.08)' : 'rgba(168, 85, 247, 0.14)'}; color: ${isLight ? '#7c3aed' : '#c084fc'}; border: 1px solid ${isLight ? 'rgba(124, 58, 237, 0.25)' : 'rgba(168, 85, 247, 0.3)'}; font-size: 9px; padding: 1px 6px; border-radius: 4px; font-weight: 600; cursor: pointer;">
                                         ${geminiApiKey ? 'Key Configured' : 'Setup AI'}
                                     </button>
                                 </div>
@@ -14641,6 +14713,27 @@
                 : `${courseInfo.subjectCode} answer key`;
         }
 
+        // Reusable Component Helpers for Clean, Monotone Course Tools Design
+        function renderCardContent(id, icon, title, badge, contentHtml) {
+            return `
+                <div id="${id}-header" class="amaes-card-header">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        ${icon}
+                        <span class="header-label">${title}</span>
+                        ${badge ? `<span style="font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 600;">${badge}</span>` : ''}
+                    </div>
+                    <span id="${id}-arrow" class="arrow-container">${ICONS.chevronRight}</span>
+                </div>
+                <div id="${id}-body" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
+                    ${contentHtml}
+                </div>
+            `;
+        }
+
+        function renderToolBtn({ id, icon = '', text, title = '', variant = 'monotone', style = '' }) {
+            return `<button id="${id}" class="amaes-btn amaes-btn-${variant}" style="justify-content: center; padding: 5px 3px; font-size: 10px; ${style}" title="${title}">${icon ? icon + ' ' : ''}<span>${text}</span></button>`;
+        }
+
         const panel = document.createElement('div');
         panel.id = 'amaes-toolkit-panel';
 
@@ -14994,185 +15087,119 @@
 
                 <!-- TAB PANE 3: Course Automation Tools -->
                 <div id="tab-pane-course" class="amaes-tab-pane" style="display: none;">
-                    <!-- MODULE 1: Auto-Marker & Undo -->
-                <div id="mod-marker-card" class="amaes-card">
-                    <div id="mod-marker-header" class="amaes-card-header">
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            ${ICONS.check}
-                            <span class="header-label">Activity Auto-Marker</span>
-                        </div>
-                        <span id="mod-marker-arrow" class="arrow-container">${ICONS.chevronRight}</span>
-                    </div>
-
-                    <div id="mod-marker-body" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
-                        <div style="font-size: 9.5px; font-weight: 700; color: var(--accent-green); display: flex; align-items: center; gap: 4px;">
-                            ${ICONS.check} <span>Mark Complete:</span>
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
-                            <button id="btn-mark-lec" class="amaes-btn amaes-btn-blue" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Mark Lectures & Videos as done">
-                                ${ICONS.book} <span>Lectures</span>
-                            </button>
-                            <button id="btn-mark-quiz" class="amaes-btn amaes-btn-pink" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Mark quizzes & exams with a passable grade (≥80%) as done">
-                                ${ICONS.edit} <span>Quizzes</span>
-                            </button>
-                            <button id="btn-mark-all" class="amaes-btn amaes-btn-gray" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Mark all eligible activities as done">
-                                ${ICONS.zap} <span>All</span>
-                            </button>
-                        </div>
-                        <div style="font-size: 9.5px; font-weight: 700; color: var(--accent-amber); display: flex; align-items: center; gap: 4px; margin-top: 4px;">
-                            ${ICONS.undo} <span>Undo Complete:</span>
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
-                            <button id="btn-undo-lec" class="amaes-btn amaes-btn-outline amaes-text-blue" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Undo completion for Lectures & Videos">
-                                ${ICONS.book} <span>Lectures</span>
-                            </button>
-                            <button id="btn-undo-quiz" class="amaes-btn amaes-btn-outline amaes-text-pink" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Undo completion for Quizzes">
-                                ${ICONS.edit} <span>Quizzes</span>
-                            </button>
-                            <button id="btn-undo-all" class="amaes-btn amaes-btn-outline" style="justify-content: center; padding: 5px 2px; font-size: 10px;" title="Undo all completions">
-                                ${ICONS.zap} <span>All</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                    <!-- MODULE 2: Activity Highlighter (Quiz / Lec / Vid) -->
-                <div id="mod-highlighter-card" class="amaes-card">
-                    <div id="mod-highlighter-header" class="amaes-card-header">
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            ${ICONS.preview}
-                            <span class="header-label">Activity Highlighter</span>
-                        </div>
-                        <span id="mod-highlighter-arrow" class="arrow-container">${ICONS.chevronRight}</span>
-                    </div>
-
-                    <div id="mod-highlighter-body" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
-                        <div style="display: flex; gap: 5px;">
-                            <button id="btn-hl-quiz" class="amaes-btn amaes-btn-outline amaes-text-pink" style="flex: 1; justify-content: center; padding: 5px 3px;" title="Highlight Quizzes & Exams">
-                                ${ICONS.edit} <span>Quiz</span>
-                            </button>
-                            <button id="btn-hl-lec" class="amaes-btn amaes-btn-outline amaes-text-blue" style="flex: 1; justify-content: center; padding: 5px 3px;" title="Highlight Lectures & Lessons">
-                                ${ICONS.book} <span>Lec</span>
-                            </button>
-                            <button id="btn-hl-vid" class="amaes-btn amaes-btn-outline amaes-text-purple" style="flex: 1; justify-content: center; padding: 5px 3px;" title="Highlight Video Lectures">
-                                ${ICONS.video} <span>Vid</span>
-                            </button>
-                        </div>
-
-                        <div style="display: flex; gap: 5px;">
-                            <button id="btn-hl-all" class="amaes-btn amaes-btn-preview" style="flex: 2; justify-content: center; padding: 5px 6px;">
-                                <span>Highlight All</span>
-                            </button>
-                            <button id="btn-hl-clear" class="amaes-btn amaes-btn-outline" style="flex: 1; justify-content: center; padding: 5px 6px;">
-                                ${ICONS.clear} <span>Clear</span>
-                            </button>
-                        </div>
-
-                        <button id="btn-hl-missing-quizzes" class="amaes-btn amaes-btn-outline amaes-text-pink" style="width: 100%; justify-content: center; padding: 5px 6px; font-size: 10.5px; font-weight: 700; margin-top: 2px;" title="Highlight unanswered, unattempted, or missing quizzes on Grades or Course page">
-                            ${ICONS.alertTriangle || ICONS.preview} <span>Highlight Missing Quizzes</span>
-                        </button>
-                    </div>
-                </div>
-                    <!-- MODULE 3: Quick Search Helper -->
-                <div id="mod-search-card" class="amaes-card">
-                    <div id="mod-search-header" class="amaes-card-header">
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            ${ICONS.search}
-                            <span class="header-label">Search Helper</span>
-                        </div>
-                        <span id="mod-search-arrow" class="arrow-container">${ICONS.chevronRight}</span>
-                    </div>
-
-                    <div id="mod-search-body" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 6px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border);">
-                            <span style="color: var(--text-muted);">Subject Code:</span>
-                            <span id="detected-code-badge" style="font-weight: 700; color: var(--accent-blue); background: var(--surface); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border);">
-                                ${courseInfo.subjectCode || "None"}
-                            </span>
-                        </div>
-
-                        <div style="display: flex; flex-direction: column; gap: 3px;">
-                            <input id="search-keyword-input" type="text" value="${initialKeyword}" placeholder="Search query" style="
-                                width: 100%;
-                                background: var(--bg);
-                                color: var(--text-primary);
-                                border: 1px solid var(--border);
-                                padding: 5px 8px;
-                                border-radius: 5px;
-                                font-size: 11px;
-                                box-sizing: border-box;
-                                outline: none;
-                            " />
-                        </div>
-
-                        <div style="display: flex; gap: 6px;">
-                            <button id="btn-copy-keyword" class="amaes-btn amaes-btn-outline" style="flex: 1; justify-content: center;">
-                                ${ICONS.copy} <span>Copy</span>
-                            </button>
-                            <button id="btn-open-google" class="amaes-btn amaes-btn-blue" style="flex: 1; justify-content: center;">
-                                ${ICONS.external} <span>Google</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- MODULE 4: Smart AI Assistant (Google Gemini) -->
-                <div id="mod-ai-card" class="amaes-card">
-                    <div id="mod-ai-header" class="amaes-card-header">
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <span style="font-weight: 700; color: #a855f7;">AI</span>
-                            <span class="header-label">Smart AI Assistant</span>
-                        </div>
-                        <span id="mod-ai-arrow" class="arrow-container">${ICONS.chevronRight}</span>
-                    </div>
-
-                    <div id="mod-ai-body" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 6px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border);">
-                            <span style="color: var(--text-muted);">Status:</span>
-                            <span id="gemini-status-badge" style="font-weight: 700; font-size: 10px; color: ${geminiApiKey ? 'var(--accent-green)' : 'var(--text-muted)'}; background: var(--surface); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border);">
-                                ${geminiApiKey ? 'Ready (Gemini 2.5 / 2.0 Flash)' : 'Not configured'}
-                            </span>
-                        </div>
-
-                        <p style="font-size: 10px; color: var(--text-secondary); line-height: 1.4; margin: 0;">
-                            Answers unknown multiple-choice & true/false questions automatically using your free Google AI Studio key. 0 tokens used on questions already in DB.
-                        </p>
-
-                        <div style="display: flex; flex-direction: column; gap: 5px; border-top: 1px solid var(--border-subtle); padding-top: 5px;">
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically copy question to clipboard if AI inference fails or times out">
-                                <input id="chk-course-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Auto-Copy Question on AI Failure (Default: ON)</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically moves to next page 1.5s after AI selects a choice">
-                                <input id="chk-course-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Auto-Advance After AI Answer (Default: ON)</span>
-                            </label>
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <span style="font-size: 10px; color: var(--text-secondary);">AI Retry Attempts:</span>
-                                <select id="sel-course-ai-retry-count" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 5px; cursor: pointer;">
-                                    <option value="1" ${aiRetryCount === 1 ? 'selected' : ''}>1 retry</option>
-                                    <option value="2" ${aiRetryCount === 2 ? 'selected' : ''}>2 retries (Default)</option>
-                                    <option value="3" ${aiRetryCount === 3 ? 'selected' : ''}>3 retries</option>
-                                    <option value="4" ${aiRetryCount === 4 ? 'selected' : ''}>4 retries</option>
-                                    <option value="5" ${aiRetryCount === 5 ? 'selected' : ''}>5 retries</option>
-                                </select>
+                    <div id="mod-marker-card" class="amaes-card">
+                        ${renderCardContent('mod-marker', ICONS.check, 'Activity Auto-Marker', '', `
+                            <div style="font-size: 9.5px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">
+                                ${ICONS.check} <span>Mark Complete:</span>
                             </div>
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <span style="font-size: 10px; color: var(--text-secondary);">API Mode:</span>
-                                <select id="sel-course-ai-plan-tier" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 5px; cursor: pointer;">
-                                    <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
-                                    <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
-                                </select>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
+                                ${renderToolBtn({ id: 'btn-mark-lec', icon: ICONS.book, text: 'Lectures', title: 'Mark Lectures & Videos as done' })}
+                                ${renderToolBtn({ id: 'btn-mark-quiz', icon: ICONS.edit, text: 'Quizzes', title: 'Mark quizzes & exams with a passable grade (≥80%) as done' })}
+                                ${renderToolBtn({ id: 'btn-mark-all', icon: ICONS.zap, text: 'All', title: 'Mark all eligible activities as done' })}
                             </div>
-                        </div>
+                            <div style="font-size: 9.5px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+                                ${ICONS.undo} <span>Undo Complete:</span>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
+                                ${renderToolBtn({ id: 'btn-undo-lec', icon: ICONS.book, text: 'Lectures', title: 'Undo completion for Lectures & Videos' })}
+                                ${renderToolBtn({ id: 'btn-undo-quiz', icon: ICONS.edit, text: 'Quizzes', title: 'Undo completion for Quizzes' })}
+                                ${renderToolBtn({ id: 'btn-undo-all', icon: ICONS.zap, text: 'All', title: 'Undo all completions' })}
+                            </div>
+                        `)}
+                    </div>
 
-                        <div style="display: flex; gap: 6px; margin-top: 2px;">
-                            <button id="btn-open-gemini-setup" type="button" class="amaes-btn" style="flex: 1; justify-content: center; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; border: none; font-weight: 700; cursor: pointer;">
-                                <span>${geminiApiKey ? 'Configure AI key' : 'Setup Free AI Assistant'}</span>
-                            </button>
-                        </div>
+                    <div id="mod-highlighter-card" class="amaes-card">
+                        ${renderCardContent('mod-highlighter', ICONS.preview, 'Activity Highlighter', '', `
+                            <div style="display: flex; gap: 4px;">
+                                ${renderToolBtn({ id: 'btn-hl-quiz', icon: ICONS.edit, text: 'Quiz', title: 'Highlight Quizzes & Exams', style: 'flex: 1;' })}
+                                ${renderToolBtn({ id: 'btn-hl-lec', icon: ICONS.book, text: 'Lec', title: 'Highlight Lectures & Lessons', style: 'flex: 1;' })}
+                                ${renderToolBtn({ id: 'btn-hl-vid', icon: ICONS.video, text: 'Vid', title: 'Highlight Video Lectures', style: 'flex: 1;' })}
+                            </div>
+                            <div style="display: flex; gap: 4px;">
+                                ${renderToolBtn({ id: 'btn-hl-all', icon: '', text: 'Highlight All', style: 'flex: 2; font-weight: 600;' })}
+                                ${renderToolBtn({ id: 'btn-hl-clear', icon: ICONS.clear, text: 'Clear', style: 'flex: 1;' })}
+                            </div>
+                            ${renderToolBtn({ id: 'btn-hl-missing-quizzes', icon: ICONS.alertTriangle || ICONS.preview, text: 'Highlight Missing Quizzes', title: 'Highlight unanswered, unattempted, or missing quizzes on Grades or Course page', style: 'width: 100%; margin-top: 2px;' })}
+                        `)}
+                    </div>
+
+                    <div id="mod-search-card" class="amaes-card">
+                        ${renderCardContent('mod-search', ICONS.search, 'Search Helper', '', `
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 6px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border);">
+                                <span style="color: var(--text-muted);">Subject Code:</span>
+                                <span id="detected-code-badge" style="font-weight: 600; color: var(--text-primary); background: var(--surface); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border);">
+                                    ${courseInfo.subjectCode || "None"}
+                                </span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 3px;">
+                                <input id="search-keyword-input" type="text" value="${initialKeyword}" placeholder="Search query" style="
+                                    width: 100%;
+                                    background: var(--bg);
+                                    color: var(--text-primary);
+                                    border: 1px solid var(--border);
+                                    padding: 5px 8px;
+                                    border-radius: 5px;
+                                    font-size: 11px;
+                                    box-sizing: border-box;
+                                    outline: none;
+                                " />
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                ${renderToolBtn({ id: 'btn-copy-keyword', icon: ICONS.copy, text: 'Copy', style: 'flex: 1;' })}
+                                ${renderToolBtn({ id: 'btn-open-google', icon: ICONS.external, text: 'Google', style: 'flex: 1;' })}
+                            </div>
+                        `)}
+                    </div>
+
+                    <div id="mod-ai-card" class="amaes-card">
+                        ${renderCardContent('mod-ai', '<span style="font-weight: 700; color: var(--accent-purple); font-size: 11px;">AI</span>', 'Smart AI Assistant', '', `
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 6px; background: var(--bg); border-radius: 5px; border: 1px solid var(--border);">
+                                <span style="color: var(--text-muted);">Status:</span>
+                                <span id="gemini-status-badge" style="font-weight: 600; font-size: 10px; color: ${geminiApiKey ? 'var(--accent-green)' : 'var(--text-muted)'}; background: var(--surface); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border);">
+                                    ${geminiApiKey ? 'Ready (Gemini Flash)' : 'Not configured'}
+                                </span>
+                            </div>
+
+                            <p style="font-size: 10px; color: var(--text-secondary); line-height: 1.4; margin: 0;">
+                                Answers unknown questions automatically using Google AI Studio. 0 tokens used on questions already in DB.
+                            </p>
+
+                            <div style="display: flex; flex-direction: column; gap: 5px; border-top: 1px solid var(--border-subtle); padding-top: 5px;">
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically copy question to clipboard if AI inference fails or times out">
+                                    <input id="chk-course-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer;" />
+                                    <span>Auto-Copy Question on AI Failure (Default: ON)</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically moves to next page after AI selects a choice">
+                                    <input id="chk-course-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer;" />
+                                    <span>Auto-Advance After AI Answer (Default: ON)</span>
+                                </label>
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 10px; color: var(--text-secondary);">AI Retry Attempts:</span>
+                                    <select id="sel-course-ai-retry-count" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 5px; cursor: pointer;">
+                                        <option value="1" ${aiRetryCount === 1 ? 'selected' : ''}>1 retry</option>
+                                        <option value="2" ${aiRetryCount === 2 ? 'selected' : ''}>2 retries (Default)</option>
+                                        <option value="3" ${aiRetryCount === 3 ? 'selected' : ''}>3 retries</option>
+                                        <option value="4" ${aiRetryCount === 4 ? 'selected' : ''}>4 retries</option>
+                                        <option value="5" ${aiRetryCount === 5 ? 'selected' : ''}>5 retries</option>
+                                    </select>
+                                </div>
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 10px; color: var(--text-secondary);">API Mode:</span>
+                                    <select id="sel-course-ai-plan-tier" style="background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 5px; cursor: pointer;">
+                                        <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
+                                        <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 6px; margin-top: 2px;">
+                                <button id="btn-open-gemini-setup" type="button" class="amaes-btn amaes-btn-monotone" style="flex: 1; justify-content: center; background: rgba(168, 85, 247, 0.1); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.28); font-weight: 600; cursor: pointer;">
+                                    <span>${geminiApiKey ? 'Configure AI key' : 'Setup Free AI Assistant'}</span>
+                                </button>
+                            </div>
+                        `)}
                     </div>
                 </div>
-            </div>
 
                 <!-- Stop Button -->
                 <button id="amaes-stop-btn" class="amaes-btn amaes-btn-stop" style="display: none; margin-bottom: 6px;">
@@ -16067,6 +16094,19 @@
                 }
                 .amaes-btn-preview:hover {
                     border-color: var(--text-muted);
+                }
+
+                .amaes-btn-monotone {
+                    background: var(--surface);
+                    color: var(--text-primary);
+                    border: 1px solid var(--border);
+                    font-weight: 500;
+                    border-radius: 4px;
+                }
+                .amaes-btn-monotone:hover {
+                    background: var(--surface-subtle);
+                    border-color: var(--text-muted);
+                    color: var(--text-primary);
                 }
 
                 .amaes-btn-blue {
@@ -17615,6 +17655,12 @@
         const runBatch = async (goal, category) => {
             if (isRunning) return;
 
+            if (typeof isFeatureDisabledByAdmin === 'function' && isFeatureDisabledByAdmin('autoMarker')) {
+                showToast("Activity Auto-Marker is temporarily disabled by administrator.");
+                setLog("[Admin Notice] Activity Auto-Marker is temporarily disabled by administrator.", "var(--accent-amber)");
+                return;
+            }
+
             if (!checkIsCoursePage()) {
                 showToast("Open a course page first to use Activity Auto-Marker!");
                 setLog("<b>Action Blocked:</b> You are not on a course page. Open a course subject first.", "var(--accent-pink)");
@@ -17779,8 +17825,11 @@
         }
         showWelcomeOnboardingModal(false);
         injectDashboardCourseBadges();
-        injectDashboardGuideBanner();
         sendPassiveTelemetryPulse();
+
+        if (checkIsQuizViewPage() || checkIsQuizSummaryPage()) {
+            promoteAttemptEvidenceFromScore();
+        }
 
         // Auto-Harvest past quizzes: scan Grade Report once per session per course or all courses on dashboard
         if (autoHarvestGrades) {
@@ -17916,7 +17965,6 @@
             let debounceTimer = null;
             const obs = new MutationObserver(() => {
                 injectDashboardCourseBadges();
-                injectDashboardGuideBanner();
                 if (autoCloudSync) {
                     if (debounceTimer) clearTimeout(debounceTimer);
                     debounceTimer = setTimeout(() => {
