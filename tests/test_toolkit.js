@@ -2863,8 +2863,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.9.3'), "Userscript header must specify v1.9.3");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.9.3";'), "Constant SCRIPT_VERSION must be v1.9.3");
+    assert.ok(script.includes('@version      1.9.4'), "Userscript header must specify v1.9.4");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.9.4";'), "Constant SCRIPT_VERSION must be v1.9.4");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3997,10 +3997,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.9.3-blue.svg"), "README badge must show v1.9.3");
+    assert.ok(readme.includes("version-1.9.4-blue.svg"), "README badge must show v1.9.4");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.9.3<"), "Website must display v1.9.3 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.9.4<"), "Website must display v1.9.4 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -5102,6 +5102,56 @@ test("Adaptive Choice Rotation & Blind Solver for Non-Reviewable Quizzes: rotate
     const tried = ["a", "b"];
     const untried = multiChoices.find(c => !tried.includes(c.norm));
     assert.strictEqual(untried.norm, "c", "Multiple choice must rotate to next untried option");
+});
+
+// --------------------------------------------------
+// 105. Strict Confirmed Verification & Manual Prior Attempt Handling
+// --------------------------------------------------
+test("Strict Confirmed Verification & Manual Prior Attempt Handling: separates verified review answers from community guesses, preserves prior manual attempt scores, and enables verified auto-pick override", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Strict Verification Helper Presence
+    assert.ok(script.includes("function isConfirmedCandidate(item)"), "Must define isConfirmedCandidate helper");
+    assert.ok(script.includes("function saveQuizAttemptSummary(subCode, data)"), "Must define saveQuizAttemptSummary helper");
+    assert.ok(script.includes("function getQuizAttemptSummary(subCode = '')"), "Must define getQuizAttemptSummary helper");
+
+    // 2. Pure Unit Verification Logic: isConfirmedCandidate
+    function isConfirmedCandidate(item) {
+        if (!item) return false;
+        if (item.deduced === true) return true;
+        const src = String(item.source || '').toLowerCase();
+        const evType = String(item.evidenceType || '').toLowerCase();
+
+        if (src.includes('community') || src.includes('gemini') || src.includes('ai') || src.includes('amauoed') || item.isAiSuggestion) {
+            return false;
+        }
+
+        if (src.includes('review') && !src.includes('not permitted') && !src.includes('95-percent')) return true;
+        if (src.includes('100_percent') || src.includes('deduction') || src.includes('elimination') || src === 'verified_db') return true;
+        if (evType.includes('review') || evType.includes('100_percent')) return true;
+
+        if (item.verified === true && !src) return true;
+        return false;
+    }
+
+    // Ground-truth verified items
+    assert.strictEqual(isConfirmedCandidate({ source: 'review_screen', verified: true }), true, "review_screen must be confirmed");
+    assert.strictEqual(isConfirmedCandidate({ source: 'moodle_100_percent', verified: true }), true, "moodle_100_percent must be confirmed");
+    assert.strictEqual(isConfirmedCandidate({ source: 'Review', verified: true }), true, "Review must be confirmed");
+    assert.strictEqual(isConfirmedCandidate({ source: 'moodle_review_verified', verified: true }), true, "moodle_review_verified must be confirmed");
+    assert.strictEqual(isConfirmedCandidate({ source: 'verified_db', verified: true }), true, "verified_db must be confirmed");
+    assert.strictEqual(isConfirmedCandidate({ deduced: true, verified: true }), true, "deduced must be confirmed");
+
+    // Unconfirmed community & AI submissions
+    assert.strictEqual(isConfirmedCandidate({ source: 'community_contribution', verified: true }), false, "community_contribution must be unconfirmed even if verified: true");
+    assert.strictEqual(isConfirmedCandidate({ source: 'Google Gemini AI', verified: false }), false, "Gemini AI must be unconfirmed");
+    assert.strictEqual(isConfirmedCandidate({ source: 'amauoed-cs6301', verified: true }), false, "amauoed must be unconfirmed");
+
+    // 3. Auto-pick Override & Pre-checked Manual Attempt Rotation
+    assert.ok(script.includes("!anyRadioChecked || hasVerifiedSource || isManualSelect"), "Verified answer must override prior pre-checked radio button");
+    assert.ok(script.includes("preCheckedRadio ? normalizeChoice"), "Adaptive probe must detect pre-checked choices from prior manual attempts");
+    assert.ok(script.includes("Community Candidate (Unconfirmed)"), "Must badge unconfirmed community submissions distinctly");
 });
 
 console.log("\n==================================================");

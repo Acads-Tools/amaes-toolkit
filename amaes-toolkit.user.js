@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.9.3
+// @version      1.9.4
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -30,7 +30,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.9.3";
+    const SCRIPT_VERSION = "v1.9.4";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -3482,6 +3482,62 @@
         return ordered.find(que => !isQuestionAnswered(que)) || null;
     }
 
+    function isConfirmedCandidate(item) {
+        if (!item) return false;
+        if (item.deduced === true) return true;
+        const src = String(item.source || '').toLowerCase();
+        const evType = String(item.evidenceType || '').toLowerCase();
+
+        // Explicitly unconfirmed sources - even if legacy database marked verified: true
+        if (src.includes('community') || src.includes('gemini') || src.includes('ai') || src.includes('amauoed') || item.isAiSuggestion) {
+            return false;
+        }
+
+        // Proven verified sources:
+        // 1. review_screen / moodle_review: Extracted from Moodle review screen with full marks
+        // 2. moodle_100_percent: Extracted from a 100% scored attempt
+        // 3. verified_db: Internal verified answer cache
+        // 4. deduction / elimination: Mathematically proven
+        if (src.includes('review') && !src.includes('not permitted') && !src.includes('95-percent')) return true;
+        if (src.includes('100_percent') || src.includes('deduction') || src.includes('elimination') || src === 'verified_db') return true;
+        if (evType.includes('review') || evType.includes('100_percent')) return true;
+
+        // Fallback for tests/local objects where source isn't set but verified: true is explicit
+        if (item.verified === true && !src) return true;
+
+        return false;
+    }
+
+    function saveQuizAttemptSummary(subCode, data) {
+        if (!data || typeof data.percentage !== 'number') return;
+        const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
+        try {
+            localStorage.setItem(`amaes_quiz_summary_${sCode}`, JSON.stringify(data));
+            const params = new URLSearchParams(window.location.search);
+            const quizId = params.get('id') || params.get('cmid') || params.get('q') || '';
+            if (quizId) {
+                localStorage.setItem(`amaes_quiz_summary_${sCode}_${quizId}`, JSON.stringify(data));
+            }
+        } catch (_) {}
+    }
+
+    function getQuizAttemptSummary(subCode = '') {
+        const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const quizId = params.get('id') || params.get('cmid') || params.get('q') || '';
+            if (quizId) {
+                const specific = localStorage.getItem(`amaes_quiz_summary_${sCode}_${quizId}`);
+                if (specific) return JSON.parse(specific);
+            }
+            const general = localStorage.getItem(`amaes_quiz_summary_${sCode}`);
+            if (general) return JSON.parse(general);
+            return null;
+        } catch (_) {
+            return null;
+        }
+    }
+
     function getAttemptEvidenceKey() {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('cmid') || params.get('id') || params.get('quiz') || params.get('attempt') || 'latest';
@@ -3617,7 +3673,7 @@
 
         evidence.forEach(item => {
             const match = cached.find(c => questionTextMatches(c.qNorm || c.qRaw || c.question, item.qNorm));
-            const isVer = match && (match.verified === true || match.deduced === true);
+            const isVer = match && isConfirmedCandidate(match);
             if (isVer) {
                 verifiedCount++;
             } else {
@@ -3882,6 +3938,19 @@
         if (earned === null || maximum === null) return;
         if (!Number.isFinite(earned) || !Number.isFinite(maximum) || maximum <= 0) return;
 
+        const courseInfo = detectCourseInfo();
+        const subCode = courseInfo.subjectCode || 'GENERAL';
+        const percentage = Math.round((earned / maximum) * 100);
+
+        // Always record latest quiz attempt summary even if prior attempt was done manually without toolkit
+        saveQuizAttemptSummary(subCode, {
+            earned,
+            maximum,
+            percentage,
+            isReviewPermitted,
+            recordedAt: Date.now()
+        });
+
         let evidence = [];
         try {
             evidence = JSON.parse(
@@ -3892,9 +3961,6 @@
             );
         } catch (_) {}
         if (!Array.isArray(evidence) || evidence.length === 0) return;
-
-        const courseInfo = detectCourseInfo();
-        const subCode = courseInfo.subjectCode || 'GENERAL';
 
         if (earned < maximum) {
             saveUnreviewedAttemptEvidence(subCode, evidence, earned, maximum, isReviewPermitted);
@@ -5671,6 +5737,7 @@
 
         let probedThisPageCount = 0;
         const sCode = (detectCourseInfo().subjectCode) || 'GENERAL';
+        const quizSummary = typeof getQuizAttemptSummary === 'function' ? getQuizAttemptSummary(sCode) : null;
 
         queContainers.forEach(que => {
             if (identifyQuestionType(que) === 'unknown') {
@@ -5689,7 +5756,7 @@
 
             // Find all matching questions from database/AMAUOED (handles multiple answers for same question and inline blanks)
             const candidates = questionsDb.filter(item => questionTextMatches(item.qNorm || item.qRaw || item.question, moodleQNorm));
-            const hasAnyVerifiedCandidate = candidates.some(item => item.verified === true || item.deduced === true);
+            const hasAnyVerifiedCandidate = candidates.some(item => isConfirmedCandidate(item));
 
             // Clean up any prior hints
             que.querySelectorAll('.amaes-unanswered-hint, .amaes-unreviewed-history-note').forEach(b => b.remove());
@@ -5697,10 +5764,12 @@
             // Check if this question was previously answered under an unreviewed attempt (<100% score)
             const unreviewed = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(moodleQNorm, sCode) : null;
             const probeData = typeof getProbeEntry === 'function' ? getProbeEntry(moodleQNorm, sCode) : null;
-            const displayPercentage = unreviewed ? unreviewed.percentage : (probeData ? probeData.lastPercentage : null);
-            const prevAnsText = (unreviewed && unreviewed.selectedAnswer) || (probeData && probeData.lastAns) || null;
+            const displayPercentage = unreviewed ? unreviewed.percentage : (probeData ? probeData.lastPercentage : (quizSummary ? quizSummary.percentage : null));
+            const preCheckedRadio = que.querySelector('.answer input[type="radio"]:checked');
+            const preCheckedText = preCheckedRadio ? cleanDOMToAI(preCheckedRadio.closest('label') || preCheckedRadio.parentElement).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim() : null;
+            const prevAnsText = (unreviewed && unreviewed.selectedAnswer) || (probeData && probeData.lastAns) || preCheckedText || null;
 
-            if (prevAnsText && displayPercentage !== null && displayPercentage < 100 && checkIsQuizAttemptPage()) {
+            if (!hasAnyVerifiedCandidate && prevAnsText && displayPercentage !== null && displayPercentage < 100 && checkIsQuizAttemptPage()) {
                 const formulation = que.querySelector('.formulation, .content') || que;
                 const note = document.createElement('div');
                 note.className = 'amaes-unreviewed-history-note';
@@ -5795,8 +5864,12 @@
                 }
                 return;
             }
-            // Sort candidates by verification and consensus confirmations descending
-            candidates.sort((a, b) => ((b.verified ? 10 : 0) + (b.confirmations || 1)) - ((a.verified ? 10 : 0) + (a.confirmations || 1)));
+            // Sort candidates: confirmed review/100% answers first (weight 100), then community contributions (weight 10), then AI (weight 0)
+            candidates.sort((a, b) => {
+                const aWeight = isConfirmedCandidate(a) ? 100 : ((a.source || '').toLowerCase().includes('community') ? 10 : 0);
+                const bWeight = isConfirmedCandidate(b) ? 100 : ((b.source || '').toLowerCase().includes('community') ? 10 : 0);
+                return (bWeight + (b.confirmations || 1)) - (aWeight + (a.confirmations || 1));
+            });
 
             // Clean up any prior highlighting or elimination badges on this question
             que.querySelectorAll('.amaes-highlighted-choice, .amaes-eliminated-choice, .amaes-ai-suggested-choice').forEach(el => {
@@ -5835,7 +5908,7 @@
             // Safety: collect all verified/confirmed answers for this question
             const verifiedNorms = new Set();
             candidates.forEach(cand => {
-                if (cand.verified) {
+                if (isConfirmedCandidate(cand)) {
                     if (cand.ansNorm) verifiedNorms.add(cand.ansNorm);
                     if (cand.ansRaw) verifiedNorms.add(normalizeChoice(cand.ansRaw));
                     if (Array.isArray(cand.answers)) {
@@ -6039,13 +6112,21 @@
             const probeEntry = typeof getProbeEntry === 'function' ? getProbeEntry(moodleQNorm, sCode) : null;
             const lastAttemptPercentage = (unreviewedEntry && typeof unreviewedEntry.percentage === 'number')
                 ? unreviewedEntry.percentage
-                : (probeEntry && typeof probeEntry.lastPercentage === 'number' ? probeEntry.lastPercentage : null);
+                : (probeEntry && typeof probeEntry.lastPercentage === 'number'
+                    ? probeEntry.lastPercentage
+                    : (quizSummary && typeof quizSummary.percentage === 'number' ? quizSummary.percentage : null));
             const hasPriorFailedAttempt = lastAttemptPercentage !== null && lastAttemptPercentage < 100;
             const isQuestionSuspect = !hasAnyVerifiedCandidate || hasPriorFailedAttempt;
 
-            if (isQuestionSuspect && isAdaptiveProbeActive && choiceRows.length >= 2 && !foundMatchForQuestion) {
+            // Probe ONLY rotates on questions lacking a confirmed answer (never touches confirmed review/100% answers!)
+            if (!hasAnyVerifiedCandidate && isQuestionSuspect && isAdaptiveProbeActive && choiceRows.length >= 2 && !foundMatchForQuestion) {
+                // If student took a prior attempt manually, Moodle's attemptonlast=1 may have pre-checked their prior choice
+                const preCheckedRadio = que.querySelector('.answer input[type="radio"]:checked');
+                const preCheckedNorm = preCheckedRadio ? normalizeChoice(cleanDOMToAI(preCheckedRadio.closest('label') || preCheckedRadio.parentElement)) : null;
+
                 const prevChoiceNorm = (unreviewedEntry && unreviewedEntry.ansNorm) ||
                     (probeEntry && probeEntry.lastNorm) ||
+                    preCheckedNorm ||
                     (candidates.length > 0 ? (candidates[0].ansNorm || normalizeChoice(candidates[0].ansRaw || candidates[0].answer || '')) : null);
                 const triedChoices = (probeEntry && Array.isArray(probeEntry.triedChoices))
                     ? probeEntry.triedChoices
@@ -6189,7 +6270,7 @@
                         for (const cand of candidates) {
                             // Never auto-pick a lower-trust AMAUOED/community answer
                             // when a verified review answer exists for this question.
-                            if (hasAnyVerifiedCandidate && cand.verified !== true && cand.deduced !== true) continue;
+                            if (hasAnyVerifiedCandidate && !isConfirmedCandidate(cand)) continue;
                             const ansNorm = cand.ansNorm || normalizeChoice(cand.ansRaw || cand.answer || '');
                             if (!ansNorm) continue;
                             if (choiceText === ansNorm) {
@@ -6223,12 +6304,16 @@
                             return answerNorms.includes(choiceText) || answerNorms.includes(unscriptDigits(choiceText));
                         });
                         const sourceCandidates = matchingSources.length > 0 ? matchingSources : [cand];
-                        const hasVerifiedSource = sourceCandidates.some(candidate => candidate.verified === true || candidate.deduced === true);
-                        const hasAmauoedSource = sourceCandidates.some(candidate =>
+                        const hasVerifiedSource = sourceCandidates.some(candidate => isConfirmedCandidate(candidate));
+                        const hasCommunitySource = !hasVerifiedSource && sourceCandidates.some(candidate =>
+                            Boolean((candidate.source || '').toLowerCase().includes('community') ||
+                            (Array.isArray(candidate.sources) && candidate.sources.some(source => String(source).toLowerCase().includes('community'))))
+                        );
+                        const hasAmauoedSource = !hasVerifiedSource && !hasCommunitySource && sourceCandidates.some(candidate =>
                             Boolean((candidate.source || '').toLowerCase().includes('amauoed') ||
                             (Array.isArray(candidate.sources) && candidate.sources.some(source => String(source).toLowerCase().includes('amauoed'))))
                         );
-                        const hasAiSource = !hasVerifiedSource && !hasAmauoedSource && sourceCandidates.some(candidate =>
+                        const hasAiSource = !hasVerifiedSource && !hasCommunitySource && !hasAmauoedSource && sourceCandidates.some(candidate =>
                             Boolean(candidate.isAiSuggestion || (candidate.source || '').toLowerCase().includes('gemini') ||
                             (Array.isArray(candidate.sources) && candidate.sources.some(source => String(source).toLowerCase().includes('gemini'))))
                         );
@@ -6246,8 +6331,10 @@
                         const sourceLabels = [];
                         if (hasVerifiedSource) {
                             sourceLabels.push(isDeduced ? 'Deduced Answer' : 'Verified Answer');
+                        } else if (hasCommunitySource) {
+                            sourceLabels.push('Community Candidate (Unconfirmed)');
                         }
-                        if (hasAmauoedSource && !hasAiSource) sourceLabels.push('Web Study Guide');
+                        if (hasAmauoedSource && !hasAiSource && !hasCommunitySource) sourceLabels.push('Web Study Guide');
                         if (hasAiSource) sourceLabels.push('AI Suggestion (Gemini)');
 
                         // Apply full row highlight on container
@@ -6330,11 +6417,12 @@
                             targetRow.appendChild(badge);
                         }
 
-                        // Auto-select radio button if autoPickQuiz is enabled OR autoQuizMode is running OR autoSelect is requested
                         // USER OVERRIDE SAFETY: If user already selected a choice on this question, NEVER overwrite their decision!
+                        // EXCEPTION: When a verified/confirmed answer exists, auto-pick applies it even if a pre-checked radio exists from a prior manual attempt
                         const canSelectAnswer = isManualSelect || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode));
                         const anyRadioChecked = isRadio && Boolean(que.querySelector('.answer input[type="radio"]:checked'));
-                        if (canSelectAnswer && input && !input.checked && (!anyRadioChecked || isManualSelect)) {
+                        const shouldSelect = canSelectAnswer && input && !input.checked && (!anyRadioChecked || hasVerifiedSource || isManualSelect);
+                        if (shouldSelect) {
                             if (!hasAiSource || aiAutoSelect) {
                                 input.checked = true;
                                 input.click();
