@@ -272,6 +272,19 @@
                                 <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Auto-Submit on Summary Review</span>
                             </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Adaptive Probe: When an unreviewed quiz attempt scores < 100%, automatically rotate choices on unverified questions on next attempts until 100% is reached">
+                                <input id="chk-adaptive-probe" type="checkbox" ${adaptiveProbeQuiz ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Adaptive Probe (Unreviewed Quizzes)</span>
+                            </label>
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
+                                <span style="font-size: 10px; color: var(--text-secondary); font-weight: 500;" title="Number of unverified questions to rotate per attempt">Probe Budget / Attempt:</span>
+                                <select id="sel-adaptive-probe-budget" style="background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 6px; cursor: pointer;">
+                                    <option value="1" ${adaptiveProbeBudget === 1 ? 'selected' : ''}>1 question (Safe)</option>
+                                    <option value="2" ${adaptiveProbeBudget === 2 ? 'selected' : ''}>2 questions (Recommended)</option>
+                                    <option value="3" ${adaptiveProbeBudget === 3 ? 'selected' : ''}>3 questions (Fast)</option>
+                                    <option value="5" ${adaptiveProbeBudget === 5 ? 'selected' : ''}>5 questions (Aggressive)</option>
+                                </select>
+                            </div>
 
                             <!-- Section: AI Prompt Formatting -->
                             <div style="font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding-top: 4px; padding-bottom: 2px; border-bottom: 1px solid rgba(255,255,255,0.06);">AI Prompt Formatting</div>

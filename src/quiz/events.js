@@ -186,6 +186,27 @@
             };
         }
 
+        const chkAdaptiveProbe = document.getElementById('chk-adaptive-probe');
+        if (chkAdaptiveProbe) {
+            chkAdaptiveProbe.onchange = () => {
+                adaptiveProbeQuiz = chkAdaptiveProbe.checked;
+                localStorage.setItem('amaes_adaptive_probe_quiz', adaptiveProbeQuiz);
+                showToast(`Adaptive Probe: ${adaptiveProbeQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Adaptive Probe (Unreviewed Quizzes): <b>${adaptiveProbeQuiz ? 'ON (Rotating unverified choices)' : 'OFF'}</b>`, adaptiveProbeQuiz ? "var(--accent-purple)" : "var(--accent-amber)", adaptiveProbeQuiz ? "Rotates unverified choices across attempts to find 100%" : "Repeats static choices on re-attempts");
+                if (adaptiveProbeQuiz && checkIsQuizAttemptPage()) runAutoQuizSolver();
+            };
+        }
+
+        const selAdaptiveProbeBudget = document.getElementById('sel-adaptive-probe-budget');
+        if (selAdaptiveProbeBudget) {
+            selAdaptiveProbeBudget.onchange = () => {
+                adaptiveProbeBudget = parseInt(selAdaptiveProbeBudget.value, 10) || 2;
+                localStorage.setItem('amaes_adaptive_probe_budget', adaptiveProbeBudget);
+                showToast(`Probe Budget: ${adaptiveProbeBudget} questions/attempt`);
+                setLog(`Probe Budget: <b>${adaptiveProbeBudget}</b> unverified questions rotated per attempt`, "var(--accent-purple)");
+            };
+        }
+
         const chkKeyboardShortcuts = document.getElementById('chk-keyboard-shortcuts');
         if (chkKeyboardShortcuts) {
             chkKeyboardShortcuts.onchange = () => {

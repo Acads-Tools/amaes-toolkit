@@ -1725,6 +1725,9 @@
     let autoPickQuiz = localStorage.getItem('amaes_auto_pick_quiz') !== 'false'; // default true: auto-select verified answers
     let autoNextVerified = localStorage.getItem('amaes_auto_next_verified') !== 'false'; // default true: auto-advance when solver answers verified question
     let autoNextQuiz = localStorage.getItem('amaes_auto_next_quiz') === 'true'; // default false: manual answers do NOT auto-advance by default (safe review)
+    let adaptiveProbeQuiz = localStorage.getItem('amaes_adaptive_probe_quiz') !== 'false'; // default true: rotate choices across unreviewed attempts until 100%
+    let adaptiveProbeBudget = parseInt(localStorage.getItem('amaes_adaptive_probe_budget') || '2', 10); // default: probe at most 2 unverified questions per attempt
+    if (isNaN(adaptiveProbeBudget) || adaptiveProbeBudget < 1) adaptiveProbeBudget = 2;
     let isWaitingForUserAnswer = false; // session state: true when paused on an unknown question waiting for student input
     let autoSubmitQuiz = localStorage.getItem('amaes_auto_submit_quiz') === 'true'; // default false: safe manual review before final submission
     let autoNextTimer = null;
@@ -3485,7 +3488,7 @@
         return `amaes_attempt_evidence_${id}`;
     }
 
-    function recordAttemptAnswerEvidence(que, answer, source = 'manual_selection') {
+    function recordAttemptAnswerEvidence(que, answer, source = 'manual_selection', metadata = {}) {
         if (!que || !answer) return;
         const qData = extractQuestionData(que);
         if (!qData || !qData.qText) return;
@@ -3501,6 +3504,8 @@
                 questionType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : (Array.isArray(qData.choices) && qData.choices.length > 0 ? 'multichoice' : 'shortanswer')),
                 source,
                 isAiSuggestion: source === 'ai_inference',
+                verified: Boolean(metadata.verified),
+                isAdaptiveProbe: Boolean(metadata.isAdaptiveProbe),
                 recordedAt: Date.now()
             };
             const next = current.filter(item => item.qNorm !== entry.qNorm);
@@ -3510,6 +3515,225 @@
         } catch (err) {
             logDebug(`Attempt evidence storage note: ${err.message}`);
         }
+    }
+
+    function syncCurrentPageSelectionsToEvidence() {
+        if (!checkIsQuizAttemptPage()) return;
+        const ques = document.querySelectorAll('.que');
+        ques.forEach(que => {
+            const checkedRadio = que.querySelector('.answer input[type="radio"]:checked, .answer input[type="checkbox"]:checked');
+            if (checkedRadio) {
+                const lbl = checkedRadio.closest('label') || checkedRadio.parentElement;
+                const choiceText = cleanDOMToAI(lbl).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
+                const isVerified = Boolean(que.querySelector('.amaes-verified-badge'));
+                const isAdaptive = Boolean(que.querySelector('.amaes-adaptive-probe-badge'));
+                if (choiceText) {
+                    recordAttemptAnswerEvidence(que, choiceText, isAdaptive ? 'adaptive_probe' : (isVerified ? 'verified_db' : 'manual'), {
+                        verified: isVerified,
+                        isAdaptiveProbe: isAdaptive
+                    });
+                }
+            } else {
+                const textInput = que.querySelector('input[type="text"].form-control, input.form-control, textarea');
+                if (textInput && textInput.value) {
+                    recordAttemptAnswerEvidence(que, textInput.value.trim(), 'manual_text');
+                }
+                const selectInput = que.querySelector('select');
+                if (selectInput && selectInput.selectedIndex > 0) {
+                    const optText = (selectInput.options[selectInput.selectedIndex]?.text || '').trim();
+                    if (optText && !optText.toLowerCase().includes('choose')) {
+                        recordAttemptAnswerEvidence(que, optText, 'manual_select');
+                    }
+                }
+            }
+        });
+    }
+
+    function getProbeHistory(subCode = '') {
+        const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
+        try {
+            return JSON.parse(localStorage.getItem(`amaes_probe_history_${sCode}`) || '{}');
+        } catch (_) {
+            return {};
+        }
+    }
+
+    function saveProbeHistory(subCode, history) {
+        const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
+        try {
+            localStorage.setItem(`amaes_probe_history_${sCode}`, JSON.stringify(history));
+        } catch (e) {
+            logDebug(`Failed to save probe history: ${e.message}`);
+        }
+    }
+
+    function getProbeEntry(qText, subCode = '') {
+        if (!qText) return null;
+        const qNorm = normalizeText(qText);
+        const history = getProbeHistory(subCode);
+        if (history[qNorm]) return history[qNorm];
+        const matchKey = Object.keys(history).find(k => questionTextMatches(k, qNorm));
+        return matchKey ? history[matchKey] : null;
+    }
+
+    function markProbeQuestionsSolved(subCode, promotedItems) {
+        if (!Array.isArray(promotedItems) || promotedItems.length === 0) return;
+        const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
+        const history = getProbeHistory(sCode);
+        promotedItems.forEach(item => {
+            if (history[item.qNorm]) {
+                history[item.qNorm].solved = true;
+                history[item.qNorm].verifiedAnswer = item.ansRaw;
+            }
+        });
+        saveProbeHistory(sCode, history);
+    }
+
+    function recordAdaptiveProbeAttempt(subCode, evidence, earned, maximum, isReviewPermitted) {
+        if (!Array.isArray(evidence) || evidence.length === 0) return;
+        const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
+        const history = getProbeHistory(sCode);
+        const percentage = Math.round((earned / maximum) * 100);
+
+        let cached = [];
+        try {
+            cached = typeof getCachedAnswers === 'function' ? (getCachedAnswers(sCode) || []) : [];
+        } catch (_) {}
+
+        let verifiedCount = 0;
+        const unverifiedItems = [];
+
+        evidence.forEach(item => {
+            const match = cached.find(c => questionTextMatches(c.qNorm || c.qRaw || c.question, item.qNorm));
+            const isVer = match && (match.verified === true || match.deduced === true);
+            if (isVer) {
+                verifiedCount++;
+            } else {
+                unverifiedItems.push(item);
+            }
+        });
+
+        const unverifiedCount = unverifiedItems.length;
+        const pointsFromUnverified = Math.max(0, earned - verifiedCount);
+
+        // Constraint Deduction 1: Zero Points on Unverified Questions
+        if (pointsFromUnverified === 0 && unverifiedCount > 0) {
+            const deducedPromotions = [];
+            unverifiedItems.forEach(item => {
+                const rawChoices = item.choices || [];
+                if (rawChoices.length === 2) {
+                    const normSelected = item.ansNorm;
+                    const alt = rawChoices.find(c => {
+                        const nc = normalizeChoice(c);
+                        return nc !== normSelected && unscriptDigits(nc) !== unscriptDigits(normSelected);
+                    });
+                    if (alt) {
+                        const cleanAlt = alt.replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
+                        deducedPromotions.push({
+                            qRaw: item.qRaw,
+                            qNorm: item.qNorm,
+                            ansRaw: cleanAlt,
+                            ansNorm: normalizeChoice(cleanAlt),
+                            choices: rawChoices,
+                            verified: true,
+                            deduced: true,
+                            source: 'Zero-Score Elimination'
+                        });
+                    }
+                } else {
+                    mergeAnswersIntoCache(sCode, [{
+                        qRaw: item.qRaw,
+                        qNorm: item.qNorm,
+                        wrongAnswers: [{ text: item.ansRaw, norm: item.ansNorm, count: 1 }],
+                        choices: rawChoices
+                    }], 'Adaptive Probe');
+                }
+            });
+            if (deducedPromotions.length > 0) {
+                mergeAnswersIntoCache(sCode, deducedPromotions, 'Zero-Score Elimination');
+                setLog(`<b>Probe Deduction:</b> Zero score on unverified batch proved opposite answers for <b>${deducedPromotions.length}</b> questions!`, 'var(--accent-green)');
+                showToast(`Probe Deduction: Verified ${deducedPromotions.length} questions!`, 4000);
+            }
+        }
+        // Constraint Deduction 2: Single Unverified Question in attempt
+        else if (unverifiedCount === 1 && earned === maximum - 1) {
+            const item = unverifiedItems[0];
+            const rawChoices = item.choices || [];
+            if (rawChoices.length === 2) {
+                const normSelected = item.ansNorm;
+                const alt = rawChoices.find(c => {
+                    const nc = normalizeChoice(c);
+                    return nc !== normSelected && unscriptDigits(nc) !== unscriptDigits(normSelected);
+                });
+                if (alt) {
+                    const cleanAlt = alt.replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
+                    const deduced = [{
+                        qRaw: item.qRaw,
+                        qNorm: item.qNorm,
+                        ansRaw: cleanAlt,
+                        ansNorm: normalizeChoice(cleanAlt),
+                        choices: rawChoices,
+                        verified: true,
+                        deduced: true,
+                        source: 'Single-Defect Deduction'
+                    }];
+                    mergeAnswersIntoCache(sCode, deduced, 'Single-Defect Deduction');
+                    setLog(`<b>Probe Deduction:</b> Deduced verified answer for <i>"${item.qRaw.slice(0, 35)}..."</i>!`, 'var(--accent-green)');
+                    showToast(`Single-defect deduction verified 1 question!`, 3500);
+                }
+            } else {
+                mergeAnswersIntoCache(sCode, [{
+                    qRaw: item.qRaw,
+                    qNorm: item.qNorm,
+                    wrongAnswers: [{ text: item.ansRaw, norm: item.ansNorm, count: 1 }],
+                    choices: rawChoices
+                }], 'Adaptive Probe');
+            }
+        }
+        // Constraint Deduction 3: Full Yield on Unverified Questions
+        else if (pointsFromUnverified === unverifiedCount && unverifiedCount > 0) {
+            const verifiedBatch = unverifiedItems.map(item => ({
+                ...item,
+                verified: true,
+                isAiSuggestion: false,
+                source: 'Full-Yield Deduction',
+                deduced: true
+            }));
+            mergeAnswersIntoCache(sCode, verifiedBatch, 'Full-Yield Deduction');
+            setLog(`<b>Probe Deduction:</b> Full points on unverified batch confirmed <b>${verifiedBatch.length}</b> verified answers!`, 'var(--accent-green)');
+            showToast(`Full-yield deduction verified ${verifiedBatch.length} questions!`, 4000);
+        }
+
+        // Update probe tracking history
+        evidence.forEach(item => {
+            const entry = history[item.qNorm] || {
+                qNorm: item.qNorm,
+                qRaw: item.qRaw,
+                triedChoices: [],
+                attempts: []
+            };
+            const choiceNorm = item.ansNorm;
+            if (choiceNorm && !entry.triedChoices.includes(choiceNorm)) {
+                entry.triedChoices.push(choiceNorm);
+            }
+            entry.lastChoice = item.ansRaw;
+            entry.lastNorm = choiceNorm;
+            entry.lastEarned = earned;
+            entry.lastMax = maximum;
+            entry.lastPercentage = percentage;
+            entry.updatedAt = Date.now();
+            entry.attempts.push({
+                choice: item.ansRaw,
+                norm: choiceNorm,
+                earned,
+                maximum,
+                percentage,
+                date: Date.now()
+            });
+            history[item.qNorm] = entry;
+        });
+
+        saveProbeHistory(sCode, history);
     }
 
     function getUnreviewedAttemptEntry(qText, subCode = '') {
@@ -3607,7 +3831,8 @@
 
         if (earned < maximum) {
             saveUnreviewedAttemptEvidence(subCode, evidence, earned, maximum, isReviewPermitted);
-            setLog(`Score evidence recorded (${earned}/${maximum} - ${Math.round((earned/maximum)*100)}%). Review: ${isReviewPermitted ? 'Permitted' : 'Not permitted'}. Unreviewed answers saved to help AI evaluate alternative options on re-attempt.`, 'var(--accent-amber)');
+            recordAdaptiveProbeAttempt(subCode, evidence, earned, maximum, isReviewPermitted);
+            setLog(`Score evidence recorded (${earned}/${maximum} - ${Math.round((earned/maximum)*100)}%). Review: ${isReviewPermitted ? 'Permitted' : 'Not permitted'}. Adaptive probe rotated unverified choices to find 100%.`, 'var(--accent-amber)');
             return;
         }
 
@@ -3619,6 +3844,7 @@
             evidenceType: 'moodle_100_percent'
         }));
         mergeAnswersIntoCache(subCode, promoted, 'moodle_100_percent');
+        markProbeQuestionsSolved(subCode, promoted);
         queueCommunityContribution(subCode, promoted, {
             source: 'moodle_100_percent',
             evidenceType: 'moodle_100_percent'
@@ -5299,11 +5525,16 @@
                 // 3. Navigation / Submission button click
                 const navBtn = target.closest('.submitbtns input, #mod_quiz-next-nav, .mod_quiz-next-nav, a[href*="attempt.php"], a[href*="review.php"]');
                 if (navBtn) {
+                    try { syncCurrentPageSelectionsToEvidence(); } catch (_) {}
                     const text = navBtn.value || navBtn.innerText || navBtn.title || 'Navigation';
                     recordBreadcrumb('navigation', `User clicked navigation: ${String(text).trim().slice(0, 40)}`);
                 }
             } catch (_) {}
         }, true);
+
+        window.addEventListener('beforeunload', () => {
+            try { syncCurrentPageSelectionsToEvidence(); } catch (_) {}
+        });
 
         document.addEventListener('change', (e) => {
             try {
@@ -5341,6 +5572,8 @@
         if (checkIsReviewPage()) {
             return { matched: 0, total: queContainers.length, isReview: true };
         }
+
+        let probedThisPageCount = 0;
 
         queContainers.forEach(que => {
             if (identifyQuestionType(que) === 'unknown') {
@@ -5408,8 +5641,22 @@
                                 lbl.style.opacity = '0.5';
                             }
                         });
-                        showToast('Previous choice marked. Re-evaluating alternative choice...', 3000);
-                        if (typeof manualSolveWithAi === 'function') {
+                        showToast('Previous choice marked. Switching to alternative choice...', 2500);
+                        // Find remaining alternative row and select it
+                        const altRow = Array.from(choiceRows).find(r => !r.classList.contains('amaes-eliminated-row') && !r.classList.contains('amaes-eliminated-choice'));
+                        if (altRow) {
+                            const inp = altRow.querySelector('input[type="radio"], input[type="checkbox"]');
+                            const lbl = altRow.querySelector('label') || altRow;
+                            if (inp) {
+                                inp.checked = true;
+                                inp.click();
+                                if (lbl && lbl !== inp) lbl.click();
+                                inp.dispatchEvent(new Event('input', { bubbles: true }));
+                                inp.dispatchEvent(new Event('change', { bubbles: true }));
+                                const choiceText = cleanDOMToAI(lbl).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
+                                recordAttemptAnswerEvidence(que, choiceText, 'manual_alt_probe', { verified: false, isAdaptiveProbe: true });
+                            }
+                        } else if (typeof manualSolveWithAi === 'function') {
                             manualSolveWithAi(que);
                         }
                     };
@@ -5674,6 +5921,131 @@
 
             const isRadio = que.querySelector('.answer input[type="radio"]') !== null;
             let foundMatchForQuestion = false;
+
+            // ── Adaptive Choice Rotation / Blind Probe Solver ──────────────────
+            // When an unreviewed quiz attempt scored < 100%, rotate choices on unverified questions
+            // across attempts to systematically explore the solution space until 100% is reached.
+            const isAdaptiveProbeActive = (typeof adaptiveProbeQuiz === 'undefined' || adaptiveProbeQuiz !== false) && checkIsQuizAttemptPage();
+            if (!hasAnyVerifiedCandidate && isAdaptiveProbeActive && choiceRows.length >= 2) {
+                const sCode = (detectCourseInfo().subjectCode) || 'GENERAL';
+                const unreviewedEntry = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(moodleQNorm, sCode) : null;
+                const probeEntry = typeof getProbeEntry === 'function' ? getProbeEntry(moodleQNorm, sCode) : null;
+                const lastAttemptPercentage = (unreviewedEntry && typeof unreviewedEntry.percentage === 'number')
+                    ? unreviewedEntry.percentage
+                    : (probeEntry && typeof probeEntry.lastPercentage === 'number' ? probeEntry.lastPercentage : null);
+                const hasPriorFailedAttempt = lastAttemptPercentage !== null && lastAttemptPercentage < 100;
+                const prevChoiceNorm = (unreviewedEntry && unreviewedEntry.ansNorm) || (probeEntry && probeEntry.lastNorm) || null;
+                const triedChoices = (probeEntry && Array.isArray(probeEntry.triedChoices))
+                    ? probeEntry.triedChoices
+                    : (prevChoiceNorm ? [prevChoiceNorm] : []);
+
+                // Check available valid (non-eliminated) rows
+                const validRows = [];
+                choiceRows.forEach(row => {
+                    const lbl = row.querySelector('label') || row;
+                    const inp = row.querySelector('input[type="radio"], input[type="checkbox"]');
+                    const norm = normalizeChoice(cleanDOMToAI(lbl));
+                    const isElim = isChoiceRowEliminated(row) || allWrongList.some(w => w.norm === norm || unscriptDigits(w.norm) === unscriptDigits(norm));
+                    if (norm && !isElim) {
+                        validRows.push({ row, label: lbl, input: inp, norm, rawText: cleanDOMToAI(lbl).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim() });
+                    }
+                });
+
+                const budget = typeof adaptiveProbeBudget === 'number' ? adaptiveProbeBudget : 2;
+                if (hasPriorFailedAttempt && validRows.length >= 2 && probedThisPageCount < budget) {
+                    let probeTarget = null;
+                    let isFlipped = false;
+
+                    if (validRows.length === 2) {
+                        // Binary True/False question: Flip to the opposite choice!
+                        const opposite = validRows.find(vr => vr.norm !== prevChoiceNorm && unscriptDigits(vr.norm) !== unscriptDigits(prevChoiceNorm));
+                        if (opposite) {
+                            probeTarget = opposite;
+                            isFlipped = true;
+                        }
+                    } else {
+                        // Multiple choice (3+ choices): Pick the first untried candidate row
+                        const untried = validRows.find(vr => !triedChoices.includes(vr.norm) && !triedChoices.includes(unscriptDigits(vr.norm)));
+                        if (untried) {
+                            probeTarget = untried;
+                        }
+                    }
+
+                    if (probeTarget) {
+                        foundMatchForQuestion = true;
+                        probedThisPageCount++;
+
+                        const targetRow = probeTarget.row;
+                        targetRow.classList.add('amaes-adaptive-probe-choice');
+                        targetRow.style.outline = '2px solid #a855f7';
+                        targetRow.style.backgroundColor = 'rgba(168, 85, 247, 0.12)';
+                        targetRow.style.boxShadow = '0 0 0 1px rgba(168, 85, 247, 0.25)';
+                        targetRow.style.borderRadius = '6px';
+                        targetRow.style.padding = '6px 12px';
+                        targetRow.style.margin = '4px 0';
+                        targetRow.style.display = 'flex';
+                        targetRow.style.alignItems = 'center';
+                        targetRow.style.flexWrap = 'wrap';
+                        targetRow.style.gap = '8px';
+                        targetRow.style.width = '100%';
+                        targetRow.style.boxSizing = 'border-box';
+                        targetRow.style.transition = 'all 0.2s ease';
+
+                        const targetLbl = probeTarget.label;
+                        if (targetLbl && targetLbl !== targetRow) {
+                            targetLbl.style.outline = 'none';
+                            targetLbl.style.backgroundColor = 'transparent';
+                            targetLbl.style.padding = '0';
+                            targetLbl.style.margin = '0';
+                            targetLbl.style.display = 'inline-flex';
+                            targetLbl.style.alignItems = 'center';
+                            targetLbl.style.gap = '6px';
+                            targetLbl.style.cursor = 'pointer';
+                        }
+
+                        let badge = targetRow.querySelector('.amaes-adaptive-probe-badge');
+                        if (!badge) {
+                            badge = document.createElement('span');
+                            badge.className = 'amaes-adaptive-probe-badge';
+                            badge.innerHTML = `${ICONS.rotateCcw || ''} <span>Adaptive Probe (${isFlipped ? 'Flipped' : 'Rotated'})</span>`;
+                            badge.style.cssText = `
+                                background: #a855f7;
+                                color: #ffffff !important;
+                                font-size: 10px;
+                                font-weight: 700;
+                                padding: 2px 7px;
+                                border-radius: 4px;
+                                margin-left: auto;
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 4px;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+                                white-space: nowrap;
+                                flex-shrink: 0;
+                            `;
+                            targetRow.appendChild(badge);
+                        }
+
+                        const canSelectAnswer = isManualSelect || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode));
+                        const anyRadioChecked = isRadio && Boolean(que.querySelector('.answer input[type="radio"]:checked'));
+                        if (canSelectAnswer && probeTarget.input && !probeTarget.input.checked && (!anyRadioChecked || isManualSelect)) {
+                            probeTarget.input.checked = true;
+                            probeTarget.input.click();
+                            if (targetLbl && targetLbl !== probeTarget.input) targetLbl.click();
+                            probeTarget.input.dispatchEvent(new Event('input', { bubbles: true }));
+                            probeTarget.input.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+
+                        recordAttemptAnswerEvidence(que, probeTarget.rawText, 'adaptive_probe', {
+                            verified: false,
+                            isAdaptiveProbe: true
+                        });
+
+                        setLog(`<b>Adaptive Probe:</b> Rotated choice on unverified question (prior attempt scored ${lastAttemptPercentage}%) to test alternative.`, '#a855f7');
+                    }
+                }
+            }
+            // ────────────────────────────────────────────────────────────────────
 
             choiceRows.forEach(row => {
                 // If it is a single-choice radio question and we already highlighted the top verified answer, avoid double-highlighting
@@ -14957,6 +15329,19 @@
                                 <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Auto-Submit on Summary Review</span>
                             </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Adaptive Probe: When an unreviewed quiz attempt scores < 100%, automatically rotate choices on unverified questions on next attempts until 100% is reached">
+                                <input id="chk-adaptive-probe" type="checkbox" ${adaptiveProbeQuiz ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Adaptive Probe (Unreviewed Quizzes)</span>
+                            </label>
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
+                                <span style="font-size: 10px; color: var(--text-secondary); font-weight: 500;" title="Number of unverified questions to rotate per attempt">Probe Budget / Attempt:</span>
+                                <select id="sel-adaptive-probe-budget" style="background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 6px; cursor: pointer;">
+                                    <option value="1" ${adaptiveProbeBudget === 1 ? 'selected' : ''}>1 question (Safe)</option>
+                                    <option value="2" ${adaptiveProbeBudget === 2 ? 'selected' : ''}>2 questions (Recommended)</option>
+                                    <option value="3" ${adaptiveProbeBudget === 3 ? 'selected' : ''}>3 questions (Fast)</option>
+                                    <option value="5" ${adaptiveProbeBudget === 5 ? 'selected' : ''}>5 questions (Aggressive)</option>
+                                </select>
+                            </div>
 
                             <!-- Section: AI Prompt Formatting -->
                             <div style="font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding-top: 4px; padding-bottom: 2px; border-bottom: 1px solid rgba(255,255,255,0.06);">AI Prompt Formatting</div>
@@ -16474,6 +16859,27 @@
                 localStorage.setItem('amaes_auto_submit_quiz', autoSubmitQuiz);
                 showToast(`Auto-Submit on Summary: ${autoSubmitQuiz ? 'Enabled' : 'Disabled'}`);
                 setLog(`Auto-Submit on Summary Review: <b>${autoSubmitQuiz ? 'ON' : 'OFF'}</b>`, autoSubmitQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoSubmitQuiz ? "Auto-submits from summary page & plays completion chime" : "Safe manual submission");
+            };
+        }
+
+        const chkAdaptiveProbe = document.getElementById('chk-adaptive-probe');
+        if (chkAdaptiveProbe) {
+            chkAdaptiveProbe.onchange = () => {
+                adaptiveProbeQuiz = chkAdaptiveProbe.checked;
+                localStorage.setItem('amaes_adaptive_probe_quiz', adaptiveProbeQuiz);
+                showToast(`Adaptive Probe: ${adaptiveProbeQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Adaptive Probe (Unreviewed Quizzes): <b>${adaptiveProbeQuiz ? 'ON (Rotating unverified choices)' : 'OFF'}</b>`, adaptiveProbeQuiz ? "var(--accent-purple)" : "var(--accent-amber)", adaptiveProbeQuiz ? "Rotates unverified choices across attempts to find 100%" : "Repeats static choices on re-attempts");
+                if (adaptiveProbeQuiz && checkIsQuizAttemptPage()) runAutoQuizSolver();
+            };
+        }
+
+        const selAdaptiveProbeBudget = document.getElementById('sel-adaptive-probe-budget');
+        if (selAdaptiveProbeBudget) {
+            selAdaptiveProbeBudget.onchange = () => {
+                adaptiveProbeBudget = parseInt(selAdaptiveProbeBudget.value, 10) || 2;
+                localStorage.setItem('amaes_adaptive_probe_budget', adaptiveProbeBudget);
+                showToast(`Probe Budget: ${adaptiveProbeBudget} questions/attempt`);
+                setLog(`Probe Budget: <b>${adaptiveProbeBudget}</b> unverified questions rotated per attempt`, "var(--accent-purple)");
             };
         }
 
