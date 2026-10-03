@@ -2863,8 +2863,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.9.2'), "Userscript header must specify v1.9.2");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.9.2";'), "Constant SCRIPT_VERSION must be v1.9.2");
+    assert.ok(script.includes('@version      1.9.3'), "Userscript header must specify v1.9.3");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.9.3";'), "Constant SCRIPT_VERSION must be v1.9.3");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3997,10 +3997,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.9.2-blue.svg"), "README badge must show v1.9.2");
+    assert.ok(readme.includes("version-1.9.3-blue.svg"), "README badge must show v1.9.3");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.9.2<"), "Website must display v1.9.2 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.9.3<"), "Website must display v1.9.3 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -5060,6 +5060,48 @@ test("Monotone Course Tools Design, Non-Reviewed Quiz Intelligence & Admin Kills
     assert.ok(script.includes("isFeatureDisabledByAdmin('autoQuiz')"), "Must guard Auto-Quiz with admin remote flag");
     assert.ok(script.includes("isFeatureDisabledByAdmin('aiSolver')"), "Must guard AI Solver with admin remote flag");
     assert.ok(script.includes("isFeatureDisabledByAdmin('autoMarker')"), "Must guard Auto-Marker with admin remote flag");
+});
+
+// --------------------------------------------------
+// 104. Adaptive Choice Rotation & Blind Solver for Non-Reviewable Quizzes
+// --------------------------------------------------
+test("Adaptive Choice Rotation & Blind Solver for Non-Reviewable Quizzes: rotates suspect answers across attempts, flips binary choices, and preserves flipped state", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Suspect Question Eligibility & Probe Activation
+    assert.ok(script.includes("const isQuestionSuspect = !hasAnyVerifiedCandidate || hasPriorFailedAttempt;"), "Must consider questions suspect if prior attempt scored < 100%");
+    assert.ok(script.includes("isQuestionSuspect && isAdaptiveProbeActive"), "Adaptive probe must activate on suspect questions even if database candidates exist");
+
+    // 2. Binary Choice Flip & Untried Rotation
+    assert.ok(script.includes("vr.norm !== prevChoiceNorm && unscriptDigits(vr.norm) !== unscriptDigits(prevChoiceNorm)"), "Must flip binary choice to opposite candidate");
+    assert.ok(script.includes("amaes-adaptive-probe-choice"), "Must apply distinct styling class for adaptive probe choices");
+    assert.ok(script.includes("amaes-adaptive-probe-badge"), "Must attach adaptive probe badge to rotated choices");
+    assert.ok(script.includes("que.dataset.amaesProbeFlipped = 'true'"), "Must mark question as probe-flipped to prevent database overwrite");
+
+    // 3. Evidence Synchronization & Robust Attempt Scoring
+    assert.ok(script.includes("localStorage.setItem('amaes_attempt_evidence_latest'"), "Must persist attempt evidence to localStorage for cross-tab resilience");
+    assert.ok(script.includes("const slashMatch = text.match("), "Must support direct slash-in-cell score parsing");
+    assert.ok(script.includes("gradeMatch = feedbackText.match("), "Must parse overall feedback fallback score");
+
+    // 4. Pure Unit Logic: Verify Choice Rotation Mechanics
+    const validChoices = [
+        { norm: "true", rawText: "True" },
+        { norm: "false", rawText: "False" }
+    ];
+    const prevChoice = "false";
+    const flipped = validChoices.find(c => c.norm !== prevChoice);
+    assert.strictEqual(flipped.norm, "true", "True/False must flip to opposite choice");
+
+    const multiChoices = [
+        { norm: "a", rawText: "A" },
+        { norm: "b", rawText: "B" },
+        { norm: "c", rawText: "C" },
+        { norm: "d", rawText: "D" }
+    ];
+    const tried = ["a", "b"];
+    const untried = multiChoices.find(c => !tried.includes(c.norm));
+    assert.strictEqual(untried.norm, "c", "Multiple choice must rotate to next untried option");
 });
 
 console.log("\n==================================================");

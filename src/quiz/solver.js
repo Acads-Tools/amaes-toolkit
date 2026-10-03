@@ -376,6 +376,9 @@
             next.push(entry);
             sessionStorage.setItem(key, JSON.stringify(next.slice(-100)));
             sessionStorage.setItem('amaes_attempt_evidence_latest', JSON.stringify(next.slice(-100)));
+            try {
+                localStorage.setItem('amaes_attempt_evidence_latest', JSON.stringify(next.slice(-100)));
+            } catch (_) {}
         } catch (err) {
             logDebug(`Attempt evidence storage note: ${err.message}`);
         }
@@ -434,10 +437,19 @@
     function getProbeEntry(qText, subCode = '') {
         if (!qText) return null;
         const qNorm = normalizeText(qText);
-        const history = getProbeHistory(subCode);
+        const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
+        const history = getProbeHistory(sCode);
         if (history[qNorm]) return history[qNorm];
         const matchKey = Object.keys(history).find(k => questionTextMatches(k, qNorm));
-        return matchKey ? history[matchKey] : null;
+        if (matchKey) return history[matchKey];
+
+        if (sCode !== 'GENERAL') {
+            const genHistory = getProbeHistory('GENERAL');
+            if (genHistory[qNorm]) return genHistory[qNorm];
+            const gMatchKey = Object.keys(genHistory).find(k => questionTextMatches(k, qNorm));
+            if (gMatchKey) return genHistory[gMatchKey];
+        }
+        return null;
     }
 
     function markProbeQuestionsSolved(subCode, promotedItems) {
@@ -605,8 +617,26 @@
         const qNorm = normalizeText(qText);
         const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
         try {
-            const history = JSON.parse(localStorage.getItem(`amaes_unreviewed_history_${sCode}`) || '[]');
-            return history.find(h => questionTextMatches(h.qNorm || h.qRaw, qNorm));
+            let history = JSON.parse(localStorage.getItem(`amaes_unreviewed_history_${sCode}`) || '[]');
+            let match = history.find(h => questionTextMatches(h.qNorm || h.qRaw, qNorm));
+            if (match) return match;
+
+            if (sCode !== 'GENERAL') {
+                const genHistory = JSON.parse(localStorage.getItem('amaes_unreviewed_history_GENERAL') || '[]');
+                match = genHistory.find(h => questionTextMatches(h.qNorm || h.qRaw, qNorm));
+                if (match) return match;
+            }
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('amaes_unreviewed_history_') && key !== `amaes_unreviewed_history_${sCode}`) {
+                    const otherHist = JSON.parse(localStorage.getItem(key) || '[]');
+                    if (Array.isArray(otherHist)) {
+                        match = otherHist.find(h => questionTextMatches(h.qNorm || h.qRaw, qNorm));
+                        if (match) return match;
+                    }
+                }
+            }
+            return null;
         } catch (_) {
             return null;
         }
@@ -651,42 +681,79 @@
         let maximum = null;
         let isReviewPermitted = true;
 
-        document.querySelectorAll('table').forEach(table => {
+        document.querySelectorAll('table, .quizattemptsummary, .generaltable').forEach(table => {
             if (earned !== null) return;
             const rows = Array.from(table.querySelectorAll('tr'));
             const headerRow = rows.find(row => Array.from(row.children).some(cell => /grade|marks/i.test(cell.innerText || '')));
-            if (!headerRow) return;
-            const headers = Array.from(headerRow.children);
-            const gradeIndex = headers.findIndex(cell => /grade/i.test(cell.innerText || ''));
-            const marksIndex = headers.findIndex(cell => /marks/i.test(cell.innerText || ''));
-            const reviewIndex = headers.findIndex(cell => /review/i.test(cell.innerText || ''));
-            if (gradeIndex < 0 && marksIndex < 0) return;
-
-            const targetIndex = gradeIndex >= 0 ? gradeIndex : marksIndex;
-            const headerMax = (headers[targetIndex].innerText || '').match(/\/\s*([0-9]+(?:\.[0-9]+)?)/);
-            const attemptRows = rows.filter(row => /finished/i.test(row.innerText || ''));
+            const attemptRows = rows.filter(row => /finished|submitted|complete/i.test(row.innerText || ''));
             if (attemptRows.length === 0) return;
             const latest = attemptRows[attemptRows.length - 1];
 
-            const gradeCell = latest && latest.children[targetIndex];
-            const gradeValue = gradeCell && (gradeCell.innerText || '').match(/([0-9]+(?:\.[0-9]+)?)/);
-            if (gradeValue && headerMax) {
-                earned = Number(gradeValue[1]);
-                maximum = Number(headerMax[1]);
+            // 1. Direct cell parsing (e.g. cell has "15.00 / 20.00" or "75.00 / 100.00")
+            for (const cell of latest.children) {
+                const text = (cell.innerText || '').trim();
+                const slashMatch = text.match(/([0-9]+(?:\.[0-9]+)?)\s*\/\s*([0-9]+(?:\.[0-9]+)?)/);
+                if (slashMatch) {
+                    earned = Number(slashMatch[1]);
+                    maximum = Number(slashMatch[2]);
+                    break;
+                }
             }
-            if (reviewIndex >= 0 && latest && latest.children[reviewIndex]) {
+
+            // 2. Header-based parsing if no slash in cell
+            if (earned === null && headerRow) {
+                const headers = Array.from(headerRow.children);
+                const marksIndex = headers.findIndex(cell => /marks/i.test(cell.innerText || ''));
+                const gradeIndex = headers.findIndex(cell => /grade/i.test(cell.innerText || ''));
+                const targetIndex = marksIndex >= 0 ? marksIndex : gradeIndex;
+
+                if (targetIndex >= 0 && latest.children[targetIndex]) {
+                    const headerText = headers[targetIndex].innerText || '';
+                    const headerMax = headerText.match(/\/\s*([0-9]+(?:\.[0-9]+)?)/);
+                    const cellVal = (latest.children[targetIndex].innerText || '').match(/([0-9]+(?:\.[0-9]+)?)/);
+                    if (cellVal && headerMax) {
+                        earned = Number(cellVal[1]);
+                        maximum = Number(headerMax[1]);
+                    }
+                }
+            }
+
+            // 3. Review permission check
+            const reviewIndex = headerRow ? Array.from(headerRow.children).findIndex(cell => /review/i.test(cell.innerText || '')) : -1;
+            if (reviewIndex >= 0 && latest.children[reviewIndex]) {
                 const revText = (latest.children[reviewIndex].innerText || '').toLowerCase();
-                if (revText.includes('not permitted')) {
+                if (revText.includes('not permitted') || revText.includes('not allowed')) {
+                    isReviewPermitted = false;
+                }
+            } else {
+                const hasReviewLink = Boolean(latest.querySelector('a[href*="review.php"]'));
+                if (!hasReviewLink) {
                     isReviewPermitted = false;
                 }
             }
         });
+
+        // 4. Overall feedback fallback parsing if table wasn't matched
+        if (earned === null || maximum === null) {
+            const feedbackText = document.body.innerText || '';
+            const gradeMatch = feedbackText.match(/(?:overall\s+feedback|grade\s+for\s+this\s+quiz)[^0-9]*([0-9]+(?:\.[0-9]+)?)\s*\/\s*([0-9]+(?:\.[0-9]+)?)/i);
+            if (gradeMatch) {
+                earned = Number(gradeMatch[1]);
+                maximum = Number(gradeMatch[2]);
+            }
+        }
+
         if (earned === null || maximum === null) return;
         if (!Number.isFinite(earned) || !Number.isFinite(maximum) || maximum <= 0) return;
 
         let evidence = [];
         try {
-            evidence = JSON.parse(sessionStorage.getItem(getAttemptEvidenceKey()) || sessionStorage.getItem('amaes_attempt_evidence_latest') || '[]');
+            evidence = JSON.parse(
+                sessionStorage.getItem(getAttemptEvidenceKey()) ||
+                sessionStorage.getItem('amaes_attempt_evidence_latest') ||
+                localStorage.getItem('amaes_attempt_evidence_latest') ||
+                '[]'
+            );
         } catch (_) {}
         if (!Array.isArray(evidence) || evidence.length === 0) return;
 
@@ -811,6 +878,7 @@
 
     // Fail-safe click & smart navigation executor (skips already-answered questions)
     function clickQuizNextButton(btn, forceAllow = false) {
+        try { syncCurrentPageSelectionsToEvidence(); } catch (_) {}
         if (!autoQuizMode && !forceAllow && !autoNextQuiz) {
             logDebug("Blocked clickQuizNextButton: Auto-Quiz is PAUSED.");
             return false;
@@ -2466,6 +2534,7 @@
         }
 
         let probedThisPageCount = 0;
+        const sCode = (detectCourseInfo().subjectCode) || 'GENERAL';
 
         queContainers.forEach(que => {
             if (identifyQuestionType(que) === 'unknown') {
@@ -2490,8 +2559,12 @@
             que.querySelectorAll('.amaes-unanswered-hint, .amaes-unreviewed-history-note').forEach(b => b.remove());
 
             // Check if this question was previously answered under an unreviewed attempt (<100% score)
-            const unreviewed = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(moodleQNorm) : null;
-            if (unreviewed && unreviewed.selectedAnswer && checkIsQuizAttemptPage()) {
+            const unreviewed = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(moodleQNorm, sCode) : null;
+            const probeData = typeof getProbeEntry === 'function' ? getProbeEntry(moodleQNorm, sCode) : null;
+            const displayPercentage = unreviewed ? unreviewed.percentage : (probeData ? probeData.lastPercentage : null);
+            const prevAnsText = (unreviewed && unreviewed.selectedAnswer) || (probeData && probeData.lastAns) || null;
+
+            if (prevAnsText && displayPercentage !== null && displayPercentage < 100 && checkIsQuizAttemptPage()) {
                 const formulation = que.querySelector('.formulation, .content') || que;
                 const note = document.createElement('div');
                 note.className = 'amaes-unreviewed-history-note';
@@ -2513,7 +2586,7 @@
                 note.innerHTML = `
                     <div>
                         <span style="background: rgba(245, 158, 11, 0.2); color: #d97706; padding: 1px 5px; border-radius: 3px; font-weight: 700; font-size: 9px; margin-right: 4px;">UNREVIEWED ATTEMPT</span>
-                        <span>Prior attempt scored <b>${unreviewed.percentage}%</b> (Review Not Permitted). Selected: <i>"${escapeHtml(unreviewed.selectedAnswer)}"</i></span>
+                        <span>Prior attempt scored <b>${displayPercentage}%</b> (Review Not Permitted). Selected: <i>"${escapeHtml(prevAnsText)}"</i></span>
                     </div>
                     <button type="button" class="amaes-btn-try-alt" style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); border-radius: 4px; padding: 2px 7px; font-size: 9.5px; cursor: pointer; white-space: nowrap; font-weight: 600;">Try Alternative</button>
                 `;
@@ -2522,12 +2595,13 @@
                     altBtn.onclick = (e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        const prevNorm = unreviewed ? unreviewed.ansNorm : normalizeChoice(prevAnsText);
                         // Eliminate previous choice row
                         const choiceRows = que.querySelectorAll('.answer > div, .answer div.r0, .answer div.r1, .answer li, .answer tr, .answer label');
                         choiceRows.forEach(r => {
                             const lbl = r.querySelector('label') || r;
                             const txt = normalizeChoice(cleanDOMToAI(lbl));
-                            if (txt && (txt === unreviewed.ansNorm || txt.includes(unreviewed.ansNorm) || unreviewed.ansNorm.includes(txt))) {
+                            if (txt && prevNorm && (txt === prevNorm || txt.includes(prevNorm) || prevNorm.includes(txt))) {
                                 r.classList.add('amaes-eliminated-row');
                                 lbl.style.textDecoration = 'line-through';
                                 lbl.style.opacity = '0.5';
@@ -2546,6 +2620,8 @@
                                 inp.dispatchEvent(new Event('input', { bubbles: true }));
                                 inp.dispatchEvent(new Event('change', { bubbles: true }));
                                 const choiceText = cleanDOMToAI(lbl).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
+                                altRow.classList.add('amaes-adaptive-probe-choice');
+                                que.dataset.amaesProbeFlipped = 'true';
                                 recordAttemptAnswerEvidence(que, choiceText, 'manual_alt_probe', { verified: false, isAdaptiveProbe: true });
                             }
                         } else if (typeof manualSolveWithAi === 'function') {
@@ -2814,19 +2890,27 @@
             const isRadio = que.querySelector('.answer input[type="radio"]') !== null;
             let foundMatchForQuestion = false;
 
+            // Preserve explicit probe/alternative flips
+            if (que.dataset.amaesProbeFlipped === 'true') {
+                foundMatchForQuestion = true;
+            }
+
             // ── Adaptive Choice Rotation / Blind Probe Solver ──────────────────
-            // When an unreviewed quiz attempt scored < 100%, rotate choices on unverified questions
+            // When an unreviewed quiz attempt scored < 100%, rotate choices on suspect/unverified questions
             // across attempts to systematically explore the solution space until 100% is reached.
             const isAdaptiveProbeActive = (typeof adaptiveProbeQuiz === 'undefined' || adaptiveProbeQuiz !== false) && checkIsQuizAttemptPage();
-            if (!hasAnyVerifiedCandidate && isAdaptiveProbeActive && choiceRows.length >= 2) {
-                const sCode = (detectCourseInfo().subjectCode) || 'GENERAL';
-                const unreviewedEntry = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(moodleQNorm, sCode) : null;
-                const probeEntry = typeof getProbeEntry === 'function' ? getProbeEntry(moodleQNorm, sCode) : null;
-                const lastAttemptPercentage = (unreviewedEntry && typeof unreviewedEntry.percentage === 'number')
-                    ? unreviewedEntry.percentage
-                    : (probeEntry && typeof probeEntry.lastPercentage === 'number' ? probeEntry.lastPercentage : null);
-                const hasPriorFailedAttempt = lastAttemptPercentage !== null && lastAttemptPercentage < 100;
-                const prevChoiceNorm = (unreviewedEntry && unreviewedEntry.ansNorm) || (probeEntry && probeEntry.lastNorm) || null;
+            const unreviewedEntry = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(moodleQNorm, sCode) : null;
+            const probeEntry = typeof getProbeEntry === 'function' ? getProbeEntry(moodleQNorm, sCode) : null;
+            const lastAttemptPercentage = (unreviewedEntry && typeof unreviewedEntry.percentage === 'number')
+                ? unreviewedEntry.percentage
+                : (probeEntry && typeof probeEntry.lastPercentage === 'number' ? probeEntry.lastPercentage : null);
+            const hasPriorFailedAttempt = lastAttemptPercentage !== null && lastAttemptPercentage < 100;
+            const isQuestionSuspect = !hasAnyVerifiedCandidate || hasPriorFailedAttempt;
+
+            if (isQuestionSuspect && isAdaptiveProbeActive && choiceRows.length >= 2 && !foundMatchForQuestion) {
+                const prevChoiceNorm = (unreviewedEntry && unreviewedEntry.ansNorm) ||
+                    (probeEntry && probeEntry.lastNorm) ||
+                    (candidates.length > 0 ? (candidates[0].ansNorm || normalizeChoice(candidates[0].ansRaw || candidates[0].answer || '')) : null);
                 const triedChoices = (probeEntry && Array.isArray(probeEntry.triedChoices))
                     ? probeEntry.triedChoices
                     : (prevChoiceNorm ? [prevChoiceNorm] : []);
@@ -2856,16 +2940,19 @@
                             isFlipped = true;
                         }
                     } else {
-                        // Multiple choice (3+ choices): Pick the first untried candidate row
-                        const untried = validRows.find(vr => !triedChoices.includes(vr.norm) && !triedChoices.includes(unscriptDigits(vr.norm)));
+                        // Multiple choice (3+ choices): Pick an untried candidate row different from prevChoiceNorm
+                        const untried = validRows.find(vr => vr.norm !== prevChoiceNorm && !triedChoices.includes(vr.norm) && !triedChoices.includes(unscriptDigits(vr.norm)));
                         if (untried) {
                             probeTarget = untried;
+                        } else {
+                            probeTarget = validRows.find(vr => vr.norm !== prevChoiceNorm) || validRows[0];
                         }
                     }
 
                     if (probeTarget) {
                         foundMatchForQuestion = true;
                         probedThisPageCount++;
+                        que.dataset.amaesProbeFlipped = 'true';
 
                         const targetRow = probeTarget.row;
                         targetRow.classList.add('amaes-adaptive-probe-choice');
@@ -3121,6 +3208,11 @@
                                 }
                                 input.dispatchEvent(new Event('input', { bubbles: true }));
                                 input.dispatchEvent(new Event('change', { bubbles: true }));
+                                const choiceTextClean = cleanDOMToAI(label).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
+                                recordAttemptAnswerEvidence(que, choiceTextClean, hasAiSource ? 'ai_inference' : (hasVerifiedSource ? 'verified_db' : 'community_db'), {
+                                    verified: hasVerifiedSource,
+                                    isAdaptiveProbe: false
+                                });
                             }
                         }
 

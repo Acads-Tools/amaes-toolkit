@@ -21,7 +21,7 @@ Client pings to `/telemetry` adhere strictly to the following lightweight JSON s
 ```json
 {
   "anon_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "event": "heartbeat",
   "session_quizzes_solved": 3,
   "fast_mode_enabled": true
@@ -31,7 +31,7 @@ Client pings to `/telemetry` adhere strictly to the following lightweight JSON s
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `anon_id` | `UUID v4` | Random anonymous installation identifier stored locally in `localStorage`. Regenerated upon reinstall. |
-| `version` | `string` | Current version of the userscript (e.g. `1.9.2`). Used for update adoption metrics. |
+| `version` | `string` | Current version of the userscript (e.g. `1.9.3`). Used for update adoption metrics. |
 | `event` | `string` | Event type: `heartbeat` (sent at most once every 6 hours) or `quiz_completed`. |
 | `session_quizzes_solved` | `integer` | Count of quizzes completed in the current browser session only (`sessionStorage`). |
 | `fast_mode_enabled` | `boolean` | Whether ⚡ Fast Answer (Turbo) Mode is currently toggled on. |

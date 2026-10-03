@@ -56,6 +56,9 @@
 
         if (checkIsQuizViewPage() || checkIsQuizSummaryPage()) {
             promoteAttemptEvidenceFromScore();
+            setTimeout(() => {
+                try { promoteAttemptEvidenceFromScore(); } catch (_) {}
+            }, 800);
         }
 
         // Auto-Harvest past quizzes: scan Grade Report once per session per course or all courses on dashboard
