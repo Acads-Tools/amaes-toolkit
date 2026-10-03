@@ -6142,8 +6142,7 @@
                         }
 
                         const canSelectAnswer = isManualSelect || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode));
-                        const anyRadioChecked = isRadio && Boolean(que.querySelector('.answer input[type="radio"]:checked'));
-                        if (canSelectAnswer && probeTarget.input && !probeTarget.input.checked && (!anyRadioChecked || isManualSelect)) {
+                        if (canSelectAnswer && probeTarget.input && !probeTarget.input.checked) {
                             probeTarget.input.checked = true;
                             probeTarget.input.click();
                             if (targetLbl && targetLbl !== probeTarget.input) targetLbl.click();
