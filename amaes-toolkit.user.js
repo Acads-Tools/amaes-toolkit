@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.9.1
+// @version      1.9.2
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -30,7 +30,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.9.1";
+    const SCRIPT_VERSION = "v1.9.2";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -4089,20 +4089,31 @@
 
             // 2. Identify questions verified by the database vs unverified/unknown questions
             const unverifiedQuestions = [];
+            const unreviewedOrProbeQuestions = [];
+
             queContainers.forEach(que => {
-                // A student's manual answer is not an unknown question. Do not
-                // replace it with an AI warning on one-page quizzes.
-                if (isQuestionAnswered(que)) return;
                 const hasVerifiedBadge = que.querySelector('.amaes-verified-badge');
+                const hasAdaptiveBadge = que.querySelector('.amaes-adaptive-probe-badge');
+                const hasUnreviewedNote = que.querySelector('.amaes-unreviewed-history-note');
+                const hasAiBadge = que.querySelector('.amaes-ai-suggested-badge');
+                const hasUnverifiedBadge = que.querySelector('.amaes-unverified-badge');
+                const hasDragHint = que.querySelector('.amaes-drag-hint');
                 const hasShortAnsHint = que.querySelector('.amaes-shortans-hint');
                 const hasSelectHint = que.querySelector('.amaes-select-hint');
-                const hasDragHint = que.querySelector('.amaes-drag-hint');
+
+                // Track unverified, AI-suggested, or prior unreviewed attempts
+                if (hasUnreviewedNote || hasAdaptiveBadge || hasAiBadge || hasUnverifiedBadge) {
+                    unreviewedOrProbeQuestions.push(que);
+                }
+
+                if (isQuestionAnswered(que)) return;
+
                 const dropZones = que.querySelectorAll('.drop, .dropzone, span.droptarget, .droppable');
                 const selectInputs = que.querySelectorAll('select');
                 const textInputs = que.querySelectorAll('input[type="text"].form-control, input.form-control');
 
                 let isFullyVerified = false;
-                if (hasVerifiedBadge) {
+                if (hasVerifiedBadge && !hasUnreviewedNote && !hasAdaptiveBadge && !hasAiBadge && !hasUnverifiedBadge) {
                     isFullyVerified = true;
                 } else if (dropZones.length > 0) {
                     isFullyVerified = que.querySelectorAll('.amaes-drag-hint').length >= dropZones.length;
@@ -4121,49 +4132,66 @@
 
             const nextBtn = findQuizNextButton();
 
+            // Safe review pause: If any question on this page was an unreviewed probe or unverified suggestion,
+            // do NOT silently breeze through unless user explicitly enabled auto-advance on manual/unverified clicks!
+            if (unreviewedOrProbeQuestions.length > 0 && !autoNextQuiz && !fastQuizMode) {
+                const firstProbeQue = unreviewedOrProbeQuestions[0];
+                setActiveQuestion(firstProbeQue, false);
+                firstProbeQue.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                clearTimeout(autoNextTimer);
+                autoNextTimer = null;
+                isWaitingForUserAnswer = true;
+                syncAutoQuizUI(true);
+                const qData = extractQuestionData(firstProbeQue);
+                const isFlippedProbe = Boolean(firstProbeQue.querySelector('.amaes-adaptive-probe-choice'));
+                setLog(`[Review Pause] Question #${qData ? qData.qNum : ''}: ${isFlippedProbe ? 'Adaptive probe flipped to alternative choice' : 'Unverified candidate selected'}. Paused for review—press <b>N</b> or click Next page when ready.`, "var(--accent-purple)");
+                isSolverRunning = false;
+                return;
+            }
+
             // Co-Pilot: Auto-Pick & Next IF Known, WAIT if Unknown
-                // Case A: 100% of questions on this page were verified & answered by database!
-                if (unverifiedQuestions.length === 0 && res.total > 0) {
-                    const allAnswered = areAllPageQuestionsAnswered();
-                    if (allAnswered) {
-                        setLog(`All <b>${res.total}</b> question(s) verified & picked!`, "var(--accent-green)");
+            // Case A: 100% of questions on this page were verified & answered by database!
+            if (unverifiedQuestions.length === 0 && res.total > 0) {
+                const allAnswered = areAllPageQuestionsAnswered();
+                if (allAnswered) {
+                    setLog(`All <b>${res.total}</b> question(s) verified & picked!`, "var(--accent-green)");
 
-                        // Answered by Auto-Quiz: automatically advance to next page!
-                        if (nextBtn && autoNextVerified) {
-                            const btnText = (nextBtn.value || nextBtn.innerText || '').toLowerCase();
-                            const isFinish = btnText.includes('finish') || btnText.includes('submit');
+                    // Answered by Auto-Quiz: automatically advance to next page!
+                    if (nextBtn && autoNextVerified) {
+                        const btnText = (nextBtn.value || nextBtn.innerText || '').toLowerCase();
+                        const isFinish = btnText.includes('finish') || btnText.includes('submit');
 
-                            clearTimeout(autoNextTimer);
-                            const navDelay = fastQuizMode ? 200 : (isFinish ? 1200 : 1000);
-                            if (isFinish) {
-                                if (autoSubmitQuiz || fastQuizMode) {
-                                    setLog(`<b>All Questions Answered!</b> Advancing to summary in ${(navDelay / 1000).toFixed(1)}s...`, "var(--accent-green)");
-                                    showToast("Finishing attempt...", navDelay + 1000);
-                                    autoNextTimer = setTimeout(() => {
-                                        if (!autoQuizMode) return;
-                                        clickQuizNextButton(nextBtn);
-                                    }, navDelay);
-                                } else {
-                                    setLog("<b>Last Question Answered!</b> Paused for review before final submit.", "var(--accent-green)");
-                                    showToast("Last question answered! Review before submitting.", 4000);
-                                }
-                                isSolverRunning = false;
-                                return;
+                        clearTimeout(autoNextTimer);
+                        const navDelay = fastQuizMode ? 200 : (isFinish ? 1200 : 1000);
+                        if (isFinish) {
+                            if (autoSubmitQuiz || fastQuizMode) {
+                                setLog(`<b>All Questions Answered!</b> Advancing to summary in ${(navDelay / 1000).toFixed(1)}s...`, "var(--accent-green)");
+                                showToast("Finishing attempt...", navDelay + 1000);
+                                autoNextTimer = setTimeout(() => {
+                                    if (!autoQuizMode) return;
+                                    clickQuizNextButton(nextBtn);
+                                }, navDelay);
+                            } else {
+                                setLog("<b>Last Question Answered!</b> Paused for review before final submit.", "var(--accent-green)");
+                                showToast("Last question answered! Review before submitting.", 4000);
                             }
-
-                            setLog(`[Auto-Next] <b>Auto-Next:</b> Advancing to next question in <b>${(navDelay / 1000).toFixed(1)}s${fastQuizMode ? ' (Fast Mode)' : ''}</b>...`, fastQuizMode ? "var(--accent-amber)" : "var(--accent-blue)");
-                            autoNextTimer = setTimeout(() => {
-                                if (!autoQuizMode) return;
-                                clickQuizNextButton(nextBtn);
-                            }, navDelay);
+                            isSolverRunning = false;
+                            return;
                         }
-                    } else {
-                        // Verified choices highlighted, but not all picked (e.g. auto-pick disabled)
-                        setLog(`Verified answers found! Select your choice${autoNextQuiz ? ' (advances automatically)' : ' and click Next page'}.`, "var(--accent-blue)");
+
+                        setLog(`[Auto-Next] <b>Auto-Next:</b> Advancing to next question in <b>${(navDelay / 1000).toFixed(1)}s${fastQuizMode ? ' (Fast Mode)' : ''}</b>...`, fastQuizMode ? "var(--accent-amber)" : "var(--accent-blue)");
+                        autoNextTimer = setTimeout(() => {
+                            if (!autoQuizMode) return;
+                            clickQuizNextButton(nextBtn);
+                        }, navDelay);
                     }
-                    isSolverRunning = false;
-                    return;
+                } else {
+                    // Verified choices highlighted, but not all picked (e.g. auto-pick disabled)
+                    setLog(`Verified answers found! Select your choice${autoNextQuiz ? ' (advances automatically)' : ' and click Next page'}.`, "var(--accent-blue)");
                 }
+                isSolverRunning = false;
+                return;
+            }
 
                 // Case B: UNKNOWN QUESTION DETECTED (Auto-solver cannot answer it!)
                 // Safe wait state on unknown question: solver pauses on THIS question for user input,
@@ -6181,7 +6209,7 @@
                         let badge = targetRow.querySelector('.amaes-verified-badge, .amaes-ai-suggested-badge');
                         if (!badge) {
                             badge = document.createElement(isAmauoed && !hasVerifiedSource ? 'a' : 'span');
-                            badge.className = hasAiSource ? 'amaes-ai-suggested-badge' : `amaes-verified-badge ${hasAmauoedSource ? 'amaes-badge-amauoed' : 'amaes-badge-db'}`;
+                            badge.className = hasAiSource ? 'amaes-ai-suggested-badge' : (hasVerifiedSource ? `amaes-verified-badge ${hasAmauoedSource ? 'amaes-badge-amauoed' : 'amaes-badge-db'}` : `amaes-unverified-badge ${hasAmauoedSource ? 'amaes-badge-amauoed' : 'amaes-badge-db'}`);
                             badge.innerHTML = sourceLabels.map(label => {
                                 const icon = label.startsWith('AI Suggestion') ? '' : ((label.startsWith('Web Study Guide') || label.startsWith('AMAUOED')) ? ICONS.external : (isDeduced ? ICONS.lightbulb : ICONS.checkCircle));
                                 return `${icon} <span>${label}</span>`;

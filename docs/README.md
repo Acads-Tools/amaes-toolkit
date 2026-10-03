@@ -19,7 +19,7 @@ Welcome to the technical documentation hub for the **AMAES Moodle Toolkit** and 
 
 | Document | Topic | Description |
 | :--- | :--- | :--- |
-| **[Client Compatibility & Lifecycle](CLIENT-COMPATIBILITY.md)** | Versioning Policy | Supported client matrix (`v1.9.1`), minimum version enforcement (`v1.8.2`), relay HTTP 426 gates, and release procedures. |
+| **[Client Compatibility & Lifecycle](CLIENT-COMPATIBILITY.md)** | Versioning Policy | Supported client matrix (`v1.9.2`), minimum version enforcement (`v1.8.2`), relay HTTP 426 gates, and release procedures. |
 | **[Terms of Use & Disclaimer](TERMS.md)** | Legal & Compliance | Independent status, student sole responsibility for academic integrity, "AS IS" warranty disclaimers, limitation of liability, and MIT license governance. |
 | **[Contributor Identity Rules](AGENTS.md)** | Privacy & Git Rules | Strict zero-linkage policy: mandatory `AcademicContributor` git author and committer identity across all commits and connected repositories. |
 | **[Security Policy](../SECURITY.md)** | Security & Vulnerabilities | Privacy audit checklists, vulnerability reporting workflow, and responsible disclosure guidelines. |
