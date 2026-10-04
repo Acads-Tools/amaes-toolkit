@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.11.14
+// @version      1.11.15
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -31,7 +31,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.14";
+    const SCRIPT_VERSION = "v1.11.15";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -6266,9 +6266,11 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
     function getMatchingRowAnswerEvidence(questionsDb, subQuestionText) {
         if (!subQuestionText) return { candidates: [], wrongAnswers: [], hasConflict: false };
-        const candidates = questionsDb.filter(candidate =>
-            questionTextMatches(candidate.qNorm || candidate.qRaw || candidate.question, subQuestionText)
-        );
+        const rowPromptKey = normalizeQuestionMatchKey(subQuestionText);
+        const candidates = questionsDb.filter(candidate => {
+            const candidatePrompt = candidate.qRaw || candidate.question || candidate.qNorm || '';
+            return rowPromptKey && normalizeQuestionMatchKey(candidatePrompt) === rowPromptKey;
+        });
         const wrongAnswers = [];
         candidates.forEach(candidate => {
             if (!(candidate.wrongAnswerEvidence === true || candidate.evidenceType === 'moodle_review_elimination') ||

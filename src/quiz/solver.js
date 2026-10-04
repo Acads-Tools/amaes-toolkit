@@ -2868,9 +2868,11 @@
 
     function getMatchingRowAnswerEvidence(questionsDb, subQuestionText) {
         if (!subQuestionText) return { candidates: [], wrongAnswers: [], hasConflict: false };
-        const candidates = questionsDb.filter(candidate =>
-            questionTextMatches(candidate.qNorm || candidate.qRaw || candidate.question, subQuestionText)
-        );
+        const rowPromptKey = normalizeQuestionMatchKey(subQuestionText);
+        const candidates = questionsDb.filter(candidate => {
+            const candidatePrompt = candidate.qRaw || candidate.question || candidate.qNorm || '';
+            return rowPromptKey && normalizeQuestionMatchKey(candidatePrompt) === rowPromptKey;
+        });
         const wrongAnswers = [];
         candidates.forEach(candidate => {
             if (!(candidate.wrongAnswerEvidence === true || candidate.evidenceType === 'moodle_review_elimination') ||

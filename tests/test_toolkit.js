@@ -2924,8 +2924,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.11.14'), "Userscript header must specify v1.11.14");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.14";'), "Constant SCRIPT_VERSION must be v1.11.14");
+    assert.ok(script.includes('@version      1.11.15'), "Userscript header must specify v1.11.15");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.15";'), "Constant SCRIPT_VERSION must be v1.11.15");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4123,11 +4123,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.11.14-blue.svg"), "README badge must show v1.11.14");
+    assert.ok(readme.includes("version-1.11.15-blue.svg"), "README badge must show v1.11.15");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.11.14<"), "Website must display v1.11.14 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.11.15<"), "Website must display v1.11.15 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -5523,6 +5523,7 @@ test("Matching questions: maps answers by row prompt, blocks reviewed wrong answ
             const b = normalize(right);
             return Boolean(a && b && (a === b || (a.length > 20 && (a.includes(b) || b.includes(a)))));
         },
+        normalizeQuestionMatchKey: normalize,
         normalizeChoice: normalize,
         unscriptDigits: value => value,
         isConfirmedCandidate: candidate => Boolean(candidate.verified && candidate.source === 'review_screen'),
@@ -5559,6 +5560,13 @@ test("Matching questions: maps answers by row prompt, blocks reviewed wrong answ
     const confirmed = sandbox.resolveRow([...guides, verifiedReviewAnswer], prompt);
     assert.strictEqual(confirmed.candidates[0].ansRaw, 'Queries', "A directly verified Moodle row answer must outrank unconfirmed source disagreements");
     assert.strictEqual(confirmed.hasConflict, false);
+
+    const exactOnly = sandbox.resolveRow([
+        { qRaw: prompt, ansRaw: 'Reports', source: 'jennysonline', verified: false },
+        { qRaw: `${prompt} plus extra context`, ansRaw: 'form helper class', source: 'amauoed', verified: false }
+    ], prompt);
+    assert.strictEqual(exactOnly.candidates.length, 1, "Matching row lookup must not borrow answers from longer, merely overlapping prompts");
+    assert.strictEqual(exactOnly.candidates[0].ansRaw, 'Reports');
 
     const harvester = fs.readFileSync('src/sync/harvester.js', 'utf8');
     assert.ok(harvester.includes("const isMatchingQuestion = matchingRows.length > 0 || qData.questionType === 'match';"), "Harvester must identify Moodle matching tables");

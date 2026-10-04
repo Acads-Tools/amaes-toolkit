@@ -117,7 +117,7 @@ Injections here provide real-time assistance during active assessments.
   - Placed beside text input fields and textareas.
   - Displays the verified answer with a 1-click button to insert the text.
 - **Matching-Question Row Hints**: `.amaes-select-hint`
-  - Matches each dropdown to its own row prompt; it never maps Moodle's shuffled matching answers by position.
+  - Matches each dropdown to its own exact normalized row prompt; it never borrows a candidate from a merely similar question or maps Moodle's shuffled matching answers by position.
   - Moodle review evidence is stored against the individual row. Confirmed wrong selections are excluded and flagged, while conflicting unverified study-guide answers pause Auto-Pick for that row.
 - **Gemini Matching Suggestions**: `.amaes-ai-matching-suggestion`
   - Sends each matching prompt with its own available choices to Gemini and accepts only explicitly numbered, exact-option row answers.
