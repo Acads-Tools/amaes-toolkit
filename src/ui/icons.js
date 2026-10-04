@@ -615,7 +615,11 @@
         notice.style.cssText = 'margin: 12px 0; padding: 10px 12px; border-left: 4px solid #f59e0b; border-radius: 5px; background: rgba(245, 158, 11, 0.12); color: inherit; font-size: 13px; line-height: 1.5;';
         const notices = [];
         if (sharedRestricted) {
-            notices.push(`Review access reports for ${subjectCode}: at least ${sharedStatus.threshold} distinct installations reported that quiz review was restricted in this course within the last ${sharedStatus.windowDays} days. This does not prove that every quiz has the same policy.`);
+            if (sharedStatus.reportCount >= sharedStatus.threshold) {
+                notices.push(`Review access reports for ${subjectCode}: at least ${sharedStatus.threshold} distinct installations reported that quiz review was restricted in this course within the last ${sharedStatus.windowDays} days. This does not prove that every quiz has the same policy.`);
+            } else {
+                notices.push(`Answer sharing is disabled for ${subjectCode} because the course is designated non-reviewable. Study-guide and AI suggestions may still be available, but they are not verified answer keys.`);
+            }
         }
         if (locallyObservedRestricted) {
             notices.push(`This browser also observed a quiz that blocked review. Its overall grade cannot verify individual answers.`);

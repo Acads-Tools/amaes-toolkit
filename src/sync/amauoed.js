@@ -509,6 +509,7 @@
     }
 
     function getCachedAnswers(code) {
+        const sharingDisabled = ANSWER_SHARING_DISABLED_COURSES.has(String(code || '').toUpperCase());
         const raw = localStorage.getItem(`amaes_amauoed_cache_${code}`);
         if (!raw) return null;
         try {
@@ -522,13 +523,19 @@
                 logDebug(`Ignoring incompatible answer cache for ${code}.`);
                 return null;
             }
-            const normalized = parsed
+            let normalized = parsed
                 .filter(item => item && typeof item === 'object')
                 .map(item => ({
                     ...item,
                     qNorm: item.qNorm || normalizeText(item.qRaw || item.question || '')
                 }))
                 .filter(item => Boolean(item.qNorm));
+            if (sharingDisabled) {
+                normalized = normalized.filter(item => item.verified !== true &&
+                    item.evidenceType === 'study_guide_candidate' &&
+                    /amauoed|jennysonline/i.test(String(item.source || '')));
+                localStorage.setItem(`amaes_amauoed_cache_${code}`, JSON.stringify(normalized));
+            }
             if (storedSchema < ANSWER_DB_SCHEMA_VERSION) {
                 localStorage.setItem(`amaes_cache_schema_${code}`, String(ANSWER_DB_SCHEMA_VERSION));
             }
@@ -543,7 +550,11 @@
         if (!Array.isArray(questions)) {
             throw new TypeError('Answer cache must be an array');
         }
+        if (ANSWER_SHARING_DISABLED_COURSES.has(String(code || '').toUpperCase())) {
+            questions = questions.filter(item => item && item.verified !== true &&
+                item.evidenceType === 'study_guide_candidate' &&
+                /amauoed|jennysonline/i.test(String(item.source || '')));
+        }
         localStorage.setItem(`amaes_amauoed_cache_${code}`, JSON.stringify(questions));
         localStorage.setItem(`amaes_cache_schema_${code}`, String(ANSWER_DB_SCHEMA_VERSION));
     }
-

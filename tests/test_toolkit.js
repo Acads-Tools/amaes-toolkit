@@ -2881,8 +2881,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.11.0'), "Userscript header must specify v1.11.0");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.0";'), "Constant SCRIPT_VERSION must be v1.11.0");
+    assert.ok(script.includes('@version      1.11.1'), "Userscript header must specify v1.11.1");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.1";'), "Constant SCRIPT_VERSION must be v1.11.1");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4005,7 +4005,7 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     const fs = require('fs');
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
     const readme = fs.readFileSync('README.md', 'utf8');
-    const indexHtml = fs.readFileSync('index.html', 'utf8');
+    const indexHtml = fs.readFileSync(path.join('public', 'index.html'), 'utf8');
 
     // 1. Welcome Guide card & setup button
     assert.ok(script.includes("Built-in Google Gemini AI"), "Welcome guide must feature Built-in Google Gemini AI card");
@@ -4015,10 +4015,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.11.0-blue.svg"), "README badge must show v1.11.0");
+    assert.ok(readme.includes("version-1.11.1-blue.svg"), "README badge must show v1.11.1");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.11.0<"), "Website must display v1.11.0 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.11.1<"), "Website must display v1.11.1 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -5092,6 +5092,7 @@ test("Evidence-Gated Adaptive Choice Probe for Non-Reviewable Quizzes: only prob
     const fs = require('fs');
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
     const icons = fs.readFileSync(path.join('src', 'ui', 'icons.js'), 'utf8');
+    const cacheSource = fs.readFileSync(path.join('src', 'sync', 'amauoed.js'), 'utf8');
 
     // 1. Suspect Question Eligibility & Probe Activation
     assert.ok(script.includes("const isQuestionSuspect = !hasAnyVerifiedCandidate || hasPriorFailedAttempt;"), "Must consider questions suspect if prior attempt scored < 100%");
@@ -5119,6 +5120,12 @@ test("Evidence-Gated Adaptive Choice Probe for Non-Reviewable Quizzes: only prob
     assert.ok(reportBody, "Shared reports must contain only the course code and explicit review restriction");
     assert.ok(script.includes("X-AMAES-Installation': getAnonymousContributorId()"), "Shared reviewability reports must use the existing anonymous installation ID");
     assert.ok(icons.includes("course-reviewability") && icons.includes("restricted-reported"), "Course pages must display the shared status only when the relay confirms it");
+    assert.ok(script.includes("const ANSWER_SHARING_DISABLED_COURSES = new Set(['GE6301'])"), "Gender and Society must be designated non-reviewable in the client");
+    assert.ok(cacheSource.includes("normalized = normalized.filter(item => item.verified !== true") &&
+        cacheSource.includes("item.evidenceType === 'study_guide_candidate'") &&
+        cacheSource.includes("questions = questions.filter(item => item && item.verified !== true"),
+    "Disabled courses must purge cached answer keys while preserving unverified study-guide suggestions");
+    assert.ok(icons.includes("Answer sharing is disabled for ${subjectCode}"), "Course page must explain the explicit non-reviewable course sharing block");
 
     // 4. Pure Unit Logic: Verify Choice Rotation Mechanics
     const validChoices = [

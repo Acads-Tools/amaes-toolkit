@@ -64,6 +64,7 @@
         "GE6106": "Science, Technology and Society",
         "GE6107": "Ethics",
         "GE6108": "Rizal's Life and Works",
+        "GE6301": "Gender and Society",
         "GE6115": "Art Appreciation",
         "ETHNS6101": "Euthenics 1",
         "ETHNS6102": "Euthenics 2",

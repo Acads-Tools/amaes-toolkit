@@ -1,10 +1,11 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.0";
+    const SCRIPT_VERSION = "v1.11.1";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
+    const ANSWER_SHARING_DISABLED_COURSES = new Set(['GE6301']);
     const CONTRIBUTOR_ID_STORAGE_KEY = 'amaes_anonymous_contributor_id';
 
     // The installer page uses a same-page event as a privacy-safe installation check.

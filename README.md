@@ -10,14 +10,14 @@
 </p>
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js"><img src="https://img.shields.io/badge/version-1.11.0-blue.svg" alt="Version 1.11.0"></a>
+  <a href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js"><img src="https://img.shields.io/badge/version-1.11.1-blue.svg" alt="Version 1.11.1"></a>
   <a href="https://acads-tools.github.io/amaes-toolkit/"><img src="https://img.shields.io/badge/platform-Violentmonkey%20%7C%20Tampermonkey-darkblue.svg" alt="Platform Compatibility"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="#zero-telemetry--privacy-architecture"><img src="https://img.shields.io/badge/privacy-zero--telemetry-success.svg" alt="Zero Telemetry"></a>
   <a href=".github/workflows/privacy-check.yml"><img src="https://img.shields.io/badge/privacy--audit-passing-brightgreen.svg" alt="Privacy Check Passed"></a>
 </p>
 
-> **Compatibility Notice:** Version **1.11.0** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](docs/CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
+> **Compatibility Notice:** Version **1.11.1** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](docs/CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
 
 ---
 
@@ -70,7 +70,7 @@ Before installing, ensure your environment meets the following specifications:
 * **Autonomous Progression (`Auto-Next`):** Automatically selects verified answers and smoothly advances to the next question.
 * **Ground-Truth Safety Gate:** Only Moodle-confirmed answers are auto-selected or auto-filled. AMAUOED and Jenny's Online suggestions remain clearly labeled and require manual selection, even when Auto-Pick is enabled.
 * **Source Confidence Labels:** Jenny's Online and AMAUOED are equal-priority study-guide suggestions, not verified answers; only Moodle review evidence, a matching 100% attempt, or explicit review-backed deduction can confirm an answer. An overall quiz score alone never proves which question was right or wrong.
-* **Non-Reviewable Quiz Safety:** A 100% overall score is not used to verify or share individual answers when Moodle explicitly blocks review or review permission cannot be confirmed. Explicit restrictions are reported to the relay using only the course code and a random anonymous installation ID, which is hashed before database storage. Course pages show a shared warning after three distinct installations report restrictions within 90 days; it warns that policy may vary between quizzes.
+* **Non-Reviewable Quiz Safety:** A 100% overall score is not used to verify or share individual answers when Moodle explicitly blocks review or review permission cannot be confirmed. GE6301 (Gender and Society) is designated non-reviewable: its shared verified answer bank is cleared, answer sharing is blocked locally and at the relay, while unverified study-guide/AI suggestions remain separate. Other explicit restrictions are reported using only the course code and a random anonymous installation ID, hashed before database storage; shared warnings require three distinct installations within 90 days.
 * **Course-Aware Guide Discovery:** AMAUOED discovery uses the detected course name when available. Jenny's Online is scraped by the database refresh job, not by quiz-page code.
 * **Study-Guide Data Safety:** Jenny's shared database snapshot is the source of truth and includes its last refresh timestamp. The toolkit uses snapshots younger than 30 days, returns cached/stale suggestions while queuing a refresh for stale or missing data, and rechecks the shared snapshot during the same session. The database scrapes Jenny monthly and can also refresh an individual course on demand. AMAUOED and Jenny remain separate, equally prioritized, and unconfirmed.
 * **Unreviewable Retry Warning:** On quiz pages that prohibit review, the toolkit warns that a later attempt may score lower and that a quiz-wide score is not evidence about individual answers.

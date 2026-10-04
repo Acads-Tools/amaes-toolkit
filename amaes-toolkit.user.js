@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.11.0
+// @version      1.11.1
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -31,10 +31,11 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.0";
+    const SCRIPT_VERSION = "v1.11.1";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
+    const ANSWER_SHARING_DISABLED_COURSES = new Set(['GE6301']);
     const CONTRIBUTOR_ID_STORAGE_KEY = 'amaes_anonymous_contributor_id';
 
     // The installer page uses a same-page event as a privacy-safe installation check.
@@ -1641,7 +1642,11 @@
         notice.style.cssText = 'margin: 12px 0; padding: 10px 12px; border-left: 4px solid #f59e0b; border-radius: 5px; background: rgba(245, 158, 11, 0.12); color: inherit; font-size: 13px; line-height: 1.5;';
         const notices = [];
         if (sharedRestricted) {
-            notices.push(`Review access reports for ${subjectCode}: at least ${sharedStatus.threshold} distinct installations reported that quiz review was restricted in this course within the last ${sharedStatus.windowDays} days. This does not prove that every quiz has the same policy.`);
+            if (sharedStatus.reportCount >= sharedStatus.threshold) {
+                notices.push(`Review access reports for ${subjectCode}: at least ${sharedStatus.threshold} distinct installations reported that quiz review was restricted in this course within the last ${sharedStatus.windowDays} days. This does not prove that every quiz has the same policy.`);
+            } else {
+                notices.push(`Answer sharing is disabled for ${subjectCode} because the course is designated non-reviewable. Study-guide and AI suggestions may still be available, but they are not verified answer keys.`);
+            }
         }
         if (locallyObservedRestricted) {
             notices.push(`This browser also observed a quiz that blocked review. Its overall grade cannot verify individual answers.`);
@@ -2368,6 +2373,7 @@
         "GE6106": "Science, Technology and Society",
         "GE6107": "Ethics",
         "GE6108": "Rizal's Life and Works",
+        "GE6301": "Gender and Society",
         "GE6115": "Art Appreciation",
         "ETHNS6101": "Euthenics 1",
         "ETHNS6102": "Euthenics 2",
@@ -3154,6 +3160,7 @@
     }
 
     function getCachedAnswers(code) {
+        const sharingDisabled = ANSWER_SHARING_DISABLED_COURSES.has(String(code || '').toUpperCase());
         const raw = localStorage.getItem(`amaes_amauoed_cache_${code}`);
         if (!raw) return null;
         try {
@@ -3167,13 +3174,19 @@
                 logDebug(`Ignoring incompatible answer cache for ${code}.`);
                 return null;
             }
-            const normalized = parsed
+            let normalized = parsed
                 .filter(item => item && typeof item === 'object')
                 .map(item => ({
                     ...item,
                     qNorm: item.qNorm || normalizeText(item.qRaw || item.question || '')
                 }))
                 .filter(item => Boolean(item.qNorm));
+            if (sharingDisabled) {
+                normalized = normalized.filter(item => item.verified !== true &&
+                    item.evidenceType === 'study_guide_candidate' &&
+                    /amauoed|jennysonline/i.test(String(item.source || '')));
+                localStorage.setItem(`amaes_amauoed_cache_${code}`, JSON.stringify(normalized));
+            }
             if (storedSchema < ANSWER_DB_SCHEMA_VERSION) {
                 localStorage.setItem(`amaes_cache_schema_${code}`, String(ANSWER_DB_SCHEMA_VERSION));
             }
@@ -3188,10 +3201,14 @@
         if (!Array.isArray(questions)) {
             throw new TypeError('Answer cache must be an array');
         }
+        if (ANSWER_SHARING_DISABLED_COURSES.has(String(code || '').toUpperCase())) {
+            questions = questions.filter(item => item && item.verified !== true &&
+                item.evidenceType === 'study_guide_candidate' &&
+                /amauoed|jennysonline/i.test(String(item.source || '')));
+        }
         localStorage.setItem(`amaes_amauoed_cache_${code}`, JSON.stringify(questions));
         localStorage.setItem(`amaes_cache_schema_${code}`, String(ANSWER_DB_SCHEMA_VERSION));
     }
-
 // ==========================================
 // Jenny's Online public study-guide sources
 // ==========================================
