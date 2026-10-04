@@ -392,6 +392,42 @@
         return null;
     }
 
+    function setQuestionStudyGuideTag(que, label) {
+        if (!que) return;
+        que.querySelectorAll('.amaes-study-guide-question-tag').forEach(el => el.remove());
+        const formulation = que.querySelector('.formulation, .content') || que;
+        const tag = document.createElement('div');
+        tag.className = 'amaes-study-guide-question-tag';
+        tag.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 4px 10px;
+            background: rgba(2, 132, 199, 0.09);
+            border: 1px solid rgba(2, 132, 199, 0.32);
+            border-left: 3px solid #0284c7;
+            border-radius: 6px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 11px;
+            line-height: 1.35;
+            box-sizing: border-box;
+        `;
+        tag.title = `This answer matches an unverified ${label} study-guide suggestion. Review before submitting.`;
+        tag.innerHTML = `
+            <span style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <span style="background: #0284c7; color: #ffffff !important; padding: 2px 7px; border-radius: 4px; font-weight: 800; font-size: 9.5px; letter-spacing: 0.4px;">STUDY-GUIDE MATCH</span>
+                <span style="color: #0369a1; font-weight: 700;">Suggested by ${escapeHtml(label)}</span>
+                <span style="color: #0369a1; font-size: 10px;">(Unverified — review before submitting)</span>
+            </span>
+        `;
+        const qtextElem = que.querySelector('.qtext, .formulation .qtext');
+        if (qtextElem && qtextElem.parentNode === formulation) {
+            formulation.insertBefore(tag, qtextElem);
+        } else {
+            formulation.insertBefore(tag, formulation.firstChild);
+        }
+    }
+
     function saveQuizAttemptSummary(subCode, data) {
         if (!data || typeof data.percentage !== 'number') return;
         const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
@@ -2652,7 +2688,7 @@
             const hasAnyVerifiedCandidate = candidates.some(item => isConfirmedCandidate(item));
 
             // Clean up any prior hints
-            que.querySelectorAll('.amaes-unanswered-hint, .amaes-unreviewed-history-note, .amaes-ambiguous-question-match-note').forEach(b => b.remove());
+            que.querySelectorAll('.amaes-unanswered-hint, .amaes-unreviewed-history-note, .amaes-ambiguous-question-match-note, .amaes-study-guide-question-tag').forEach(b => b.remove());
 
             // Check if this question was previously answered under an unreviewed attempt (<100% score)
             const unreviewed = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(moodleQNorm, sCode) : null;
@@ -2681,12 +2717,13 @@
                     color: var(--text-secondary);
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 `;
+                const canTestAnotherChoice = !ANSWER_SHARING_DISABLED_COURSES.has(String(sCode || '').toUpperCase());
                 note.innerHTML = `
                     <div>
                         <span style="background: rgba(245, 158, 11, 0.2); color: #d97706; padding: 1px 5px; border-radius: 3px; font-weight: 700; font-size: 9px; margin-right: 4px;">UNREVIEWED ATTEMPT</span>
                         <span>Prior attempt scored <b>${displayPercentage}% overall</b>; this selection is not confirmed. Selected: <i>"${escapeHtml(prevAnsText)}"</i></span>
                     </div>
-                    <button type="button" class="amaes-btn-try-alt" title="A different choice is only a test; the overall quiz score does not show this answer was wrong." style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); border-radius: 4px; padding: 2px 7px; font-size: 9.5px; cursor: pointer; white-space: nowrap; font-weight: 600;">Test Another Choice</button>
+                    ${canTestAnotherChoice ? '<button type="button" class="amaes-btn-try-alt" title="A different choice is only a test; the overall quiz score does not show this answer was wrong." style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); border-radius: 4px; padding: 2px 7px; font-size: 9.5px; cursor: pointer; white-space: nowrap; font-weight: 600;">Test Another Choice</button>' : ''}
                 `;
                 const altBtn = note.querySelector('.amaes-btn-try-alt');
                 if (altBtn) {
@@ -2810,7 +2847,7 @@
                 el.style.backgroundColor = '';
                 el.style.borderRadius = '';
             });
-            que.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-select-elim-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag, .amaes-pool-changed-hint').forEach(b => b.remove());
+            que.querySelectorAll('.amaes-verified-badge, .amaes-unverified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-select-elim-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag, .amaes-study-guide-question-tag, .amaes-pool-changed-hint').forEach(b => b.remove());
 
             // Safety: collect all verified/confirmed answers for this question
             const verifiedNorms = new Set();
@@ -3276,6 +3313,8 @@
                             setQuestionAiTag(que, true);
                         } else if (hasVerifiedSource) {
                             setQuestionAiTag(que, false);
+                        } else if (isStudyGuide) {
+                            setQuestionStudyGuideTag(que, studyGuide.label);
                         }
                         targetRow.style.outline = `2px solid ${sourceColor}`;
                         targetRow.style.backgroundColor = sourceBg;
