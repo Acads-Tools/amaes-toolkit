@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.11.4
+// @version      1.11.5
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -31,7 +31,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.4";
+    const SCRIPT_VERSION = "v1.11.5";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -8618,14 +8618,14 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
             accounts.forEach(account => {
                 const row = document.createElement('div');
-                row.style.cssText = 'display: flex; gap: 5px; align-items: center;';
+                row.style.cssText = 'display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px; align-items: center; width: 100%;';
 
                 const switchButton = document.createElement('button');
                 switchButton.type = 'button';
                 switchButton.className = 'amaes-btn amaes-btn-monotone';
                 switchButton.textContent = account.nickname;
                 switchButton.title = `Switch to ${account.nickname}`;
-                switchButton.style.cssText = 'flex: 1; justify-content: flex-start; min-width: 0; overflow: hidden; text-overflow: ellipsis;';
+                switchButton.style.cssText = 'width: 100%; justify-content: flex-start; min-width: 0; overflow: hidden; text-overflow: ellipsis;';
                 switchButton.addEventListener('click', () => {
                     startAccountSwitch(account.id, returnToggle.checked);
                 });
@@ -8635,7 +8635,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 removeButton.className = 'amaes-btn amaes-btn-outline';
                 removeButton.textContent = 'Remove';
                 removeButton.setAttribute('aria-label', `Remove ${account.nickname}`);
-                removeButton.style.cssText = 'padding: 4px 7px; font-size: 9px;';
+                removeButton.style.cssText = 'width: auto; white-space: nowrap; padding: 4px 7px; font-size: 9px;';
                 removeButton.addEventListener('click', async () => {
                     try {
                         const latest = await getAccountSwitcherAccounts();
@@ -16642,9 +16642,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     <div id="amaes-account-switcher-card" class="amaes-card" style="padding: 8px; display: flex; flex-direction: column; gap: 7px;">
                         <div style="font-size: 11px; font-weight: 700; color: var(--text-primary);">Account Switcher</div>
                         <form id="amaes-account-switcher-form" style="display: flex; flex-direction: column; gap: 5px;">
-                            <input id="amaes-account-switcher-username" type="text" autocomplete="off" placeholder="Username" aria-label="Username" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                            <input id="amaes-account-switcher-username" type="text" autocomplete="off" placeholder="Username / USN" aria-label="Username / USN" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
                             <input id="amaes-account-switcher-password" type="password" autocomplete="new-password" placeholder="Password" aria-label="Password" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
-                            <input id="amaes-account-switcher-nickname" type="text" autocomplete="off" placeholder="Nickname" aria-label="Nickname" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                            <input id="amaes-account-switcher-nickname" type="text" autocomplete="off" placeholder="Nickname / Display name" aria-label="Nickname / Display name" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
                             <button type="submit" class="amaes-btn amaes-btn-monotone" style="justify-content: center; padding: 6px; font-size: 10px;">Add account</button>
                         </form>
                         <div id="amaes-account-switcher-list" style="display: flex; flex-direction: column; gap: 4px;"></div>

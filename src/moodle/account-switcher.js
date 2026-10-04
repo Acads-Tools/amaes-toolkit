@@ -300,14 +300,14 @@
 
             accounts.forEach(account => {
                 const row = document.createElement('div');
-                row.style.cssText = 'display: flex; gap: 5px; align-items: center;';
+                row.style.cssText = 'display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px; align-items: center; width: 100%;';
 
                 const switchButton = document.createElement('button');
                 switchButton.type = 'button';
                 switchButton.className = 'amaes-btn amaes-btn-monotone';
                 switchButton.textContent = account.nickname;
                 switchButton.title = `Switch to ${account.nickname}`;
-                switchButton.style.cssText = 'flex: 1; justify-content: flex-start; min-width: 0; overflow: hidden; text-overflow: ellipsis;';
+                switchButton.style.cssText = 'width: 100%; justify-content: flex-start; min-width: 0; overflow: hidden; text-overflow: ellipsis;';
                 switchButton.addEventListener('click', () => {
                     startAccountSwitch(account.id, returnToggle.checked);
                 });
@@ -317,7 +317,7 @@
                 removeButton.className = 'amaes-btn amaes-btn-outline';
                 removeButton.textContent = 'Remove';
                 removeButton.setAttribute('aria-label', `Remove ${account.nickname}`);
-                removeButton.style.cssText = 'padding: 4px 7px; font-size: 9px;';
+                removeButton.style.cssText = 'width: auto; white-space: nowrap; padding: 4px 7px; font-size: 9px;';
                 removeButton.addEventListener('click', async () => {
                     try {
                         const latest = await getAccountSwitcherAccounts();

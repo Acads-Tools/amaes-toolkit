@@ -2896,8 +2896,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.11.4'), "Userscript header must specify v1.11.4");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.4";'), "Constant SCRIPT_VERSION must be v1.11.4");
+    assert.ok(script.includes('@version      1.11.5'), "Userscript header must specify v1.11.5");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.5";'), "Constant SCRIPT_VERSION must be v1.11.5");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4030,10 +4030,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.11.4-blue.svg"), "README badge must show v1.11.4");
+    assert.ok(readme.includes("version-1.11.5-blue.svg"), "README badge must show v1.11.5");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.11.4<"), "Website must display v1.11.4 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.11.5<"), "Website must display v1.11.5 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -5329,8 +5329,13 @@ test("Account Switcher: stores credentials in userscript-local storage and safel
     assert.ok(source.includes('GM_getValue') && source.includes('GM_setValue') && source.includes('GM_deleteValue'), "Account data and temporary switch state must use userscript-manager storage");
     assert.ok(!/localStorage|sessionStorage|fetch\s*\(|GM_xmlhttpRequest/.test(source), "Account credentials must not use page storage or toolkit network APIs");
     assert.ok(script.includes('id="amaes-account-switcher-form"') && script.includes('id="amaes-account-switcher-return"'), "Course Tools must expose the account form and return-page option");
+    assert.ok(script.includes('placeholder="Username / USN"') && script.includes('aria-label="Username / USN"'), "Login identifier field must clarify that usernames and USNs are accepted");
+    assert.ok(script.includes('placeholder="Nickname / Display name"') && script.includes('aria-label="Nickname / Display name"'), "Nickname field must clarify it is a display label");
     assert.ok(script.includes('Return to current page after switch'), "Return-page checkbox must have the requested label");
     assert.ok(source.includes("'#username, input[name=\"username\"") && source.includes("'#password, input[name=\"password\""), "Automation must target Moodle's username and password fields");
+    assert.ok(source.includes("grid-template-columns: minmax(0, 1fr) auto;"), "Saved-account rows must reserve a flexible nickname column and compact action column");
+    assert.ok(source.includes("width: 100%; justify-content: flex-start; min-width: 0;"), "Saved-account switch button must fill the nickname column");
+    assert.ok(source.includes("width: auto; white-space: nowrap; padding: 4px 7px;"), "Remove button must stay compact without squeezing the nickname");
     assert.ok(source.includes('requestSubmit') && source.includes("stage: 'attempted'"), "Login must submit once and guard against repeated submission after failure");
     assert.ok(source.includes('target.origin !== window.location.origin'), "Return navigation must reject cross-origin destinations");
     assert.ok(source.includes('window.location.replace(target.href)'), "A valid saved return URL must be restored after login");

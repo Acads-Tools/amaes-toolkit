@@ -422,9 +422,9 @@
                     <div id="amaes-account-switcher-card" class="amaes-card" style="padding: 8px; display: flex; flex-direction: column; gap: 7px;">
                         <div style="font-size: 11px; font-weight: 700; color: var(--text-primary);">Account Switcher</div>
                         <form id="amaes-account-switcher-form" style="display: flex; flex-direction: column; gap: 5px;">
-                            <input id="amaes-account-switcher-username" type="text" autocomplete="off" placeholder="Username" aria-label="Username" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                            <input id="amaes-account-switcher-username" type="text" autocomplete="off" placeholder="Username / USN" aria-label="Username / USN" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
                             <input id="amaes-account-switcher-password" type="password" autocomplete="new-password" placeholder="Password" aria-label="Password" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
-                            <input id="amaes-account-switcher-nickname" type="text" autocomplete="off" placeholder="Nickname" aria-label="Nickname" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                            <input id="amaes-account-switcher-nickname" type="text" autocomplete="off" placeholder="Nickname / Display name" aria-label="Nickname / Display name" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
                             <button type="submit" class="amaes-btn amaes-btn-monotone" style="justify-content: center; padding: 6px; font-size: 10px;">Add account</button>
                         </form>
                         <div id="amaes-account-switcher-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
