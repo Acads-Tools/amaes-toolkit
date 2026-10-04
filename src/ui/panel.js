@@ -415,6 +415,23 @@
 
                 <!-- TAB PANE 3: Course Automation Tools -->
                 <div id="tab-pane-course" class="amaes-tab-pane" style="display: none;">
+                    <div id="amaes-account-switcher-card" class="amaes-card" style="padding: 8px; display: flex; flex-direction: column; gap: 7px;">
+                        <div style="font-size: 11px; font-weight: 700; color: var(--text-primary);">Account Switcher</div>
+                        <form id="amaes-account-switcher-form" style="display: flex; flex-direction: column; gap: 5px;">
+                            <input id="amaes-account-switcher-username" type="text" autocomplete="off" placeholder="Username" aria-label="Username" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                            <input id="amaes-account-switcher-password" type="password" autocomplete="new-password" placeholder="Password" aria-label="Password" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                            <input id="amaes-account-switcher-nickname" type="text" autocomplete="off" placeholder="Nickname" aria-label="Nickname" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                            <button type="submit" class="amaes-btn amaes-btn-monotone" style="justify-content: center; padding: 6px; font-size: 10px;">Add account</button>
+                        </form>
+                        <div id="amaes-account-switcher-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
+                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 9.5px; color: var(--text-secondary); cursor: pointer;">
+                            <input id="amaes-account-switcher-return" type="checkbox" style="margin: 1px 0 0; cursor: pointer;" />
+                            <span>Return to current page after switch</span>
+                        </label>
+                        <div style="font-size: 9px; color: var(--text-muted); line-height: 1.4;">Accounts are saved locally in your userscript manager. Credentials are only filled into the Moodle login form.</div>
+                        <div id="amaes-account-switcher-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
+                    </div>
+
                     <div id="mod-marker-card" class="amaes-card">
                         ${renderCardContent('mod-marker', ICONS.check, 'Activity Auto-Marker', '', `
                             <div style="font-size: 9.5px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">
@@ -594,6 +611,7 @@
         `;
 
         document.body.appendChild(panel);
+        setupAccountSwitcherUI();
 
         // Inject Dynamic CSS Stylesheet
         const styleSheet = document.createElement('style');
@@ -1616,4 +1634,3 @@
         // Initial Tab Selection: Auto-open to 'quiz'
         let initialTab = localStorage.getItem('amaes_active_tab') || 'quiz';
         switchTab(initialTab);
-

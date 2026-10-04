@@ -1,4 +1,6 @@
     async function initializeToolkit() {
+        await handleAccountSwitcherNavigation();
+        if (isUserLoggedIn() && await completeAccountSwitcherReturn()) return;
         if (!(await verifyClientCompatibility())) return;
         if (!isUserLoggedIn()) {
             logDebug("User not logged in; skipping UI mounting.");

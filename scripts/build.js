@@ -31,6 +31,7 @@ const BUILD_MANIFEST = [
     'sync/jennysonline.js',
     'quiz/solver.js',
     'moodle/highlighter.js',
+    'moodle/account-switcher.js',
     'dev/diagnostics.js',
     'ai/prompts.js',
     'ai/gemini.js',

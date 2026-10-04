@@ -39,7 +39,7 @@ The Software is developed and released strictly for lawful study assistance, sel
 To facilitate shared knowledge and crowdsourced accuracy, the Software may include an optional, community-driven answer synchronization feature.
 
 * **Strict Anonymity:** When enabled, the Software only synchronizes non-personal question-and-answer pairs extracted from confirmed post-quiz review feedback.
-* **Zero Personally Identifiable Information (PII):** The Software does **not** collect, store, or transmit your name, student ID number, email address, physical location, IP address, passwords, grades, overall scores, or Moodle authentication cookies/tokens.
+* **Privacy by Default:** The Software does **not** collect or transmit your name, student ID number, email address, physical location, grades, overall scores, or Moodle authentication cookies/tokens. If you explicitly save credentials in the optional Account Switcher, they are kept in your userscript manager's local storage and are used only to submit the target Moodle site's login form; they are not sent to toolkit services.
 * **Client-Generated Tokens:** Submissions utilize an ephemeral, random client-side token strictly used to deduplicate repeated network attempts and mitigate spam. This token contains zero user-identifiable data.
 * **Opt-Out Control:** You may disable community sharing at any time in the toolkit settings under the Database tab without losing the core client-side highlighting and solver features.
 

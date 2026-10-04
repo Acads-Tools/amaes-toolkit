@@ -5313,6 +5313,21 @@ test("Jenny's Online public spreadsheet loads as locally cached unconfirmed cour
     assert.strictEqual(sandbox.readJennyCache('IT6205A'), null, "Expired local suggestions must be discarded after the 30-day TTL");
 });
 
+test("Account Switcher: stores credentials in userscript-local storage and safely automates Moodle login/return", () => {
+    const fs = require('fs');
+    const source = fs.readFileSync('src/moodle/account-switcher.js', 'utf8');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    assert.ok(source.includes('GM_getValue') && source.includes('GM_setValue') && source.includes('GM_deleteValue'), "Account data and temporary switch state must use userscript-manager storage");
+    assert.ok(!/localStorage|sessionStorage|fetch\s*\(|GM_xmlhttpRequest/.test(source), "Account credentials must not use page storage or toolkit network APIs");
+    assert.ok(script.includes('id="amaes-account-switcher-form"') && script.includes('id="amaes-account-switcher-return"'), "Course Tools must expose the account form and return-page option");
+    assert.ok(script.includes('Return to current page after switch'), "Return-page checkbox must have the requested label");
+    assert.ok(source.includes("'#username, input[name=\"username\"") && source.includes("'#password, input[name=\"password\""), "Automation must target Moodle's username and password fields");
+    assert.ok(source.includes('requestSubmit') && source.includes("stage: 'attempted'"), "Login must submit once and guard against repeated submission after failure");
+    assert.ok(source.includes('target.origin !== window.location.origin'), "Return navigation must reject cross-origin destinations");
+    assert.ok(source.includes('window.location.replace(target.href)'), "A valid saved return URL must be restored after login");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

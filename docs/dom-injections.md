@@ -49,6 +49,12 @@ These components are loaded across all matched Moodle pages when logged in.
 
 ## 3. Dashboard & Course Pages (`/my/`, `courses.php`, `course/view.php`)
 
+### Account Switcher
+- **Location**: Added to the Course Tools tab in the floating toolkit panel.
+- **Storage**: Saved accounts and switch/return state use the userscript manager's local `GM_*` storage, isolated from Moodle page `localStorage`. The toolkit does not sync or transmit saved credentials.
+- **Behavior**: Selecting an account opens the Moodle profile menu, activates Log out and any confirmation prompt, then fills and submits the Moodle login form. The optional return-page setting is off by default; when enabled, a same-origin return URL is kept temporarily and cleared after login.
+- **Privacy**: The username and password are submitted to Moodle only as part of the site's normal authentication form. They are never included in toolkit telemetry, community sync, or toolkit API requests. Userscript-manager storage is local to the browser profile and is not represented as encrypted-at-rest storage.
+
 ### A. Course Database Readiness Pill
 - **Class**: `.amaes-home-db-badge-wrapper` / `.amaes-home-db-badge`
 - **Target Container**: Appended inside `.course-info-container, .card-body, [data-region="course-content"]`.

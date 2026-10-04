@@ -114,7 +114,7 @@ Before installing, ensure your environment meets the following specifications:
 ### 7. Privacy-Safe Community Synchronization
 * **Automatic Course Bank Loading:** Automatically fetches verified questions for your active subject directly from the open study database ([`Acads-Tools/database`](https://github.com/Acads-Tools/database)) upon opening Moodle.
 * **Consensus-Driven Question Sharing:** Confirmed review answers from completed quiz attempts are pooled anonymously to expand coverage for fellow students.
-* **Strict Zero-PII Guarantee:** Student names, student IDs, email addresses, passwords, grades, and Moodle session tokens are never collected, logged, or transmitted.
+* **Privacy by Default:** Student names, student IDs, email addresses, grades, and Moodle session tokens are never collected or transmitted. The optional Account Switcher stores only credentials that you explicitly add, in your userscript manager's local storage; they are not sent to toolkit services or logged.
 
 ---
 
@@ -323,7 +323,7 @@ This happens when a userscript manager is not yet installed in your browser. Ins
 <details>
 <summary><b>Does this tool transmit any personal student data?</b></summary>
 <br>
-<b>No.</b> The toolkit operates under a strict privacy-first architecture. It never collects, transmits, or stores student names, student IDs, email addresses, passwords, grades, cookies, or Moodle session tokens. Shared community contributions consist exclusively of anonymous question-and-answer pairs confirmed against Moodle review keys.
+<b>Not to toolkit services.</b> The toolkit does not send student names, student IDs, email addresses, grades, cookies, or Moodle session tokens to its APIs, telemetry, or community services. If you opt in to the Account Switcher, its credentials are stored locally by your userscript manager and submitted only to the target Moodle site's own login form for authentication. Shared community contributions consist exclusively of anonymous question-and-answer pairs confirmed against Moodle review keys.
 </details>
 
 <details>
