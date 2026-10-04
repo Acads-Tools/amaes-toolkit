@@ -1986,10 +1986,10 @@
                 `;
                 const wrongText = wrongList.map(w => typeof w === 'string' ? w : w.text).filter(Boolean).join(', ');
                 const isEmptyAnswer = !wrongText; // e.g. user cleared a fill-in-the-blank field
-                const pillLabel = isEmptyAnswer ? 'No Answer / Incorrect' : 'Choice Eliminated';
+                const pillLabel = isEmptyAnswer ? 'No Answer / Incorrect' : 'Past response eliminated';
                 pill.title = isEmptyAnswer
                     ? 'No answer was submitted or the answer field was cleared. Check the verified answer below.'
-                    : `Wrong choice "${wrongText}" eliminated in database. Will not be selected on next attempt!`;
+                    : `Moodle keeps this submitted answer in the completed-attempt history. The toolkit saved "${wrongText}" as incorrect and excludes it from future suggestions on this browser.`;
                 pill.innerHTML = `${ICONS.xCircle} <span>${pillLabel}</span>`;
 
                 // Try to get the correct answer from the .rightanswer element for display

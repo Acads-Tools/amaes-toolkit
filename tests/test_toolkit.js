@@ -2900,8 +2900,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.11.10'), "Userscript header must specify v1.11.10");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.10";'), "Constant SCRIPT_VERSION must be v1.11.10");
+    assert.ok(script.includes('@version      1.11.11'), "Userscript header must specify v1.11.11");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.11";'), "Constant SCRIPT_VERSION must be v1.11.11");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4036,11 +4036,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.11.10-blue.svg"), "README badge must show v1.11.10");
+    assert.ok(readme.includes("version-1.11.11-blue.svg"), "README badge must show v1.11.11");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.11.10<"), "Website must display v1.11.10 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.11.11<"), "Website must display v1.11.11 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -4650,7 +4650,7 @@ test("Multi-Web AI Launchers & Choice Eliminated Marker: provides 1-click extern
     assert.ok(script.includes("amaes-pill-gemini"), "Cards must provide Gemini button");
 
     // 2. Choice Eliminated Marker
-    assert.ok(script.includes("'Choice Eliminated'"), "Harvester must use user-friendly 'Choice Eliminated' label instead of 'Wrong Choice Saved'");
+    assert.ok(script.includes("'Past response eliminated'"), "Harvester must identify a wrong answer as a historical response, not a future suggestion");
 });
 
 // --------------------------------------------------
@@ -5368,6 +5368,44 @@ test("Account Switcher: stores credentials in userscript-local storage and safel
     assert.ok(source.includes('requestSubmit') && source.includes("stage: 'attempted'"), "Login must submit once and guard against repeated submission after failure");
     assert.ok(source.includes('target.origin !== window.location.origin'), "Return navigation must reject cross-origin destinations");
     assert.ok(source.includes('window.location.replace(target.href)'), "A valid saved return URL must be restored after login");
+});
+
+test("Quiz HUD: tracks the visible question and live answers on single-page quizzes", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    assert.ok(script.includes('function getQuizFloatingProgressState()'), "HUD must calculate progress independently from a stale render");
+    assert.ok(script.includes('const readingLine = viewportHeight * 0.42'), "One-page HUD must identify the question around the current reading position");
+    assert.ok(script.includes('questions.filter(isQuestionAnswered).length'), "One-page HUD must count current DOM answers, not stale Moodle navigation markers");
+    assert.ok(script.includes("window.addEventListener('scroll', scheduleUpdate"), "HUD must refresh when the student scrolls between questions");
+    assert.ok(script.includes("document.addEventListener('change', event =>"), "HUD must refresh when an answer is changed");
+    assert.ok(script.includes('Moodle keeps this submitted answer in the completed-attempt history.'), "Review marker must explain that the displayed rejected answer is historical, not a future suggestion");
+});
+
+test("Review elimination: wrapped Moodle review prompt blocks an exact study-guide candidate", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    assert.ok(script.includes('const reviewEliminationCandidates = [];'), "Solver must search review evidence independently of exact prompt matches");
+    assert.ok(script.includes('questionTextMatches(candidateKey, currentQuestionKey)'), "Review evidence must match Moodle-wrapped prompt variants");
+    assert.ok(script.includes('candidates = Array.from(new Set([...candidates, ...reviewEliminationCandidates]));'), "Matching review evidence must join the exact candidate set before wrong-answer filtering");
+
+    const normalize = value => value.toLowerCase().replace(/\s+/g, ' ').replace(/[.:?!;,]+$/g, '').trim();
+    const cleanPrompt = normalize("It is any process or technology that allows users who forgot their passwords authenticate and reset the passwords of their account");
+    const reviewPrompt = normalize("IDENTIFICATION: Answer Question 6 Self-service password reset It is any process or technology that allows users who forgot their passwords authenticate and reset the passwords of their account");
+    const reviewEvidence = {
+        qNorm: reviewPrompt,
+        wrongAnswerEvidence: true,
+        wrongAnswers: [{ text: "Self-service password reset" }]
+    };
+    const questionMatches = (left, right) => left === right ||
+        (left.length > 20 && (left.includes(right) || right.includes(left)));
+    const exactGuideCandidates = [{ qNorm: cleanPrompt, ansRaw: "Self-service password reset" }];
+    const matchingReviewEvidence = [reviewEvidence].filter(item => questionMatches(item.qNorm, cleanPrompt));
+    const allCandidates = [...exactGuideCandidates, ...matchingReviewEvidence];
+    const wrongAnswers = allCandidates.flatMap(item => item.wrongAnswers || []);
+    assert.strictEqual(matchingReviewEvidence.length, 1, "Moodle's question-number wrapper and recorded response must not hide the review evidence");
+    assert.ok(wrongAnswers.some(item => item.text === "Self-service password reset"), "Repeated wrong review answer must be available to suppress the study-guide suggestion");
+    const safeSuggestions = exactGuideCandidates.filter(candidate =>
+        !wrongAnswers.some(item => normalize(item.text) === normalize(candidate.ansRaw))
+    );
+    assert.strictEqual(safeSuggestions.length, 0, "The exact study-guide answer disproved by Moodle must be removed from suggestions");
 });
 
 console.log("\n==================================================");

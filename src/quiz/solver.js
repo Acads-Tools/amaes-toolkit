@@ -2079,13 +2079,107 @@
         syncAutoQuizUI();
     }
 
+    function getQuizFloatingProgressState() {
+        const questions = Array.from(document.querySelectorAll('.que'));
+        const navState = getQuizNavQuestionStates();
+        if (questions.length > 1) {
+            const viewportHeight = window.innerHeight || 800;
+            const readingLine = viewportHeight * 0.42;
+            let currentQuestion = questions.find(question => {
+                const rect = question.getBoundingClientRect();
+                return rect.top <= readingLine && rect.bottom > readingLine;
+            });
+            if (!currentQuestion) {
+                currentQuestion = questions
+                    .map(question => {
+                        const rect = question.getBoundingClientRect();
+                        return {
+                            question,
+                            distance: Math.abs((rect.top + rect.bottom) / 2 - readingLine),
+                            visible: rect.bottom > 0 && rect.top < viewportHeight
+                        };
+                    })
+                    .filter(item => item.visible)
+                    .sort((a, b) => a.distance - b.distance)[0]?.question || questions[0];
+            }
+            const currentIndex = Math.max(0, questions.indexOf(currentQuestion));
+            const totalAnswered = questions.filter(isQuestionAnswered).length;
+            return {
+                currentIndex,
+                totalQuestions: questions.length,
+                totalAnswered
+            };
+        }
+        if (!navState || navState.totalQuestions === 0) return null;
+
+        const questionData = questions.length === 1 ? extractQuestionData(questions[0]) : null;
+        const questionIndex = questionData
+            ? navState.questions.findIndex(question => question.qNum === questionData.qNum)
+            : -1;
+        const currentIndex = questionIndex >= 0 ? questionIndex : navState.currentIndex;
+        const currentNavQuestion = navState.questions[currentIndex];
+        const currentAnswerIsLive = questions.length === 1 && isQuestionAnswered(questions[0]);
+        const answerCount = navState.totalAnswered +
+            (currentAnswerIsLive && currentNavQuestion && !currentNavQuestion.isAnswered ? 1 : 0);
+
+        return {
+            ...navState,
+            currentIndex,
+            totalAnswered: answerCount
+        };
+    }
+
+    let quizHudUpdateFrame = null;
+    function updateQuizFloatingHUD() {
+        if (quizHudUpdateFrame !== null) return;
+        quizHudUpdateFrame = requestAnimationFrame(() => {
+            quizHudUpdateFrame = null;
+            const hud = document.getElementById('amaes-quiz-hud');
+            if (!hud || !checkIsQuizAttemptPage()) return;
+            const progress = getQuizFloatingProgressState();
+            const progressContainer = document.getElementById('hud-question-progress');
+            if (!progressContainer) return;
+            if (!progress) {
+                progressContainer.style.display = 'none';
+                return;
+            }
+            const currentQuestion = document.getElementById('hud-question-label');
+            const progressFill = document.getElementById('hud-question-progress-fill');
+            const totalQuestions = progress.totalQuestions;
+            const currentIndex = Math.max(0, Math.min(progress.currentIndex, totalQuestions - 1));
+            const totalAnswered = Math.max(0, Math.min(progress.totalAnswered, totalQuestions));
+            const percentage = Math.round((totalAnswered / totalQuestions) * 100);
+            if (currentQuestion) currentQuestion.textContent = `Q ${currentIndex + 1}/${totalQuestions}`;
+            if (progressFill) progressFill.style.width = `${percentage}%`;
+            progressContainer.title = `${totalAnswered}/${totalQuestions} answered (${percentage}%)`;
+            progressContainer.style.display = 'flex';
+        });
+    }
+
+    function bindQuizFloatingHUDUpdates() {
+        if (window.__amaesQuizHudUpdatesBound) return;
+        window.__amaesQuizHudUpdatesBound = true;
+        const scheduleUpdate = () => updateQuizFloatingHUD();
+        window.addEventListener('scroll', scheduleUpdate, { passive: true, capture: true });
+        window.addEventListener('resize', scheduleUpdate, { passive: true });
+        document.addEventListener('input', event => {
+            if (event.target && event.target.closest && event.target.closest('.que')) scheduleUpdate();
+        }, true);
+        document.addEventListener('change', event => {
+            if (event.target && event.target.closest && event.target.closest('.que')) scheduleUpdate();
+        }, true);
+        document.addEventListener('click', event => {
+            if (event.target && event.target.closest && event.target.closest('.que')) scheduleUpdate();
+        }, true);
+    }
+
     // Floating HUD for Quiz Attempt Screen
     function injectQuizFloatingHUD() {
         if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') return;
         if (!checkIsQuizAttemptPage()) return;
         if (document.getElementById('amaes-quiz-hud')) return;
 
-        const navState = getQuizNavQuestionStates();
+        const navState = getQuizFloatingProgressState();
         const panelEl = document.getElementById('amaes-toolkit-panel');
         const bodyEl = document.getElementById('amaes-panel-body');
         const isPanelMinimized = !panelEl || panelEl.classList.contains('amaes-minimized') || (bodyEl && bodyEl.style.display === 'none');
@@ -2097,9 +2191,9 @@
             const pct = Math.round((navState.totalAnswered / totalQ) * 100);
             progressHtml = `
                 <div style="display: flex; align-items: center; gap: 6px; padding: 0 4px; border-left: 1px solid rgba(255,255,255,0.12); margin-left: 2px;">
-                    <span style="font-weight: 700; color: #94a3b8; font-size: 10px;">Q ${currentQ}/${totalQ}</span>
-                    <div style="width: 32px; height: 3.5px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;" title="${navState.totalAnswered}/${totalQ} answered (${pct}%)">
-                        <div style="width: ${pct}%; height: 100%; background: #3b82f6; border-radius: 2px; transition: width 0.3s ease;"></div>
+                    <span id="hud-question-label" style="font-weight: 700; color: #94a3b8; font-size: 10px;">Q ${currentQ}/${totalQ}</span>
+                    <div id="hud-question-progress" style="width: 32px; height: 3.5px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;" title="${navState.totalAnswered}/${totalQ} answered (${pct}%)">
+                        <div id="hud-question-progress-fill" style="width: ${pct}%; height: 100%; background: #3b82f6; border-radius: 2px; transition: width 0.3s ease;"></div>
                     </div>
                 </div>
             `;
@@ -2109,8 +2203,11 @@
         hud.id = 'amaes-quiz-hud';
         hud.style.cssText = `
             position: fixed;
-            bottom: 22px;
-            left: 22px;
+            bottom: max(12px, env(safe-area-inset-bottom));
+            left: max(12px, env(safe-area-inset-left));
+            max-width: calc(100vw - 24px);
+            box-sizing: border-box;
+            flex-wrap: wrap;
             z-index: 99998;
             background: var(--surface, #1e293b);
             border: 1.5px solid ${autoQuizMode ? '#3b82f6' : 'var(--border, #334155)'};
@@ -2168,6 +2265,8 @@
         `;
 
         document.body.appendChild(hud);
+        bindQuizFloatingHUDUpdates();
+        updateQuizFloatingHUD();
 
         const _el__btn_hud_toggle_quiz_ = document.getElementById('btn-hud-toggle-quiz');
         if (_el__btn_hud_toggle_quiz_) _el__btn_hud_toggle_quiz_.onclick = () => {
@@ -2824,9 +2923,27 @@
                 });
             }
             const hasAmbiguousQuestionMatch = exactCandidates.length === 0 && matchingQuestionKeys.size > 1;
-            const candidates = exactCandidates.length > 0
+            let candidates = exactCandidates.length > 0
                 ? exactCandidates
                 : (hasAmbiguousQuestionMatch ? [] : matchingCandidates);
+            const reviewEliminationCandidates = [];
+            questionCandidateIndex.forEach((items, candidateKey) => {
+                if (candidateKey === currentQuestionKey || !questionTextMatches(candidateKey, currentQuestionKey)) return;
+                items.forEach(item => {
+                    const hasReviewElimination = item.wrongAnswerEvidence === true ||
+                        item.evidenceType === 'moodle_review_elimination' ||
+                        (Array.isArray(item.wrongAnswers) && item.wrongAnswers.some(w =>
+                            w && typeof w === 'object' && Array.isArray(w.sources) &&
+                            w.sources.some(source => source === 'Review' || source === 'moodle_review')
+                        ));
+                    if (hasReviewElimination && Array.isArray(item.wrongAnswers) && item.wrongAnswers.length > 0) {
+                        reviewEliminationCandidates.push(item);
+                    }
+                });
+            });
+            if (reviewEliminationCandidates.length > 0) {
+                candidates = Array.from(new Set([...candidates, ...reviewEliminationCandidates]));
+            }
             const hasAnyVerifiedCandidate = candidates.some(item => isConfirmedCandidate(item));
 
             // Clean up any prior hints

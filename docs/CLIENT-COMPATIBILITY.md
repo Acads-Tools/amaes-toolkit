@@ -1,6 +1,6 @@
 # Client Compatibility & Version Lifecycle
 
-The current AMAES Toolkit client version is **1.11.10**. The relay currently
+The current AMAES Toolkit client version is **1.11.11**. The relay currently
 allows version **1.8.2 or newer**.
 
 Clients below the configured minimum, clients with a missing or invalid
@@ -19,8 +19,8 @@ authoritative because a modified userscript cannot be trusted.
 
 | Version Range | Status | Support Level | Actions Required |
 | :--- | :--- | :--- | :--- |
-| **`v1.11.10`** | Active Release | Full support | None. Recommended version. |
-| **`v1.8.2` – `v1.11.9`** | Supported Legacy | Core features active | Strongly encouraged to update to v1.11.10. |
+| **`v1.11.11`** | Active Release | Full support | None. Recommended version. |
+| **`v1.8.2` – `v1.11.10`** | Supported Legacy | Core features active | Strongly encouraged to update to v1.11.11. |
 | **`< v1.8.2`** | Deprecated / Blocked | Inactive (Startup Lockout) | Must update via Violentmonkey or GitHub. |
 
 ---

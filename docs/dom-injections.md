@@ -120,6 +120,11 @@ Injections here provide real-time assistance during active assessments.
   - Question has no match in any database tier.
   - Multi-answer question requires student confirmation before advancing.
 
+### G. Floating Quiz HUD
+- **DOM ID**: `#amaes-quiz-hud`
+- **Location**: Fixed to the lower-left of the viewport, with safe-area and narrow-screen spacing.
+- **Progress**: On one-page quizzes, follows the question at the reading position and counts answers from the live question controls. Scroll, input, change, and click events refresh it. On paginated quizzes, the current question number is matched against Moodle's navigation and the current answer is reflected immediately.
+
 ---
 
 ## 4b. Quiz Summary Pages (`summary.php`)
@@ -146,6 +151,7 @@ Harvesting occurs on review pages immediately after quiz submission.
 - **States**:
   - **`Uploaded to DB`**: Displayed when *"Collect & Share Anonymously"* is enabled. Indicates verified answer was queued and transmitted to the community relay.
   - **`Saved Locally`**: Displayed when anonymous sharing is disabled or offline. Indicates answer was saved exclusively to local browser storage.
+  - **`Past response eliminated`**: Moodle still displays the submitted response for that completed attempt; the toolkit records it as incorrect and excludes it from future suggestions on this browser. Completed Moodle attempts are historical and cannot be edited by the toolkit.
 
 ---
 
