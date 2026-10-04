@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.11.5
+// @version      1.11.6
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -31,7 +31,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.5";
+    const SCRIPT_VERSION = "v1.11.6";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -8320,7 +8320,126 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     const ACCOUNT_SWITCHER_RETURN_KEY = 'amaes_account_switcher_return_url';
     const ACCOUNT_SWITCHER_PENDING_KEY = 'amaes_account_switcher_pending';
     const ACCOUNT_SWITCHER_RETURN_OPTION_KEY = 'amaes_account_switcher_return_enabled';
+    const ACCOUNT_SWITCHER_SESSION_KEY = 'amaes_account_switcher_session_key';
+    const ACCOUNT_SWITCHER_VAULT_KEY = 'amaes_account_switcher_vault';
     const ACCOUNT_SWITCHER_INTENT_TTL_MS = 10 * 60 * 1000;
+    const ACCOUNT_SWITCHER_PBKDF2_ITERATIONS = 310000;
+    const ACCOUNT_SWITCHER_VERIFIER = 'AMAES Account Switcher vault verifier v1';
+
+    function accountSwitcherEncodeBase64(bytes) {
+        return btoa(String.fromCharCode(...new Uint8Array(bytes)));
+    }
+
+    function accountSwitcherDecodeBase64(value) {
+        return Uint8Array.from(atob(value), character => character.charCodeAt(0));
+    }
+
+    async function accountSwitcherDeriveKey(passphrase, salt) {
+        if (typeof passphrase !== 'string' || passphrase.length < 12) {
+            throw new Error('Use the same encryption passphrase of at least 12 characters.');
+        }
+        if (!window.crypto?.subtle) {
+            throw new Error('Encrypted accounts require a browser with Web Crypto support.');
+        }
+        const material = await window.crypto.subtle.importKey(
+            'raw',
+            new TextEncoder().encode(passphrase),
+            'PBKDF2',
+            false,
+            ['deriveKey']
+        );
+        return window.crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt, iterations: ACCOUNT_SWITCHER_PBKDF2_ITERATIONS, hash: 'SHA-256' },
+            material,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+        );
+    }
+
+    async function encryptAccountSwitcherCredentials(username, password, passphrase) {
+        const salt = window.crypto.getRandomValues(new Uint8Array(16));
+        const iv = window.crypto.getRandomValues(new Uint8Array(12));
+        const key = await accountSwitcherDeriveKey(passphrase, salt);
+        const plaintext = new TextEncoder().encode(JSON.stringify({ username, password }));
+        const ciphertext = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
+        return {
+            version: 1,
+            salt: accountSwitcherEncodeBase64(salt),
+            iv: accountSwitcherEncodeBase64(iv),
+            ciphertext: accountSwitcherEncodeBase64(ciphertext)
+        };
+    }
+
+    async function decryptAccountSwitcherCredentials(account, passphrase) {
+        if (!account.encryptedCredentials) {
+            return { username: account.username, password: account.password };
+        }
+        try {
+            const encrypted = account.encryptedCredentials;
+            if (encrypted.version !== 1) throw new Error('Unsupported encrypted account format.');
+            const salt = accountSwitcherDecodeBase64(encrypted.salt);
+            const iv = accountSwitcherDecodeBase64(encrypted.iv);
+            const key = await accountSwitcherDeriveKey(passphrase, salt);
+            const plaintext = await window.crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv },
+                key,
+                accountSwitcherDecodeBase64(encrypted.ciphertext)
+            );
+            const credentials = JSON.parse(new TextDecoder().decode(plaintext));
+            if (typeof credentials.username !== 'string' || typeof credentials.password !== 'string') {
+                throw new Error('Encrypted account data is invalid.');
+            }
+            return credentials;
+        } catch (error) {
+            if (error.name === 'OperationError' || error.name === 'DataError') {
+                throw new Error('Could not decrypt the saved account. Check the encryption passphrase.');
+            }
+            throw error;
+        }
+    }
+
+    async function verifyAccountSwitcherPassphrase(passphrase) {
+        if (typeof passphrase !== 'string' || passphrase.length < 12) {
+            throw new Error('Use an encryption passphrase of at least 12 characters.');
+        }
+        const storedVerifier = await getAccountSwitcherValue(ACCOUNT_SWITCHER_VAULT_KEY, null);
+        if (storedVerifier) {
+            try {
+                const key = await accountSwitcherDeriveKey(
+                    passphrase,
+                    accountSwitcherDecodeBase64(storedVerifier.salt)
+                );
+                const plaintext = await window.crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv: accountSwitcherDecodeBase64(storedVerifier.iv) },
+                    key,
+                    accountSwitcherDecodeBase64(storedVerifier.ciphertext)
+                );
+                if (new TextDecoder().decode(plaintext) !== ACCOUNT_SWITCHER_VERIFIER) {
+                    throw new Error('The encryption passphrase does not match this account vault.');
+                }
+                return;
+            } catch (error) {
+                if (error.message === 'The encryption passphrase does not match this account vault.') throw error;
+                throw new Error('The encryption passphrase does not match this account vault.');
+            }
+        }
+
+        const salt = window.crypto.getRandomValues(new Uint8Array(16));
+        const iv = window.crypto.getRandomValues(new Uint8Array(12));
+        const key = await accountSwitcherDeriveKey(passphrase, salt);
+        const ciphertext = await window.crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            key,
+            new TextEncoder().encode(ACCOUNT_SWITCHER_VERIFIER)
+        );
+        await setAccountSwitcherValue(ACCOUNT_SWITCHER_VAULT_KEY, {
+            version: 1,
+            salt: accountSwitcherEncodeBase64(salt),
+            iv: accountSwitcherEncodeBase64(iv),
+            ciphertext: accountSwitcherEncodeBase64(ciphertext)
+        });
+    }
 
     async function getAccountSwitcherValue(key, fallbackValue = null) {
         if (typeof GM_getValue !== 'function') {
@@ -8352,14 +8471,37 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         return accounts.filter(account =>
             account &&
             typeof account.id === 'string' &&
-            typeof account.username === 'string' &&
-            typeof account.password === 'string' &&
-            typeof account.nickname === 'string'
+            typeof account.nickname === 'string' &&
+            (
+                (account.encryptedCredentials && typeof account.encryptedCredentials === 'object') ||
+                (typeof account.username === 'string' && typeof account.password === 'string')
+            )
         );
     }
 
     async function saveAccountSwitcherAccounts(accounts) {
         await setAccountSwitcherValue(ACCOUNT_SWITCHER_ACCOUNTS_KEY, accounts);
+    }
+
+    async function encryptLegacyAccountSwitcherAccounts(accounts, passphrase) {
+        const encryptedAccounts = [];
+        let changed = false;
+        for (const account of accounts) {
+            if (account.encryptedCredentials) {
+                encryptedAccounts.push(account);
+                continue;
+            }
+            const encryptedCredentials = await encryptAccountSwitcherCredentials(
+                account.username,
+                account.password,
+                passphrase
+            );
+            const { username, password, ...safeAccount } = account;
+            changed = true;
+            encryptedAccounts.push({ ...safeAccount, encryptedCredentials });
+        }
+        if (changed) await saveAccountSwitcherAccounts(encryptedAccounts);
+        return encryptedAccounts;
     }
 
     function accountSwitcherSetStatus(message, isError = false) {
@@ -8449,11 +8591,22 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         return null;
     }
 
-    async function startAccountSwitch(accountId, returnToCurrentPage) {
+    async function startAccountSwitch(accountId, returnToCurrentPage, passphrase) {
         try {
-            const accounts = await getAccountSwitcherAccounts();
+            if (!passphrase) throw new Error('Enter your encryption passphrase before switching accounts.');
+            await verifyAccountSwitcherPassphrase(passphrase);
+            const accounts = await encryptLegacyAccountSwitcherAccounts(
+                await getAccountSwitcherAccounts(),
+                passphrase
+            );
             const account = accounts.find(saved => saved.id === accountId);
             if (!account) throw new Error('The selected account could not be found.');
+            await decryptAccountSwitcherCredentials(account, passphrase);
+
+            await setAccountSwitcherValue(ACCOUNT_SWITCHER_SESSION_KEY, {
+                passphrase,
+                expiresAt: Date.now() + ACCOUNT_SWITCHER_INTENT_TTL_MS
+            });
 
             if (returnToCurrentPage) {
                 await setAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY, {
@@ -8483,6 +8636,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             logoutLink.click();
         } catch (error) {
             try {
+                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_SESSION_KEY);
                 await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY);
                 await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY);
             } catch (cleanupError) {
@@ -8497,6 +8651,10 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
         let pending;
         try {
+            const temporaryKey = await getAccountSwitcherValue(ACCOUNT_SWITCHER_SESSION_KEY, null);
+            if (temporaryKey && temporaryKey.expiresAt < Date.now()) {
+                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_SESSION_KEY);
+            }
             pending = await getAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY, null);
             if (!pending || typeof pending !== 'object') return;
             if (!pending.createdAt || Date.now() - pending.createdAt > ACCOUNT_SWITCHER_INTENT_TTL_MS) {
@@ -8536,12 +8694,32 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 throw new Error('The selected account no longer exists.');
             }
 
+            let sessionKey;
+            try {
+                sessionKey = await getAccountSwitcherValue(ACCOUNT_SWITCHER_SESSION_KEY, null);
+            } finally {
+                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_SESSION_KEY);
+            }
+            if (!sessionKey || typeof sessionKey.passphrase !== 'string' || sessionKey.expiresAt < Date.now()) {
+                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY);
+                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY);
+                throw new Error('The temporary encryption key expired. Start account switching again.');
+            }
+            let credentials;
+            try {
+                credentials = await decryptAccountSwitcherCredentials(account, sessionKey.passphrase);
+            } catch (error) {
+                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY);
+                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY);
+                throw error;
+            }
+
             await setAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY, {
                 ...pending,
                 stage: 'attempted'
             });
-            accountSwitcherSetInputValue(loginFields.username, account.username);
-            accountSwitcherSetInputValue(loginFields.password, account.password);
+            accountSwitcherSetInputValue(loginFields.username, credentials.username);
+            accountSwitcherSetInputValue(loginFields.password, credentials.password);
 
             const submitButton = loginFields.form.querySelector(
                 'button[type="submit"], input[type="submit"], #loginbtn'
@@ -8603,7 +8781,19 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         const form = document.getElementById('amaes-account-switcher-form');
         const list = document.getElementById('amaes-account-switcher-list');
         const returnToggle = document.getElementById('amaes-account-switcher-return');
-        if (!form || !list || !returnToggle) return;
+        const passphraseInput = document.getElementById('amaes-account-switcher-passphrase');
+        const submitButton = document.getElementById('amaes-account-switcher-submit');
+        const cancelEditButton = document.getElementById('amaes-account-switcher-cancel-edit');
+        const encryptExistingButton = document.getElementById('amaes-account-switcher-encrypt-existing');
+        if (!form || !list || !returnToggle || !passphraseInput || !submitButton || !cancelEditButton || !encryptExistingButton) return;
+        let editingAccountId = null;
+
+        const resetAccountForm = () => {
+            editingAccountId = null;
+            form.reset();
+            submitButton.textContent = 'Add account';
+            cancelEditButton.style.display = 'none';
+        };
 
         const renderAccounts = async () => {
             const accounts = await getAccountSwitcherAccounts();
@@ -8618,7 +8808,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
             accounts.forEach(account => {
                 const row = document.createElement('div');
-                row.style.cssText = 'display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px; align-items: center; width: 100%;';
+                row.style.cssText = 'display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 5px; align-items: center; width: 100%;';
 
                 const switchButton = document.createElement('button');
                 switchButton.type = 'button';
@@ -8627,7 +8817,34 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 switchButton.title = `Switch to ${account.nickname}`;
                 switchButton.style.cssText = 'width: 100%; justify-content: flex-start; min-width: 0; overflow: hidden; text-overflow: ellipsis;';
                 switchButton.addEventListener('click', () => {
-                    startAccountSwitch(account.id, returnToggle.checked);
+                    const passphrase = passphraseInput.value;
+                    passphraseInput.value = '';
+                    startAccountSwitch(account.id, returnToggle.checked, passphrase);
+                });
+
+                const editButton = document.createElement('button');
+                editButton.type = 'button';
+                editButton.className = 'amaes-btn amaes-btn-outline';
+                editButton.textContent = 'Edit';
+                editButton.setAttribute('aria-label', `Edit ${account.nickname}`);
+                editButton.style.cssText = 'width: auto; white-space: nowrap; padding: 4px 7px; font-size: 9px;';
+                editButton.addEventListener('click', async () => {
+                    try {
+                        const passphrase = passphraseInput.value;
+                        if (!passphrase) throw new Error('Enter your encryption passphrase to edit this account.');
+                        await verifyAccountSwitcherPassphrase(passphrase);
+                        const credentials = await decryptAccountSwitcherCredentials(account, passphrase);
+                        editingAccountId = account.id;
+                        document.getElementById('amaes-account-switcher-username').value = credentials.username;
+                        document.getElementById('amaes-account-switcher-password').value = credentials.password;
+                        document.getElementById('amaes-account-switcher-nickname').value = account.nickname;
+                        submitButton.textContent = 'Save changes';
+                        cancelEditButton.style.display = 'block';
+                        document.getElementById('amaes-account-switcher-username').focus();
+                        accountSwitcherSetStatus(`Editing ${account.nickname}.`);
+                    } catch (error) {
+                        accountSwitcherSetStatus(error.message || 'Could not decrypt the saved account.', true);
+                    }
                 });
 
                 const removeButton = document.createElement('button');
@@ -8639,7 +8856,12 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 removeButton.addEventListener('click', async () => {
                     try {
                         const latest = await getAccountSwitcherAccounts();
-                        await saveAccountSwitcherAccounts(latest.filter(saved => saved.id !== account.id));
+                        const remainingAccounts = latest.filter(saved => saved.id !== account.id);
+                        await saveAccountSwitcherAccounts(remainingAccounts);
+                        if (remainingAccounts.length === 0) {
+                            await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_VAULT_KEY);
+                        }
+                        if (editingAccountId === account.id) resetAccountForm();
                         await renderAccounts();
                         accountSwitcherSetStatus(`${account.nickname} removed.`);
                     } catch (error) {
@@ -8647,7 +8869,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     }
                 });
 
-                row.append(switchButton, removeButton);
+                row.append(switchButton, editButton, removeButton);
                 list.appendChild(row);
             });
         };
@@ -8662,6 +8884,30 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 }
             });
 
+            cancelEditButton.addEventListener('click', resetAccountForm);
+            encryptExistingButton.addEventListener('click', async () => {
+                try {
+                    const passphrase = passphraseInput.value;
+                    if (!passphrase || passphrase.length < 12) {
+                        throw new Error('Enter a passphrase of at least 12 characters to encrypt saved accounts.');
+                    }
+                    const accounts = await getAccountSwitcherAccounts();
+                    if (accounts.length === 0) {
+                        accountSwitcherSetStatus('Add an account before encrypting saved accounts.');
+                        return;
+                    }
+                    await verifyAccountSwitcherPassphrase(passphrase);
+                    const legacyCount = accounts.filter(account => !account.encryptedCredentials).length;
+                    await encryptLegacyAccountSwitcherAccounts(accounts, passphrase);
+                    passphraseInput.value = '';
+                    accountSwitcherSetStatus(legacyCount
+                        ? `${legacyCount} existing account${legacyCount === 1 ? '' : 's'} encrypted locally.`
+                        : 'All saved account credentials are already encrypted.');
+                } catch (error) {
+                    accountSwitcherSetStatus(error.message || 'Could not encrypt existing accounts.', true);
+                }
+            });
+
             form.addEventListener('submit', async event => {
                 event.preventDefault();
                 const usernameInput = document.getElementById('amaes-account-switcher-username');
@@ -8670,21 +8916,42 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 const username = usernameInput.value.trim();
                 const password = passwordInput.value;
                 const nickname = nicknameInput.value.trim();
+                const passphrase = passphraseInput.value;
                 if (!username || !password || !nickname) {
                     accountSwitcherSetStatus('Enter a username, password, and nickname.', true);
                     return;
                 }
+                if (!passphrase) {
+                    accountSwitcherSetStatus('Enter an encryption passphrase to save this account securely.', true);
+                    return;
+                }
+                if (passphrase.length < 12) {
+                    accountSwitcherSetStatus('Use an encryption passphrase of at least 12 characters.', true);
+                    return;
+                }
 
                 try {
-                    const accounts = await getAccountSwitcherAccounts();
-                    const id = crypto.randomUUID
+                    const wasEditing = Boolean(editingAccountId);
+                    await verifyAccountSwitcherPassphrase(passphrase);
+                    let accounts = await encryptLegacyAccountSwitcherAccounts(
+                        await getAccountSwitcherAccounts(),
+                        passphrase
+                    );
+                    const id = editingAccountId || (crypto.randomUUID
                         ? crypto.randomUUID()
-                        : `account-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-                    accounts.push({ id, username, password, nickname });
+                        : `account-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+                    const encryptedCredentials = await encryptAccountSwitcherCredentials(username, password, passphrase);
+                    const updatedAccount = { id, nickname, encryptedCredentials };
+                    if (editingAccountId) {
+                        accounts = accounts.map(account => account.id === editingAccountId ? updatedAccount : account);
+                    } else {
+                        accounts.push(updatedAccount);
+                    }
                     await saveAccountSwitcherAccounts(accounts);
-                    form.reset();
+                    resetAccountForm();
+                    passphraseInput.value = '';
                     await renderAccounts();
-                    accountSwitcherSetStatus(`${nickname} saved on this device.`);
+                    accountSwitcherSetStatus(`${nickname} ${wasEditing ? 'updated' : 'saved'} with local encryption.`);
                 } catch (error) {
                     accountSwitcherSetStatus(error.message || 'Could not save the account.', true);
                 }
@@ -16642,17 +16909,20 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     <div id="amaes-account-switcher-card" class="amaes-card" style="padding: 8px; display: flex; flex-direction: column; gap: 7px;">
                         <div style="font-size: 11px; font-weight: 700; color: var(--text-primary);">Account Switcher</div>
                         <form id="amaes-account-switcher-form" style="display: flex; flex-direction: column; gap: 5px;">
+                            <input id="amaes-account-switcher-passphrase" type="password" autocomplete="new-password" placeholder="Encryption passphrase (12+ characters)" aria-label="Encryption passphrase" minlength="12" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                            <button id="amaes-account-switcher-encrypt-existing" type="button" class="amaes-btn amaes-btn-outline" style="justify-content: center; padding: 5px; font-size: 9px;">Encrypt existing accounts</button>
                             <input id="amaes-account-switcher-username" type="text" autocomplete="off" placeholder="Username / USN" aria-label="Username / USN" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
                             <input id="amaes-account-switcher-password" type="password" autocomplete="new-password" placeholder="Password" aria-label="Password" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
                             <input id="amaes-account-switcher-nickname" type="text" autocomplete="off" placeholder="Nickname / Display name" aria-label="Nickname / Display name" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
-                            <button type="submit" class="amaes-btn amaes-btn-monotone" style="justify-content: center; padding: 6px; font-size: 10px;">Add account</button>
+                            <button id="amaes-account-switcher-submit" type="submit" class="amaes-btn amaes-btn-monotone" style="justify-content: center; padding: 6px; font-size: 10px;">Add account</button>
+                            <button id="amaes-account-switcher-cancel-edit" type="button" class="amaes-btn amaes-btn-outline" style="display: none; justify-content: center; padding: 6px; font-size: 10px;">Cancel edit</button>
                         </form>
                         <div id="amaes-account-switcher-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
                         <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 9.5px; color: var(--text-secondary); cursor: pointer;">
                             <input id="amaes-account-switcher-return" type="checkbox" style="margin: 1px 0 0; cursor: pointer;" />
                             <span>Return to current page after switch</span>
                         </label>
-                        <div style="font-size: 9px; color: var(--text-muted); line-height: 1.4;">Accounts are saved locally in your userscript manager. Credentials are only filled into the Moodle login form.</div>
+                        <div style="font-size: 9px; color: var(--text-muted); line-height: 1.4;">Usernames and passwords are encrypted in userscript storage (AES-GCM); nicknames remain visible. Use a passphrase of 12+ characters and keep it safe: it cannot be recovered. During switching, it is held temporarily in userscript storage, then deleted after login.</div>
                         <div id="amaes-account-switcher-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
                     </div>
 
