@@ -2863,6 +2863,50 @@
     // Match questions & auto-highlight / auto-select on Moodle Quiz
     let knownWrongAnswerWarningListenersBound = false;
 
+    function getMatchingRowAnswerEvidence(questionsDb, subQuestionText) {
+        if (!subQuestionText) return { candidates: [], wrongAnswers: [], hasConflict: false };
+        const candidates = questionsDb.filter(candidate =>
+            questionTextMatches(candidate.qNorm || candidate.qRaw || candidate.question, subQuestionText)
+        );
+        const wrongAnswers = [];
+        candidates.forEach(candidate => {
+            if (!(candidate.wrongAnswerEvidence === true || candidate.evidenceType === 'moodle_review_elimination') ||
+                !Array.isArray(candidate.wrongAnswers)) return;
+            candidate.wrongAnswers.forEach(wrong => {
+                const text = typeof wrong === 'string' ? wrong : wrong && (wrong.text || wrong.answer);
+                const norm = typeof wrong === 'string' ? normalizeChoice(wrong) :
+                    (wrong && (wrong.norm || normalizeChoice(text || '')));
+                if (norm && text && !wrongAnswers.some(item => item.norm === norm)) {
+                    wrongAnswers.push({ norm, text });
+                }
+            });
+        });
+        const validCandidates = candidates.filter(candidate => {
+            const answer = candidate.ansRaw || candidate.answer || '';
+            const answerNorm = candidate.ansNorm || normalizeChoice(answer);
+            return answerNorm && !wrongAnswers.some(wrong =>
+                wrong.norm === answerNorm || unscriptDigits(wrong.norm) === unscriptDigits(answerNorm));
+        }).sort((left, right) => {
+            const priority = candidate => {
+                if (isConfirmedCandidate(candidate)) return 1000 + (candidate.confirmations || 1);
+                if (String(candidate.source || '').toLowerCase().includes('community')) return 100 + (candidate.confirmations || 1);
+                if (getStudyGuideInfo(candidate)) return 50;
+                return 0;
+            };
+            return priority(right) - priority(left);
+        });
+        const verifiedCandidates = validCandidates.filter(isConfirmedCandidate);
+        const candidatesForConflictCheck = verifiedCandidates.length > 0 ? verifiedCandidates : validCandidates;
+        const answerKeys = new Set(candidatesForConflictCheck.map(candidate =>
+            normalizeChoice(candidate.ansNorm || candidate.ansRaw || candidate.answer || '')
+        ).filter(Boolean));
+        return {
+            candidates: validCandidates,
+            wrongAnswers,
+            hasConflict: answerKeys.size > 1
+        };
+    }
+
     function updateKnownWrongAnswerWarning(que) {
         if (!que) return;
         let knownWrongAnswers = [];
@@ -2896,8 +2940,19 @@
                 value = input.value || '';
             }
 
+            let inputWrongValues = wrongValues;
+            if (input.dataset && input.dataset.amaesKnownWrongAnswers) {
+                try {
+                    inputWrongValues = new Map(JSON.parse(input.dataset.amaesKnownWrongAnswers)
+                        .filter(item => item && item.norm && item.text)
+                        .map(item => [item.norm, item.text]));
+                } catch (error) {
+                    console.warn('Could not read known-wrong-answer evidence for answer control:', error);
+                    return;
+                }
+            }
             const norm = normalizeChoice(value);
-            const match = norm && wrongValues.has(norm) ? wrongValues.get(norm) : null;
+            const match = norm && inputWrongValues.has(norm) ? inputWrongValues.get(norm) : null;
             if (!match) return;
             matchedWrongValues.set(norm, match);
             input.classList.add('amaes-known-wrong-selection');
@@ -3180,7 +3235,7 @@
                 el.style.backgroundColor = '';
                 el.style.borderRadius = '';
             });
-            que.querySelectorAll('.amaes-verified-badge, .amaes-unverified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-select-elim-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag, .amaes-study-guide-question-tag, .amaes-pool-changed-hint').forEach(b => b.remove());
+            que.querySelectorAll('.amaes-verified-badge, .amaes-unverified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-select-elim-hint, .amaes-matching-row-conflict-note, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag, .amaes-study-guide-question-tag, .amaes-pool-changed-hint').forEach(b => b.remove());
 
             // Safety: collect all verified/confirmed answers for this question
             const verifiedNorms = new Set();
@@ -3945,14 +4000,14 @@
                 const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
                 if (textInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()) {
                     const bestCand = validCandidates[0];
-                    const bestAnswer = bestCand.ansRaw || bestCand.answer || '';
+                    const bestAnswer = bestCand ? (bestCand.ansRaw || bestCand.answer || '') : '';
                     const studyGuide = isConfirmedCandidate(bestCand) ? null : getStudyGuideInfo(bestCand);
                     const isStudyGuide = Boolean(studyGuide);
                     const courseInfo = detectCourseInfo();
                     const subCode = courseInfo.subjectCode || 'CS6301';
                     const amauoedUrl = getStoredAmauoedUrl(subCode) || 'https://amauoed.com/courses';
-                    const sourceColor = isStudyGuide ? '#0284c7' : (isConfirmedCandidate(bestCand) ? '#10b981' : '#3b82f6');
-                    const sourceBg = isStudyGuide ? 'rgba(2, 132, 199, 0.1)' : (isConfirmedCandidate(bestCand) ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)');
+                    const sourceColor = isStudyGuide ? '#0284c7' : (bestCand && isConfirmedCandidate(bestCand) ? '#10b981' : '#3b82f6');
+                    const sourceBg = isStudyGuide ? 'rgba(2, 132, 199, 0.1)' : (bestCand && isConfirmedCandidate(bestCand) ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)');
                     const guideUrl = studyGuide && studyGuide.url ? studyGuide.url : amauoedUrl;
                     const sourceTitle = studyGuide
                         ? `<a href="${guideUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" style="color:${sourceColor}; font-weight:700; text-decoration:underline; cursor:pointer;" title="Unconfirmed study-guide suggestion: ${studyGuide.label}">Suggested (${studyGuide.label}, unconfirmed):</a>`
@@ -4057,10 +4112,17 @@
             // Handle Dropdown / Select elements (matching questions table, cloze / gapselect dropdowns)
             if (!foundMatchForQuestion) {
                 const selectInputs = que.querySelectorAll('select');
-                if (selectInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()) {
-                    const bestCand = validCandidates[0];
-                    const bestAnswer = bestCand.ansRaw || bestCand.answer || '';
-                    const studyGuide = isConfirmedCandidate(bestCand) ? null : getStudyGuideInfo(bestCand);
+                const matchingRows = Array.from(selectInputs).map(selectInput => {
+                    const row = selectInput.closest('tr');
+                    const textCell = row && row.querySelector('td.text, td:first-child');
+                    return { selectInput, row, subQuestion: textCell ? textCell.innerText.trim() : '' };
+                }).filter(item => item.subQuestion);
+                const hasMatchingRows = matchingRows.length > 0;
+                if (selectInputs.length > 0 && (validCandidates.length > 0 || hasMatchingRows) && !checkIsReviewPage()) {
+                    const bestCand = validCandidates[0] || null;
+                    if (!bestCand && !hasMatchingRows) return;
+                    const bestAnswer = bestCand ? (bestCand.ansRaw || bestCand.answer || '') : '';
+                    const studyGuide = bestCand && !isConfirmedCandidate(bestCand) ? getStudyGuideInfo(bestCand) : null;
                     const isStudyGuide = Boolean(studyGuide);
                     const courseInfo = detectCourseInfo();
                     const subCode = courseInfo.subjectCode || 'CS6301';
@@ -4070,9 +4132,9 @@
                     const guideUrl = studyGuide && studyGuide.url ? studyGuide.url : amauoedUrl;
                     const sourceTitle = studyGuide
                         ? `<a href="${guideUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" style="color:${sourceColor}; font-weight:700; text-decoration:underline; cursor:pointer;" title="Unconfirmed study-guide suggestion: ${studyGuide.label}">Suggested (${studyGuide.label}, unconfirmed):</a>`
-                        : isConfirmedCandidate(bestCand) ? 'Verified Answer:' : 'Unconfirmed Candidate:';
+                        : bestCand && isConfirmedCandidate(bestCand) ? 'Verified Answer:' : 'Unconfirmed Candidate:';
 
-                    const candAnswers = (bestCand.answers && bestCand.answers.length > 0)
+                    const candAnswers = (bestCand && bestCand.answers && bestCand.answers.length > 0)
                         ? bestCand.answers
                         : (bestAnswer.includes(',') && selectInputs.length > 1 ? bestAnswer.split(',').map(s => s.trim()) : [bestAnswer]);
 
@@ -4081,29 +4143,70 @@
                     selectInputs.forEach((selectInput, idx) => {
                         // Check if dropdown is inside a matching table row with sub-question text
                         const row = selectInput.closest('tr');
-                        const rowTextElem = row ? row.querySelector('td.text') : null;
+                        const rowTextElem = row ? row.querySelector('td.text, td:first-child') : null;
                         const subQText = rowTextElem ? rowTextElem.innerText.trim() : '';
+                        const rowEvidence = hasMatchingRows
+                            ? getMatchingRowAnswerEvidence(questionsDb, subQText)
+                            : { candidates: [], wrongAnswers: [], hasConflict: false };
+                        const rowWrongAnswers = rowEvidence.wrongAnswers;
+                        const hasRowAnswerConflict = rowEvidence.hasConflict;
+                        const rowCandidate = hasMatchingRows && !hasRowAnswerConflict
+                            ? (rowEvidence.candidates[0] || null)
+                            : null;
+                        if (selectInput.dataset) {
+                            if (hasMatchingRows) {
+                                selectInput.dataset.amaesKnownWrongAnswers = JSON.stringify(rowWrongAnswers);
+                            } else {
+                                delete selectInput.dataset.amaesKnownWrongAnswers;
+                            }
+                        }
+                        const effectiveCandidate = hasMatchingRows ? rowCandidate : bestCand;
+                        if (hasRowAnswerConflict) {
+                            const note = document.createElement('div');
+                            note.className = 'amaes-matching-row-conflict-note';
+                            note.setAttribute('role', 'status');
+                            note.textContent = 'Study guides disagree on this matching item. Auto-Pick is paused; check the source answers before selecting.';
+                            note.style.cssText = 'margin-top: 5px; padding: 5px 8px; border-left: 3px solid #f59e0b; background: rgba(245,158,11,.1); color: #92400e; font-size: 11px;';
+                            selectInput.insertAdjacentElement('afterend', note);
+                            updateKnownWrongAnswerWarning(que);
+                            return;
+                        }
+                        if (hasMatchingRows && !effectiveCandidate) {
+                            updateKnownWrongAnswerWarning(que);
+                            return;
+                        }
+                        const effectiveStudyGuide = effectiveCandidate && !isConfirmedCandidate(effectiveCandidate)
+                            ? getStudyGuideInfo(effectiveCandidate)
+                            : null;
+                        const effectiveIsStudyGuide = Boolean(effectiveStudyGuide);
+                        const effectiveSourceColor = effectiveIsStudyGuide ? '#0284c7' :
+                            (effectiveCandidate && isConfirmedCandidate(effectiveCandidate) ? '#10b981' : '#3b82f6');
+                        const effectiveSourceBg = effectiveIsStudyGuide ? 'rgba(2, 132, 199, 0.1)' :
+                            (effectiveCandidate && isConfirmedCandidate(effectiveCandidate) ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)');
+                        const effectiveSourceTitle = effectiveStudyGuide
+                            ? `<a href="${effectiveStudyGuide.url || amauoedUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" style="color:${effectiveSourceColor}; font-weight:700; text-decoration:underline; cursor:pointer;" title="Unconfirmed study-guide suggestion: ${effectiveStudyGuide.label}">Suggested (${effectiveStudyGuide.label}, unconfirmed):</a>`
+                            : effectiveCandidate && isConfirmedCandidate(effectiveCandidate) ? 'Verified Answer:' : 'Unconfirmed Candidate:';
 
                         // Determine target answer for this dropdown:
                         // 1. Try matching sub-question text in bestAnswer (e.g. "Term: Definition" or "Term -> Definition")
                         let targetAns = '';
-                        if (subQText && (bestAnswer.includes(':') || bestAnswer.includes('->') || bestAnswer.includes('-'))) {
+                        if (rowCandidate) {
+                            targetAns = rowCandidate.ansRaw || rowCandidate.answer || '';
+                        }
+                        if (!targetAns && subQText && (bestAnswer.includes('→') || bestAnswer.includes('->'))) {
                             const lines = bestAnswer.split(/[\n,;]+/).map(l => l.trim());
                             for (const line of lines) {
-                                const subNorm = normalizeText(subQText);
-                                const lineNorm = normalizeText(line);
-                                if (lineNorm.includes(subNorm)) {
-                                    const parts = line.split(/[:\->=]+/);
-                                    if (parts.length >= 2) {
-                                        targetAns = parts.slice(1).join(':').trim();
-                                        break;
-                                    }
-                                }
+                                const arrowIndex = Math.max(line.indexOf('→'), line.indexOf('->'));
+                                if (arrowIndex < 0) continue;
+                                const prompt = line.slice(0, arrowIndex).trim();
+                                if (!questionTextMatches(prompt, subQText)) continue;
+                                targetAns = line.slice(arrowIndex + (line[arrowIndex] === '→' ? 1 : 2)).trim();
+                                break;
                             }
                         }
 
-                        // 2. Fallback to candidate answers array index
-                        if (!targetAns) {
+                        // Positional answer lists are unsafe when Moodle shuffles matching rows.
+                        if (!targetAns && !hasMatchingRows) {
                             targetAns = selectInputs.length === 1 ? (candAnswers[0] || bestAnswer || '') : (candAnswers[idx] || '');
                         }
                         if (!targetAns) return;
@@ -4111,6 +4214,7 @@
                         // Look for a matching option in the select
                         const options = Array.from(selectInput.options);
                         const normTarget = normalizeChoice(targetAns);
+                        const applicableWrongAnswers = hasMatchingRows ? rowWrongAnswers : allWrongList;
 
                         // 1. Mark eliminated options in dropdown
                         const eliminatedOptions = [];
@@ -4118,7 +4222,7 @@
                             if (!opt.value || opt.value === '0' || opt.text.toLowerCase().includes('choose')) return;
                             const optClean = opt.text.replace(/\s*\(Eliminated\)/g, '').trim();
                             const optNorm = normalizeChoice(optClean);
-                            const isWrong = allWrongList.some(w => w.norm === optNorm || unscriptDigits(w.norm) === unscriptDigits(optNorm));
+                            const isWrong = applicableWrongAnswers.some(w => w.norm === optNorm || unscriptDigits(w.norm) === unscriptDigits(optNorm));
                             if (isWrong) {
                                 if (!opt.text.includes('(Eliminated)')) {
                                     opt.text = `${optClean} (Eliminated)`;
@@ -4150,17 +4254,17 @@
                             if (!opt.value || opt.value === '0' || opt.text.toLowerCase().includes('choose')) return false;
                             const optClean = opt.text.replace(/\s*\(Eliminated\)/g, '').trim();
                             const normOpt = normalizeChoice(optClean);
-                            if (allWrongList.some(w => w.norm === normOpt || unscriptDigits(w.norm) === unscriptDigits(normOpt))) return false;
+                            if (applicableWrongAnswers.some(w => w.norm === normOpt || unscriptDigits(w.norm) === unscriptDigits(normOpt))) return false;
                             return normOpt === normTarget || (normTarget.length > 2 && normOpt.includes(normTarget)) || (normOpt.length > 2 && targetAns.length > 2 && normTarget.includes(normOpt));
                         });
 
                         // Fallback: if no direct match, try matching any candidate answer (excluding eliminated)
-                        if (!matchedOption && candAnswers.length > 0) {
+                        if (!matchedOption && !hasMatchingRows && candAnswers.length > 0) {
                             matchedOption = options.find(opt => {
                                 if (!opt.value || opt.value === '0' || opt.text.toLowerCase().includes('choose')) return false;
                                 const optClean = opt.text.replace(/\s*\(Eliminated\)/g, '').trim();
                                 const normOpt = normalizeChoice(optClean);
-                                if (allWrongList.some(w => w.norm === normOpt || unscriptDigits(w.norm) === unscriptDigits(normOpt))) return false;
+                                if (applicableWrongAnswers.some(w => w.norm === normOpt || unscriptDigits(w.norm) === unscriptDigits(normOpt))) return false;
                                 return candAnswers.some(ca => {
                                     const nca = normalizeChoice(ca);
                                     return normOpt === nca || (nca.length > 2 && normOpt.includes(nca)) || (normOpt.length > 2 && nca.includes(normOpt));
@@ -4173,7 +4277,7 @@
                             if (!opt.value || opt.value === '0' || opt.text.toLowerCase().includes('choose')) return false;
                             const optClean = opt.text.replace(/\s*\(Eliminated\)/g, '').trim();
                             const optNorm = normalizeChoice(optClean);
-                            return !allWrongList.some(w => w.norm === optNorm || unscriptDigits(w.norm) === unscriptDigits(optNorm));
+                            return !applicableWrongAnswers.some(w => w.norm === optNorm || unscriptDigits(w.norm) === unscriptDigits(optNorm));
                         });
 
                         let isDeducedSelect = false;
@@ -4184,8 +4288,8 @@
 
                         if (matchedOption) {
                             matchedAnySelect = true;
-                            selectInput.style.outline = `2px solid ${sourceColor}`;
-                            selectInput.style.backgroundColor = sourceBg;
+                            selectInput.style.outline = `2px solid ${hasMatchingRows ? effectiveSourceColor : sourceColor}`;
+                            selectInput.style.backgroundColor = hasMatchingRows ? effectiveSourceBg : sourceBg;
                             selectInput.style.borderRadius = '4px';
 
                             let hint = que.querySelector(`.amaes-select-hint[data-select-idx="${idx}"]`);
@@ -4193,9 +4297,9 @@
                                 hint = document.createElement('div');
                                 hint.className = 'amaes-select-hint';
                                 hint.setAttribute('data-select-idx', String(idx));
-                                const displayTitle = isDeducedSelect ? 'Deduced Answer:' : sourceTitle;
+                                const displayTitle = isDeducedSelect ? 'Deduced Answer:' : (hasMatchingRows ? effectiveSourceTitle : sourceTitle);
                                 const cleanText = matchedOption.text.replace(/\s*\(Eliminated\)/g, '').trim();
-                                const activeColor = isDeducedSelect ? '#f59e0b' : sourceColor;
+                                const activeColor = isDeducedSelect ? '#f59e0b' : (hasMatchingRows ? effectiveSourceColor : sourceColor);
                                 hint.innerHTML = `
                                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                                         <span><span style="color:${activeColor}; font-weight:700;">${displayTitle}</span> <b>${cleanText}</b></span>
@@ -4216,7 +4320,9 @@
                                         ">${ICONS.zap} Pick</button>
                                     </div>
                                 `;
-                                hint.style.cssText = `font-size: 11px; margin-top: 5px; margin-bottom: 3px; padding: 5px 9px; background: ${sourceBg}; border-left: 3px solid ${sourceColor}; border-radius: 4px; cursor: pointer; transition: background 0.15s;`;
+                                const hintSourceBg = hasMatchingRows ? effectiveSourceBg : sourceBg;
+                                const hintSourceColor = hasMatchingRows ? effectiveSourceColor : sourceColor;
+                                hint.style.cssText = `font-size: 11px; margin-top: 5px; margin-bottom: 3px; padding: 5px 9px; background: ${hintSourceBg}; border-left: 3px solid ${hintSourceColor}; border-radius: 4px; cursor: pointer; transition: background 0.15s;`;
                                 hint.title = `Click to pick "${matchedOption.text}"`;
 
                                 const pickFn = (e) => {
@@ -4247,10 +4353,10 @@
                             }
 
                             // Auto-select when autoPickQuiz is enabled and auto-quiz is running, or user triggered manual select
-                            const canAutoPick = (isManualSelect && (isConfirmedCandidate(bestCand) || isDeducedSelect)) ||
+                            const canAutoPick = (isManualSelect && ((effectiveCandidate && isConfirmedCandidate(effectiveCandidate)) || isDeducedSelect)) ||
                                 (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                                (isConfirmedCandidate(bestCand) ||
-                                    (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback)) && !isDeducedSelect);
+                                ((effectiveCandidate && isConfirmedCandidate(effectiveCandidate)) ||
+                                    ((hasMatchingRows ? effectiveIsStudyGuide : isStudyGuide) && autoQuizMode && autoPickStudyGuideFallback)) && !isDeducedSelect);
                             if (canAutoPick && (!selectInput.value || selectInput.value === '0')) {
                                 selectInput.value = matchedOption.value;
                                 selectInput.dispatchEvent(new Event('input', { bubbles: true }));

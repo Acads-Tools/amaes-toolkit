@@ -903,6 +903,10 @@
         queList.forEach((que, idx) => {
             const qData = extractQuestionData(que);
             if (!qData || !qData.qText) return;
+            const matchingRows = Array.from(que.querySelectorAll('.answer table tr, .answer tr')).filter(row =>
+                row.querySelector('select') && row.querySelector('td.text, td:first-child')
+            );
+            const isMatchingQuestion = matchingRows.length > 0 || qData.questionType === 'match';
 
             let rightAnswer = '';
             let isVerified = false;
@@ -910,7 +914,7 @@
 
             // 1. Check for explicit Moodle .rightanswer box (handles both singular and plural answers)
             const rightElem = que.querySelector('.rightanswer, .outcome .rightanswer');
-            if (rightElem) {
+            if (rightElem && !isMatchingQuestion) {
                 let raw = cleanDOMToAI(rightElem);
                 raw = raw.replace(/^The correct answers? (is|are):?\s*['"]?/i, '').replace(/['"]?\s*$/i, '').trim();
                 if (raw) {
@@ -970,12 +974,56 @@
             const isFullMark = gradeInfo.isFullMark;
             const isZeroMark = gradeInfo.isZeroMark;
             const isPartialMark = gradeInfo.isPartialMark;
+            const matchingEvidence = [];
+
+            if (isMatchingQuestion) {
+                matchingRows.forEach(row => {
+                    const promptCell = row.querySelector('td.text, td:first-child');
+                    const select = row.querySelector('select');
+                    const selectedOption = select && select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
+                    const selectedAnswer = selectedOption && selectedOption.value && !selectedOption.text.toLowerCase().includes('choose')
+                        ? String(selectedOption.text || selectedOption.innerText || '').trim()
+                        : '';
+                    const prompt = promptCell ? cleanDOMToAI(promptCell).trim() : '';
+                    if (!prompt || !selectedAnswer) return;
+
+                    const rowIsWrong = hasChoiceCross(row) || row.classList.contains('incorrect') ||
+                        Boolean(row.querySelector('.text-danger, .incorrect'));
+                    const rowIsCorrect = !rowIsWrong && (
+                        hasChoiceCheckmark(row) || row.classList.contains('correct') ||
+                        Boolean(row.querySelector('.text-success, .correct')) || isFullMark
+                    );
+                    if (!rowIsWrong && !rowIsCorrect) return;
+
+                    matchingEvidence.push({
+                        index: idx + 1,
+                        qRaw: prompt,
+                        qNorm: normalizeText(prompt),
+                        ansRaw: rowIsCorrect ? selectedAnswer : '',
+                        ansNorm: rowIsCorrect ? normalizeChoice(selectedAnswer) : '',
+                        questionType: 'shortanswer',
+                        wrongAnswers: rowIsWrong ? normalizeWrongAnswers([selectedAnswer]) : [],
+                        choices: [],
+                        verified: rowIsCorrect,
+                        evidenceType: rowIsWrong ? 'moodle_review_elimination' : 'moodle_review',
+                        wrongAnswerEvidence: rowIsWrong,
+                        period: detectTermFromText(quizTitle) || 'General',
+                        quizTitle
+                    });
+                });
+                matchingEvidence.forEach(item => {
+                    if (item.ansRaw) correctCount++;
+                    eliminatedTotal += item.wrongAnswers.length;
+                    harvested.push(item);
+                });
+            }
 
             // Direct per-choice checkmark and cross detection (supports nested fieldsets and all Moodle themes)
             const choiceRows = que.querySelectorAll('.answer div.r0, .answer div.r1, .answer div[class*="r"], .answer fieldset > div, .answer li, .answer tr, .answer label, .answer > div');
             const checkmarkedTexts = [];
             const crossedTexts = [];
             choiceRows.forEach(row => {
+                if (isMatchingQuestion) return;
                 const label = row.querySelector('label') || row;
                 let text = cleanDOMToAI(label).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
                 if (!text) return;
@@ -1025,7 +1073,7 @@
             });
 
             // 2. If question was marked INCORRECT (0 marks): the checked/entered choice(s) are confirmed WRONG!
-            if (isZeroMark) {
+            if (isZeroMark && !isMatchingQuestion) {
                 [...checkedTexts, ...filledInputTexts, ...selectedDropdownTexts, ...placedDropTexts].forEach(txt => {
                     const norm = normalizeChoice(txt);
                     if (norm && !wrongAnswers.some(w => normalizeChoice(w) === norm)) {
@@ -1037,6 +1085,7 @@
             // Also check Moodle's per-choice incorrect indicators on non-standard containers
             const incorrectChoiceElems = que.querySelectorAll('.answer div.incorrect, .answer tr.incorrect, .answer li.incorrect, .answer .fa-remove, .answer .fa-times, .drop.incorrect');
             incorrectChoiceElems.forEach(el => {
+                if (isMatchingQuestion) return;
                 const row = el.closest('div.r0, div.r1, tr, li') || el;
                 const label = row.querySelector('label') || row;
                 let text = cleanDOMToAI(label).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
@@ -1074,7 +1123,7 @@
                 }
             }
 
-            if (rightAnswer || wrongAnswers.length > 0) {
+            if (!isMatchingQuestion && (rightAnswer || wrongAnswers.length > 0)) {
                 if (rightAnswer) correctCount++;
                 eliminatedTotal += wrongAnswers.length;
                 const detectedPeriod = detectTermFromText(quizTitle) || 'General';

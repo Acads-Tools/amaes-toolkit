@@ -2725,7 +2725,7 @@ test("Study-Guide Links & Opt-In Auto-Pick: links sources and keeps unverified f
     assert.ok(script.includes("que.dataset.amaesStudyGuideFallbackPicked === 'true'"), "Only selected study-guide fallback answers may bypass the unknown-answer pause");
     assert.ok(script.includes("input.dispatchEvent(new Event('change', { bubbles: true }));"), "Radio auto-select must dispatch change event");
     assert.ok(script.includes("const canAutoFill = (isManualSelect && isConfirmedCandidate(bestCand)) ||") && script.includes("isConfirmedCandidate(bestCand));"), "Text inputs may auto-fill only confirmed answers");
-    assert.ok(script.includes("const canAutoPick = (isManualSelect && (isConfirmedCandidate(bestCand) || isDeducedSelect)) ||"), "Dropdown Auto-Pick must require confirmed evidence");
+    assert.ok(script.includes("const canAutoPick = (isManualSelect && ((effectiveCandidate && isConfirmedCandidate(effectiveCandidate)) || isDeducedSelect)) ||"), "Dropdown Auto-Pick must require confirmed evidence for the row-specific candidate");
     assert.ok(script.includes("hasAmbiguousQuestionMatch") && script.includes("matchingQuestionKeys.size > 1"), "Fuzzy matching must pause when similar saved prompts are ambiguous");
     assert.ok(script.includes("normalizeQuestionMatchKey(value)") && script.includes("\\[\\s*_{2,}(?:\\s*:\\s*[\\s\\S]*?)?\\s*\\]"), "Question matching must normalize Moodle's scored short-answer blanks, including the displayed wrong response");
     assert.ok(script.includes("currentInputIsKnownWrong") && script.includes("!textInput.value || currentInputIsKnownWrong"), "A confirmed answer must replace a preserved short-answer response already recorded as wrong");
@@ -2924,8 +2924,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.11.12'), "Userscript header must specify v1.11.12");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.12";'), "Constant SCRIPT_VERSION must be v1.11.12");
+    assert.ok(script.includes('@version      1.11.13'), "Userscript header must specify v1.11.13");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.13";'), "Constant SCRIPT_VERSION must be v1.11.13");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4060,11 +4060,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.11.12-blue.svg"), "README badge must show v1.11.12");
+    assert.ok(readme.includes("version-1.11.13-blue.svg"), "README badge must show v1.11.13");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.11.12<"), "Website must display v1.11.12 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.11.13<"), "Website must display v1.11.13 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -4570,7 +4570,7 @@ test("Gapselect / Dropdown Pick Support, Unknown Question Type JSON Store, and R
     assert.ok(script.includes("if (checkIsReviewPage()) {"), "highlightQuizAnswers must check checkIsReviewPage");
     assert.ok(script.includes("const validCandidates = candidates.filter"), "Must filter candidates against allWrongList before picking suggested answer");
     assert.ok(script.includes("textInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()"), "Short-answer hint must require validCandidates and not be on review page");
-    assert.ok(script.includes("selectInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()"), "Select hint must require validCandidates and not be on review page");
+    assert.ok(script.includes("selectInputs.length > 0 && (validCandidates.length > 0 || hasMatchingRows) && !checkIsReviewPage()"), "Select hints must require a usable candidate or a matching table, and never run on review pages");
 
     // 5. Gapselect Prompt Builder & Gemini Inference
     assert.ok(script.includes("[Dropdown Pick / Fill Blank]"), "buildGeminiCompactPrompt must format gapselect dropdown prompts");
@@ -5445,6 +5445,64 @@ test("Review elimination: wrapped Moodle review prompt blocks an exact study-gui
         !wrongAnswers.some(item => normalize(item.text) === normalize(candidate.ansRaw))
     );
     assert.strictEqual(safeSuggestions.length, 0, "The exact study-guide answer disproved by Moodle must be removed from suggestions");
+});
+
+test("Matching questions: maps answers by row prompt, blocks reviewed wrong answers, and pauses conflicting guides", () => {
+    const vm = require('vm');
+    const solver = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const start = solver.indexOf('    function getMatchingRowAnswerEvidence(');
+    const end = solver.indexOf('    function updateKnownWrongAnswerWarning(', start);
+    assert.ok(start >= 0 && end > start, "Matching-row evidence resolver must be defined");
+    const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9$]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const sandbox = {
+        questionTextMatches: (left, right) => {
+            const a = normalize(left);
+            const b = normalize(right);
+            return Boolean(a && b && (a === b || (a.length > 20 && (a.includes(b) || b.includes(a)))));
+        },
+        normalizeChoice: normalize,
+        unscriptDigits: value => value,
+        isConfirmedCandidate: candidate => Boolean(candidate.verified && candidate.source === 'review_screen'),
+        getStudyGuideInfo: candidate => candidate.source === 'jennysonline' ? { label: "Jenny's Online" } : null
+    };
+    vm.runInNewContext(`${solver.slice(start, end)}\nglobalThis.resolveRow = getMatchingRowAnswerEvidence;`, sandbox);
+
+    const prompt = 'are templates for reports';
+    const guides = [
+        { qRaw: prompt, ansRaw: 'Queries', source: 'jennysonline', verified: false },
+        { qRaw: prompt, ansRaw: 'Reports', source: 'jennysonline', verified: false }
+    ];
+    assert.strictEqual(sandbox.resolveRow(guides, prompt).hasConflict, true, "Conflicting unverified row suggestions must pause rather than auto-pick");
+
+    const reviewEvidence = {
+        qRaw: prompt,
+        ansRaw: '',
+        wrongAnswers: [{ text: 'Queries' }],
+        wrongAnswerEvidence: true,
+        source: 'review_screen'
+    };
+    const afterReview = sandbox.resolveRow([...guides, reviewEvidence], prompt);
+    assert.strictEqual(afterReview.candidates.length, 1, "Review evidence must filter a disproven mapping from this sub-question only");
+    assert.strictEqual(afterReview.candidates[0].ansRaw, 'Reports');
+    assert.deepStrictEqual(Array.from(afterReview.wrongAnswers, item => item.text), ['Queries']);
+
+    const verifiedReviewAnswer = {
+        qRaw: prompt,
+        ansRaw: 'Queries',
+        wrongAnswers: [],
+        verified: true,
+        source: 'review_screen'
+    };
+    const confirmed = sandbox.resolveRow([...guides, verifiedReviewAnswer], prompt);
+    assert.strictEqual(confirmed.candidates[0].ansRaw, 'Queries', "A directly verified Moodle row answer must outrank unconfirmed source disagreements");
+    assert.strictEqual(confirmed.hasConflict, false);
+
+    const harvester = fs.readFileSync('src/sync/harvester.js', 'utf8');
+    assert.ok(harvester.includes("const isMatchingQuestion = matchingRows.length > 0 || qData.questionType === 'match';"), "Harvester must identify Moodle matching tables");
+    assert.ok(harvester.includes('if (rightElem && !isMatchingQuestion)'), "A whole-question answer list must not be stored as a verified per-row mapping");
+    assert.ok(harvester.includes('if (isZeroMark && !isMatchingQuestion)'), "A partial or zero score must not label every selected matching-row answer as wrong");
+    assert.ok(harvester.includes("evidenceType: rowIsWrong ? 'moodle_review_elimination' : 'moodle_review'"), "Review harvesting must save correctness evidence against each matching sub-question");
+    assert.ok(solver.includes("selectInput.dataset.amaesKnownWrongAnswers = JSON.stringify(rowWrongAnswers)"), "Matching-row warnings must use row-scoped wrong-answer evidence, even when that evidence is empty");
 });
 
 console.log("\n==================================================");

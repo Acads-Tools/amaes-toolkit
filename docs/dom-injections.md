@@ -116,6 +116,9 @@ Injections here provide real-time assistance during active assessments.
 - **Short-Answer Auto-Fill Pill**: `.amaes-shortans-hint`
   - Placed beside text input fields and textareas.
   - Displays the verified answer with a 1-click button to insert the text.
+- **Matching-Question Row Hints**: `.amaes-select-hint`
+  - Matches each dropdown to its own row prompt; it never maps Moodle's shuffled matching answers by position.
+  - Moodle review evidence is stored against the individual row. Confirmed wrong selections are excluded and flagged, while conflicting unverified study-guide answers pause Auto-Pick for that row.
 
 ### G. Blockage & Safety HUD
 - **Class**: `.amaes-blockage-hud`
