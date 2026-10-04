@@ -109,7 +109,10 @@
                     qNorm,
                     ansRaw,
                     ansNorm,
-                    source: 'amauoed'
+                    source: 'amauoed',
+                    verified: false,
+                    confirmations: 1,
+                    evidenceType: 'study_guide_candidate'
                 };
                 if (correctList.length > 1) {
                     entry.answers = correctList;
@@ -154,7 +157,10 @@
             try {
                 logDebug(`Fetching amauoed page ${page}: ${pageUrl}`);
                 const html = await fetchAmauoedPage(pageUrl);
-                const questions = parseAmauoedHtml(html);
+                const questions = parseAmauoedHtml(html).map(question => ({
+                    ...question,
+                    sourceUrl: cleanBase
+                }));
 
                 if (questions.length === 0) {
                     hasMore = false;

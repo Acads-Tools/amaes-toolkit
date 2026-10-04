@@ -1373,7 +1373,10 @@ test("AMAUOED HTML Parser: extracts multi-chip answers, distractors as wrongAnsw
             qNorm: normalizeChoice(cardData.question),
             ansRaw,
             ansNorm,
-            source: 'amauoed'
+            source: 'amauoed',
+            verified: false,
+            confirmations: 1,
+            evidenceType: 'study_guide_candidate'
         };
         if (correctList.length > 1) {
             entry.answers = correctList;
@@ -1394,6 +1397,8 @@ test("AMAUOED HTML Parser: extracts multi-chip answers, distractors as wrongAnsw
     });
 
     assert.strictEqual(parsed.ansRaw, "Star, Mesh, Ring");
+    assert.strictEqual(parsed.verified, false, "AMAUOED scraper candidates must never default to confirmed");
+    assert.strictEqual(parsed.evidenceType, "study_guide_candidate");
     assert.deepStrictEqual(parsed.answers, ["Star", "Mesh", "Ring"], "Must contain all 3 correct chips in answers array");
     assert.strictEqual(parsed.wrongAnswers.length, 1);
     assert.strictEqual(parsed.wrongAnswers[0].text, "Banana", "Distractor must be recorded in wrongAnswers");
@@ -2863,8 +2868,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.10.0'), "Userscript header must specify v1.10.0");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.10.0";'), "Constant SCRIPT_VERSION must be v1.10.0");
+    assert.ok(script.includes('@version      1.11.0'), "Userscript header must specify v1.11.0");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.0";'), "Constant SCRIPT_VERSION must be v1.11.0");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3997,10 +4002,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.10.0-blue.svg"), "README badge must show v1.10.0");
+    assert.ok(readme.includes("version-1.11.0-blue.svg"), "README badge must show v1.11.0");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.10.0<"), "Website must display v1.10.0 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.11.0<"), "Website must display v1.11.0 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -5209,6 +5214,7 @@ test("Jenny's Online public spreadsheet loads as locally cached unconfirmed cour
     const vm = require('vm');
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
     const source = fs.readFileSync('src/sync/jennysonline.js', 'utf8');
+    const amauoed = fs.readFileSync(path.join('src', 'sync', 'amauoed.js'), 'utf8');
     const harvester = fs.readFileSync('src/sync/harvester.js', 'utf8');
     const init = fs.readFileSync('src/init.js', 'utf8');
     const registry = JSON.parse(fs.readFileSync('../database/data/jennysonline/IT6205A.json', 'utf8'));
@@ -5225,10 +5231,16 @@ test("Jenny's Online public spreadsheet loads as locally cached unconfirmed cour
     assert.ok(script.includes('loadJennysonlineAnswersForCourse(subCode, courseName)'), "Auto-Quiz must search Jenny using the detected course name");
     assert.ok(script.includes('hasStudyGuideSource && !hasStudyGuideConflict'), "Auto-Pick must use non-conflicting study-guide suggestions");
     assert.ok(script.includes("source: 'jennysonline'") && script.includes("evidenceType: 'study_guide_candidate'"), "Imported sheet answers must carry an unconfirmed evidence label");
+    assert.ok(amauoed.includes("verified: false") && amauoed.includes("evidenceType: 'study_guide_candidate'"), "Live AMAUOED results must remain unverified candidates");
+    assert.ok(amauoed.includes('sourceUrl: cleanBase'), "Live AMAUOED results must retain their source URL");
     assert.ok(script.includes('amaes-unreviewable-retry-warning'), "Unreviewable quiz retries must show a warning");
     assert.ok(script.includes('if (getStudyGuideInfo(item)) return 50;'), "AMAUOED and Jenny suggestions must receive equal, confidence-independent source priority");
     assert.ok(script.includes('amaes-study-guide-conflict-note'), "Conflicting study-guide answers must pause Auto-Pick");
     assert.ok(harvester.includes('count: totalAvailable') && harvester.includes('cachedCount'), "Cloud sync must report session-only suggestions separately from cached tiers");
+    assert.ok(harvester.includes('refreshStudyGuideSourcesForCourse(cleanSubCode, resolvedCourseTitle)'), "Course access must refresh AMAUOED and Jenny independently of other cached answers");
+    assert.ok(harvester.includes('STUDY_GUIDE_CACHE_TTL = 30 * 24 * 60 * 60 * 1000'), "Each source snapshot must use a 30-day freshness window");
+    assert.ok(harvester.includes('queueStudyGuideRefresh(code)'), "Stale or newly discovered course sources must queue a shared refresh");
+    assert.ok(source.includes("Date.parse(registry.refreshedAt || registry.updatedAt || '')"), "Jenny shared snapshots must be checked against their source refresh date");
     assert.ok(init.includes('highlightQuizAnswers((fresh || []).concat(jennyAnswers), false)'), "Auto-sync highlighting must include Jenny suggestions without adding them to shared answer tiers");
 
     const sandbox = {

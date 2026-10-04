@@ -494,6 +494,187 @@
             });
         }
 
+        const STUDY_GUIDE_CACHE_TTL = 30 * 24 * 60 * 60 * 1000;
+        const studyGuideSessionLoads = new Map();
+
+        function studyGuideCacheKey(source, code) {
+            return `amaes_study_guide_${source}_v1_${code}`;
+        }
+
+        function readStudyGuideLocalCache(source, code) {
+            try {
+                const cached = JSON.parse(localStorage.getItem(studyGuideCacheKey(source, code)) || 'null');
+                if (!cached || !Number.isFinite(cached.savedAt) ||
+                    Date.now() - cached.savedAt < 0 ||
+                    Date.now() - cached.savedAt >= STUDY_GUIDE_CACHE_TTL ||
+                    !Array.isArray(cached.answers) ||
+                    cached.answers.length > 5000 ||
+                    cached.answers.some(answer => !answer || answer.verified !== false ||
+                        answer.evidenceType !== 'study_guide_candidate' || answer.source !== source)) {
+                    return null;
+                }
+                return cached;
+            } catch (error) {
+                logDebug(`Study-guide ${source} cache read note for ${code}: ${error.message}`);
+                return null;
+            }
+        }
+
+        function writeStudyGuideLocalCache(source, code, sourceUrl, answers, savedAt = Date.now()) {
+            const safeAnswers = answers.filter(answer => answer && answer.qNorm && answer.ansNorm)
+                .map(answer => ({
+                    ...answer,
+                    verified: false,
+                    confirmations: 1,
+                    source,
+                    evidenceType: 'study_guide_candidate',
+                    sourceUrl: answer.sourceUrl || sourceUrl
+                }));
+            if (!safeAnswers.length) return null;
+            const snapshot = { savedAt, sourceUrl, answers: safeAnswers };
+            try {
+                localStorage.setItem(studyGuideCacheKey(source, code), JSON.stringify(snapshot));
+            } catch (error) {
+                logDebug(`Study-guide ${source} cache write note for ${code}: ${error.message}`);
+            }
+            return snapshot;
+        }
+
+        function parseStudyGuideTier(payload, code, source) {
+            if (!payload || payload.subjectCode !== code || !Array.isArray(payload.questions)) return [];
+            return payload.questions.map(question => {
+                const qRaw = question.question || question.qRaw || '';
+                const ansRaw = question.answer || question.ansRaw || '';
+                return {
+                    ...question,
+                    qRaw,
+                    qNorm: normalizeText(qRaw),
+                    ansRaw,
+                    ansNorm: normalizeChoice(ansRaw),
+                    verified: false,
+                    confirmations: 1,
+                    source,
+                    evidenceType: 'study_guide_candidate',
+                    sourceUrl: question.sourceUrl || payload.sourceUrl || ''
+                };
+            }).filter(question => question.qNorm && question.ansNorm);
+        }
+
+        function studyGuideTierIsFresh(payload) {
+            const timestamp = Date.parse(payload && (payload.refreshedAt || payload.updatedAt) || '');
+            return Number.isFinite(timestamp) && Date.now() - timestamp >= 0 &&
+                Date.now() - timestamp < STUDY_GUIDE_CACHE_TTL;
+        }
+
+        async function fetchStudyGuideJson(url) {
+            const req = (typeof GM_xmlhttpRequest === 'function') ? GM_xmlhttpRequest :
+                (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
+            if (!req) {
+                const response = await fetch(url, { headers: { Accept: 'application/json' } });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            }
+            return new Promise((resolve, reject) => {
+                req({
+                    method: 'GET',
+                    url,
+                    headers: { Accept: 'application/json' },
+                    onload: response => {
+                        if (response.status < 200 || response.status >= 300) {
+                            reject(new Error(`HTTP ${response.status}`));
+                            return;
+                        }
+                        try {
+                            resolve(JSON.parse(response.responseText));
+                        } catch (_) {
+                            reject(new Error('Invalid study-guide JSON'));
+                        }
+                    },
+                    onerror: () => reject(new Error('Study-guide database request failed'))
+                });
+            });
+        }
+
+        async function loadAmauoedStudyGuideForCourse(code, courseTitle) {
+            const source = 'amauoed';
+            const local = readStudyGuideLocalCache(source, code);
+            let shared = null;
+            try {
+                shared = await fetchStudyGuideJson(`${CLOUD_DB_AMAUOED_URL}${code}.json`);
+                const answers = parseStudyGuideTier(shared, code, source);
+                if (answers.length && studyGuideTierIsFresh(shared)) {
+                    const snapshot = writeStudyGuideLocalCache(
+                        source, code, shared.sourceUrl, answers,
+                        Date.parse(shared.refreshedAt || shared.updatedAt)
+                    );
+                    mergeAnswersIntoCache(code, snapshot.answers, 'Study-Guide-Amauoed');
+                    return snapshot.answers;
+                }
+            } catch (error) {
+                if (!/HTTP 404/.test(error.message)) logDebug(`AMAUOED shared snapshot note for ${code}: ${error.message}`);
+            }
+
+            if (local) {
+                queueStudyGuideRefresh(code);
+                mergeAnswersIntoCache(code, local.answers, 'Study-Guide-Amauoed');
+                return local.answers;
+            }
+
+            try {
+                const url = await autoFindAmauoedLink(code, courseTitle);
+                if (url) {
+                    const scraped = await loadAllAmauoedAnswers(url);
+                    const candidates = scraped.map(answer => ({
+                        ...answer,
+                        verified: false,
+                        source: 'amauoed',
+                        evidenceType: 'study_guide_candidate',
+                        sourceUrl: url
+                    }));
+                    const snapshot = writeStudyGuideLocalCache(source, code, url, candidates);
+                    if (snapshot) {
+                        queueStudyGuideRefresh(code);
+                        mergeAnswersIntoCache(code, snapshot.answers, 'Study-Guide-Amauoed');
+                        return snapshot.answers;
+                    }
+                }
+            } catch (error) {
+                logDebug(`AMAUOED live lookup note for ${code}: ${error.message}`);
+            }
+
+            queueStudyGuideRefresh(code);
+            const stale = shared ? parseStudyGuideTier(shared, code, source) : [];
+            const fallback = stale.length ? stale : (local ? local.answers : []);
+            if (fallback.length) mergeAnswersIntoCache(code, fallback, 'Study-Guide-Amauoed');
+            return fallback;
+        }
+
+        async function refreshStudyGuideSourcesForCourse(code, courseTitle = '') {
+            const cleanCode = String(code || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+            if (!cleanCode || cleanCode === 'GENERAL' || cleanCode === 'DEFAULT') return [];
+            if (studyGuideSessionLoads.has(cleanCode)) return studyGuideSessionLoads.get(cleanCode);
+            const load = (async () => {
+                const results = await Promise.allSettled([
+                    loadAmauoedStudyGuideForCourse(cleanCode, courseTitle),
+                    loadJennysonlineAnswersForCourse(cleanCode, courseTitle)
+                ]);
+                const answers = [];
+                results.forEach((result, index) => {
+                    const source = index === 0 ? 'AMAUOED' : "Jenny's Online";
+                    if (result.status === 'fulfilled') answers.push(...result.value);
+                    else logDebug(`${source} course lookup note for ${cleanCode}: ${result.reason.message}`);
+                });
+                return answers;
+            })();
+            studyGuideSessionLoads.set(cleanCode, load);
+            try {
+                return await load;
+            } catch (error) {
+                studyGuideSessionLoads.delete(cleanCode);
+                throw error;
+            }
+        }
+
         let verifiedCount = 0;
         let communityCount = 0;
         let amauoedCount = 0;
@@ -544,29 +725,10 @@
             logDebug(`Community cache tier note for ${cleanSubCode}: ${e.message}`);
         }
 
-        // 3. Fetch AMAUOED Tier (Study Guide Catalog)
-        try {
-            const amaUrl = `${CLOUD_DB_AMAUOED_URL}${cleanSubCode}.json`;
-            logDebug(`Syncing amauoed catalog from: ${amaUrl}`);
-            const amaData = await fetchJsonUrl(amaUrl);
-            const parsedAma = parseIncomingAnswerPayload(amaData, cleanSubCode).map(q => ({
-                ...q,
-                source: 'amauoed'
-            }));
-            mergeAnswersIntoCache(cleanSubCode, parsedAma, 'Cloud-Amauoed');
-            amauoedCount = parsedAma.length;
-        } catch (e) {
-            logDebug(`AMAUOED tier note for ${cleanSubCode}: ${e.message}`);
-        }
-
-        // Jenny's Online rows are unconfirmed local suggestions, never merged
-        // into the shared verified, community, or study-guide tiers.
-        try {
-            const jennyAnswers = await loadJennysonlineAnswersForCourse(cleanSubCode, resolvedCourseTitle);
-            jennysonlineCount = jennyAnswers.length;
-        } catch (e) {
-            logDebug(`Jenny's Online tier note for ${cleanSubCode}: ${e.message}`);
-        }
+        // Study-guide sources have independent local/shared freshness and remain unverified.
+        const studyGuideAnswers = await refreshStudyGuideSourcesForCourse(cleanSubCode, resolvedCourseTitle);
+        amauoedCount = studyGuideAnswers.filter(answer => answer.source === 'amauoed').length;
+        jennysonlineCount = studyGuideAnswers.filter(answer => answer.source === 'jennysonline').length;
 
         const cachedCount = verifiedCount + communityCount + amauoedCount;
         const totalAvailable = cachedCount + jennysonlineCount;
@@ -595,6 +757,11 @@
             // 1. Check local cache: If answers already exist locally, avoid unnecessary scraping or network calls
             const existing = getCachedAnswers(code) || [];
             if (existing.length > 0) {
+                try {
+                    await syncAnswersFromCloud(code, null, courseTitle);
+                } catch (error) {
+                    logDebug(`Study-guide freshness check note for ${code}: ${error.message}`);
+                }
                 return true;
             }
 
@@ -604,25 +771,6 @@
                 return true;
             }
 
-            // 3. Fallback: Auto-discover AMAUOED link dynamically or use stored (if autoScrapeAmauoed is enabled)
-            if (autoScrapeAmauoed) {
-                const amauoedUrl = (typeof autoFindAmauoedLink === 'function')
-                    ? await autoFindAmauoedLink(code, courseTitle)
-                    : getStoredAmauoedUrl(code);
-                const alreadyScraped = localStorage.getItem(`amaes_amauoed_scraped_${code}`);
-                if (amauoedUrl && !alreadyScraped && typeof loadAllAmauoedAnswers === 'function') {
-                    logDebug(`Auto-scraping AMAUOED URL for missing course ${code}: ${amauoedUrl}`);
-                    setLog(`Scraping AMAUOED answers for <b>${code}</b>...`, 'var(--accent-blue)', 'Plan: Crawl study guide and merge question bank');
-                    const scraped = await loadAllAmauoedAnswers(amauoedUrl);
-                    if (scraped && scraped.length > 0) {
-                        localStorage.setItem(`amaes_amauoed_scraped_${code}`, '1');
-                        mergeAnswersIntoCache(code, scraped, 'AMAUOED');
-                        setLog(`Auto-scraped <b>${scraped.length}</b> answers from AMAUOED for <b>${code}</b>!`, 'var(--accent-green)');
-                        showToast(`Loaded ${scraped.length} answers from AMAUOED!`);
-                        return true;
-                    }
-                }
-            }
             return false;
         } catch (e) {
             logDebug(`autoFetchCloudAnswersIfMissing note for ${code}: ${e.message}`);

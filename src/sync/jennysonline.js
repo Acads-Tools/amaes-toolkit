@@ -14,7 +14,8 @@ function readJennysonlinePersistentCache(code) {
         const raw = localStorage.getItem(getJennysonlineCacheKey(code));
         if (!raw) return null;
         const cached = JSON.parse(raw);
-        if (!cached || !Number.isFinite(cached.savedAt) || Date.now() - cached.savedAt >= JENNYSONLINE_CACHE_TTL ||
+        if (!cached || !Number.isFinite(cached.savedAt) || Date.now() - cached.savedAt < 0 ||
+            Date.now() - cached.savedAt >= JENNYSONLINE_CACHE_TTL ||
             !Array.isArray(cached.answers) || cached.answers.length > 5000 ||
             cached.answers.some(answer => !answer || answer.verified !== false ||
                 answer.source !== 'jennysonline' || answer.evidenceType !== 'study_guide_candidate')) {
@@ -28,14 +29,41 @@ function readJennysonlinePersistentCache(code) {
     }
 }
 
-function writeJennysonlinePersistentCache(code, answers) {
+function writeJennysonlinePersistentCache(code, answers, savedAt = Date.now()) {
     try {
         localStorage.setItem(getJennysonlineCacheKey(code), JSON.stringify({
-            savedAt: Date.now(),
+            savedAt,
             answers
         }));
     } catch (error) {
         if (typeof logDebug === 'function') logDebug(`Jenny's Online local cache write note: ${error.message}`);
+    }
+}
+
+function queueStudyGuideRefresh(code) {
+    try {
+        const key = `amaes_study_guide_refresh_request_v1_${code}`;
+        const requestedAt = Number(localStorage.getItem(key) || 0);
+        if (Date.now() - requestedAt < 15 * 60 * 1000) return;
+        localStorage.setItem(key, String(Date.now()));
+        fetch(`${communityRelayUrl}/study-guides/refresh`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-AMAES-Installation': getAnonymousContributorId(),
+                'X-AMAES-Client-Version': CLIENT_VERSION
+            },
+            body: JSON.stringify({ subjectCode: code })
+        }).then(async response => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const result = await response.json();
+            logDebug(`Shared study-guide refresh for ${code}: ${result.queued ? 'queued' : 'not queued'}`);
+        }).catch(error => {
+            localStorage.removeItem(key);
+            logDebug(`Shared study-guide refresh queue note for ${code}: ${error.message}`);
+        });
+    } catch (error) {
+        logDebug(`Shared study-guide refresh queue note for ${code}: ${error.message}`);
     }
 }
 
@@ -253,59 +281,70 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
     const cachedAnswers = readJennysonlinePersistentCache(code);
 
     const loading = (async () => {
+        let matchedTitle = String(courseTitle || '').trim();
+        if (!matchedTitle && typeof detectCourseInfo === 'function') {
+            const info = detectCourseInfo();
+            if (String(info.subjectCode || '').toUpperCase() === code) matchedTitle = info.subjectName || '';
+        }
+
+        let registeredUrl = '';
+        let staleSharedAnswers = [];
         try {
-            let matchedTitle = String(courseTitle || '').trim();
-            if (!matchedTitle && typeof detectCourseInfo === 'function') {
-                const info = detectCourseInfo();
-                if (String(info.subjectCode || '').toUpperCase() === code) matchedTitle = info.subjectName || '';
+            const registryUrl = `${CLOUD_DB_JENNYSONLINE_URL}${code}.json`;
+            const registry = JSON.parse(await fetchJennysonlineText(registryUrl));
+            if (registry.subjectCode !== code || registry.verified !== false) {
+                throw new Error(`Invalid or unverified Jenny's Online snapshot for ${code}`);
             }
-
-            let registeredUrl = '';
-            try {
-                const registryUrl = `${CLOUD_DB_JENNYSONLINE_URL}${code}.json`;
-                const registry = JSON.parse(await fetchJennysonlineText(registryUrl));
-                if (registry.subjectCode !== code || registry.verified !== false) {
-                    throw new Error(`Invalid or unverified Jenny's Online registry for ${code}`);
-                }
-                if (Array.isArray(registry.questions) && registry.questions.length > 0) {
-                    const sharedAnswers = parseJennysonlineSharedSnapshot(registry);
-                    if (sharedAnswers.length > 0) return sharedAnswers;
-                    throw new Error(`Jenny's Online snapshot for ${code} contains no valid unconfirmed rows`);
-                }
-                registeredUrl = registry.sourceUrl;
-            } catch (error) {
-                if (!/HTTP 404/.test(error.message)) {
-                    throw new Error(`Could not load Jenny's Online registry for ${code}: ${error.message}`);
+            registeredUrl = typeof registry.sourceUrl === 'string' ? registry.sourceUrl : '';
+            const sharedAnswers = parseJennysonlineSharedSnapshot(registry);
+            if (sharedAnswers.length > 0) {
+                staleSharedAnswers = sharedAnswers;
+                const updatedAt = Date.parse(registry.refreshedAt || registry.updatedAt || '');
+                if (Number.isFinite(updatedAt) && Date.now() - updatedAt >= 0 &&
+                    Date.now() - updatedAt < JENNYSONLINE_CACHE_TTL) {
+                    writeJennysonlinePersistentCache(code, sharedAnswers, updatedAt);
+                    return sharedAnswers;
                 }
             }
+        } catch (error) {
+            if (!/HTTP 404/.test(error.message)) {
+                logDebug(`Jenny's Online shared snapshot note for ${code}: ${error.message}`);
+            }
+        }
 
-            if (registeredUrl) {
-                let pageUrl;
-                try {
-                    pageUrl = new URL(registeredUrl);
-                } catch (_) {
-                    throw new Error(`Invalid Jenny's Online source URL registered for ${code}`);
-                }
-                if (pageUrl.protocol !== 'https:' || pageUrl.hostname !== 'jennysonline.blogspot.com' || pageUrl.port || pageUrl.username || pageUrl.password) {
+        if (cachedAnswers) {
+            queueStudyGuideRefresh(code);
+            return cachedAnswers;
+        }
+
+        let liveAnswers = [];
+        try {
+            const liveUrl = registeredUrl ? [registeredUrl] : [];
+            if (liveUrl.length) {
+                const pageUrl = new URL(liveUrl[0]);
+                if (pageUrl.protocol !== 'https:' || pageUrl.hostname !== 'jennysonline.blogspot.com' ||
+                    pageUrl.port || pageUrl.username || pageUrl.password) {
                     throw new Error(`Unapproved Jenny's Online source host for ${code}`);
                 }
-                const registeredAnswers = await fetchJennysonlineSheetAnswers(pageUrl.href);
-                if (registeredAnswers.length > 0) return registeredAnswers;
+                liveAnswers = await fetchJennysonlineSheetAnswers(pageUrl.href);
             }
-
-            const liveAnswers = await searchJennysonlineForCourse(code, matchedTitle);
-            return liveAnswers.length > 0 ? liveAnswers : (cachedAnswers || []);
+            if (!liveAnswers.length) liveAnswers = await searchJennysonlineForCourse(code, matchedTitle);
         } catch (error) {
-            if (cachedAnswers) return cachedAnswers;
-            throw error;
+            logDebug(`Jenny's Online live lookup note for ${code}: ${error.message}`);
         }
+        if (liveAnswers.length > 0) {
+            writeJennysonlinePersistentCache(code, liveAnswers);
+            queueStudyGuideRefresh(code);
+            return liveAnswers;
+        }
+        queueStudyGuideRefresh(code);
+        return staleSharedAnswers.length ? staleSharedAnswers : [];
     })();
 
     jennysonlineSessionCache.set(code, loading);
     try {
         const answers = await loading;
         jennysonlineSessionCache.set(code, answers);
-        writeJennysonlinePersistentCache(code, answers);
         return answers;
     } catch (error) {
         jennysonlineSessionCache.delete(code);
