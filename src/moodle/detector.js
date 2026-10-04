@@ -253,7 +253,9 @@
 
     function normalizeQuestionMatchKey(value) {
         return normalizeText(value)
-            .replace(/\[\s*_{2,}\s*(?::\s*\d+)?\s*\]/g, ' ')
+            .replace(/\[\s*_{2,}(?:\s*:\s*[\s\S]*?)?\s*\]/g, ' ')
+            .replace(/^(?:identification|identify)\s*:\s*/i, '')
+            .replace(/^(?:answer\s+)?question\s*(?:no\.?|#)?\s*\d+[\s:.-]*/i, '')
             .replace(/[_\u00a0]+/g, ' ')
             .replace(/\s+/g, ' ')
             .replace(/[.:?!;,]+$/g, '')

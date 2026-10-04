@@ -93,19 +93,23 @@ Injections here provide real-time assistance during active assessments.
 - **Location**: Applied to choices confirmed wrong from previous attempts.
 - **Visuals**: Text strikethrough, dim opacity (`0.45`), and a red `(❌ Eliminated)` badge.
 
-### C. Targeted AI Prompt Buttons
+### C. Known-Wrong Answer Warning
+- **Class**: `.amaes-known-wrong-answer-warning`
+- **Behavior**: Displays an accessible alert when a currently selected choice, dropdown value, or typed answer exactly matches an answer disproved by Moodle review evidence for that question. The warning clears when the student changes the answer; the toolkit never changes a manual answer.
+
+### D. Targeted AI Prompt Buttons
 - **`[Copy AI]`**: `.amaes-copy-ai-card-btn`
   - Injected into the header/footer of each `.que` card.
   - Formats clean question text, instructions, and choices into a prompt ready for ChatGPT / Claude / Gemini.
 - **`[Paste AI]`**: `.amaes-paste-ai-card-btn`
   - Reads clipboard content and automatically checks the corresponding radio button, checkbox, or fills the input for that specific question card.
 
-### D. In-Question Stop / Resume Control
+### E. In-Question Stop / Resume Control
 - **Class**: `.amaes-in-question-stop-btn`
 - **Location**: Docked in the upper right corner of the currently active question card during Auto-Quiz runs.
 - **Purpose**: Instantly pauses automated progression on the active question to give the student manual control without closing the solver.
 
-### E. Interactive Question Type Hints
+### F. Interactive Question Type Hints
 - **Drag-and-Drop 1-Click Placement**: `.amaes-drag-hint`
   - Added to `.drop` / `.droptarget` blanks for `ddwtos` and `ddimageortext` questions.
   - Clicking snaps the verified draggable tile directly into position.
@@ -113,14 +117,14 @@ Injections here provide real-time assistance during active assessments.
   - Placed beside text input fields and textareas.
   - Displays the verified answer with a 1-click button to insert the text.
 
-### F. Blockage & Safety HUD
+### G. Blockage & Safety HUD
 - **Class**: `.amaes-blockage-hud`
 - **Location**: Injected above the active question when Auto-Quiz halts.
 - **Triggers**:
   - Question has no match in any database tier.
   - Multi-answer question requires student confirmation before advancing.
 
-### G. Floating Quiz HUD
+### H. Floating Quiz HUD
 - **DOM ID**: `#amaes-quiz-hud`
 - **Location**: Fixed to the lower-left of the viewport, with safe-area and narrow-screen spacing.
 - **Progress**: On one-page quizzes, follows the question at the reading position and counts answers from the live question controls. Scroll, input, change, and click events refresh it. On paginated quizzes, the current question number is matched against Moodle's navigation and the current answer is reflected immediately.

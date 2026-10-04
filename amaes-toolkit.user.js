@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.11.11
+// @version      1.11.12
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -31,7 +31,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.11";
+    const SCRIPT_VERSION = "v1.11.12";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -2569,7 +2569,9 @@
 
     function normalizeQuestionMatchKey(value) {
         return normalizeText(value)
-            .replace(/\[\s*_{2,}\s*(?::\s*\d+)?\s*\]/g, ' ')
+            .replace(/\[\s*_{2,}(?:\s*:\s*[\s\S]*?)?\s*\]/g, ' ')
+            .replace(/^(?:identification|identify)\s*:\s*/i, '')
+            .replace(/^(?:answer\s+)?question\s*(?:no\.?|#)?\s*\d+[\s:.-]*/i, '')
             .replace(/[_\u00a0]+/g, ' ')
             .replace(/\s+/g, ' ')
             .replace(/[.:?!;,]+$/g, '')
@@ -6257,6 +6259,80 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     }
 
     // Match questions & auto-highlight / auto-select on Moodle Quiz
+    let knownWrongAnswerWarningListenersBound = false;
+
+    function updateKnownWrongAnswerWarning(que) {
+        if (!que) return;
+        let knownWrongAnswers = [];
+        try {
+            knownWrongAnswers = JSON.parse(que.dataset.amaesKnownWrongAnswers || '[]');
+        } catch (error) {
+            console.warn('Could not read known-wrong-answer evidence for quiz question:', error);
+            return;
+        }
+
+        que.querySelectorAll('.amaes-known-wrong-selection').forEach(el => {
+            el.classList.remove('amaes-known-wrong-selection');
+        });
+        const wrongValues = new Map(knownWrongAnswers
+            .filter(item => item && item.norm && item.text)
+            .map(item => [item.norm, item.text]));
+        const matchedWrongValues = new Map();
+        const inputs = que.querySelectorAll(
+            '.answer input[type="radio"]:checked, .answer input[type="checkbox"]:checked, select, ' +
+            'input[type="text"], input.form-control, textarea'
+        );
+
+        inputs.forEach(input => {
+            let value = '';
+            if (input.matches('select')) {
+                const option = input.selectedOptions && input.selectedOptions[0];
+                if (option && option.value && !option.text.toLowerCase().includes('choose')) value = option.text;
+            } else if (input.matches('input[type="radio"], input[type="checkbox"]')) {
+                value = cleanDOMToAI(input.closest('.r0, .r1, li, tr, label') || input.parentElement);
+            } else {
+                value = input.value || '';
+            }
+
+            const norm = normalizeChoice(value);
+            const match = norm && wrongValues.has(norm) ? wrongValues.get(norm) : null;
+            if (!match) return;
+            matchedWrongValues.set(norm, match);
+            input.classList.add('amaes-known-wrong-selection');
+            const choiceRow = input.closest('.r0, .r1, li, tr');
+            if (choiceRow) choiceRow.classList.add('amaes-known-wrong-selection');
+        });
+
+        let warning = que.querySelector('.amaes-known-wrong-answer-warning');
+        if (matchedWrongValues.size === 0) {
+            if (warning) warning.remove();
+            return;
+        }
+
+        if (!warning) {
+            warning = document.createElement('div');
+            warning.className = 'amaes-known-wrong-answer-warning';
+            warning.setAttribute('role', 'alert');
+            warning.setAttribute('aria-live', 'polite');
+            warning.style.cssText = 'margin: 6px 0; padding: 8px 10px; border-left: 4px solid #dc2626; border-radius: 4px; background: rgba(220,38,38,.1); color: #b91c1c; font-size: 12px; font-weight: 700;';
+            const formulation = que.querySelector('.formulation, .content') || que;
+            formulation.insertBefore(warning, formulation.firstChild);
+        }
+        const answers = Array.from(matchedWrongValues.values());
+        warning.textContent = `Warning: ${answers.map(answer => `“${answer}”`).join(', ')} ${answers.length === 1 ? 'was' : 'were'} marked incorrect in a previous Moodle review. Change ${answers.length === 1 ? 'this answer' : 'these answers'} before continuing.`;
+    }
+
+    function bindKnownWrongAnswerWarningListeners() {
+        if (knownWrongAnswerWarningListenersBound) return;
+        knownWrongAnswerWarningListenersBound = true;
+        const refreshWarning = event => {
+            const que = event.target && event.target.closest ? event.target.closest('.que') : null;
+            if (que) updateKnownWrongAnswerWarning(que);
+        };
+        document.addEventListener('input', refreshWarning, true);
+        document.addEventListener('change', refreshWarning, true);
+    }
+
     function highlightQuizAnswers(questionsDb, autoSelect = false, isManualSelect = false) {
         if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') {
             return { matched: 0, total: 0, error: "Toolkit locked" };
@@ -6301,7 +6377,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
             // Clone qtext and remove input, select, textarea, drop zones, and badges so inline blanks match AMAUOED entries cleanly
             const qClone = qtextElem.cloneNode(true);
-            qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-unreviewed-history-note, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-question-tag').forEach(el => el.remove());
+            qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-unreviewed-history-note, .amaes-known-wrong-answer-warning, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-question-tag').forEach(el => el.remove());
             const moodleQRaw = qClone.innerText.trim();
             const moodleQNorm = normalizeText(moodleQRaw);
 
@@ -6343,7 +6419,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             const hasAnyVerifiedCandidate = candidates.some(item => isConfirmedCandidate(item));
 
             // Clean up any prior hints
-            que.querySelectorAll('.amaes-unanswered-hint, .amaes-unreviewed-history-note, .amaes-ambiguous-question-match-note, .amaes-study-guide-question-tag').forEach(b => b.remove());
+            que.querySelectorAll('.amaes-unanswered-hint, .amaes-unreviewed-history-note, .amaes-known-wrong-answer-warning, .amaes-ambiguous-question-match-note, .amaes-study-guide-question-tag').forEach(b => b.remove());
 
             // Check if this question was previously answered under an unreviewed attempt (<100% score)
             const unreviewed = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(moodleQNorm, sCode) : null;
@@ -6672,6 +6748,11 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 allWrongList.sort((a, b) => (b.count || 1) - (a.count || 1));
                 allWrongList.splice(choiceRows.length - 1);
             }
+            que.dataset.amaesKnownWrongAnswers = JSON.stringify(allWrongList
+                .filter(item => item.norm && item.text)
+                .map(item => ({ norm: normalizeChoice(item.norm), text: item.text })));
+            bindKnownWrongAnswerWarningListeners();
+            updateKnownWrongAnswerWarning(que);
 
             // ── Choice Pool Mismatch Detection ──────────────────────────────────
             // If the DB has stored choices for this question but NONE of them match the

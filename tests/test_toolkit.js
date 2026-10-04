@@ -169,6 +169,30 @@ test("Question matching: ignores Moodle answer blank rendering differences", () 
     assert.notStrictEqual(closePromptA, closePromptB, "Near-duplicate questions must retain distinct exact keys");
 });
 
+test("Review question normalization: matches answered Moodle identification blanks to the clean prompt", () => {
+    const vm = require('vm');
+    const detector = fs.readFileSync('src/moodle/detector.js', 'utf8');
+    const start = detector.indexOf('    function normalizeText(str) {');
+    const end = detector.indexOf('    // Helper to unscript unicode superscript', start);
+    assert.ok(start >= 0 && end > start, "Question normalization helpers must be available");
+    const sandbox = {
+        DOMParser: class {
+            parseFromString(value) {
+                return { body: { textContent: value } };
+            }
+        },
+        unscriptDigits: value => value
+    };
+    vm.runInNewContext(`${detector.slice(start, end)}\nglobalThis.matchQuestion = questionTextMatches;\nglobalThis.normalizeQuestion = normalizeQuestionMatchKey;`, sandbox);
+
+    const reviewPrompt = "IDENTIFICATION: [____: Self-service password reset] It is any process or technology that allows users who forgot their passwords authenticate and reset the passwords of their account";
+    const livePrompt = "IDENTIFICATION: Answer Question 5 It is any process or technology that allows users who forgot their passwords authenticate and reset the passwords of their account";
+    const studyGuidePrompt = "It is any process or technology that allows users who forgot their passwords authenticate and reset the passwords of their account";
+    assert.strictEqual(sandbox.normalizeQuestion(reviewPrompt), sandbox.normalizeQuestion(studyGuidePrompt), "Review answer text inside Moodle's scored blank must be excluded from the question key");
+    assert.strictEqual(sandbox.normalizeQuestion(livePrompt), sandbox.normalizeQuestion(studyGuidePrompt), "Moodle identification and question-number boilerplate must be excluded from the live question key");
+    assert.strictEqual(sandbox.matchQuestion(reviewPrompt, livePrompt), true, "Review elimination must match the corresponding live prompt");
+});
+
 test("Choice matching: strips Moodle letter prefixes before comparing answers", () => {
     const normalizeChoiceForTest = value => value.toLowerCase().trim()
         .replace(/^[a-z]\s*[\.)]\s+/i, '')
@@ -2703,7 +2727,7 @@ test("Study-Guide Links & Opt-In Auto-Pick: links sources and keeps unverified f
     assert.ok(script.includes("const canAutoFill = (isManualSelect && isConfirmedCandidate(bestCand)) ||") && script.includes("isConfirmedCandidate(bestCand));"), "Text inputs may auto-fill only confirmed answers");
     assert.ok(script.includes("const canAutoPick = (isManualSelect && (isConfirmedCandidate(bestCand) || isDeducedSelect)) ||"), "Dropdown Auto-Pick must require confirmed evidence");
     assert.ok(script.includes("hasAmbiguousQuestionMatch") && script.includes("matchingQuestionKeys.size > 1"), "Fuzzy matching must pause when similar saved prompts are ambiguous");
-    assert.ok(script.includes("normalizeQuestionMatchKey(value)") && script.includes("\\[\\s*_{2,}\\s*(?::\\s*\\d+)?\\s*\\]"), "Question matching must normalize Moodle's bracketed short-answer blanks");
+    assert.ok(script.includes("normalizeQuestionMatchKey(value)") && script.includes("\\[\\s*_{2,}(?:\\s*:\\s*[\\s\\S]*?)?\\s*\\]"), "Question matching must normalize Moodle's scored short-answer blanks, including the displayed wrong response");
     assert.ok(script.includes("currentInputIsKnownWrong") && script.includes("!textInput.value || currentInputIsKnownWrong"), "A confirmed answer must replace a preserved short-answer response already recorded as wrong");
 
     // 4. Fallback warning badge when candidates exist but choices differ
@@ -2900,8 +2924,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.11.11'), "Userscript header must specify v1.11.11");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.11";'), "Constant SCRIPT_VERSION must be v1.11.11");
+    assert.ok(script.includes('@version      1.11.12'), "Userscript header must specify v1.11.12");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.12";'), "Constant SCRIPT_VERSION must be v1.11.12");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4036,11 +4060,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.11.11-blue.svg"), "README badge must show v1.11.11");
+    assert.ok(readme.includes("version-1.11.12-blue.svg"), "README badge must show v1.11.12");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.11.11<"), "Website must display v1.11.11 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.11.12<"), "Website must display v1.11.12 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -5378,6 +5402,21 @@ test("Quiz HUD: tracks the visible question and live answers on single-page quiz
     assert.ok(script.includes("window.addEventListener('scroll', scheduleUpdate"), "HUD must refresh when the student scrolls between questions");
     assert.ok(script.includes("document.addEventListener('change', event =>"), "HUD must refresh when an answer is changed");
     assert.ok(script.includes('Moodle keeps this submitted answer in the completed-attempt history.'), "Review marker must explain that the displayed rejected answer is historical, not a future suggestion");
+});
+
+test("Known-wrong answer warning: flags previously eliminated selections and text entries", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    assert.ok(script.includes('function updateKnownWrongAnswerWarning(que)'), "Toolkit must evaluate the student's current answer against review evidence");
+    assert.ok(script.includes("document.addEventListener('input', refreshWarning, true)"), "Warning must react as a student types an answer");
+    assert.ok(script.includes("document.addEventListener('change', refreshWarning, true)"), "Warning must react when a choice or dropdown changes");
+    assert.ok(script.includes('marked incorrect in a previous Moodle review'), "Warning must explain the source of the known-wrong evidence");
+    assert.ok(script.includes("role', 'alert'") && script.includes("aria-live', 'polite'"), "Warning must be announced accessibly");
+
+    const normalize = value => String(value || '').toLowerCase().replace(/^[a-e]\s*[\.)]\s*/, '').replace(/\s+/g, ' ').trim();
+    const knownWrong = new Set(['Self-service password reset'].map(normalize));
+    assert.ok(knownWrong.has(normalize('Self-service password reset')), "Typed incorrect answer must be recognized");
+    assert.ok(knownWrong.has(normalize('a. Self-service password reset')), "Selected choice text with a Moodle option prefix must be recognized");
+    assert.ok(!knownWrong.has(normalize('Forgot Password')), "A different answer must not trigger a false positive warning");
 });
 
 test("Review elimination: wrapped Moodle review prompt blocks an exact study-guide candidate", () => {
