@@ -63,13 +63,14 @@ The question is evaluated against three confidence tiers:
 Upon answering the final question, Moodle navigates to the summary review table:
 - **Default Safe Review**: Auto-submit is disabled by default, giving students full control to review all answers at their own pace.
 - **Visual Submission Focus**: Highlights the *"Submit all and finish"* button with an emerald pulse.
-- **Optional Auto-Submit on Summary Review**: When enabled in Advanced Settings (`#chk-auto-submit-quiz`), the toolkit pauses 1.2s on the summary screen, triggers submission, automatically confirms Moodle's submission dialog modal, and sounds the celebratory `quest_done` ascending ding chime.
+- **Optional Auto-Submit on Summary Review**: When enabled in Advanced Settings (`#chk-auto-submit-quiz`), the toolkit pauses 1.2s on the summary screen, triggers submission, and attempts to confirm Moodle's submission dialog. If Moodle's controls cannot be found or submission does not complete, an on-page warning offers a button that scrolls to and focuses Moodle's submit/confirmation control; the student can finish the submission there.
 
 ---
 
 ### Stage 3: Review & Harvesting (`review.php`)
 
 Harvesting occurs automatically the instant the student submits the quiz and lands on the review page.
+Confirmed answers and Moodle-marked incorrect choices are merged into the local course cache. When community sharing is enabled, elimination evidence is also sent to the relay even if Moodle did not reveal the correct answer. The toolkit records a share as complete only after relay acceptance; network failures are logged and can be retried on a later review visit. Relay acceptance queues evidence for validation and does not itself mean the shared database has already been updated.
 
 #### The 4-Tier Ground Truth Deduction Engine
 

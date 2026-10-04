@@ -10,14 +10,14 @@
 </p>
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js"><img src="https://img.shields.io/badge/version-1.11.8-blue.svg" alt="Version 1.11.8"></a>
+  <a href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js"><img src="https://img.shields.io/badge/version-1.11.9-blue.svg" alt="Version 1.11.9"></a>
   <a href="https://acads-tools.github.io/amaes-toolkit/"><img src="https://img.shields.io/badge/platform-Violentmonkey%20%7C%20Tampermonkey-darkblue.svg" alt="Platform Compatibility"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="#zero-telemetry--privacy-architecture"><img src="https://img.shields.io/badge/privacy-zero--telemetry-success.svg" alt="Zero Telemetry"></a>
   <a href=".github/workflows/privacy-check.yml"><img src="https://img.shields.io/badge/privacy--audit-passing-brightgreen.svg" alt="Privacy Check Passed"></a>
 </p>
 
-> **Compatibility Notice:** Version **1.11.8** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](docs/CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
+> **Compatibility Notice:** Version **1.11.9** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](docs/CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
 
 ---
 
@@ -108,7 +108,8 @@ Before installing, ensure your environment meets the following specifications:
   * **Under 80% / Failing (< 80%):** Quizzes with scores below 80% or marked as failed are strictly skipped and left untouched.
   * **Unattempted / No Grade:** Quizzes that have not yet been taken or have no recorded score are strictly skipped and left untouched, ensuring you never accidentally bypass an assessment.
 * **Live Audit Log:** Displays verified percentages in real time (e.g. `[1/3] Marking: Quiz 1... [90%]`) and reports clear safety warnings when unpassed quizzes remain protected.
-* **Fast Account Switcher:** Optionally save an account from the Moodle login page, then use its nickname as a quick sign-in button on later login pages or switch from Course Tools. Edit or remove saved accounts and see which saved nickname matches the current Moodle profile. Credentials remain unencrypted in local userscript-manager storage and are never sent to toolkit services.
+* **Fast Account Switcher:** Optionally save an account from the Moodle login page, then use its nickname as a quick sign-in button on later login pages or switch from Course Tools. Edit or remove saved accounts and see which saved nickname matches the current Moodle profile. Credentials remain unencrypted in local userscript-manager storage.
+* **Encrypted Setup Transfer:** From Course Tools, create a one-time code to transfer selected toolkit preferences (automation, AI, appearance, and panel layout), saved Moodle profiles, and Gemini API keys to another device. Data is encrypted in your browser before upload; the relay stores ciphertext until it is imported, then deletes it. Codes do not expire but can be consumed only once. The code is a secret: anyone who gets it can import the selected credentials. Service tokens, Moodle sessions, caches, and installation identity are not transferred. Imported credentials remain unencrypted in the destination browser's local storage.
 
 ### 6. Autonomous Web Scraper Fallback Engine
 * **Background Study Search:** When an answer is missing from the local database, the toolkit searches online study guides and presents clearly labeled, unconfirmed suggestions for manual review.
@@ -116,7 +117,8 @@ Before installing, ensure your environment meets the following specifications:
 ### 7. Privacy-Safe Community Synchronization
 * **Automatic Course Bank Loading:** Automatically fetches verified questions for your active subject directly from the open study database ([`Acads-Tools/database`](https://github.com/Acads-Tools/database)) upon opening Moodle.
 * **Consensus-Driven Question Sharing:** Confirmed review answers from completed quiz attempts are pooled anonymously to expand coverage for fellow students.
-* **Privacy by Default:** Student names, student IDs, email addresses, grades, and Moodle session tokens are never collected or transmitted. Account Switcher details are saved locally in userscript-manager storage on your device and are not sent to toolkit services; usernames and passwords are not encrypted, so anyone with access to your browser profile may be able to view them. Credentials are only submitted to Moodle's own login form and are never sent to toolkit services or logged. Saving from the login page is optional and occurs only when you check the save box.
+* **Review Elimination Sharing:** Moodle-confirmed incorrect choices are saved locally and sent as elimination evidence, even when the review does not reveal the correct answer. Failed relay requests remain eligible for retry; accepted reports still pass through automated validation before entering the shared database.
+* **Privacy by Default:** Student names, student IDs, email addresses, grades, and Moodle session tokens are not collected for telemetry, community answers, or study services. Account Switcher details stay in userscript-manager storage on your device; usernames and passwords are not encrypted at rest, so anyone with access to your browser profile may be able to view them. Credentials are only submitted to Moodle's own login form unless you explicitly opt in to an encrypted one-time setup transfer. If selected, account usernames/passwords and API keys are sent only inside browser-encrypted ciphertext; the relay cannot read them. The ciphertext is retained until the transfer is consumed, and the code does not expire but works once only. Anyone who obtains the code can import the selected credentials. Saving from the login page is optional and occurs only when you check the save box.
 
 ---
 
@@ -325,7 +327,7 @@ This happens when a userscript manager is not yet installed in your browser. Ins
 <details>
 <summary><b>Does this tool transmit any personal student data?</b></summary>
 <br>
-<b>Not to toolkit services.</b> The toolkit does not send student names, student IDs, email addresses, grades, cookies, or Moodle session tokens to its APIs, telemetry, or community services. If you opt in to the Account Switcher, its usernames and passwords are saved unencrypted in local userscript-manager storage and submitted only to the target Moodle site's own login form for authentication. Do not use it on a device or browser profile other people can access. Shared community contributions consist exclusively of anonymous question-and-answer pairs confirmed against Moodle review keys.
+The toolkit does not collect student names, student IDs, email addresses, grades, cookies, or Moodle session tokens for telemetry, community answers, or study services. Account Switcher usernames and passwords are stored unencrypted in local userscript-manager storage and ordinarily submitted only to Moodle's login form. If you explicitly create a setup transfer, selected settings, account profiles, and Gemini API keys are encrypted in your browser and relayed as ciphertext; toolkit services cannot read the selected credentials. The code is the decryption secret; anyone with it can import the selected data. It does not expire, works once only, and the ciphertext is deleted on import. Never share the code publicly. Do not use saved credentials on a browser profile other people can access. Shared review reports contain anonymous question text, confirmed answer(s) when Moodle reveals them, and/or choices Moodle marked incorrect; submissions are validated before being merged into the shared database.
 </details>
 
 <details>

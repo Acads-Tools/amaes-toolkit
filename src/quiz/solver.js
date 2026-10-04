@@ -1733,6 +1733,71 @@
         }
     }
 
+    function findQuizSummarySubmitButton() {
+        const candidates = document.querySelectorAll(
+            '.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], button[name="submitallandfinish"], input[name="submitallandfinish"]'
+        );
+        return Array.from(candidates).find(button => {
+            if (button.disabled) return false;
+            const label = `${button.value || ''} ${button.innerText || button.textContent || ''}`.trim();
+            return /submit all and finish|finish attempt/i.test(label) ||
+                /finishattempt|submitallandfinish/i.test(button.name || '');
+        }) || null;
+    }
+
+    function findQuizSubmitConfirmationButton() {
+        const dialogs = document.querySelectorAll('.moodle-dialogue, .modal, [role="dialog"]');
+        for (const dialog of dialogs) {
+            const buttons = dialog.querySelectorAll('button, input[type="submit"], input[type="button"]');
+            const confirmation = Array.from(buttons).find(button => {
+                if (button.disabled) return false;
+                const label = `${button.value || ''} ${button.innerText || button.textContent || ''}`.trim();
+                return /submit all and finish|submit attempt|^submit$/i.test(label) &&
+                    !/cancel|do not submit/i.test(label);
+            });
+            if (confirmation) return confirmation;
+        }
+        return null;
+    }
+
+    function showQuizSubmitFallback(message, targetFinder = findQuizSummarySubmitButton, actionLabel = 'Show Moodle submit control') {
+        let notice = document.getElementById('amaes-auto-submit-fallback');
+        if (!notice) {
+            notice = document.createElement('div');
+            notice.id = 'amaes-auto-submit-fallback';
+            notice.setAttribute('role', 'alert');
+            notice.setAttribute('aria-live', 'assertive');
+            notice.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0;padding:12px 14px;border:2px solid #f59e0b;border-radius:8px;background:#fffbeb;color:#78350f;font:600 14px/1.4 sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.12);';
+            const messageNode = document.createElement('span');
+            messageNode.className = 'amaes-auto-submit-fallback-message';
+            const action = document.createElement('button');
+            action.type = 'button';
+            action.className = 'amaes-auto-submit-fallback-action';
+            action.style.cssText = 'flex:0 0 auto;padding:8px 12px;border:0;border-radius:6px;background:#b45309;color:#fff;font-weight:700;cursor:pointer;';
+            action.addEventListener('click', () => {
+                const target = targetFinder();
+                if (!target) {
+                    messageNode.textContent = 'Moodle’s submit control is not currently available. Use the controls on this summary page to finish submitting.';
+                    return;
+                }
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                target.focus({ preventScroll: true });
+                target.style.outline = '4px solid #f59e0b';
+                target.style.boxShadow = '0 0 0 6px rgba(245, 158, 11, 0.25)';
+            });
+            notice.append(messageNode, action);
+        }
+        notice.querySelector('.amaes-auto-submit-fallback-message').textContent = message;
+        notice.querySelector('.amaes-auto-submit-fallback-action').textContent = actionLabel;
+        const summary = document.querySelector('#region-main, main, [role="main"]') || document.body;
+        summary.prepend(notice);
+        notice.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setLog(`<b>Auto-Submit needs you:</b> ${message}`, "var(--accent-amber)");
+    }
+
+    let summaryAutoSubmitTimer = null;
+    let summaryAutoSubmitAttempted = false;
+
     // Auto-Mark as Done / Submit Handler for Quiz Summary Page (/mod/quiz/summary.php)
     function handleQuizSummaryAutoSubmit() {
         if (!checkIsQuizSummaryPage()) return;
@@ -1740,8 +1805,14 @@
 
         // Update UI immediately to indicate completion and waiting for confirmation
         syncAutoQuizUI();
-        setLog("<b>Quiz Completed:</b> All questions answered and saved. Waiting for your confirmation to submit.", "var(--accent-green)", "Review your saved answers below and click Submit all and finish");
-        showToast("✓ All questions answered! Waiting for confirmation...", 4000);
+        setLog(
+            autoSubmitQuiz
+                ? "<b>Quiz Completed:</b> All questions answered and saved. Auto-submit is enabled."
+                : "<b>Quiz Completed:</b> All questions answered and saved. Waiting for your confirmation to submit.",
+            "var(--accent-green)",
+            autoSubmitQuiz ? "Moodle submission will be confirmed automatically" : "Review your saved answers below and click Submit all and finish"
+        );
+        showToast(autoSubmitQuiz ? "✓ All questions answered! Auto-submit is enabled." : "✓ All questions answered! Waiting for confirmation...", 4000);
 
         // Update document title so students multitasking in background tabs know it's ready
         if (typeof document !== 'undefined' && document.title && !document.title.includes('(✓ Ready to Submit)')) {
@@ -1749,7 +1820,7 @@
         }
 
         // Highlight Moodle's "Submit all and finish" button
-        const submitBtn = document.querySelector('.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], #region-main input[type="submit"], input[value*="Submit"]');
+        const submitBtn = findQuizSummarySubmitButton();
         if (submitBtn) {
             submitBtn.style.outline = '3px solid #10b981';
             submitBtn.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.45)';
@@ -1763,19 +1834,71 @@
             }
         }
 
-        if (autoSubmitQuiz) {
+        if (autoSubmitQuiz && !summaryAutoSubmitAttempted && !summaryAutoSubmitTimer) {
+            if (!submitBtn) {
+                showQuizSubmitFallback(
+                    'Auto-submit could not find Moodle’s “Submit all and finish” button. Locate Moodle’s submission control on this page and click it to finish.',
+                    () => findQuizSummarySubmitButton(),
+                    'Find Moodle’s submit button'
+                );
+                return;
+            }
             setLog("<b>Auto-Submit:</b> Submitting attempt in 1.2s...", "var(--accent-green)");
             showToast("Auto-submitting attempt in 1.2s...", 2000);
-            setTimeout(() => {
-                const sBtn = document.querySelector('.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], #region-main input[type="submit"], input[value*="Submit"]');
-                if (sBtn) {
-                    sBtn.click();
-                    setTimeout(() => {
-                        const confirmBtn = document.querySelector('.moodle-dialogue-bd input[type="button"][value*="Submit"], .modal-dialog button.btn-primary, .modal-footer .btn-primary, input.btn-finishattempt, input[value="Submit all and finish"]');
-                        if (confirmBtn) confirmBtn.click();
-                        playToolkitSound('quest_done');
-                    }, 400);
+            summaryAutoSubmitTimer = setTimeout(() => {
+                summaryAutoSubmitTimer = null;
+                if (!checkIsQuizSummaryPage()) return;
+                const currentSubmitBtn = findQuizSummarySubmitButton();
+                if (!currentSubmitBtn) {
+                    showQuizSubmitFallback(
+                        'Auto-submit could not continue because Moodle’s submit button disappeared. Use Moodle’s submission controls on this page to finish.',
+                        () => findQuizSummarySubmitButton(),
+                        'Find Moodle’s submit button'
+                    );
+                    return;
                 }
+                summaryAutoSubmitAttempted = true;
+                currentSubmitBtn.click();
+                const confirmUntil = Date.now() + 5_000;
+                const confirmSubmission = () => {
+                    if (!checkIsQuizSummaryPage()) return;
+                    const confirmationButton = findQuizSubmitConfirmationButton();
+                    if (confirmationButton) {
+                        confirmationButton.click();
+                        const confirmUntil = Date.now() + 5_000;
+                        const verifySubmission = () => {
+                            if (!checkIsQuizSummaryPage()) return;
+                            if (Date.now() < confirmUntil) {
+                                summaryAutoSubmitTimer = setTimeout(verifySubmission, 150);
+                                return;
+                            }
+                            const stillOpenConfirmation = findQuizSubmitConfirmationButton();
+                            showQuizSubmitFallback(
+                                stillOpenConfirmation
+                                    ? 'Moodle’s confirmation is still open. Click its submit button to finish submitting.'
+                                    : 'Moodle did not leave the summary page after confirmation. Check the attempt and click Moodle’s submit button if it is still available.',
+                                () => findQuizSubmitConfirmationButton() || findQuizSummarySubmitButton(),
+                                stillOpenConfirmation ? 'Find confirmation button' : 'Find Moodle’s submit button'
+                            );
+                        };
+                        setLog("<b>Auto-Submit:</b> Confirmation clicked; checking that Moodle completes submission.", "var(--accent-green)");
+                        summaryAutoSubmitTimer = setTimeout(verifySubmission, 150);
+                        return;
+                    }
+                    if (Date.now() < confirmUntil) {
+                        summaryAutoSubmitTimer = setTimeout(confirmSubmission, 150);
+                        return;
+                    }
+                    const fallbackConfirmationButton = findQuizSubmitConfirmationButton();
+                    showQuizSubmitFallback(
+                        fallbackConfirmationButton
+                            ? 'Moodle opened a submission confirmation that could not be completed automatically. Click the confirmation button to finish submitting.'
+                            : 'Auto-submit could not confirm that Moodle started submission. Click Moodle’s “Submit all and finish” button to finish.',
+                        () => findQuizSubmitConfirmationButton() || findQuizSummarySubmitButton(),
+                        fallbackConfirmationButton ? 'Find confirmation button' : 'Find Moodle’s submit button'
+                    );
+                };
+                summaryAutoSubmitTimer = setTimeout(confirmSubmission, 150);
             }, 1200);
         } else {
             logDebug("Quiz Summary reached. Student reviews at their own pace (Auto-submit disabled by design).");
@@ -2941,7 +3064,13 @@
             // Compile all eliminated wrong choices known for this question
             const allWrongList = [];
             candidates.forEach(cand => {
-                if (isConfirmedCandidate(cand) && Array.isArray(cand.wrongAnswers)) {
+                const hasReviewBackedWrongAnswers = cand.wrongAnswerEvidence === true ||
+                    cand.evidenceType === 'moodle_review_elimination' ||
+                    (Array.isArray(cand.wrongAnswers) && cand.wrongAnswers.some(w =>
+                        w && typeof w === 'object' && Array.isArray(w.sources) &&
+                        w.sources.some(source => source === 'Review' || source === 'moodle_review')
+                    ));
+                if ((isConfirmedCandidate(cand) || hasReviewBackedWrongAnswers) && Array.isArray(cand.wrongAnswers)) {
                     cand.wrongAnswers.forEach(w => {
                         const wNorm = typeof w === 'string' ? normalizeChoice(w) : (w.norm || normalizeChoice(w.text || ''));
                         const wCount = typeof w === 'object' && typeof w.count === 'number' ? w.count : 1;
@@ -3407,7 +3536,8 @@
                         // USER OVERRIDE SAFETY: If user already selected a choice on this question, NEVER overwrite their decision!
                         // EXCEPTION: When a verified/confirmed answer exists, auto-pick applies it even if a pre-checked radio exists from a prior manual attempt
                         const canSelectAnswer = (isManualSelect && hasVerifiedSource) || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                            (hasVerifiedSource || (hasAiSource && aiAutoSelect)));
+                            (hasVerifiedSource || (hasAiSource && aiAutoSelect) ||
+                                (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback)));
                         const anyRadioChecked = isRadio && Boolean(que.querySelector('.answer input[type="radio"]:checked'));
                         const shouldSelect = canSelectAnswer && input && !input.checked && (!anyRadioChecked || hasVerifiedSource || isManualSelect);
                         if (shouldSelect) {
@@ -3616,7 +3746,7 @@
 
             // Handle Short Answer / Text inputs (both standard and inline cloze inputs)
             if (!foundMatchForQuestion) {
-                const textInputs = que.querySelectorAll('input[type="text"], input.form-control, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
+                const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
                 if (textInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()) {
                     const bestCand = validCandidates[0];
                     const bestAnswer = bestCand.ansRaw || bestCand.answer || '';
@@ -3710,7 +3840,8 @@
                         // Auto-fill when autoPickQuiz is enabled and auto-quiz is running, or user triggered manual select
                         const canAutoFill = (isManualSelect && isConfirmedCandidate(bestCand)) ||
                             (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                                isConfirmedCandidate(bestCand));
+                                (isConfirmedCandidate(bestCand) ||
+                                    (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback)));
                         const currentInputNorm = normalizeChoice(textInput.value || '');
                         const currentInputIsKnownWrong = currentInputNorm && allWrongList.some(w =>
                             normalizeChoice(w.norm || w.text || w) === currentInputNorm
@@ -3922,7 +4053,8 @@
                             // Auto-select when autoPickQuiz is enabled and auto-quiz is running, or user triggered manual select
                             const canAutoPick = (isManualSelect && (isConfirmedCandidate(bestCand) || isDeducedSelect)) ||
                                 (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                                isConfirmedCandidate(bestCand) && !isDeducedSelect);
+                                (isConfirmedCandidate(bestCand) ||
+                                    (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback)) && !isDeducedSelect);
                             if (canAutoPick && (!selectInput.value || selectInput.value === '0')) {
                                 selectInput.value = matchedOption.value;
                                 selectInput.dispatchEvent(new Event('input', { bubbles: true }));

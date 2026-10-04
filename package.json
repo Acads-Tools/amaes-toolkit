@@ -1,11 +1,11 @@
 {
   "name": "amaes-toolkit",
-  "version": "1.11.8",
+  "version": "1.11.9",
   "description": "Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals.",
   "main": "amaes-toolkit.user.js",
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "node scripts/build.js && node tests/test_toolkit.js",
+    "test": "node scripts/build.js && node tests/test_toolkit.js && node tests/test_account_transfer.js",
     "test:live:jenny": "node tests/test_jennysonline_live.js",
     "syntax": "node -c amaes-toolkit.user.js"
   },

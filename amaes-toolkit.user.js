@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.11.8
+// @version      1.11.9
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -31,7 +31,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.8";
+    const SCRIPT_VERSION = "v1.11.9";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -5129,6 +5129,71 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         }
     }
 
+    function findQuizSummarySubmitButton() {
+        const candidates = document.querySelectorAll(
+            '.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], button[name="submitallandfinish"], input[name="submitallandfinish"]'
+        );
+        return Array.from(candidates).find(button => {
+            if (button.disabled) return false;
+            const label = `${button.value || ''} ${button.innerText || button.textContent || ''}`.trim();
+            return /submit all and finish|finish attempt/i.test(label) ||
+                /finishattempt|submitallandfinish/i.test(button.name || '');
+        }) || null;
+    }
+
+    function findQuizSubmitConfirmationButton() {
+        const dialogs = document.querySelectorAll('.moodle-dialogue, .modal, [role="dialog"]');
+        for (const dialog of dialogs) {
+            const buttons = dialog.querySelectorAll('button, input[type="submit"], input[type="button"]');
+            const confirmation = Array.from(buttons).find(button => {
+                if (button.disabled) return false;
+                const label = `${button.value || ''} ${button.innerText || button.textContent || ''}`.trim();
+                return /submit all and finish|submit attempt|^submit$/i.test(label) &&
+                    !/cancel|do not submit/i.test(label);
+            });
+            if (confirmation) return confirmation;
+        }
+        return null;
+    }
+
+    function showQuizSubmitFallback(message, targetFinder = findQuizSummarySubmitButton, actionLabel = 'Show Moodle submit control') {
+        let notice = document.getElementById('amaes-auto-submit-fallback');
+        if (!notice) {
+            notice = document.createElement('div');
+            notice.id = 'amaes-auto-submit-fallback';
+            notice.setAttribute('role', 'alert');
+            notice.setAttribute('aria-live', 'assertive');
+            notice.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0;padding:12px 14px;border:2px solid #f59e0b;border-radius:8px;background:#fffbeb;color:#78350f;font:600 14px/1.4 sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.12);';
+            const messageNode = document.createElement('span');
+            messageNode.className = 'amaes-auto-submit-fallback-message';
+            const action = document.createElement('button');
+            action.type = 'button';
+            action.className = 'amaes-auto-submit-fallback-action';
+            action.style.cssText = 'flex:0 0 auto;padding:8px 12px;border:0;border-radius:6px;background:#b45309;color:#fff;font-weight:700;cursor:pointer;';
+            action.addEventListener('click', () => {
+                const target = targetFinder();
+                if (!target) {
+                    messageNode.textContent = 'Moodle’s submit control is not currently available. Use the controls on this summary page to finish submitting.';
+                    return;
+                }
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                target.focus({ preventScroll: true });
+                target.style.outline = '4px solid #f59e0b';
+                target.style.boxShadow = '0 0 0 6px rgba(245, 158, 11, 0.25)';
+            });
+            notice.append(messageNode, action);
+        }
+        notice.querySelector('.amaes-auto-submit-fallback-message').textContent = message;
+        notice.querySelector('.amaes-auto-submit-fallback-action').textContent = actionLabel;
+        const summary = document.querySelector('#region-main, main, [role="main"]') || document.body;
+        summary.prepend(notice);
+        notice.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setLog(`<b>Auto-Submit needs you:</b> ${message}`, "var(--accent-amber)");
+    }
+
+    let summaryAutoSubmitTimer = null;
+    let summaryAutoSubmitAttempted = false;
+
     // Auto-Mark as Done / Submit Handler for Quiz Summary Page (/mod/quiz/summary.php)
     function handleQuizSummaryAutoSubmit() {
         if (!checkIsQuizSummaryPage()) return;
@@ -5136,8 +5201,14 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
         // Update UI immediately to indicate completion and waiting for confirmation
         syncAutoQuizUI();
-        setLog("<b>Quiz Completed:</b> All questions answered and saved. Waiting for your confirmation to submit.", "var(--accent-green)", "Review your saved answers below and click Submit all and finish");
-        showToast("✓ All questions answered! Waiting for confirmation...", 4000);
+        setLog(
+            autoSubmitQuiz
+                ? "<b>Quiz Completed:</b> All questions answered and saved. Auto-submit is enabled."
+                : "<b>Quiz Completed:</b> All questions answered and saved. Waiting for your confirmation to submit.",
+            "var(--accent-green)",
+            autoSubmitQuiz ? "Moodle submission will be confirmed automatically" : "Review your saved answers below and click Submit all and finish"
+        );
+        showToast(autoSubmitQuiz ? "✓ All questions answered! Auto-submit is enabled." : "✓ All questions answered! Waiting for confirmation...", 4000);
 
         // Update document title so students multitasking in background tabs know it's ready
         if (typeof document !== 'undefined' && document.title && !document.title.includes('(✓ Ready to Submit)')) {
@@ -5145,7 +5216,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         }
 
         // Highlight Moodle's "Submit all and finish" button
-        const submitBtn = document.querySelector('.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], #region-main input[type="submit"], input[value*="Submit"]');
+        const submitBtn = findQuizSummarySubmitButton();
         if (submitBtn) {
             submitBtn.style.outline = '3px solid #10b981';
             submitBtn.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.45)';
@@ -5159,19 +5230,71 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             }
         }
 
-        if (autoSubmitQuiz) {
+        if (autoSubmitQuiz && !summaryAutoSubmitAttempted && !summaryAutoSubmitTimer) {
+            if (!submitBtn) {
+                showQuizSubmitFallback(
+                    'Auto-submit could not find Moodle’s “Submit all and finish” button. Locate Moodle’s submission control on this page and click it to finish.',
+                    () => findQuizSummarySubmitButton(),
+                    'Find Moodle’s submit button'
+                );
+                return;
+            }
             setLog("<b>Auto-Submit:</b> Submitting attempt in 1.2s...", "var(--accent-green)");
             showToast("Auto-submitting attempt in 1.2s...", 2000);
-            setTimeout(() => {
-                const sBtn = document.querySelector('.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], #region-main input[type="submit"], input[value*="Submit"]');
-                if (sBtn) {
-                    sBtn.click();
-                    setTimeout(() => {
-                        const confirmBtn = document.querySelector('.moodle-dialogue-bd input[type="button"][value*="Submit"], .modal-dialog button.btn-primary, .modal-footer .btn-primary, input.btn-finishattempt, input[value="Submit all and finish"]');
-                        if (confirmBtn) confirmBtn.click();
-                        playToolkitSound('quest_done');
-                    }, 400);
+            summaryAutoSubmitTimer = setTimeout(() => {
+                summaryAutoSubmitTimer = null;
+                if (!checkIsQuizSummaryPage()) return;
+                const currentSubmitBtn = findQuizSummarySubmitButton();
+                if (!currentSubmitBtn) {
+                    showQuizSubmitFallback(
+                        'Auto-submit could not continue because Moodle’s submit button disappeared. Use Moodle’s submission controls on this page to finish.',
+                        () => findQuizSummarySubmitButton(),
+                        'Find Moodle’s submit button'
+                    );
+                    return;
                 }
+                summaryAutoSubmitAttempted = true;
+                currentSubmitBtn.click();
+                const confirmUntil = Date.now() + 5_000;
+                const confirmSubmission = () => {
+                    if (!checkIsQuizSummaryPage()) return;
+                    const confirmationButton = findQuizSubmitConfirmationButton();
+                    if (confirmationButton) {
+                        confirmationButton.click();
+                        const confirmUntil = Date.now() + 5_000;
+                        const verifySubmission = () => {
+                            if (!checkIsQuizSummaryPage()) return;
+                            if (Date.now() < confirmUntil) {
+                                summaryAutoSubmitTimer = setTimeout(verifySubmission, 150);
+                                return;
+                            }
+                            const stillOpenConfirmation = findQuizSubmitConfirmationButton();
+                            showQuizSubmitFallback(
+                                stillOpenConfirmation
+                                    ? 'Moodle’s confirmation is still open. Click its submit button to finish submitting.'
+                                    : 'Moodle did not leave the summary page after confirmation. Check the attempt and click Moodle’s submit button if it is still available.',
+                                () => findQuizSubmitConfirmationButton() || findQuizSummarySubmitButton(),
+                                stillOpenConfirmation ? 'Find confirmation button' : 'Find Moodle’s submit button'
+                            );
+                        };
+                        setLog("<b>Auto-Submit:</b> Confirmation clicked; checking that Moodle completes submission.", "var(--accent-green)");
+                        summaryAutoSubmitTimer = setTimeout(verifySubmission, 150);
+                        return;
+                    }
+                    if (Date.now() < confirmUntil) {
+                        summaryAutoSubmitTimer = setTimeout(confirmSubmission, 150);
+                        return;
+                    }
+                    const fallbackConfirmationButton = findQuizSubmitConfirmationButton();
+                    showQuizSubmitFallback(
+                        fallbackConfirmationButton
+                            ? 'Moodle opened a submission confirmation that could not be completed automatically. Click the confirmation button to finish submitting.'
+                            : 'Auto-submit could not confirm that Moodle started submission. Click Moodle’s “Submit all and finish” button to finish.',
+                        () => findQuizSubmitConfirmationButton() || findQuizSummarySubmitButton(),
+                        fallbackConfirmationButton ? 'Find confirmation button' : 'Find Moodle’s submit button'
+                    );
+                };
+                summaryAutoSubmitTimer = setTimeout(confirmSubmission, 150);
             }, 1200);
         } else {
             logDebug("Quiz Summary reached. Student reviews at their own pace (Auto-submit disabled by design).");
@@ -6337,7 +6460,13 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             // Compile all eliminated wrong choices known for this question
             const allWrongList = [];
             candidates.forEach(cand => {
-                if (isConfirmedCandidate(cand) && Array.isArray(cand.wrongAnswers)) {
+                const hasReviewBackedWrongAnswers = cand.wrongAnswerEvidence === true ||
+                    cand.evidenceType === 'moodle_review_elimination' ||
+                    (Array.isArray(cand.wrongAnswers) && cand.wrongAnswers.some(w =>
+                        w && typeof w === 'object' && Array.isArray(w.sources) &&
+                        w.sources.some(source => source === 'Review' || source === 'moodle_review')
+                    ));
+                if ((isConfirmedCandidate(cand) || hasReviewBackedWrongAnswers) && Array.isArray(cand.wrongAnswers)) {
                     cand.wrongAnswers.forEach(w => {
                         const wNorm = typeof w === 'string' ? normalizeChoice(w) : (w.norm || normalizeChoice(w.text || ''));
                         const wCount = typeof w === 'object' && typeof w.count === 'number' ? w.count : 1;
@@ -6803,7 +6932,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         // USER OVERRIDE SAFETY: If user already selected a choice on this question, NEVER overwrite their decision!
                         // EXCEPTION: When a verified/confirmed answer exists, auto-pick applies it even if a pre-checked radio exists from a prior manual attempt
                         const canSelectAnswer = (isManualSelect && hasVerifiedSource) || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                            (hasVerifiedSource || (hasAiSource && aiAutoSelect)));
+                            (hasVerifiedSource || (hasAiSource && aiAutoSelect) ||
+                                (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback)));
                         const anyRadioChecked = isRadio && Boolean(que.querySelector('.answer input[type="radio"]:checked'));
                         const shouldSelect = canSelectAnswer && input && !input.checked && (!anyRadioChecked || hasVerifiedSource || isManualSelect);
                         if (shouldSelect) {
@@ -7012,7 +7142,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
             // Handle Short Answer / Text inputs (both standard and inline cloze inputs)
             if (!foundMatchForQuestion) {
-                const textInputs = que.querySelectorAll('input[type="text"], input.form-control, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
+                const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
                 if (textInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()) {
                     const bestCand = validCandidates[0];
                     const bestAnswer = bestCand.ansRaw || bestCand.answer || '';
@@ -7106,7 +7236,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         // Auto-fill when autoPickQuiz is enabled and auto-quiz is running, or user triggered manual select
                         const canAutoFill = (isManualSelect && isConfirmedCandidate(bestCand)) ||
                             (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                                isConfirmedCandidate(bestCand));
+                                (isConfirmedCandidate(bestCand) ||
+                                    (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback)));
                         const currentInputNorm = normalizeChoice(textInput.value || '');
                         const currentInputIsKnownWrong = currentInputNorm && allWrongList.some(w =>
                             normalizeChoice(w.norm || w.text || w) === currentInputNorm
@@ -7318,7 +7449,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             // Auto-select when autoPickQuiz is enabled and auto-quiz is running, or user triggered manual select
                             const canAutoPick = (isManualSelect && (isConfirmedCandidate(bestCand) || isDeducedSelect)) ||
                                 (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                                isConfirmedCandidate(bestCand) && !isDeducedSelect);
+                                (isConfirmedCandidate(bestCand) ||
+                                    (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback)) && !isDeducedSelect);
                             if (canAutoPick && (!selectInput.value || selectInput.value === '0')) {
                                 selectInput.value = matchedOption.value;
                                 selectInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -8920,6 +9052,382 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             accountSwitcherSetStatus(error.message || 'Could not load saved accounts.', true);
         }
     }
+// ==========================================
+// Encrypted one-time account/settings transfer
+// ==========================================
+
+const ACCOUNT_TRANSFER_FORMAT = 'amaes-toolkit-transfer';
+const ACCOUNT_TRANSFER_VERSION = 1;
+const ACCOUNT_TRANSFER_SETTINGS_KEYS = [
+    'amaes_toolkit_theme',
+    'amaes_auto_highlight_quiz',
+    'amaes_auto_copy_ai',
+    'amaes_auto_quiz_mode',
+    'amaes_fast_quiz_mode',
+    'amaes_auto_pick_quiz',
+    'amaes_auto_next_verified',
+    'amaes_auto_pick_study_guide_fallback',
+    'amaes_auto_next_quiz',
+    'amaes_adaptive_probe_quiz',
+    'amaes_adaptive_probe_budget',
+    'amaes_quiz_personality',
+    'amaes_auto_submit_quiz',
+    'amaes_smart_skip_quiz',
+    'amaes_auto_cloud_sync',
+    'amaes_auto_scrape_amauoed',
+    'amaes_auto_harvest_grades',
+    'amaes_enable_hotkeys',
+    'amaes_auto_copy_search',
+    'amaes_copy_include_confidence',
+    'amaes_show_in_question_ai_btns',
+    'amaes_ai_prompt_hint',
+    'amaes_auto_community_share',
+    'amaes_auto_min_quiz',
+    'amaes_enable_audio_alerts',
+    'amaes_ai_quiz_enabled',
+    'amaes_ai_auto_select',
+    'amaes_ai_retry_count',
+    'amaes_ai_auto_copy_on_fail',
+    'amaes_ai_auto_next_on_ai',
+    'amaes_ai_plan_tier',
+    'amaes_shared_ai_fallback_enabled',
+    'amaes_account_switcher_return_enabled',
+    'amaes_preferred_web_ai',
+    'amaes_pref_minimized',
+    'amaes_pref_show_logs',
+    'amaes_active_tab'
+];
+let pendingAccountTransfer = null;
+
+function accountTransferStatus(message, isError = false) {
+    const status = document.getElementById('amaes-account-transfer-status');
+    if (status) {
+        status.textContent = message;
+        status.style.color = isError ? 'var(--accent-pink, #f43f5e)' : 'var(--text-secondary)';
+    }
+}
+
+function accountTransferBase64Url(bytes) {
+    let binary = '';
+    bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function accountTransferDecodeBase64Url(value) {
+    if (typeof value !== 'string' || !/^[A-Za-z0-9_-]+$/.test(value)) {
+        throw new Error('Transfer data has an invalid encoding.');
+    }
+    const base64 = value.replace(/-/g, '+').replace(/_/g, '/') +
+        '='.repeat((4 - value.length % 4) % 4);
+    const binary = atob(base64);
+    return Uint8Array.from(binary, character => character.charCodeAt(0));
+}
+
+async function accountTransferLookupHash(codeBytes) {
+    const prefix = new TextEncoder().encode('AMAES transfer lookup v1:');
+    const input = new Uint8Array(prefix.length + codeBytes.length);
+    input.set(prefix);
+    input.set(codeBytes, prefix.length);
+    return accountTransferBase64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', input)));
+}
+
+function accountTransferValidateSettings(settings) {
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+        throw new Error('The transfer does not contain valid settings.');
+    }
+    if (Object.keys(settings).some(key => !ACCOUNT_TRANSFER_SETTINGS_KEYS.includes(key))) {
+        throw new Error('The transfer contains an unsupported setting.');
+    }
+    const result = {};
+    for (const key of ACCOUNT_TRANSFER_SETTINGS_KEYS) {
+        if (!Object.prototype.hasOwnProperty.call(settings, key)) continue;
+        const value = settings[key];
+        if (typeof value !== 'string' || value.length > 128) {
+            throw new Error(`Invalid setting value for ${key}.`);
+        }
+        if (key === 'amaes_toolkit_theme' && !['dark', 'light'].includes(value)) {
+            throw new Error('The transferred theme value is invalid.');
+        }
+        if (key === 'amaes_quiz_personality' &&
+            !['passive', 'aggressive', 'active', 'balanced'].includes(value)) {
+            throw new Error('The transferred quiz preference is invalid.');
+        }
+        if (key === 'amaes_ai_plan_tier' && !['free', 'paid'].includes(value)) {
+            throw new Error('The transferred AI plan preference is invalid.');
+        }
+        if (key === 'amaes_adaptive_probe_budget' && !/^[1-9]\d?$/.test(value)) {
+            throw new Error('The transferred probe setting is invalid.');
+        }
+        if (key === 'amaes_ai_retry_count' && !/^[1-9]\d?$/.test(value)) {
+            throw new Error('The transferred retry setting is invalid.');
+        }
+        if (key === 'amaes_preferred_web_ai' && !['chatgpt', 'perplexity', 'gemini'].includes(value)) {
+            throw new Error('The transferred preferred AI setting is invalid.');
+        }
+        if (key === 'amaes_active_tab' && !['quiz', 'db', 'course'].includes(value)) {
+            throw new Error('The transferred panel tab setting is invalid.');
+        }
+        if (key !== 'amaes_toolkit_theme' && key !== 'amaes_quiz_personality' &&
+            key !== 'amaes_ai_plan_tier' && key !== 'amaes_adaptive_probe_budget' &&
+            key !== 'amaes_ai_retry_count' && key !== 'amaes_preferred_web_ai' &&
+            key !== 'amaes_active_tab' && !['true', 'false'].includes(value)) {
+            throw new Error(`Invalid boolean setting for ${key}.`);
+        }
+        result[key] = value;
+    }
+    return result;
+}
+
+function accountTransferValidatePayload(payload) {
+    const allowedPayloadKeys = ['format', 'version', 'createdAt', 'accounts', 'apiKeys', 'settings'];
+    if (!payload || payload.format !== ACCOUNT_TRANSFER_FORMAT ||
+        payload.version !== ACCOUNT_TRANSFER_VERSION ||
+        Object.keys(payload).some(key => !allowedPayloadKeys.includes(key)) ||
+        typeof payload.createdAt !== 'string' || Number.isNaN(Date.parse(payload.createdAt))) {
+        throw new Error('Unsupported or invalid transfer code.');
+    }
+    const accounts = payload.accounts;
+    const apiKeys = payload.apiKeys;
+    if (!Array.isArray(accounts) || accounts.length > 30 ||
+        accounts.some(account => !account || typeof account.id !== 'string' ||
+            Object.keys(account).some(key => !['id', 'username', 'password', 'nickname'].includes(key)) ||
+            account.id.length > 128 || typeof account.username !== 'string' ||
+            !account.username.trim() || account.username.length > 256 ||
+            typeof account.password !== 'string' || !account.password ||
+            account.password.length > 2048 || typeof account.nickname !== 'string' ||
+            !account.nickname.trim() || account.nickname.length > 128)) {
+        throw new Error('The transfer contains invalid account profiles.');
+    }
+    if (!Array.isArray(apiKeys) || apiKeys.length > 10 ||
+        apiKeys.some(key => typeof key !== 'string' || key.length < 10 || key.length > 512)) {
+        throw new Error('The transfer contains invalid API keys.');
+    }
+    return {
+        format: payload.format,
+        version: payload.version,
+        createdAt: payload.createdAt,
+        accounts: accounts.map(account => ({
+            id: account.id,
+            username: account.username,
+            password: account.password,
+            nickname: account.nickname
+        })),
+        apiKeys: Array.from(new Set(apiKeys)),
+        settings: accountTransferValidateSettings(payload.settings)
+    };
+}
+
+async function accountTransferEncrypt(codeBytes, payload) {
+    const key = await crypto.subtle.importKey('raw', codeBytes, { name: 'AES-GCM' }, false, ['encrypt']);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const plaintext = new TextEncoder().encode(JSON.stringify(payload));
+    if (plaintext.length > 65_536) throw new Error('Selected transfer data exceeds the 64 KiB secure transfer limit.');
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
+    return {
+        iv: accountTransferBase64Url(iv),
+        ciphertext: accountTransferBase64Url(new Uint8Array(ciphertext))
+    };
+}
+
+async function accountTransferDecrypt(codeBytes, encrypted) {
+    const iv = accountTransferDecodeBase64Url(encrypted.iv);
+    const ciphertext = accountTransferDecodeBase64Url(encrypted.ciphertext);
+    if (iv.length !== 12 || ciphertext.length < 16 || ciphertext.length > 65_552) {
+        throw new Error('Transfer data is invalid or too large.');
+    }
+    const key = await crypto.subtle.importKey('raw', codeBytes, { name: 'AES-GCM' }, false, ['decrypt']);
+    let plaintext;
+    try {
+        plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+    } catch (_) {
+        throw new Error('Transfer code is incorrect or the encrypted data was altered.');
+    }
+    let payload;
+    try {
+        payload = JSON.parse(new TextDecoder().decode(plaintext));
+    } catch (_) {
+        throw new Error('Decrypted transfer data is not valid JSON.');
+    }
+    return accountTransferValidatePayload(payload);
+}
+
+async function accountTransferReadSelectedData(includeAccounts, includeApiKeys, includeSettings) {
+    const savedAccounts = includeAccounts ? await getAccountSwitcherAccounts() : [];
+    const apiKeys = includeApiKeys && typeof getGeminiApiKeys === 'function'
+        ? getGeminiApiKeys()
+        : [];
+    const settings = includeSettings
+        ? Object.fromEntries(ACCOUNT_TRANSFER_SETTINGS_KEYS
+            .filter(key => key !== 'amaes_account_switcher_return_enabled')
+            .map(key => [key, localStorage.getItem(key)])
+            .filter(([, value]) => value !== null))
+        : {};
+    if (includeSettings) {
+        const returnEnabled = await getAccountSwitcherValue('amaes_account_switcher_return_enabled', null);
+        if (returnEnabled !== null) {
+            settings.amaes_account_switcher_return_enabled =
+                String(returnEnabled === true || returnEnabled === 'true');
+        }
+    }
+    return {
+        format: ACCOUNT_TRANSFER_FORMAT,
+        version: ACCOUNT_TRANSFER_VERSION,
+        createdAt: new Date().toISOString(),
+        accounts: savedAccounts.map(account => ({
+            id: account.id,
+            username: account.username,
+            password: account.password,
+            nickname: account.nickname
+        })),
+        apiKeys: apiKeys.filter(key => typeof key === 'string' && key.trim()).map(key => key.trim()),
+        settings
+    };
+}
+
+async function accountTransferPost(path, body) {
+    const response = await fetch(`${communityRelayUrl}/transfer/${path}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-AMAES-Client-Version': CLIENT_VERSION,
+            'X-AMAES-Installation': getAnonymousContributorId()
+        },
+        body: JSON.stringify(body)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || `Secure transfer request failed (${response.status}).`);
+    return result;
+}
+
+async function createAccountTransferCode() {
+    const includeAccounts = document.getElementById('amaes-transfer-include-accounts').checked;
+    const includeApiKeys = document.getElementById('amaes-transfer-include-api-keys').checked;
+    const includeSettings = document.getElementById('amaes-transfer-include-settings').checked;
+    if (!includeAccounts && !includeApiKeys && !includeSettings) {
+        throw new Error('Select at least one item to transfer.');
+    }
+    if ((includeAccounts || includeApiKeys) &&
+        !document.getElementById('amaes-transfer-secret-consent').checked) {
+        throw new Error('Confirm that you understand the code can transfer selected passwords and API keys.');
+    }
+    const codeBytes = crypto.getRandomValues(new Uint8Array(32));
+    const code = accountTransferBase64Url(codeBytes);
+    const payload = accountTransferValidatePayload(
+        await accountTransferReadSelectedData(includeAccounts, includeApiKeys, includeSettings)
+    );
+    const encrypted = await accountTransferEncrypt(codeBytes, payload);
+    const lookupHash = await accountTransferLookupHash(codeBytes);
+    await accountTransferPost('create', { lookupHash, ...encrypted });
+    const output = document.getElementById('amaes-transfer-code');
+    output.value = code;
+    output.hidden = false;
+    const copyButton = document.getElementById('amaes-transfer-copy');
+    copyButton.hidden = false;
+    accountTransferStatus('Code created. It stays available until it is imported once. Keep it private.');
+}
+
+async function importAccountTransferCode() {
+    const input = document.getElementById('amaes-transfer-import-code');
+    const code = input.value.trim();
+    const codeBytes = accountTransferDecodeBase64Url(code);
+    if (codeBytes.length !== 32) throw new Error('Enter the complete 43-character transfer code.');
+    const lookupHash = await accountTransferLookupHash(codeBytes);
+    const encrypted = await accountTransferPost('consume', { lookupHash });
+    const payload = await accountTransferDecrypt(codeBytes, encrypted);
+    const preview = document.getElementById('amaes-transfer-preview');
+    preview.textContent = `Ready to import ${payload.accounts.length} account(s), ${payload.apiKeys.length} API key(s), and ${Object.keys(payload.settings).length} setting(s). Imported account profiles and API keys will be stored on this device.`;
+    preview.hidden = false;
+    input.value = '';
+    document.getElementById('amaes-transfer-import').hidden = true;
+    document.getElementById('amaes-transfer-apply').hidden = false;
+    document.getElementById('amaes-transfer-discard').hidden = false;
+    pendingAccountTransfer = payload;
+}
+
+async function applyAccountTransfer() {
+    const payload = pendingAccountTransfer;
+    if (!payload) throw new Error('There is no decrypted transfer awaiting confirmation.');
+    const existing = await getAccountSwitcherAccounts();
+    const byUsername = new Map(existing.map(account => [account.username.toLocaleLowerCase(), account]));
+    payload.accounts.forEach(account => byUsername.set(account.username.toLocaleLowerCase(), account));
+    await saveAccountSwitcherAccounts(Array.from(byUsername.values()));
+
+    if (payload.apiKeys.length) {
+        const current = typeof getGeminiApiKeys === 'function' ? getGeminiApiKeys() : [];
+        const keys = Array.from(new Set(current.concat(payload.apiKeys)));
+        if (typeof setGeminiApiKeys !== 'function') {
+            throw new Error('Gemini API key storage is unavailable in this toolkit version.');
+        }
+        setGeminiApiKeys(keys);
+    }
+    for (const [key, value] of Object.entries(payload.settings)) {
+        if (key === 'amaes_account_switcher_return_enabled') {
+            await setAccountSwitcherValue(key, value === 'true');
+        } else {
+            localStorage.setItem(key, value);
+        }
+    }
+    pendingAccountTransfer = null;
+    document.getElementById('amaes-transfer-preview').hidden = true;
+    document.getElementById('amaes-transfer-apply').hidden = true;
+    document.getElementById('amaes-transfer-discard').hidden = true;
+    document.getElementById('amaes-transfer-import').hidden = false;
+    document.getElementById('amaes-transfer-import-code').value = '';
+    accountTransferStatus('Transfer imported. Reload the page to apply all settings.');
+}
+
+function discardAccountTransfer() {
+    pendingAccountTransfer = null;
+    document.getElementById('amaes-transfer-preview').hidden = true;
+    document.getElementById('amaes-transfer-apply').hidden = true;
+    document.getElementById('amaes-transfer-discard').hidden = true;
+    document.getElementById('amaes-transfer-import').hidden = false;
+    accountTransferStatus('Decrypted preview discarded. This one-time code has already been consumed.');
+}
+
+function setupAccountTransferUI() {
+    const exportButton = document.getElementById('amaes-transfer-create');
+    const importButton = document.getElementById('amaes-transfer-import');
+    if (!exportButton || !importButton) return;
+    exportButton.addEventListener('click', async () => {
+        try {
+            exportButton.disabled = true;
+            await createAccountTransferCode();
+        } catch (error) {
+            accountTransferStatus(error.message || 'Could not create transfer code.', true);
+        } finally {
+            exportButton.disabled = false;
+        }
+    });
+    document.getElementById('amaes-transfer-copy').addEventListener('click', async () => {
+        const code = document.getElementById('amaes-transfer-code').value;
+        try {
+            if (typeof GM_setClipboard === 'function') GM_setClipboard(code);
+            else await navigator.clipboard.writeText(code);
+            accountTransferStatus('Transfer code copied. Share it only with the intended device owner.');
+        } catch (error) {
+            accountTransferStatus(error.message || 'Could not copy the transfer code.', true);
+        }
+    });
+    importButton.addEventListener('click', async () => {
+        try {
+            importButton.disabled = true;
+            await importAccountTransferCode();
+        } catch (error) {
+            accountTransferStatus(error.message || 'Could not import transfer code.', true);
+        } finally {
+            importButton.disabled = false;
+        }
+    });
+    document.getElementById('amaes-transfer-apply').addEventListener('click', async () => {
+        try {
+            await applyAccountTransfer();
+        } catch (error) {
+            accountTransferStatus(error.message || 'Could not apply transferred settings.', true);
+        }
+    });
+    document.getElementById('amaes-transfer-discard').addEventListener('click', discardAccountTransfer);
+}
     // ==========================================
     // Debug Report Generator
     // ==========================================
@@ -13117,6 +13625,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     period: newItem.period || newItem.term || detectTermFromText(newItem.quizTitle || newItem.qRaw || '') || 'General',
                     quizTitle: newItem.quizTitle || '',
                     wrongAnswers: incomingWrong,
+                    wrongAnswerEvidence: Boolean(newItem.wrongAnswerEvidence ||
+                        newItem.evidenceType === 'moodle_review_elimination' || sourceLabel === 'Review'),
                     confirmations: ansRaw ? 1 : 0,
                     source: newItem.source || sourceLabel,
                     evidenceType: newItem.evidenceType || '',
@@ -13156,9 +13666,15 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 if (!Array.isArray(cur.wrongAnswers)) {
                     cur.wrongAnswers = normalizeWrongAnswers(cur.wrongAnswers);
                 }
+                if (newItem.wrongAnswerEvidence ||
+                    newItem.evidenceType === 'moodle_review_elimination' || sourceLabel === 'Review') {
+                    cur.wrongAnswerEvidence = true;
+                }
 
                 // Merge incoming wrong answers with weighting
                 incomingWrong.forEach(inW => {
+                    inW.sources = Array.isArray(inW.sources) ? inW.sources : [];
+                    if (!inW.sources.includes(sourceLabel)) inW.sources.push(sourceLabel);
                     // Safety Guard: If incoming wrong answer matches current ansNorm, review/attempt proved cur.ansRaw was WRONG!
                     if (cur.ansNorm && (inW.norm === cur.ansNorm || unscriptDigits(inW.norm) === unscriptDigits(cur.ansNorm))) {
                         cur.ansRaw = '';
@@ -13196,7 +13712,11 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 }
 
                 // Handle correct answer
-                if (ansRaw) {
+                const answerIsPreviouslyEliminated = ansRaw && cur.wrongAnswers.some(w => {
+                    const wrongNorm = typeof w === 'string' ? normalizeChoice(w) : (w.norm || normalizeChoice(w.text || ''));
+                    return wrongNorm === ansNorm || unscriptDigits(wrongNorm) === unscriptDigits(ansNorm);
+                });
+                if (ansRaw && (!answerIsPreviouslyEliminated || newItem.verified)) {
                     if (!cur.ansRaw) {
                         cur.ansRaw = ansRaw;
                         cur.ansNorm = ansNorm;
@@ -13857,6 +14377,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             qNorm: normalizeText(q.question || q.qRaw),
             ansRaw: q.answer || q.ansRaw,
             ansNorm: normalizeChoice(q.answer || q.ansRaw),
+            wrongAnswers: Array.isArray(q.wrongAnswers) ? q.wrongAnswers : [],
+            wrongAnswerEvidence: Boolean(q.wrongAnswerEvidence || q.evidenceType === 'moodle_review_elimination'),
             choices: q.choices || [],
             verified: q.verified !== false,
             isAiSuggestion: Boolean(q.isAiSuggestion || q.evidenceType === 'ai_inference'),
@@ -14139,7 +14661,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     choices: qData.choices,
                     verified: isVerified,
                     deduced: isDeduced,
-                    evidenceType: isVerified ? 'moodle_review' : 'community_report',
+                    evidenceType: isVerified ? 'moodle_review' :
+                        (wrongAnswers.length > 0 ? 'moodle_review_elimination' : 'community_report'),
+                    wrongAnswerEvidence: wrongAnswers.length > 0,
                     period: detectedPeriod,
                     quizTitle: quizTitle
                 });
@@ -14190,10 +14714,15 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     // Batched & Debounced Community Contribution Queue
     const pendingContributionBatches = {};
     const pendingContributionTimers = {};
+    const pendingReviewShares = new Set();
 
     function queueCommunityContribution(subCode, questions, options = {}) {
         if (!questions || questions.length === 0) return;
-        const validQuestions = questions.filter(q => Boolean(q.ansRaw || q.answer || q.correctAnswer));
+        const validQuestions = questions.filter(q => Boolean(
+            q.ansRaw || q.answer || q.correctAnswer ||
+            (q.evidenceType === 'moodle_review_elimination' &&
+                Array.isArray(q.wrongAnswers) && q.wrongAnswers.length > 0)
+        ));
         if (validQuestions.length === 0) return;
 
         if (!pendingContributionBatches[subCode]) {
@@ -14214,7 +14743,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
         // Ultra-fast 2-second debounce: catches simultaneous page discoveries and shares immediately
         pendingContributionTimers[subCode] = setTimeout(() => {
-            flushCommunityContributions(subCode, options);
+            flushCommunityContributions(subCode, options)
+                .catch(error => logDebug(`Community contribution queue note: ${error.message}`));
         }, 2000);
     }
 
@@ -14235,7 +14765,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         if (!questions || questions.length === 0) return;
         const validQuestions = questions.filter(q => {
             const raw = (q.ansRaw || q.answer || q.correctAnswer || '').trim();
-            if (!raw) return false;
+            const hasReviewElimination = q.evidenceType === 'moodle_review_elimination' &&
+                Array.isArray(q.wrongAnswers) && q.wrongAnswers.length > 0;
+            if (!raw) return hasReviewElimination;
             // Proven Wrong Guard: If answer was confirmed wrong/eliminated, NEVER share it!
             const norm = normalizeChoice(raw);
             const wrongList = Array.isArray(q.wrongAnswers) ? q.wrongAnswers : [];
@@ -14271,6 +14803,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 answer: q.ansRaw || q.answer || "",
                 choices: q.choices || [],
                 wrongAnswers: Array.isArray(q.wrongAnswers) ? q.wrongAnswers.map(w => typeof w === 'string' ? w : w.text) : [],
+                wrongAnswerEvidence: Boolean(q.wrongAnswerEvidence || q.evidenceType === 'moodle_review_elimination'),
                 verified: Boolean(q.verified),
                 isAiSuggestion: Boolean(q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini'))),
                 source: q.source || options.source || "auto_harvester",
@@ -14278,17 +14811,18 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             }))
         };
 
-        logDebug(`Dispatching ${validQuestions.length} answers to community relay...`);
+        logDebug(`Dispatching ${validQuestions.length} answer/evidence records to community relay...`);
 
         if (communityRelayUrl) {
             const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
                           (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
 
             if (gmReq) {
-                try {
+                return new Promise((resolve, reject) => {
                     gmReq({
                         method: 'POST',
                         url: communityRelayUrl,
+                        timeout: 15_000,
                         headers: {
                             'Content-Type': 'application/json',
                             'X-AMAES-Client-Version': SCRIPT_VERSION.replace(/^v/i, '')
@@ -14296,48 +14830,47 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         data: JSON.stringify(payload),
                         onload: (res) => {
                             if (res.status >= 200 && res.status < 300) {
-                                showToast(`Auto-shared ${validQuestions.length} verified answers to Global Database!`);
+                                showToast(`Auto-shared ${validQuestions.length} answer/evidence records to Global Database!`);
                                 setLog(`Shared <b>${validQuestions.length}</b> evidence records to Global Database via relay.`, "var(--accent-green)");
+                                resolve({ success: true, mode: 'relay_gm', count: validQuestions.length });
                             } else {
-                                logDebug(`Community relay response status: ${res.status}`);
+                                reject(new Error(`Community relay rejected the submission (${res.status}).`));
                             }
                         },
                         onerror: (err) => {
-                            logDebug("GM relay post error:", err);
+                            reject(new Error(`Community relay request failed: ${err && err.error ? err.error : 'network error'}.`));
+                        },
+                        ontimeout: () => {
+                            reject(new Error('Community relay request timed out.'));
                         }
                     });
-                    return { success: true, mode: 'relay_gm', count: validQuestions.length };
-                } catch (gmErr) {
-                    logDebug(`GM relay exception: ${gmErr.message}`);
-                }
+                });
             } else {
-                try {
-                    const resp = await fetch(communityRelayUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-AMAES-Client-Version': SCRIPT_VERSION.replace(/^v/i, '')
-                        },
-                        body: JSON.stringify(payload)
-                    });
-                    if (resp.status === 426) {
-                        const update = await resp.json().catch(() => ({}));
-                        showToast(`Update AMAES Toolkit to v${update.minimumVersion || 'the latest version'} to share answers.`, 7000);
-                        setLog(`Toolkit update required before community sharing. <a href="${SCRIPT_RAW_URL}" target="_blank">Install update</a>.`, "var(--accent-amber)");
-                    } else if (resp.ok) {
-                        showToast(`Auto-shared ${validQuestions.length} verified answers to Global Database!`);
-                        setLog(`Shared <b>${validQuestions.length}</b> evidence records to Global Database via relay.`, "var(--accent-green)");
-                        return { success: true, mode: 'relay', count: validQuestions.length };
-                    }
-                } catch (err) {
-                    logDebug(`Relay background post note: ${err.message}`);
+                const resp = await fetch(communityRelayUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-AMAES-Client-Version': SCRIPT_VERSION.replace(/^v/i, '')
+                    },
+                    body: JSON.stringify(payload)
+                });
+                if (resp.status === 426) {
+                    const update = await resp.json().catch(() => ({}));
+                    showToast(`Update AMAES Toolkit to v${update.minimumVersion || 'the latest version'} to share answers.`, 7000);
+                    setLog(`Toolkit update required before community sharing. <a href="${SCRIPT_RAW_URL}" target="_blank">Install update</a>.`, "var(--accent-amber)");
+                    throw new Error('Update required before community sharing.');
                 }
+                if (!resp.ok) {
+                    const result = await resp.json().catch(() => ({}));
+                    throw new Error(result.error || `Community relay rejected the submission (${resp.status}).`);
+                }
+                showToast(`Auto-shared ${validQuestions.length} answer/evidence records to Global Database!`);
+                setLog(`Shared <b>${validQuestions.length}</b> evidence records to Global Database via relay.`, "var(--accent-green)");
+                return { success: true, mode: 'relay', count: validQuestions.length };
             }
         }
 
-        // Silent local save notice
-        showToast(`Saved ${validQuestions.length} verified answers to local database!`, 3000);
-        return { success: true, mode: 'local', count: validQuestions.length };
+        throw new Error('Community relay is not configured; the review remains saved only in local storage.');
     }
 
     // Background Grades Report Answer Harvester
@@ -15284,8 +15817,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             }, 1000);
         }
 
-        // 3. Auto-Share newly harvested answers to Community Hub (Default: ON).
-        // Store individual evidence keys in localStorage so across tabs and sessions, duplicate network requests are avoided.
+        // 3. Auto-share review evidence. Persist deduplication keys only after relay acceptance,
+        // so a failed request can be retried on the next review visit.
         if (autoShareEnabled && (harvested.harvestedCount > 0 || (harvested.eliminatedCount || 0) > 0)) {
             let sharedKeys = [];
             try {
@@ -15296,22 +15829,43 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             }
             const sharedSet = new Set(sharedKeys);
             const pendingQuestions = harvested.questions.filter(question => {
-                if (!question.ansRaw) return false;
+                if (!question.ansRaw && !(question.evidenceType === 'moodle_review_elimination' &&
+                    Array.isArray(question.wrongAnswers) && question.wrongAnswers.length > 0)) return false;
                 const key = getReviewShareKey(question);
-                if (sharedSet.has(key)) return false;
-                sharedSet.add(key);
+                if (sharedSet.has(key) || pendingReviewShares.has(key)) return false;
                 return true;
             });
             if (pendingQuestions.length > 0) {
-                localStorage.setItem(shareKey, JSON.stringify(Array.from(sharedSet)));
-                sessionStorage.setItem(shareKey, JSON.stringify(Array.from(sharedSet)));
-                setTimeout(() => {
-                    Promise.resolve(queueCommunityContribution(harvested.subjectCode, pendingQuestions, {
-                        source: 'review_screen',
-                        evidenceType: 'moodle_review',
-                        contributionId: `review-${processingKey}`
-                    }))
-                        .catch(err => logDebug(`Review community share note: ${err.message}`));
+                const pendingKeys = pendingQuestions.map(getReviewShareKey);
+                pendingKeys.forEach(key => pendingReviewShares.add(key));
+                setTimeout(async () => {
+                    try {
+                        const result = await dispatchCommunityContribution(harvested.subjectCode, pendingQuestions, {
+                            source: 'review_screen',
+                            evidenceType: 'moodle_review',
+                            contributionId: `review-${processingKey}`
+                        });
+                        if (!result || !result.success || !String(result.mode).startsWith('relay')) {
+                            throw new Error('The relay did not confirm receipt.');
+                        }
+                        let acceptedKeys = [];
+                        try {
+                            acceptedKeys = JSON.parse(localStorage.getItem(shareKey) || sessionStorage.getItem(shareKey) || '[]');
+                            if (!Array.isArray(acceptedKeys)) acceptedKeys = [];
+                        } catch (e) {
+                            acceptedKeys = [];
+                        }
+                        const acceptedSet = new Set(acceptedKeys);
+                        pendingKeys.forEach(key => acceptedSet.add(key));
+                        const serializedKeys = JSON.stringify(Array.from(acceptedSet));
+                        localStorage.setItem(shareKey, serializedKeys);
+                        sessionStorage.setItem(shareKey, serializedKeys);
+                    } catch (err) {
+                        logDebug(`Review community share failed; it can be retried on the next review visit: ${err.message}`);
+                        setLog(`Review evidence was saved locally but not confirmed by the community relay: ${err.message}`, "var(--accent-amber)");
+                    } finally {
+                        pendingKeys.forEach(key => pendingReviewShares.delete(key));
+                    }
                 }, 1200);
             }
         }
@@ -16874,6 +17428,39 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             <button id="amaes-account-switcher-cancel-edit" type="button" class="amaes-btn amaes-btn-outline" style="display: none; justify-content: center; padding: 6px; font-size: 10px;">Cancel edit</button>
                         </form>
                         <div id="amaes-account-switcher-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
+                        <details id="amaes-account-transfer" style="border: 1px solid var(--border-subtle); border-radius: 5px; padding: 6px;">
+                            <summary style="cursor: pointer; font-size: 10px; font-weight: 600; color: var(--text-secondary);">Transfer setup to another device</summary>
+                            <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 7px;">
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9.5px; color: var(--text-secondary);">
+                                    <input id="amaes-transfer-include-settings" type="checkbox" checked />
+                                    <span>Toolkit preferences (automation, AI, appearance, and panel layout)</span>
+                                </label>
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9.5px; color: var(--text-secondary);">
+                                    <input id="amaes-transfer-include-accounts" type="checkbox" checked />
+                                    <span>Moodle account profiles (usernames, passwords, nicknames)</span>
+                                </label>
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9.5px; color: var(--text-secondary);">
+                                    <input id="amaes-transfer-include-api-keys" type="checkbox" checked />
+                                    <span>Personal Gemini API keys</span>
+                                </label>
+                                <label style="display: flex; gap: 5px; align-items: flex-start; font-size: 9px; color: var(--accent-amber, #f59e0b); line-height: 1.35;">
+                                    <input id="amaes-transfer-secret-consent" type="checkbox" style="margin-top: 1px;" />
+                                    <span>I understand anyone with the one-time code can import the selected passwords and API keys.</span>
+                                </label>
+                                <button id="amaes-transfer-create" type="button" class="amaes-btn amaes-btn-outline" style="justify-content: center; font-size: 9.5px;">Create one-time transfer code</button>
+                                <input id="amaes-transfer-code" type="text" readonly hidden aria-label="One-time transfer code" style="width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px; border-radius: 4px; font-family: monospace;" />
+                                <button id="amaes-transfer-copy" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px;">Copy code</button>
+                                <div style="font-size: 9px; color: var(--text-muted); line-height: 1.35;">The code does not expire, but works once only. The relay keeps encrypted data until it is imported, then deletes it. Anyone with the code can import it, so keep it private. Service tokens, Moodle sessions, caches, and installation identity are not included. Imported credentials are saved in this browser's userscript storage.</div>
+                                <div style="display: flex; gap: 4px;">
+                                    <input id="amaes-transfer-import-code" type="password" autocomplete="off" placeholder="Enter transfer code" aria-label="Transfer code" style="flex: 1; min-width: 0; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px; border-radius: 4px; font-family: monospace;" />
+                                    <button id="amaes-transfer-import" type="button" class="amaes-btn amaes-btn-outline" style="font-size: 9px;">Preview</button>
+                                </div>
+                                <div id="amaes-transfer-preview" hidden role="status" style="font-size: 9px; color: var(--text-secondary); line-height: 1.4;"></div>
+                                <button id="amaes-transfer-apply" type="button" class="amaes-btn amaes-btn-monotone" hidden style="justify-content: center; font-size: 9px;">Import into this device</button>
+                                <button id="amaes-transfer-discard" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px;">Discard preview</button>
+                                <div id="amaes-account-transfer-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
+                            </div>
+                        </details>
                         <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 9.5px; color: var(--text-secondary); cursor: pointer;">
                             <input id="amaes-account-switcher-return" type="checkbox" style="margin: 1px 0 0; cursor: pointer;" />
                             <span>Return to current page after switch</span>
@@ -17062,6 +17649,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
         document.body.appendChild(panel);
         setupAccountSwitcherUI();
+        setupAccountTransferUI();
 
         // Inject Dynamic CSS Stylesheet
         const styleSheet = document.createElement('style');
@@ -18131,7 +18719,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         if (btnMasterAutoQuiz) {
             btnMasterAutoQuiz.onclick = () => {
                 if (checkIsQuizSummaryPage()) {
-                    const submitBtn = document.querySelector('.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], #region-main input[type="submit"], input[value*="Submit"]');
+                    const submitBtn = findQuizSummarySubmitButton();
                     if (submitBtn) {
                         submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         submitBtn.focus();

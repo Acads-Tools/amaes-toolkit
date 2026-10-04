@@ -56,6 +56,8 @@
                     period: newItem.period || newItem.term || detectTermFromText(newItem.quizTitle || newItem.qRaw || '') || 'General',
                     quizTitle: newItem.quizTitle || '',
                     wrongAnswers: incomingWrong,
+                    wrongAnswerEvidence: Boolean(newItem.wrongAnswerEvidence ||
+                        newItem.evidenceType === 'moodle_review_elimination' || sourceLabel === 'Review'),
                     confirmations: ansRaw ? 1 : 0,
                     source: newItem.source || sourceLabel,
                     evidenceType: newItem.evidenceType || '',
@@ -95,9 +97,15 @@
                 if (!Array.isArray(cur.wrongAnswers)) {
                     cur.wrongAnswers = normalizeWrongAnswers(cur.wrongAnswers);
                 }
+                if (newItem.wrongAnswerEvidence ||
+                    newItem.evidenceType === 'moodle_review_elimination' || sourceLabel === 'Review') {
+                    cur.wrongAnswerEvidence = true;
+                }
 
                 // Merge incoming wrong answers with weighting
                 incomingWrong.forEach(inW => {
+                    inW.sources = Array.isArray(inW.sources) ? inW.sources : [];
+                    if (!inW.sources.includes(sourceLabel)) inW.sources.push(sourceLabel);
                     // Safety Guard: If incoming wrong answer matches current ansNorm, review/attempt proved cur.ansRaw was WRONG!
                     if (cur.ansNorm && (inW.norm === cur.ansNorm || unscriptDigits(inW.norm) === unscriptDigits(cur.ansNorm))) {
                         cur.ansRaw = '';
@@ -135,7 +143,11 @@
                 }
 
                 // Handle correct answer
-                if (ansRaw) {
+                const answerIsPreviouslyEliminated = ansRaw && cur.wrongAnswers.some(w => {
+                    const wrongNorm = typeof w === 'string' ? normalizeChoice(w) : (w.norm || normalizeChoice(w.text || ''));
+                    return wrongNorm === ansNorm || unscriptDigits(wrongNorm) === unscriptDigits(ansNorm);
+                });
+                if (ansRaw && (!answerIsPreviouslyEliminated || newItem.verified)) {
                     if (!cur.ansRaw) {
                         cur.ansRaw = ansRaw;
                         cur.ansNorm = ansNorm;
@@ -796,6 +808,8 @@
             qNorm: normalizeText(q.question || q.qRaw),
             ansRaw: q.answer || q.ansRaw,
             ansNorm: normalizeChoice(q.answer || q.ansRaw),
+            wrongAnswers: Array.isArray(q.wrongAnswers) ? q.wrongAnswers : [],
+            wrongAnswerEvidence: Boolean(q.wrongAnswerEvidence || q.evidenceType === 'moodle_review_elimination'),
             choices: q.choices || [],
             verified: q.verified !== false,
             isAiSuggestion: Boolean(q.isAiSuggestion || q.evidenceType === 'ai_inference'),
@@ -1078,7 +1092,9 @@
                     choices: qData.choices,
                     verified: isVerified,
                     deduced: isDeduced,
-                    evidenceType: isVerified ? 'moodle_review' : 'community_report',
+                    evidenceType: isVerified ? 'moodle_review' :
+                        (wrongAnswers.length > 0 ? 'moodle_review_elimination' : 'community_report'),
+                    wrongAnswerEvidence: wrongAnswers.length > 0,
                     period: detectedPeriod,
                     quizTitle: quizTitle
                 });
@@ -1129,10 +1145,15 @@
     // Batched & Debounced Community Contribution Queue
     const pendingContributionBatches = {};
     const pendingContributionTimers = {};
+    const pendingReviewShares = new Set();
 
     function queueCommunityContribution(subCode, questions, options = {}) {
         if (!questions || questions.length === 0) return;
-        const validQuestions = questions.filter(q => Boolean(q.ansRaw || q.answer || q.correctAnswer));
+        const validQuestions = questions.filter(q => Boolean(
+            q.ansRaw || q.answer || q.correctAnswer ||
+            (q.evidenceType === 'moodle_review_elimination' &&
+                Array.isArray(q.wrongAnswers) && q.wrongAnswers.length > 0)
+        ));
         if (validQuestions.length === 0) return;
 
         if (!pendingContributionBatches[subCode]) {
@@ -1153,7 +1174,8 @@
 
         // Ultra-fast 2-second debounce: catches simultaneous page discoveries and shares immediately
         pendingContributionTimers[subCode] = setTimeout(() => {
-            flushCommunityContributions(subCode, options);
+            flushCommunityContributions(subCode, options)
+                .catch(error => logDebug(`Community contribution queue note: ${error.message}`));
         }, 2000);
     }
 
@@ -1174,7 +1196,9 @@
         if (!questions || questions.length === 0) return;
         const validQuestions = questions.filter(q => {
             const raw = (q.ansRaw || q.answer || q.correctAnswer || '').trim();
-            if (!raw) return false;
+            const hasReviewElimination = q.evidenceType === 'moodle_review_elimination' &&
+                Array.isArray(q.wrongAnswers) && q.wrongAnswers.length > 0;
+            if (!raw) return hasReviewElimination;
             // Proven Wrong Guard: If answer was confirmed wrong/eliminated, NEVER share it!
             const norm = normalizeChoice(raw);
             const wrongList = Array.isArray(q.wrongAnswers) ? q.wrongAnswers : [];
@@ -1210,6 +1234,7 @@
                 answer: q.ansRaw || q.answer || "",
                 choices: q.choices || [],
                 wrongAnswers: Array.isArray(q.wrongAnswers) ? q.wrongAnswers.map(w => typeof w === 'string' ? w : w.text) : [],
+                wrongAnswerEvidence: Boolean(q.wrongAnswerEvidence || q.evidenceType === 'moodle_review_elimination'),
                 verified: Boolean(q.verified),
                 isAiSuggestion: Boolean(q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini'))),
                 source: q.source || options.source || "auto_harvester",
@@ -1217,17 +1242,18 @@
             }))
         };
 
-        logDebug(`Dispatching ${validQuestions.length} answers to community relay...`);
+        logDebug(`Dispatching ${validQuestions.length} answer/evidence records to community relay...`);
 
         if (communityRelayUrl) {
             const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
                           (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
 
             if (gmReq) {
-                try {
+                return new Promise((resolve, reject) => {
                     gmReq({
                         method: 'POST',
                         url: communityRelayUrl,
+                        timeout: 15_000,
                         headers: {
                             'Content-Type': 'application/json',
                             'X-AMAES-Client-Version': SCRIPT_VERSION.replace(/^v/i, '')
@@ -1235,48 +1261,47 @@
                         data: JSON.stringify(payload),
                         onload: (res) => {
                             if (res.status >= 200 && res.status < 300) {
-                                showToast(`Auto-shared ${validQuestions.length} verified answers to Global Database!`);
+                                showToast(`Auto-shared ${validQuestions.length} answer/evidence records to Global Database!`);
                                 setLog(`Shared <b>${validQuestions.length}</b> evidence records to Global Database via relay.`, "var(--accent-green)");
+                                resolve({ success: true, mode: 'relay_gm', count: validQuestions.length });
                             } else {
-                                logDebug(`Community relay response status: ${res.status}`);
+                                reject(new Error(`Community relay rejected the submission (${res.status}).`));
                             }
                         },
                         onerror: (err) => {
-                            logDebug("GM relay post error:", err);
+                            reject(new Error(`Community relay request failed: ${err && err.error ? err.error : 'network error'}.`));
+                        },
+                        ontimeout: () => {
+                            reject(new Error('Community relay request timed out.'));
                         }
                     });
-                    return { success: true, mode: 'relay_gm', count: validQuestions.length };
-                } catch (gmErr) {
-                    logDebug(`GM relay exception: ${gmErr.message}`);
-                }
+                });
             } else {
-                try {
-                    const resp = await fetch(communityRelayUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-AMAES-Client-Version': SCRIPT_VERSION.replace(/^v/i, '')
-                        },
-                        body: JSON.stringify(payload)
-                    });
-                    if (resp.status === 426) {
-                        const update = await resp.json().catch(() => ({}));
-                        showToast(`Update AMAES Toolkit to v${update.minimumVersion || 'the latest version'} to share answers.`, 7000);
-                        setLog(`Toolkit update required before community sharing. <a href="${SCRIPT_RAW_URL}" target="_blank">Install update</a>.`, "var(--accent-amber)");
-                    } else if (resp.ok) {
-                        showToast(`Auto-shared ${validQuestions.length} verified answers to Global Database!`);
-                        setLog(`Shared <b>${validQuestions.length}</b> evidence records to Global Database via relay.`, "var(--accent-green)");
-                        return { success: true, mode: 'relay', count: validQuestions.length };
-                    }
-                } catch (err) {
-                    logDebug(`Relay background post note: ${err.message}`);
+                const resp = await fetch(communityRelayUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-AMAES-Client-Version': SCRIPT_VERSION.replace(/^v/i, '')
+                    },
+                    body: JSON.stringify(payload)
+                });
+                if (resp.status === 426) {
+                    const update = await resp.json().catch(() => ({}));
+                    showToast(`Update AMAES Toolkit to v${update.minimumVersion || 'the latest version'} to share answers.`, 7000);
+                    setLog(`Toolkit update required before community sharing. <a href="${SCRIPT_RAW_URL}" target="_blank">Install update</a>.`, "var(--accent-amber)");
+                    throw new Error('Update required before community sharing.');
                 }
+                if (!resp.ok) {
+                    const result = await resp.json().catch(() => ({}));
+                    throw new Error(result.error || `Community relay rejected the submission (${resp.status}).`);
+                }
+                showToast(`Auto-shared ${validQuestions.length} answer/evidence records to Global Database!`);
+                setLog(`Shared <b>${validQuestions.length}</b> evidence records to Global Database via relay.`, "var(--accent-green)");
+                return { success: true, mode: 'relay', count: validQuestions.length };
             }
         }
 
-        // Silent local save notice
-        showToast(`Saved ${validQuestions.length} verified answers to local database!`, 3000);
-        return { success: true, mode: 'local', count: validQuestions.length };
+        throw new Error('Community relay is not configured; the review remains saved only in local storage.');
     }
 
     // Background Grades Report Answer Harvester
@@ -2223,8 +2248,8 @@
             }, 1000);
         }
 
-        // 3. Auto-Share newly harvested answers to Community Hub (Default: ON).
-        // Store individual evidence keys in localStorage so across tabs and sessions, duplicate network requests are avoided.
+        // 3. Auto-share review evidence. Persist deduplication keys only after relay acceptance,
+        // so a failed request can be retried on the next review visit.
         if (autoShareEnabled && (harvested.harvestedCount > 0 || (harvested.eliminatedCount || 0) > 0)) {
             let sharedKeys = [];
             try {
@@ -2235,22 +2260,43 @@
             }
             const sharedSet = new Set(sharedKeys);
             const pendingQuestions = harvested.questions.filter(question => {
-                if (!question.ansRaw) return false;
+                if (!question.ansRaw && !(question.evidenceType === 'moodle_review_elimination' &&
+                    Array.isArray(question.wrongAnswers) && question.wrongAnswers.length > 0)) return false;
                 const key = getReviewShareKey(question);
-                if (sharedSet.has(key)) return false;
-                sharedSet.add(key);
+                if (sharedSet.has(key) || pendingReviewShares.has(key)) return false;
                 return true;
             });
             if (pendingQuestions.length > 0) {
-                localStorage.setItem(shareKey, JSON.stringify(Array.from(sharedSet)));
-                sessionStorage.setItem(shareKey, JSON.stringify(Array.from(sharedSet)));
-                setTimeout(() => {
-                    Promise.resolve(queueCommunityContribution(harvested.subjectCode, pendingQuestions, {
-                        source: 'review_screen',
-                        evidenceType: 'moodle_review',
-                        contributionId: `review-${processingKey}`
-                    }))
-                        .catch(err => logDebug(`Review community share note: ${err.message}`));
+                const pendingKeys = pendingQuestions.map(getReviewShareKey);
+                pendingKeys.forEach(key => pendingReviewShares.add(key));
+                setTimeout(async () => {
+                    try {
+                        const result = await dispatchCommunityContribution(harvested.subjectCode, pendingQuestions, {
+                            source: 'review_screen',
+                            evidenceType: 'moodle_review',
+                            contributionId: `review-${processingKey}`
+                        });
+                        if (!result || !result.success || !String(result.mode).startsWith('relay')) {
+                            throw new Error('The relay did not confirm receipt.');
+                        }
+                        let acceptedKeys = [];
+                        try {
+                            acceptedKeys = JSON.parse(localStorage.getItem(shareKey) || sessionStorage.getItem(shareKey) || '[]');
+                            if (!Array.isArray(acceptedKeys)) acceptedKeys = [];
+                        } catch (e) {
+                            acceptedKeys = [];
+                        }
+                        const acceptedSet = new Set(acceptedKeys);
+                        pendingKeys.forEach(key => acceptedSet.add(key));
+                        const serializedKeys = JSON.stringify(Array.from(acceptedSet));
+                        localStorage.setItem(shareKey, serializedKeys);
+                        sessionStorage.setItem(shareKey, serializedKeys);
+                    } catch (err) {
+                        logDebug(`Review community share failed; it can be retried on the next review visit: ${err.message}`);
+                        setLog(`Review evidence was saved locally but not confirmed by the community relay: ${err.message}`, "var(--accent-amber)");
+                    } finally {
+                        pendingKeys.forEach(key => pendingReviewShares.delete(key));
+                    }
                 }, 1200);
             }
         }

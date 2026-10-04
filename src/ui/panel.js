@@ -429,6 +429,39 @@
                             <button id="amaes-account-switcher-cancel-edit" type="button" class="amaes-btn amaes-btn-outline" style="display: none; justify-content: center; padding: 6px; font-size: 10px;">Cancel edit</button>
                         </form>
                         <div id="amaes-account-switcher-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
+                        <details id="amaes-account-transfer" style="border: 1px solid var(--border-subtle); border-radius: 5px; padding: 6px;">
+                            <summary style="cursor: pointer; font-size: 10px; font-weight: 600; color: var(--text-secondary);">Transfer setup to another device</summary>
+                            <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 7px;">
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9.5px; color: var(--text-secondary);">
+                                    <input id="amaes-transfer-include-settings" type="checkbox" checked />
+                                    <span>Toolkit preferences (automation, AI, appearance, and panel layout)</span>
+                                </label>
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9.5px; color: var(--text-secondary);">
+                                    <input id="amaes-transfer-include-accounts" type="checkbox" checked />
+                                    <span>Moodle account profiles (usernames, passwords, nicknames)</span>
+                                </label>
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9.5px; color: var(--text-secondary);">
+                                    <input id="amaes-transfer-include-api-keys" type="checkbox" checked />
+                                    <span>Personal Gemini API keys</span>
+                                </label>
+                                <label style="display: flex; gap: 5px; align-items: flex-start; font-size: 9px; color: var(--accent-amber, #f59e0b); line-height: 1.35;">
+                                    <input id="amaes-transfer-secret-consent" type="checkbox" style="margin-top: 1px;" />
+                                    <span>I understand anyone with the one-time code can import the selected passwords and API keys.</span>
+                                </label>
+                                <button id="amaes-transfer-create" type="button" class="amaes-btn amaes-btn-outline" style="justify-content: center; font-size: 9.5px;">Create one-time transfer code</button>
+                                <input id="amaes-transfer-code" type="text" readonly hidden aria-label="One-time transfer code" style="width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px; border-radius: 4px; font-family: monospace;" />
+                                <button id="amaes-transfer-copy" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px;">Copy code</button>
+                                <div style="font-size: 9px; color: var(--text-muted); line-height: 1.35;">The code does not expire, but works once only. The relay keeps encrypted data until it is imported, then deletes it. Anyone with the code can import it, so keep it private. Service tokens, Moodle sessions, caches, and installation identity are not included. Imported credentials are saved in this browser's userscript storage.</div>
+                                <div style="display: flex; gap: 4px;">
+                                    <input id="amaes-transfer-import-code" type="password" autocomplete="off" placeholder="Enter transfer code" aria-label="Transfer code" style="flex: 1; min-width: 0; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px; border-radius: 4px; font-family: monospace;" />
+                                    <button id="amaes-transfer-import" type="button" class="amaes-btn amaes-btn-outline" style="font-size: 9px;">Preview</button>
+                                </div>
+                                <div id="amaes-transfer-preview" hidden role="status" style="font-size: 9px; color: var(--text-secondary); line-height: 1.4;"></div>
+                                <button id="amaes-transfer-apply" type="button" class="amaes-btn amaes-btn-monotone" hidden style="justify-content: center; font-size: 9px;">Import into this device</button>
+                                <button id="amaes-transfer-discard" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px;">Discard preview</button>
+                                <div id="amaes-account-transfer-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
+                            </div>
+                        </details>
                         <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 9.5px; color: var(--text-secondary); cursor: pointer;">
                             <input id="amaes-account-switcher-return" type="checkbox" style="margin: 1px 0 0; cursor: pointer;" />
                             <span>Return to current page after switch</span>
@@ -617,6 +650,7 @@
 
         document.body.appendChild(panel);
         setupAccountSwitcherUI();
+        setupAccountTransferUI();
 
         // Inject Dynamic CSS Stylesheet
         const styleSheet = document.createElement('style');

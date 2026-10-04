@@ -45,7 +45,7 @@
         if (btnMasterAutoQuiz) {
             btnMasterAutoQuiz.onclick = () => {
                 if (checkIsQuizSummaryPage()) {
-                    const submitBtn = document.querySelector('.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], #region-main input[type="submit"], input[value*="Submit"]');
+                    const submitBtn = findQuizSummarySubmitButton();
                     if (submitBtn) {
                         submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         submitBtn.focus();

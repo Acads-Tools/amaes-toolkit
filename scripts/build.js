@@ -32,6 +32,7 @@ const BUILD_MANIFEST = [
     'quiz/solver.js',
     'moodle/highlighter.js',
     'moodle/account-switcher.js',
+    'moodle/account-transfer.js',
     'dev/diagnostics.js',
     'ai/prompts.js',
     'ai/gemini.js',

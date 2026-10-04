@@ -2692,8 +2692,12 @@ test("Study-Guide Links & Opt-In Auto-Pick: links sources and keeps unverified f
     assert.ok(script.includes("STUDY-GUIDE MATCH") && script.includes("(Unverified — review before submitting)"), "Study-guide banner must not imply AI or verified evidence");
 
     // 3. Automatic selection/fill requires confirmed evidence unless study-guide fallback is explicitly enabled in Auto-Quiz.
-    assert.ok(script.includes("(isManualSelect && hasVerifiedSource)") && script.includes("(hasVerifiedSource || (hasAiSource && aiAutoSelect))"), "Radio auto-select must require confirmed evidence or the separate AI opt-in");
+    assert.ok(script.includes("(isManualSelect && hasVerifiedSource)") && script.includes("(hasVerifiedSource || (hasAiSource && aiAutoSelect) ||") && script.includes("(isStudyGuide && autoQuizMode && autoPickStudyGuideFallback)"), "Radio auto-select must require confirmed evidence, AI opt-in, or explicit study-guide fallback opt-in");
     assert.ok(script.includes("isStudyGuide && autoQuizMode && autoPickStudyGuideFallback"), "Study-guide fallback auto-pick must require both Auto-Quiz and explicit opt-in");
+    assert.ok(script.includes("(isStudyGuide && autoQuizMode && autoPickStudyGuideFallback)"), "Explicit study-guide opt-in must enable matching choice selection during Auto-Quiz");
+    assert.ok(script.includes("isConfirmedCandidate(bestCand) ||\n                                    (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback)"), "Explicit study-guide opt-in must also enable short-answer fills");
+    assert.ok(script.includes("wrongAnswerEvidence === true"), "Review-confirmed wrong answers must be used even when their candidate answer is unverified");
+    assert.ok(script.includes("answerIsPreviouslyEliminated"), "A later unverified source refresh must not restore an answer disproved by Moodle review");
     assert.ok(script.includes("que.dataset.amaesStudyGuideFallbackPicked === 'true'"), "Only selected study-guide fallback answers may bypass the unknown-answer pause");
     assert.ok(script.includes("input.dispatchEvent(new Event('change', { bubbles: true }));"), "Radio auto-select must dispatch change event");
     assert.ok(script.includes("const canAutoFill = (isManualSelect && isConfirmedCandidate(bestCand)) ||") && script.includes("isConfirmedCandidate(bestCand));"), "Text inputs may auto-fill only confirmed answers");
@@ -2896,8 +2900,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.11.8'), "Userscript header must specify v1.11.8");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.8";'), "Constant SCRIPT_VERSION must be v1.11.8");
+    assert.ok(script.includes('@version      1.11.9'), "Userscript header must specify v1.11.9");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.9";'), "Constant SCRIPT_VERSION must be v1.11.9");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3464,7 +3468,8 @@ test("Review Page Spam & Duplicate Share Prevention: strips injected badges from
 
     // 3. Persistent share key check in localStorage
     assert.ok(reviewBlock.includes('localStorage.getItem(shareKey) || sessionStorage.getItem(shareKey)'), "Must check localStorage to deduplicate sharing across sessions and tabs");
-    assert.ok(reviewBlock.includes('localStorage.setItem(shareKey, JSON.stringify(Array.from(sharedSet)))'), "Must persist shared keys in localStorage");
+    assert.ok(reviewBlock.includes('localStorage.setItem(shareKey, serializedKeys)'), "Must persist deduplication keys in localStorage only after relay acceptance");
+    assert.ok(reviewBlock.includes("String(result.mode).startsWith('relay')"), "Must leave failed relay submissions eligible for retry");
 });
 
 // --------------------------------------------------
@@ -4031,14 +4036,15 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.11.8-blue.svg"), "README badge must show v1.11.8");
+    assert.ok(readme.includes("version-1.11.9-blue.svg"), "README badge must show v1.11.9");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.11.8<"), "Website must display v1.11.8 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.11.9<"), "Website must display v1.11.9 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
+    assert.ok(readme.includes("Encrypted Setup Transfer"), "README must document encrypted one-time setup transfer");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -5056,8 +5062,14 @@ test("Activity Auto-View & Quiz Summary Auto-Submit with Completion Sound (v1.9.
     assert.ok(script.includes('id="chk-auto-submit-quiz"'), "Panel markup must render chk-auto-submit-quiz checkbox under Advanced Settings");
     assert.ok(script.includes("localStorage.getItem('amaes_auto_submit_quiz') === 'true'"), "autoSubmitQuiz state must be read from localStorage");
     assert.ok(script.includes("localStorage.setItem('amaes_auto_submit_quiz', autoSubmitQuiz)"), "Checkbox toggle must persist to localStorage");
-    assert.ok(script.includes("if (autoSubmitQuiz) {"), "handleQuizSummaryAutoSubmit must guard auto-submit execution with autoSubmitQuiz");
+    assert.ok(script.includes("if (autoSubmitQuiz && !summaryAutoSubmitAttempted && !summaryAutoSubmitTimer)"), "handleQuizSummaryAutoSubmit must guard auto-submit execution with autoSubmitQuiz");
     assert.ok(script.includes(".btn-finishattempt, input[value*=\"Submit all and finish\"]"), "handleQuizSummaryAutoSubmit must locate summary submit button");
+    assert.ok(script.includes("function findQuizSubmitConfirmationButton()"), "Auto-submit must explicitly locate Moodle's scoped confirmation control");
+    assert.ok(script.includes("const confirmUntil = Date.now() + 5_000"), "Auto-submit must wait for Moodle's delayed confirmation dialog");
+    assert.ok(script.includes("function showQuizSubmitFallback(message, targetFinder"), "Failed auto-submit must display a persistent on-page action notice");
+    assert.ok(script.includes("id = 'amaes-auto-submit-fallback'") && script.includes("aria-live', 'assertive'"), "Auto-submit fallback must be accessible and announced to assistive technology");
+    assert.ok(script.includes("target.scrollIntoView({ behavior: 'smooth', block: 'center' });") && script.includes("target.focus({ preventScroll: true });"), "Fallback action must navigate focus to Moodle's actual submit or confirmation control");
+    assert.ok(script.includes("Moodle did not leave the summary page after confirmation."), "Must flag a confirmation click that did not actually complete submission");
 
     // 5. Terms of Use & Legal Safety Link
     assert.ok(script.includes('id="welcome-terms-link"'), "Must render welcome-terms-link in disclaimer");
