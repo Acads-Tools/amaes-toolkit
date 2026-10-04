@@ -1,11 +1,14 @@
     async function initializeToolkit() {
         await handleAccountSwitcherNavigation();
-        if (isUserLoggedIn() && await completeAccountSwitcherReturn()) return;
-        if (!(await verifyClientCompatibility())) return;
-        if (!isUserLoggedIn()) {
+        if (isUserLoggedIn()) {
+            await completeAccountSwitcherLoginCapture();
+            if (await completeAccountSwitcherReturn()) return;
+        } else {
+            await setupAccountSwitcherLoginCapture();
             logDebug("User not logged in; skipping UI mounting.");
             return;
         }
+        if (!(await verifyClientCompatibility())) return;
 
         checkPendingUpdateInstallation();
         setupPendingUpdateFocusListener();

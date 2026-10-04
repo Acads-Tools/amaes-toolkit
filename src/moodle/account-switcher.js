@@ -2,6 +2,7 @@
     const ACCOUNT_SWITCHER_RETURN_KEY = 'amaes_account_switcher_return_url';
     const ACCOUNT_SWITCHER_PENDING_KEY = 'amaes_account_switcher_pending';
     const ACCOUNT_SWITCHER_RETURN_OPTION_KEY = 'amaes_account_switcher_return_enabled';
+    const ACCOUNT_SWITCHER_LOGIN_CAPTURE_KEY = 'amaes_account_switcher_login_capture';
     const ACCOUNT_SWITCHER_INTENT_TTL_MS = 10 * 60 * 1000;
 
     async function getAccountSwitcherValue(key, fallbackValue = null) {
@@ -110,6 +111,183 @@
         );
         if (!username || !password || !username.form || username.form !== password.form) return null;
         return { username, password, form: username.form };
+    }
+
+    function getCurrentAccountSwitcherProfileName() {
+        const selectors = [
+            '.usermenu .usertext',
+            '[data-region="user-menu-toggle"] .usertext',
+            '#user-menu-toggle .usertext',
+            '.logininfo a[href*="/user/profile.php"]',
+            '#user-menu-toggle',
+            '[data-region="user-menu-toggle"]'
+        ];
+        for (const selector of selectors) {
+            const element = document.querySelector(selector);
+            const value = (element?.getAttribute('aria-label') || element?.textContent || '').replace(/\s+/g, ' ').trim();
+            if (value && !/^user menu$/i.test(value)) return value;
+        }
+        return '';
+    }
+
+    function normalizeAccountSwitcherIdentity(value) {
+        return String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+    }
+
+    async function setupAccountSwitcherLoginCapture() {
+        if (window.location.hostname !== 'semestral.amaes.com') return;
+        const loginFields = findAccountSwitcherLoginFields();
+        if (!loginFields || loginFields.form.querySelector('#amaes-login-save-account')) return;
+        try {
+            const previousCapture = await getAccountSwitcherValue(ACCOUNT_SWITCHER_LOGIN_CAPTURE_KEY, null);
+            if (previousCapture) await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_LOGIN_CAPTURE_KEY);
+        } catch (error) {
+            console.error(`[AMAES Account Switcher] Could not clear an earlier login save: ${error.message || error}`);
+        }
+
+        const container = document.createElement('div');
+        container.style.cssText = 'margin: 10px 0; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;';
+        let savedAccounts = [];
+        try {
+            savedAccounts = await getAccountSwitcherAccounts();
+        } catch (error) {
+            console.error(`[AMAES Account Switcher] Could not load quick-login accounts: ${error.message || error}`);
+        }
+        if (savedAccounts.length > 0) {
+            const quickSwitch = document.createElement('div');
+            quickSwitch.style.cssText = 'display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 8px;';
+            const quickSwitchLabel = document.createElement('span');
+            quickSwitchLabel.textContent = 'Quick sign in:';
+            quickSwitchLabel.style.cssText = 'font-size: 12px; font-weight: 600; color: #374151;';
+            quickSwitch.appendChild(quickSwitchLabel);
+            savedAccounts.forEach(account => {
+                const quickLoginButton = document.createElement('button');
+                quickLoginButton.type = 'button';
+                quickLoginButton.textContent = account.nickname;
+                quickLoginButton.title = `Sign in as ${account.nickname}`;
+                quickLoginButton.style.cssText = 'max-width: 100%; padding: 5px 8px; border: 1px solid #9ca3af; border-radius: 5px; background: #f3f4f6; color: #111827; font-size: 12px; cursor: pointer;';
+                quickLoginButton.addEventListener('click', () => {
+                    accountSwitcherSetInputValue(loginFields.username, account.username);
+                    accountSwitcherSetInputValue(loginFields.password, account.password);
+                    loginFields.form.requestSubmit();
+                });
+                quickSwitch.appendChild(quickLoginButton);
+            });
+            container.appendChild(quickSwitch);
+        }
+        const label = document.createElement('label');
+        label.style.cssText = 'display: flex; align-items: flex-start; gap: 7px; cursor: pointer;';
+        const checkbox = document.createElement('input');
+        checkbox.id = 'amaes-login-save-account';
+        checkbox.type = 'checkbox';
+        checkbox.style.cssText = 'margin: 2px 0 0; flex: 0 0 auto;';
+        const labelText = document.createElement('span');
+        labelText.textContent = 'Save this account on this device for quick switching';
+        label.append(checkbox, labelText);
+
+        const nicknameInput = document.createElement('input');
+        nicknameInput.id = 'amaes-login-account-nickname';
+        nicknameInput.type = 'text';
+        nicknameInput.autocomplete = 'off';
+        nicknameInput.placeholder = 'Display name for your account';
+        nicknameInput.setAttribute('aria-label', 'Account display name');
+        nicknameInput.style.cssText = 'display: none; box-sizing: border-box; width: 100%; margin-top: 7px; padding: 6px 7px; border: 1px solid #d1d5db; border-radius: 5px; font-size: 12px;';
+        const feedback = document.createElement('div');
+        feedback.setAttribute('role', 'status');
+        feedback.style.cssText = 'display: none; margin-top: 5px; color: #b91c1c; font-size: 11px;';
+        checkbox.addEventListener('change', () => {
+            nicknameInput.style.display = checkbox.checked ? 'block' : 'none';
+            if (checkbox.checked && !nicknameInput.value.trim()) {
+                nicknameInput.value = loginFields.username.value.trim();
+            }
+        });
+
+        container.append(label, nicknameInput, feedback);
+        loginFields.password.insertAdjacentElement('afterend', container);
+        let isSavingLoginCapture = false;
+        let allowCaptureSubmission = false;
+        loginFields.form.addEventListener('submit', event => {
+            if (!checkbox.checked) return;
+            if (isSavingLoginCapture) {
+                if (allowCaptureSubmission) {
+                    allowCaptureSubmission = false;
+                } else {
+                    event.preventDefault();
+                }
+                return;
+            }
+            const username = loginFields.username.value.trim();
+            const password = loginFields.password.value;
+            const nickname = nicknameInput.value.trim() || username;
+            if (!username || !password || !nickname) return;
+
+            event.preventDefault();
+            isSavingLoginCapture = true;
+            const captureExpiresAt = Date.now() + ACCOUNT_SWITCHER_INTENT_TTL_MS;
+            setAccountSwitcherValue(ACCOUNT_SWITCHER_LOGIN_CAPTURE_KEY, {
+                username,
+                password,
+                nickname,
+                nicknameFromUsername: nickname === username,
+                expiresAt: captureExpiresAt
+            }).then(() => {
+                setTimeout(async () => {
+                    try {
+                        if (window.location.pathname.includes('/login/')) {
+                            const capture = await getAccountSwitcherValue(ACCOUNT_SWITCHER_LOGIN_CAPTURE_KEY, null);
+                            if (capture?.expiresAt === captureExpiresAt) {
+                                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_LOGIN_CAPTURE_KEY);
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`[AMAES Account Switcher] Could not clear an unsuccessful login save: ${error.message || error}`);
+                    }
+                }, 20000);
+                allowCaptureSubmission = true;
+                loginFields.form.requestSubmit(event.submitter || undefined);
+            })
+                .catch(error => {
+                    feedback.textContent = `${error.message || 'Could not save this account.'} Continuing login without saving.`;
+                    feedback.style.display = 'block';
+                    isSavingLoginCapture = true;
+                    allowCaptureSubmission = true;
+                    loginFields.form.requestSubmit(event.submitter || undefined);
+                });
+        });
+    }
+
+    async function completeAccountSwitcherLoginCapture() {
+        try {
+            const capture = await getAccountSwitcherValue(ACCOUNT_SWITCHER_LOGIN_CAPTURE_KEY, null);
+            if (!capture) return false;
+            if (!capture.expiresAt || capture.expiresAt < Date.now()) {
+                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_LOGIN_CAPTURE_KEY);
+                return false;
+            }
+
+            const accounts = await getAccountSwitcherAccounts();
+            const profileName = getCurrentAccountSwitcherProfileName();
+            const nickname = capture.nicknameFromUsername && profileName
+                ? profileName
+                : capture.nickname;
+            const existing = accounts.find(account => account.username.toLocaleLowerCase() === capture.username.toLocaleLowerCase());
+            if (existing) {
+                existing.password = capture.password;
+                existing.nickname = nickname;
+                await saveAccountSwitcherAccounts(accounts);
+            } else {
+                const id = crypto.randomUUID
+                    ? crypto.randomUUID()
+                    : `account-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                accounts.push({ id, username: capture.username, password: capture.password, nickname });
+                await saveAccountSwitcherAccounts(accounts);
+            }
+            await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_LOGIN_CAPTURE_KEY);
+            return true;
+        } catch (error) {
+            console.error(`[AMAES Account Switcher] Could not save the account after login: ${error.message || error}`);
+            return false;
+        }
     }
 
     function accountSwitcherSetInputValue(input, value) {
@@ -297,6 +475,7 @@
 
         const renderAccounts = async () => {
             const accounts = await getAccountSwitcherAccounts();
+            const currentProfileName = normalizeAccountSwitcherIdentity(getCurrentAccountSwitcherProfileName());
             list.replaceChildren();
             if (accounts.length === 0) {
                 const empty = document.createElement('div');
@@ -308,7 +487,7 @@
 
             accounts.forEach(account => {
                 const row = document.createElement('div');
-                row.style.cssText = 'display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 5px; align-items: center; width: 100%;';
+                row.style.cssText = 'display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 5px; align-items: center; width: 100%;';
 
                 const switchButton = document.createElement('button');
                 switchButton.type = 'button';
@@ -319,6 +498,17 @@
                 switchButton.addEventListener('click', () => {
                     startAccountSwitch(account.id, returnToggle.checked);
                 });
+
+                const status = document.createElement('span');
+                const isCurrentAccount = Boolean(currentProfileName && (
+                    currentProfileName === normalizeAccountSwitcherIdentity(account.nickname) ||
+                    currentProfileName === normalizeAccountSwitcherIdentity(account.username)
+                ));
+                status.textContent = isCurrentAccount ? 'Active' : 'Saved';
+                status.title = isCurrentAccount
+                    ? 'Matches the name shown in the current Moodle profile.'
+                    : 'Saved in this browser; not matched to the current Moodle profile name.';
+                status.style.cssText = `font-size: 9px; white-space: nowrap; color: ${isCurrentAccount ? 'var(--accent-green, #22c55e)' : 'var(--text-muted)'};`;
 
                 const editButton = document.createElement('button');
                 editButton.type = 'button';
@@ -356,7 +546,7 @@
                     }
                 });
 
-                row.append(switchButton, editButton, removeButton);
+                row.append(switchButton, status, editButton, removeButton);
                 list.appendChild(row);
             });
         };
@@ -388,7 +578,7 @@
 
                 try {
                     const wasEditing = Boolean(editingAccountId);
-                    const accounts = await getAccountSwitcherAccounts();
+                    let accounts = await getAccountSwitcherAccounts();
                     const id = editingAccountId || (crypto.randomUUID
                         ? crypto.randomUUID()
                         : `account-${Date.now()}-${Math.random().toString(36).slice(2)}`);

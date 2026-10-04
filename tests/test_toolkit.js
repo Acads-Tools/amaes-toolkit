@@ -2896,8 +2896,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.11.7'), "Userscript header must specify v1.11.7");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.7";'), "Constant SCRIPT_VERSION must be v1.11.7");
+    assert.ok(script.includes('@version      1.11.8'), "Userscript header must specify v1.11.8");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.8";'), "Constant SCRIPT_VERSION must be v1.11.8");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4031,13 +4031,14 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.11.7-blue.svg"), "README badge must show v1.11.7");
+    assert.ok(readme.includes("version-1.11.8-blue.svg"), "README badge must show v1.11.8");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.11.7<"), "Website must display v1.11.7 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.11.8<"), "Website must display v1.11.8 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
+    assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -5329,6 +5330,7 @@ test("Account Switcher: stores credentials in userscript-local storage and safel
     const fs = require('fs');
     const source = fs.readFileSync('src/moodle/account-switcher.js', 'utf8');
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    const init = fs.readFileSync('src/init.js', 'utf8');
 
     assert.ok(source.includes('GM_getValue') && source.includes('GM_setValue') && source.includes('GM_deleteValue'), "Account data and temporary switch state must use userscript-manager storage");
     assert.ok(!/localStorage|sessionStorage|fetch\s*\(|GM_xmlhttpRequest|crypto\.subtle|PBKDF2|AES-GCM/.test(source), "Account data must use local userscript storage without encryption, page storage, or toolkit network APIs");
@@ -5339,10 +5341,17 @@ test("Account Switcher: stores credentials in userscript-local storage and safel
     assert.ok(script.includes('placeholder="Nickname / Display name"') && script.includes('aria-label="Nickname / Display name"'), "Nickname field must clarify it is a display label");
     assert.ok(script.includes('Return to current page after switch'), "Return-page checkbox must have the requested label");
     assert.ok(source.includes("'#username, input[name=\"username\"") && source.includes("'#password, input[name=\"password\""), "Automation must target Moodle's username and password fields");
-    assert.ok(source.includes("grid-template-columns: minmax(0, 1fr) auto auto;"), "Saved-account rows must reserve a flexible nickname column and compact action columns");
+    assert.ok(source.includes("grid-template-columns: minmax(0, 1fr) auto auto auto;"), "Saved-account rows must reserve a flexible nickname column and compact action columns");
     assert.ok(source.includes("width: 100%; justify-content: flex-start; min-width: 0;"), "Saved-account switch button must fill the nickname column");
     assert.ok(source.includes("width: auto; white-space: nowrap; padding: 4px 7px;"), "Remove button must stay compact without squeezing the nickname");
     assert.ok(source.includes('const updatedAccount = { id, username, password, nickname };'), "Saved accounts must stay in local userscript storage without an encryption setup step");
+    assert.ok(source.includes("checkbox.id = 'amaes-login-save-account'"), "Login form must provide an explicit opt-in to save credentials");
+    assert.ok(source.includes('completeAccountSwitcherLoginCapture') && source.includes('expiresAt: Date.now() + ACCOUNT_SWITCHER_INTENT_TTL_MS'), "Login form credentials must be saved only after an authenticated page loads and expire if login fails");
+    assert.ok(source.includes("status.textContent = isCurrentAccount ? 'Active' : 'Saved'"), "Account list must distinguish current profile matches from saved accounts");
+    assert.ok(source.includes('currentProfileName === normalizeAccountSwitcherIdentity(account.nickname)') && source.includes('currentProfileName === normalizeAccountSwitcherIdentity(account.username)'), "Current account detection must compare against the visible Moodle profile name");
+    assert.ok(script.includes('Save this account on this device for quick switching'), "Login page must explain the opt-in account save");
+    assert.ok(source.includes("quickSwitchLabel.textContent = 'Quick sign in:'") && source.includes('loginFields.form.requestSubmit();'), "Login page must offer one-click buttons for already saved accounts");
+    assert.ok(init.indexOf('await completeAccountSwitcherLoginCapture()') < init.indexOf('if (!(await verifyClientCompatibility()))'), "Login credentials must only be saved after a logged-in page is detected");
     assert.ok(source.includes("editButton.textContent = 'Edit'") && source.includes("submitButton.textContent = 'Save changes'"), "Saved accounts must support editing and saving changes");
     assert.ok(source.includes('requestSubmit') && source.includes("stage: 'attempted'"), "Login must submit once and guard against repeated submission after failure");
     assert.ok(source.includes('target.origin !== window.location.origin'), "Return navigation must reject cross-origin destinations");
