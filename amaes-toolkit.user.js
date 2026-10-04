@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.11.15
+// @version      1.11.16
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -31,7 +31,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.15";
+    const SCRIPT_VERSION = "v1.11.16";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -6435,6 +6435,51 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             const qtextElem = que.querySelector('.qtext, .formulation .qtext');
             if (!qtextElem) return;
 
+            if (checkIsQuizAttemptPage() && identifyQuestionType(que) === 'match') {
+                const matchingData = extractQuestionData(que);
+                if (matchingData && isEligibleForAiSolver(que, matchingData)) {
+                    const formulation = que.querySelector('.formulation, .content') || que;
+                    let aiButton = que.querySelector('.amaes-ai-matching-run-btn');
+                    if (!aiButton) {
+                        aiButton = document.createElement('button');
+                        aiButton.type = 'button';
+                        aiButton.className = 'amaes-ai-matching-run-btn';
+                        aiButton.textContent = 'Ask Gemini about these matches';
+                        aiButton.style.cssText = 'margin: 6px 0; padding: 6px 10px; border: 1px solid #c084fc; border-radius: 5px; background: #faf5ff; color: #7e22ce; font-size: 11px; font-weight: 700; cursor: pointer;';
+                        aiButton.title = 'Get unverified, row-by-row suggestions without changing your current selections';
+                        aiButton.addEventListener('click', async event => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            aiButton.disabled = true;
+                            aiButton.textContent = 'Gemini is analyzing each row...';
+                            const courseCode = detectCourseInfo().subjectCode || '';
+                            try {
+                                await handleGeminiQuestionInference({
+                                    que,
+                                    qData: matchingData,
+                                    promptText: buildGeminiCompactPrompt(matchingData, courseCode, que),
+                                    allowAnswered: true,
+                                    onSuccess: () => {
+                                        aiButton.disabled = false;
+                                        aiButton.textContent = 'Ask Gemini again';
+                                    },
+                                    onFallback: () => {
+                                        aiButton.disabled = false;
+                                        aiButton.textContent = 'Retry Gemini matching suggestions';
+                                    }
+                                });
+                            } catch (error) {
+                                aiButton.disabled = false;
+                                aiButton.textContent = 'Retry Gemini matching suggestions';
+                                setLog(`Gemini matching request failed: ${error.message}`, 'var(--accent-amber)');
+                                showToast('Gemini could not analyze this matching question. Check the AI status above.', 3500);
+                            }
+                        });
+                        formulation.insertBefore(aiButton, formulation.firstChild);
+                    }
+                }
+            }
+
             // Clone qtext and remove input, select, textarea, drop zones, and badges so inline blanks match AMAUOED entries cleanly
             const qClone = qtextElem.cloneNode(true);
             qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-unreviewed-history-note, .amaes-known-wrong-answer-warning, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-question-tag').forEach(el => el.remove());
@@ -6818,7 +6863,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             // If the DB has stored choices for this question but NONE of them match the
             // live Moodle choices, it means the question pool was updated (new choices
             // swapped in). Warn the student and fall back to elimination-only mode.
-            if (choiceRows.length >= 2 && candidates.length > 0) {
+            if (identifyQuestionType(que) !== 'match' && choiceRows.length >= 2 && candidates.length > 0) {
                 const liveChoiceNorms = Array.from(choiceRows).map(r => {
                     const lbl = r.querySelector('label') || r;
                     return normalizeChoice(cleanDOMToAI(lbl));
@@ -12917,7 +12962,7 @@ function setupAccountTransferUI() {
     }
 
     // Handles thinking indicator, watchdog timeout, configurable retries, wrong choice elimination guard, session caching, and auto-copy on fail
-    async function handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback }) {
+    async function handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered = false }) {
         que.querySelectorAll('.amaes-ai-thinking-indicator, .amaes-ai-fallback-bar').forEach(el => el.remove());
 
         if (typeof isFeatureDisabledByAdmin === 'function' && isFeatureDisabledByAdmin('aiSolver')) {
@@ -12930,7 +12975,7 @@ function setupAccountTransferUI() {
         // A retry button or cooldown callback can outlive the question's
         // fallback UI. Never spend another request after the student answered.
         const existingAiChoiceBeforeRequest = que.querySelector('.amaes-ai-suggested-choice');
-        if (isQuestionAnswered(que) && !existingAiChoiceBeforeRequest) {
+        if (!allowAnswered && isQuestionAnswered(que) && !existingAiChoiceBeforeRequest) {
             setLog(`[AI Guard] Question #${qData ? qData.qNum : ''} already has an answer; no request sent.`, "var(--accent-green)");
             return;
         }
@@ -13015,7 +13060,7 @@ function setupAccountTransferUI() {
             showToast(`AI rate limit: available in ${rateLimitStatus.remainingSec}s`, 3500);
 
             showAiFallbackBar(que, qData, promptText, async () => {
-                await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
+                await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered });
             }, {
                 reason: rlMsg,
                 isRateLimit: true,
@@ -13097,7 +13142,7 @@ function setupAccountTransferUI() {
             : 64;
 
         while (attempt < maxAttempts && !answerText && !isAborted && !timedOut) {
-            if (isQuestionAnswered(que) && !que.querySelector('.amaes-ai-suggested-choice')) {
+            if (!allowAnswered && isQuestionAnswered(que) && !que.querySelector('.amaes-ai-suggested-choice')) {
                 abortCtrl.abort();
                 break;
             }
@@ -13268,18 +13313,30 @@ function setupAccountTransferUI() {
                 const suggestions = parseMatchingAiResponse(answerText, matchingRows);
                 if (suggestions.length > 0) {
                     suggestions.forEach(suggestion => {
-                        suggestion.select.value = suggestion.option.value;
-                        suggestion.select.dispatchEvent(new Event('input', { bubbles: true }));
-                        suggestion.select.dispatchEvent(new Event('change', { bubbles: true }));
-                        suggestion.select.dispatchEvent(new Event('blur', { bubbles: true }));
-                        suggestion.select.style.outline = '2px solid #a855f7';
-                        suggestion.select.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
                         suggestion.row.querySelectorAll('.amaes-ai-matching-suggestion').forEach(el => el.remove());
                         const badge = document.createElement('div');
                         badge.className = 'amaes-ai-matching-suggestion';
                         badge.setAttribute('role', 'status');
-                        badge.textContent = `AI suggestion (unverified): ${suggestion.option.text.trim()}`;
-                        badge.style.cssText = 'margin: 4px 0; color: #7e22ce; font-size: 11px; font-weight: 700;';
+                        badge.style.cssText = 'display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 4px 0; color: #7e22ce; font-size: 11px; font-weight: 700;';
+                        const label = document.createElement('span');
+                        label.textContent = `AI suggestion (unverified): ${suggestion.option.text.trim()}`;
+                        const useButton = document.createElement('button');
+                        useButton.type = 'button';
+                        useButton.textContent = 'Use suggestion';
+                        useButton.style.cssText = 'padding: 2px 7px; border: 1px solid #c084fc; border-radius: 4px; background: #faf5ff; color: #7e22ce; font-size: 10px; font-weight: 700; cursor: pointer;';
+                        useButton.addEventListener('click', event => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            suggestion.select.value = suggestion.option.value;
+                            suggestion.select.dispatchEvent(new Event('input', { bubbles: true }));
+                            suggestion.select.dispatchEvent(new Event('change', { bubbles: true }));
+                            suggestion.select.dispatchEvent(new Event('blur', { bubbles: true }));
+                            suggestion.select.style.outline = '2px solid #a855f7';
+                            suggestion.select.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+                            useButton.textContent = 'Selected';
+                            useButton.disabled = true;
+                        });
+                        badge.append(label, useButton);
                         suggestion.select.insertAdjacentElement('afterend', badge);
                     });
                     const summary = suggestions.map(item => `Row ${item.rowIndex + 1}: ${item.option.text.trim()}`).join('; ');
@@ -13383,7 +13440,7 @@ function setupAccountTransferUI() {
                             copyQuestionWithOptionalImage(que, promptText).catch(() => {});
                         }
                         showAiFallbackBar(que, qData, promptText, async () => {
-                            await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
+                            await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered });
                         }, { reason: wrongReason, isAuthError: false });
                         showToast(wrongReason, 4500);
                         setLog(`[AI Wrong Answer Blocked] Question #${qData ? qData.qNum : ''}: ${wrongReason}`, "var(--accent-pink)");
@@ -13434,7 +13491,7 @@ function setupAccountTransferUI() {
                     copyQuestionWithOptionalImage(que, promptText).catch(() => {});
                 }
                 showAiFallbackBar(que, qData, promptText, async () => {
-                    await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
+                    await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered });
                 }, { reason: mismatchReason, isAuthError: false });
                 showToast(mismatchReason, 4500);
                 setLog(`[AI Choice Mismatch] Question #${qData ? qData.qNum : ''}: ${mismatchReason}`, "var(--accent-amber)");
@@ -13482,7 +13539,7 @@ function setupAccountTransferUI() {
 
         // Failure or timeout: inject fallback bar with clear reason and direct configure button if auth error
         showAiFallbackBar(que, qData, promptText, async () => {
-            await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback });
+            await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered });
         }, {
             reason: failureReason,
             isAuthError: isAuthError,

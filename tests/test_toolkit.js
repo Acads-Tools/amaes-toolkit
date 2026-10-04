@@ -2924,8 +2924,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.11.15'), "Userscript header must specify v1.11.15");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.15";'), "Constant SCRIPT_VERSION must be v1.11.15");
+    assert.ok(script.includes('@version      1.11.16'), "Userscript header must specify v1.11.16");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.16";'), "Constant SCRIPT_VERSION must be v1.11.16");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3934,6 +3934,19 @@ test("Gemini AI Matching: builds row-specific prompts and only maps explicit, no
     assert.deepStrictEqual(Array.from(sandbox.parse('Reports\nautoload config', sandbox.getRows(question))), [], "Unlabeled answer lists must not be mapped by position");
     assert.deepStrictEqual(Array.from(sandbox.parse('Row 1: single report page\nRow 2: autoload config', sandbox.getRows(question)), item => item.rowIndex), [1], "A choice disproved for one row must not be suggested there");
     assert.strictEqual(sandbox.eligible(question, { questionType: 'match', matchPairs: pairs, choices: [] }), true, "Matching questions with usable row dropdowns must be eligible");
+
+    const inference = gemini.slice(gemini.indexOf('async function handleGeminiQuestionInference'), gemini.indexOf('// Non-tech student setup modal'));
+    assert.ok(inference.includes('allowAnswered = false'), "Manual matching AI requests must have an explicit answered-question override");
+    assert.ok(inference.includes('if (!allowAnswered && isQuestionAnswered(que)'), "Automatic inference must continue to guard answered questions");
+    assert.ok(inference.includes('allowAnswered });'), "AI retry paths must preserve the explicit answered-question override");
+    const matchingResult = inference.slice(inference.indexOf("if (qData.questionType === 'match'"), inference.indexOf('// Check for Dropdown / Select elements'));
+    assert.ok(matchingResult.includes("useButton.textContent = 'Use suggestion'"), "Matching AI suggestions must require an explicit user action");
+    assert.ok(!matchingResult.includes('suggestion.select.value = suggestion.option.value;') || matchingResult.indexOf('suggestion.select.value = suggestion.option.value;') > matchingResult.indexOf("useButton.addEventListener('click'"), "AI suggestions must not alter selected answers before the user clicks Use suggestion");
+
+    const solver = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    assert.ok(solver.includes('amaes-ai-matching-run-btn'), "Matching questions need an explicit AI action even when already answered");
+    assert.ok(solver.includes('allowAnswered: true'), "The manual matching AI action must allow analysis of prefilled matching rows");
+    assert.ok(solver.includes("identifyQuestionType(que) !== 'match' && choiceRows.length >= 2"), "Matching questions must not show the unrelated choice-pool-changed warning");
 });
 
 // --------------------------------------------------
@@ -4123,11 +4136,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.11.15-blue.svg"), "README badge must show v1.11.15");
+    assert.ok(readme.includes("version-1.11.16-blue.svg"), "README badge must show v1.11.16");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.11.15<"), "Website must display v1.11.15 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.11.16<"), "Website must display v1.11.16 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");

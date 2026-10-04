@@ -3037,6 +3037,51 @@
             const qtextElem = que.querySelector('.qtext, .formulation .qtext');
             if (!qtextElem) return;
 
+            if (checkIsQuizAttemptPage() && identifyQuestionType(que) === 'match') {
+                const matchingData = extractQuestionData(que);
+                if (matchingData && isEligibleForAiSolver(que, matchingData)) {
+                    const formulation = que.querySelector('.formulation, .content') || que;
+                    let aiButton = que.querySelector('.amaes-ai-matching-run-btn');
+                    if (!aiButton) {
+                        aiButton = document.createElement('button');
+                        aiButton.type = 'button';
+                        aiButton.className = 'amaes-ai-matching-run-btn';
+                        aiButton.textContent = 'Ask Gemini about these matches';
+                        aiButton.style.cssText = 'margin: 6px 0; padding: 6px 10px; border: 1px solid #c084fc; border-radius: 5px; background: #faf5ff; color: #7e22ce; font-size: 11px; font-weight: 700; cursor: pointer;';
+                        aiButton.title = 'Get unverified, row-by-row suggestions without changing your current selections';
+                        aiButton.addEventListener('click', async event => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            aiButton.disabled = true;
+                            aiButton.textContent = 'Gemini is analyzing each row...';
+                            const courseCode = detectCourseInfo().subjectCode || '';
+                            try {
+                                await handleGeminiQuestionInference({
+                                    que,
+                                    qData: matchingData,
+                                    promptText: buildGeminiCompactPrompt(matchingData, courseCode, que),
+                                    allowAnswered: true,
+                                    onSuccess: () => {
+                                        aiButton.disabled = false;
+                                        aiButton.textContent = 'Ask Gemini again';
+                                    },
+                                    onFallback: () => {
+                                        aiButton.disabled = false;
+                                        aiButton.textContent = 'Retry Gemini matching suggestions';
+                                    }
+                                });
+                            } catch (error) {
+                                aiButton.disabled = false;
+                                aiButton.textContent = 'Retry Gemini matching suggestions';
+                                setLog(`Gemini matching request failed: ${error.message}`, 'var(--accent-amber)');
+                                showToast('Gemini could not analyze this matching question. Check the AI status above.', 3500);
+                            }
+                        });
+                        formulation.insertBefore(aiButton, formulation.firstChild);
+                    }
+                }
+            }
+
             // Clone qtext and remove input, select, textarea, drop zones, and badges so inline blanks match AMAUOED entries cleanly
             const qClone = qtextElem.cloneNode(true);
             qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-unreviewed-history-note, .amaes-known-wrong-answer-warning, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-question-tag').forEach(el => el.remove());
@@ -3420,7 +3465,7 @@
             // If the DB has stored choices for this question but NONE of them match the
             // live Moodle choices, it means the question pool was updated (new choices
             // swapped in). Warn the student and fall back to elimination-only mode.
-            if (choiceRows.length >= 2 && candidates.length > 0) {
+            if (identifyQuestionType(que) !== 'match' && choiceRows.length >= 2 && candidates.length > 0) {
                 const liveChoiceNorms = Array.from(choiceRows).map(r => {
                     const lbl = r.querySelector('label') || r;
                     return normalizeChoice(cleanDOMToAI(lbl));
