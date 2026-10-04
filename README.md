@@ -10,14 +10,14 @@
 </p>
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js"><img src="https://img.shields.io/badge/version-1.11.6-blue.svg" alt="Version 1.11.6"></a>
+  <a href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js"><img src="https://img.shields.io/badge/version-1.11.7-blue.svg" alt="Version 1.11.7"></a>
   <a href="https://acads-tools.github.io/amaes-toolkit/"><img src="https://img.shields.io/badge/platform-Violentmonkey%20%7C%20Tampermonkey-darkblue.svg" alt="Platform Compatibility"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="#zero-telemetry--privacy-architecture"><img src="https://img.shields.io/badge/privacy-zero--telemetry-success.svg" alt="Zero Telemetry"></a>
   <a href=".github/workflows/privacy-check.yml"><img src="https://img.shields.io/badge/privacy--audit-passing-brightgreen.svg" alt="Privacy Check Passed"></a>
 </p>
 
-> **Compatibility Notice:** Version **1.11.6** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](docs/CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
+> **Compatibility Notice:** Version **1.11.7** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](docs/CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
 
 ---
 
@@ -115,7 +115,7 @@ Before installing, ensure your environment meets the following specifications:
 ### 7. Privacy-Safe Community Synchronization
 * **Automatic Course Bank Loading:** Automatically fetches verified questions for your active subject directly from the open study database ([`Acads-Tools/database`](https://github.com/Acads-Tools/database)) upon opening Moodle.
 * **Consensus-Driven Question Sharing:** Confirmed review answers from completed quiz attempts are pooled anonymously to expand coverage for fellow students.
-* **Privacy by Default:** Student names, student IDs, email addresses, grades, and Moodle session tokens are never collected or transmitted. Account Switcher usernames and passwords are encrypted in userscript-manager storage with AES-GCM using your passphrase; nicknames remain visible. The passphrase is not saved except for a short-lived userscript-storage handoff during an account switch, then deleted. Account credentials are only submitted to Moodle's own login form and are never sent to toolkit services or logged. Existing plaintext entries can be migrated with **Encrypt existing accounts**. Keep your passphrase safe; it cannot be recovered.
+* **Privacy by Default:** Student names, student IDs, email addresses, grades, and Moodle session tokens are never collected or transmitted. Account Switcher details are saved locally in userscript-manager storage on your device and are not sent to toolkit services; usernames and passwords are not encrypted, so anyone with access to your browser profile may be able to view them. Credentials are only submitted to Moodle's own login form and are never sent to toolkit services or logged.
 
 ---
 
@@ -324,7 +324,7 @@ This happens when a userscript manager is not yet installed in your browser. Ins
 <details>
 <summary><b>Does this tool transmit any personal student data?</b></summary>
 <br>
-<b>Not to toolkit services.</b> The toolkit does not send student names, student IDs, email addresses, grades, cookies, or Moodle session tokens to its APIs, telemetry, or community services. If you opt in to the Account Switcher, its usernames and passwords are encrypted locally by your userscript manager and submitted only to the target Moodle site's own login form for authentication. Shared community contributions consist exclusively of anonymous question-and-answer pairs confirmed against Moodle review keys.
+<b>Not to toolkit services.</b> The toolkit does not send student names, student IDs, email addresses, grades, cookies, or Moodle session tokens to its APIs, telemetry, or community services. If you opt in to the Account Switcher, its usernames and passwords are saved unencrypted in local userscript-manager storage and submitted only to the target Moodle site's own login form for authentication. Do not use it on a device or browser profile other people can access. Shared community contributions consist exclusively of anonymous question-and-answer pairs confirmed against Moodle review keys.
 </details>
 
 <details>

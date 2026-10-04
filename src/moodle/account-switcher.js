@@ -2,126 +2,7 @@
     const ACCOUNT_SWITCHER_RETURN_KEY = 'amaes_account_switcher_return_url';
     const ACCOUNT_SWITCHER_PENDING_KEY = 'amaes_account_switcher_pending';
     const ACCOUNT_SWITCHER_RETURN_OPTION_KEY = 'amaes_account_switcher_return_enabled';
-    const ACCOUNT_SWITCHER_SESSION_KEY = 'amaes_account_switcher_session_key';
-    const ACCOUNT_SWITCHER_VAULT_KEY = 'amaes_account_switcher_vault';
     const ACCOUNT_SWITCHER_INTENT_TTL_MS = 10 * 60 * 1000;
-    const ACCOUNT_SWITCHER_PBKDF2_ITERATIONS = 310000;
-    const ACCOUNT_SWITCHER_VERIFIER = 'AMAES Account Switcher vault verifier v1';
-
-    function accountSwitcherEncodeBase64(bytes) {
-        return btoa(String.fromCharCode(...new Uint8Array(bytes)));
-    }
-
-    function accountSwitcherDecodeBase64(value) {
-        return Uint8Array.from(atob(value), character => character.charCodeAt(0));
-    }
-
-    async function accountSwitcherDeriveKey(passphrase, salt) {
-        if (typeof passphrase !== 'string' || passphrase.length < 12) {
-            throw new Error('Use the same encryption passphrase of at least 12 characters.');
-        }
-        if (!window.crypto?.subtle) {
-            throw new Error('Encrypted accounts require a browser with Web Crypto support.');
-        }
-        const material = await window.crypto.subtle.importKey(
-            'raw',
-            new TextEncoder().encode(passphrase),
-            'PBKDF2',
-            false,
-            ['deriveKey']
-        );
-        return window.crypto.subtle.deriveKey(
-            { name: 'PBKDF2', salt, iterations: ACCOUNT_SWITCHER_PBKDF2_ITERATIONS, hash: 'SHA-256' },
-            material,
-            { name: 'AES-GCM', length: 256 },
-            false,
-            ['encrypt', 'decrypt']
-        );
-    }
-
-    async function encryptAccountSwitcherCredentials(username, password, passphrase) {
-        const salt = window.crypto.getRandomValues(new Uint8Array(16));
-        const iv = window.crypto.getRandomValues(new Uint8Array(12));
-        const key = await accountSwitcherDeriveKey(passphrase, salt);
-        const plaintext = new TextEncoder().encode(JSON.stringify({ username, password }));
-        const ciphertext = await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
-        return {
-            version: 1,
-            salt: accountSwitcherEncodeBase64(salt),
-            iv: accountSwitcherEncodeBase64(iv),
-            ciphertext: accountSwitcherEncodeBase64(ciphertext)
-        };
-    }
-
-    async function decryptAccountSwitcherCredentials(account, passphrase) {
-        if (!account.encryptedCredentials) {
-            return { username: account.username, password: account.password };
-        }
-        try {
-            const encrypted = account.encryptedCredentials;
-            if (encrypted.version !== 1) throw new Error('Unsupported encrypted account format.');
-            const salt = accountSwitcherDecodeBase64(encrypted.salt);
-            const iv = accountSwitcherDecodeBase64(encrypted.iv);
-            const key = await accountSwitcherDeriveKey(passphrase, salt);
-            const plaintext = await window.crypto.subtle.decrypt(
-                { name: 'AES-GCM', iv },
-                key,
-                accountSwitcherDecodeBase64(encrypted.ciphertext)
-            );
-            const credentials = JSON.parse(new TextDecoder().decode(plaintext));
-            if (typeof credentials.username !== 'string' || typeof credentials.password !== 'string') {
-                throw new Error('Encrypted account data is invalid.');
-            }
-            return credentials;
-        } catch (error) {
-            if (error.name === 'OperationError' || error.name === 'DataError') {
-                throw new Error('Could not decrypt the saved account. Check the encryption passphrase.');
-            }
-            throw error;
-        }
-    }
-
-    async function verifyAccountSwitcherPassphrase(passphrase) {
-        if (typeof passphrase !== 'string' || passphrase.length < 12) {
-            throw new Error('Use an encryption passphrase of at least 12 characters.');
-        }
-        const storedVerifier = await getAccountSwitcherValue(ACCOUNT_SWITCHER_VAULT_KEY, null);
-        if (storedVerifier) {
-            try {
-                const key = await accountSwitcherDeriveKey(
-                    passphrase,
-                    accountSwitcherDecodeBase64(storedVerifier.salt)
-                );
-                const plaintext = await window.crypto.subtle.decrypt(
-                    { name: 'AES-GCM', iv: accountSwitcherDecodeBase64(storedVerifier.iv) },
-                    key,
-                    accountSwitcherDecodeBase64(storedVerifier.ciphertext)
-                );
-                if (new TextDecoder().decode(plaintext) !== ACCOUNT_SWITCHER_VERIFIER) {
-                    throw new Error('The encryption passphrase does not match this account vault.');
-                }
-                return;
-            } catch (error) {
-                if (error.message === 'The encryption passphrase does not match this account vault.') throw error;
-                throw new Error('The encryption passphrase does not match this account vault.');
-            }
-        }
-
-        const salt = window.crypto.getRandomValues(new Uint8Array(16));
-        const iv = window.crypto.getRandomValues(new Uint8Array(12));
-        const key = await accountSwitcherDeriveKey(passphrase, salt);
-        const ciphertext = await window.crypto.subtle.encrypt(
-            { name: 'AES-GCM', iv },
-            key,
-            new TextEncoder().encode(ACCOUNT_SWITCHER_VERIFIER)
-        );
-        await setAccountSwitcherValue(ACCOUNT_SWITCHER_VAULT_KEY, {
-            version: 1,
-            salt: accountSwitcherEncodeBase64(salt),
-            iv: accountSwitcherEncodeBase64(iv),
-            ciphertext: accountSwitcherEncodeBase64(ciphertext)
-        });
-    }
 
     async function getAccountSwitcherValue(key, fallbackValue = null) {
         if (typeof GM_getValue !== 'function') {
@@ -153,37 +34,14 @@
         return accounts.filter(account =>
             account &&
             typeof account.id === 'string' &&
-            typeof account.nickname === 'string' &&
-            (
-                (account.encryptedCredentials && typeof account.encryptedCredentials === 'object') ||
-                (typeof account.username === 'string' && typeof account.password === 'string')
-            )
+            typeof account.username === 'string' &&
+            typeof account.password === 'string' &&
+            typeof account.nickname === 'string'
         );
     }
 
     async function saveAccountSwitcherAccounts(accounts) {
         await setAccountSwitcherValue(ACCOUNT_SWITCHER_ACCOUNTS_KEY, accounts);
-    }
-
-    async function encryptLegacyAccountSwitcherAccounts(accounts, passphrase) {
-        const encryptedAccounts = [];
-        let changed = false;
-        for (const account of accounts) {
-            if (account.encryptedCredentials) {
-                encryptedAccounts.push(account);
-                continue;
-            }
-            const encryptedCredentials = await encryptAccountSwitcherCredentials(
-                account.username,
-                account.password,
-                passphrase
-            );
-            const { username, password, ...safeAccount } = account;
-            changed = true;
-            encryptedAccounts.push({ ...safeAccount, encryptedCredentials });
-        }
-        if (changed) await saveAccountSwitcherAccounts(encryptedAccounts);
-        return encryptedAccounts;
     }
 
     function accountSwitcherSetStatus(message, isError = false) {
@@ -273,23 +131,11 @@
         return null;
     }
 
-    async function startAccountSwitch(accountId, returnToCurrentPage, passphrase) {
+    async function startAccountSwitch(accountId, returnToCurrentPage) {
         try {
-            if (!passphrase) throw new Error('Enter your encryption passphrase before switching accounts.');
-            await verifyAccountSwitcherPassphrase(passphrase);
-            const accounts = await encryptLegacyAccountSwitcherAccounts(
-                await getAccountSwitcherAccounts(),
-                passphrase
-            );
+            const accounts = await getAccountSwitcherAccounts();
             const account = accounts.find(saved => saved.id === accountId);
             if (!account) throw new Error('The selected account could not be found.');
-            await decryptAccountSwitcherCredentials(account, passphrase);
-
-            await setAccountSwitcherValue(ACCOUNT_SWITCHER_SESSION_KEY, {
-                passphrase,
-                expiresAt: Date.now() + ACCOUNT_SWITCHER_INTENT_TTL_MS
-            });
-
             if (returnToCurrentPage) {
                 await setAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY, {
                     url: window.location.href,
@@ -318,7 +164,6 @@
             logoutLink.click();
         } catch (error) {
             try {
-                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_SESSION_KEY);
                 await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY);
                 await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY);
             } catch (cleanupError) {
@@ -333,10 +178,6 @@
 
         let pending;
         try {
-            const temporaryKey = await getAccountSwitcherValue(ACCOUNT_SWITCHER_SESSION_KEY, null);
-            if (temporaryKey && temporaryKey.expiresAt < Date.now()) {
-                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_SESSION_KEY);
-            }
             pending = await getAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY, null);
             if (!pending || typeof pending !== 'object') return;
             if (!pending.createdAt || Date.now() - pending.createdAt > ACCOUNT_SWITCHER_INTENT_TTL_MS) {
@@ -375,33 +216,12 @@
                 await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY);
                 throw new Error('The selected account no longer exists.');
             }
-
-            let sessionKey;
-            try {
-                sessionKey = await getAccountSwitcherValue(ACCOUNT_SWITCHER_SESSION_KEY, null);
-            } finally {
-                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_SESSION_KEY);
-            }
-            if (!sessionKey || typeof sessionKey.passphrase !== 'string' || sessionKey.expiresAt < Date.now()) {
-                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY);
-                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY);
-                throw new Error('The temporary encryption key expired. Start account switching again.');
-            }
-            let credentials;
-            try {
-                credentials = await decryptAccountSwitcherCredentials(account, sessionKey.passphrase);
-            } catch (error) {
-                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY);
-                await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY);
-                throw error;
-            }
-
             await setAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY, {
                 ...pending,
                 stage: 'attempted'
             });
-            accountSwitcherSetInputValue(loginFields.username, credentials.username);
-            accountSwitcherSetInputValue(loginFields.password, credentials.password);
+            accountSwitcherSetInputValue(loginFields.username, account.username);
+            accountSwitcherSetInputValue(loginFields.password, account.password);
 
             const submitButton = loginFields.form.querySelector(
                 'button[type="submit"], input[type="submit"], #loginbtn'
@@ -463,11 +283,9 @@
         const form = document.getElementById('amaes-account-switcher-form');
         const list = document.getElementById('amaes-account-switcher-list');
         const returnToggle = document.getElementById('amaes-account-switcher-return');
-        const passphraseInput = document.getElementById('amaes-account-switcher-passphrase');
         const submitButton = document.getElementById('amaes-account-switcher-submit');
         const cancelEditButton = document.getElementById('amaes-account-switcher-cancel-edit');
-        const encryptExistingButton = document.getElementById('amaes-account-switcher-encrypt-existing');
-        if (!form || !list || !returnToggle || !passphraseInput || !submitButton || !cancelEditButton || !encryptExistingButton) return;
+        if (!form || !list || !returnToggle || !submitButton || !cancelEditButton) return;
         let editingAccountId = null;
 
         const resetAccountForm = () => {
@@ -499,9 +317,7 @@
                 switchButton.title = `Switch to ${account.nickname}`;
                 switchButton.style.cssText = 'width: 100%; justify-content: flex-start; min-width: 0; overflow: hidden; text-overflow: ellipsis;';
                 switchButton.addEventListener('click', () => {
-                    const passphrase = passphraseInput.value;
-                    passphraseInput.value = '';
-                    startAccountSwitch(account.id, returnToggle.checked, passphrase);
+                    startAccountSwitch(account.id, returnToggle.checked);
                 });
 
                 const editButton = document.createElement('button');
@@ -511,22 +327,14 @@
                 editButton.setAttribute('aria-label', `Edit ${account.nickname}`);
                 editButton.style.cssText = 'width: auto; white-space: nowrap; padding: 4px 7px; font-size: 9px;';
                 editButton.addEventListener('click', async () => {
-                    try {
-                        const passphrase = passphraseInput.value;
-                        if (!passphrase) throw new Error('Enter your encryption passphrase to edit this account.');
-                        await verifyAccountSwitcherPassphrase(passphrase);
-                        const credentials = await decryptAccountSwitcherCredentials(account, passphrase);
-                        editingAccountId = account.id;
-                        document.getElementById('amaes-account-switcher-username').value = credentials.username;
-                        document.getElementById('amaes-account-switcher-password').value = credentials.password;
-                        document.getElementById('amaes-account-switcher-nickname').value = account.nickname;
-                        submitButton.textContent = 'Save changes';
-                        cancelEditButton.style.display = 'block';
-                        document.getElementById('amaes-account-switcher-username').focus();
-                        accountSwitcherSetStatus(`Editing ${account.nickname}.`);
-                    } catch (error) {
-                        accountSwitcherSetStatus(error.message || 'Could not decrypt the saved account.', true);
-                    }
+                    editingAccountId = account.id;
+                    document.getElementById('amaes-account-switcher-username').value = account.username;
+                    document.getElementById('amaes-account-switcher-password').value = account.password;
+                    document.getElementById('amaes-account-switcher-nickname').value = account.nickname;
+                    submitButton.textContent = 'Save changes';
+                    cancelEditButton.style.display = 'block';
+                    document.getElementById('amaes-account-switcher-username').focus();
+                    accountSwitcherSetStatus(`Editing ${account.nickname}.`);
                 });
 
                 const removeButton = document.createElement('button');
@@ -540,9 +348,6 @@
                         const latest = await getAccountSwitcherAccounts();
                         const remainingAccounts = latest.filter(saved => saved.id !== account.id);
                         await saveAccountSwitcherAccounts(remainingAccounts);
-                        if (remainingAccounts.length === 0) {
-                            await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_VAULT_KEY);
-                        }
                         if (editingAccountId === account.id) resetAccountForm();
                         await renderAccounts();
                         accountSwitcherSetStatus(`${account.nickname} removed.`);
@@ -567,28 +372,6 @@
             });
 
             cancelEditButton.addEventListener('click', resetAccountForm);
-            encryptExistingButton.addEventListener('click', async () => {
-                try {
-                    const passphrase = passphraseInput.value;
-                    if (!passphrase || passphrase.length < 12) {
-                        throw new Error('Enter a passphrase of at least 12 characters to encrypt saved accounts.');
-                    }
-                    const accounts = await getAccountSwitcherAccounts();
-                    if (accounts.length === 0) {
-                        accountSwitcherSetStatus('Add an account before encrypting saved accounts.');
-                        return;
-                    }
-                    await verifyAccountSwitcherPassphrase(passphrase);
-                    const legacyCount = accounts.filter(account => !account.encryptedCredentials).length;
-                    await encryptLegacyAccountSwitcherAccounts(accounts, passphrase);
-                    passphraseInput.value = '';
-                    accountSwitcherSetStatus(legacyCount
-                        ? `${legacyCount} existing account${legacyCount === 1 ? '' : 's'} encrypted locally.`
-                        : 'All saved account credentials are already encrypted.');
-                } catch (error) {
-                    accountSwitcherSetStatus(error.message || 'Could not encrypt existing accounts.', true);
-                }
-            });
 
             form.addEventListener('submit', async event => {
                 event.preventDefault();
@@ -598,32 +381,18 @@
                 const username = usernameInput.value.trim();
                 const password = passwordInput.value;
                 const nickname = nicknameInput.value.trim();
-                const passphrase = passphraseInput.value;
                 if (!username || !password || !nickname) {
                     accountSwitcherSetStatus('Enter a username, password, and nickname.', true);
-                    return;
-                }
-                if (!passphrase) {
-                    accountSwitcherSetStatus('Enter an encryption passphrase to save this account securely.', true);
-                    return;
-                }
-                if (passphrase.length < 12) {
-                    accountSwitcherSetStatus('Use an encryption passphrase of at least 12 characters.', true);
                     return;
                 }
 
                 try {
                     const wasEditing = Boolean(editingAccountId);
-                    await verifyAccountSwitcherPassphrase(passphrase);
-                    let accounts = await encryptLegacyAccountSwitcherAccounts(
-                        await getAccountSwitcherAccounts(),
-                        passphrase
-                    );
+                    const accounts = await getAccountSwitcherAccounts();
                     const id = editingAccountId || (crypto.randomUUID
                         ? crypto.randomUUID()
                         : `account-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-                    const encryptedCredentials = await encryptAccountSwitcherCredentials(username, password, passphrase);
-                    const updatedAccount = { id, nickname, encryptedCredentials };
+                    const updatedAccount = { id, username, password, nickname };
                     if (editingAccountId) {
                         accounts = accounts.map(account => account.id === editingAccountId ? updatedAccount : account);
                     } else {
@@ -631,9 +400,8 @@
                     }
                     await saveAccountSwitcherAccounts(accounts);
                     resetAccountForm();
-                    passphraseInput.value = '';
                     await renderAccounts();
-                    accountSwitcherSetStatus(`${nickname} ${wasEditing ? 'updated' : 'saved'} with local encryption.`);
+                    accountSwitcherSetStatus(`${nickname} ${wasEditing ? 'updated' : 'saved'} on this device.`);
                 } catch (error) {
                     accountSwitcherSetStatus(error.message || 'Could not save the account.', true);
                 }
