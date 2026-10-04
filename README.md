@@ -68,10 +68,11 @@ Before installing, ensure your environment meets the following specifications:
 ### 1. Real-Time Answer Verification & Auto-Quiz Assistance
 * **Visual Answer Highlighting:** Automatically matches quiz questions against verified ground truth and highlights correct choices in clean green indicators.
 * **Autonomous Progression (`Auto-Next`):** Automatically selects verified answers and smoothly advances to the next question.
-* **Ground-Truth Safety Gate:** Verified answers are auto-selected; AMAUOED and Jenny's Online may also be auto-selected as clearly labeled, unconfirmed suggestions when Auto-Pick is enabled.
+* **Ground-Truth Safety Gate:** Only Moodle-confirmed answers are auto-selected or auto-filled. AMAUOED and Jenny's Online suggestions remain clearly labeled and require manual selection, even when Auto-Pick is enabled.
 * **Source Confidence Labels:** Jenny's Online and AMAUOED are equal-priority study-guide suggestions, not verified answers; only Moodle review evidence, a matching 100% attempt, or explicit review-backed deduction can confirm an answer. An overall quiz score alone never proves which question was right or wrong.
-* **Course-Aware Guide Discovery:** For courses without a registered Jenny source, the toolkit searches Jenny's Blogger feed by course code and detected course title, then uses only title-matched posts with published sheets. AMAUOED discovery also uses the detected course name when available.
-* **Study-Guide Data Safety:** On course access, the toolkit checks AMAUOED and Jenny's Online independently. It uses source timestamps for 30-day shared/local freshness, discovers stale or missing sources live, and queues a privacy-minimal course-code refresh for the shared database. Both tiers stay separate, equally prioritized, and unconfirmed; Jenny discovery uses Blogger's feed API, not its robots-disallowed `/search` path.
+* **Non-Reviewable Quiz Safety:** A 100% overall score is not used to verify or share individual answers when Moodle explicitly blocks review or review permission cannot be confirmed. Explicit restrictions are reported to the relay using only the course code and a random anonymous installation ID, which is hashed before database storage. Course pages show a shared warning after three distinct installations report restrictions within 90 days; it warns that policy may vary between quizzes.
+* **Course-Aware Guide Discovery:** AMAUOED discovery uses the detected course name when available. Jenny's Online is scraped by the database refresh job, not by quiz-page code.
+* **Study-Guide Data Safety:** Jenny's shared database snapshot is the source of truth and includes its last refresh timestamp. The toolkit uses snapshots younger than 30 days, returns cached/stale suggestions while queuing a refresh for stale or missing data, and rechecks the shared snapshot during the same session. The database scrapes Jenny monthly and can also refresh an individual course on demand. AMAUOED and Jenny remain separate, equally prioritized, and unconfirmed.
 * **Unreviewable Retry Warning:** On quiz pages that prohibit review, the toolkit warns that a later attempt may score lower and that a quiz-wide score is not evidence about individual answers.
 * **Live In-Question Controls:** Pause or resume automated assistance directly from the top banner inside any question without closing your workflow.
 
@@ -109,7 +110,7 @@ Before installing, ensure your environment meets the following specifications:
 * **Live Audit Log:** Displays verified percentages in real time (e.g. `[1/3] Marking: Quiz 1... [90%]`) and reports clear safety warnings when unpassed quizzes remain protected.
 
 ### 6. Autonomous Web Scraper Fallback Engine
-* **Background Study Search:** When an answer is missing from the local database, the toolkit searches verified online study guides and extracts confirmed answer keys automatically.
+* **Background Study Search:** When an answer is missing from the local database, the toolkit searches online study guides and presents clearly labeled, unconfirmed suggestions for manual review.
 
 ### 7. Privacy-Safe Community Synchronization
 * **Automatic Course Bank Loading:** Automatically fetches verified questions for your active subject directly from the open study database ([`Acads-Tools/database`](https://github.com/Acads-Tools/database)) upon opening Moodle.
@@ -159,7 +160,7 @@ The toolkit offers two distinct operational modes depending on your preference:
   * **How to Enable:** In the **Quiz** tab, toggle **Auto-Quiz Mode: ON** (or press keyboard shortcut `P`).
   * **Safety Gate:** If a question has no confirmed answer, the solver pauses automatically, brings up the in-question toolbar, and sounds an intervention chime.
 * **⚡ Fast Answer (Turbo) Mode:**
-  * **What it does:** Designed for students with reliable internet connections who want swift answering. Reduces the page transition delay from ~1000ms down to **200ms**, and enables instant 1-click batch solving for multi-question pages.
+  * **What it does:** Reduces the toolkit's post-answer navigation delay to **200ms** and enables 1-click batch solving for visible questions. Locally cached verified answers are checked first; optional online study-guide refreshes run in the background. Turbo does not accelerate Moodle's page/network response or turn unconfirmed suggestions into auto-answers.
   * **Multi-Question Pages:** Adds a 1-click **"Fill Verified Answers"** button that selects all verified answers on the current page simultaneously in 0.1s. If unknown questions remain and AI is enabled, it resolves them concurrently in parallel.
   * **How to Toggle:** Toggle **⚡ Fast Answer Mode** in the Quiz tab, click the **⚡ Turbo** button in the floating HUD, or press keyboard shortcut **`F`**.
 

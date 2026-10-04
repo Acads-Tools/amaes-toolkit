@@ -656,7 +656,7 @@
             const load = (async () => {
                 const results = await Promise.allSettled([
                     loadAmauoedStudyGuideForCourse(cleanCode, courseTitle),
-                    loadJennysonlineAnswersForCourse(cleanCode, courseTitle)
+                    loadJennysonlineAnswersForCourse(cleanCode)
                 ]);
                 const answers = [];
                 results.forEach((result, index) => {

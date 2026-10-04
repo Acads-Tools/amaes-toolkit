@@ -1595,12 +1595,67 @@
         });
     }
 
+    async function injectCourseReviewabilityNotice() {
+        const existing = document.getElementById('amaes-course-reviewability-notice');
+        if (!window.location.pathname.includes('/course/view.php')) {
+            existing?.remove();
+            return;
+        }
+
+        const subjectCode = detectCourseInfo().subjectCode;
+        if (!subjectCode) {
+            existing?.remove();
+            return;
+        }
+
+        let locallyObservedRestricted = false;
+        try {
+            const localStatus = JSON.parse(localStorage.getItem(`amaes_course_reviewability_${subjectCode}`) || 'null');
+            locallyObservedRestricted = localStatus && localStatus.status === 'restricted-observed';
+        } catch (error) {
+            logDebug(`Course reviewability status read note: ${error.message}`);
+        }
+
+        let sharedStatus = null;
+        try {
+            const statusUrl = new URL(`${communityRelayUrl}/course-reviewability`);
+            statusUrl.searchParams.set('subjectCode', subjectCode);
+            const response = await fetch(statusUrl.href);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            sharedStatus = await response.json();
+        } catch (error) {
+            logDebug(`Shared course reviewability lookup note for ${subjectCode}: ${error.message}`);
+        }
+
+        const sharedRestricted = sharedStatus && sharedStatus.subjectCode === subjectCode &&
+            sharedStatus.status === 'restricted-reported';
+        if (!locallyObservedRestricted && !sharedRestricted) {
+            existing?.remove();
+            return;
+        }
+        const target = document.querySelector('#region-main .course-content, #region-main, .course-content');
+        if (!target) return;
+        const notice = existing || document.createElement('div');
+        notice.id = 'amaes-course-reviewability-notice';
+        notice.setAttribute('role', 'status');
+        notice.style.cssText = 'margin: 12px 0; padding: 10px 12px; border-left: 4px solid #f59e0b; border-radius: 5px; background: rgba(245, 158, 11, 0.12); color: inherit; font-size: 13px; line-height: 1.5;';
+        const notices = [];
+        if (sharedRestricted) {
+            notices.push(`Review access reports for ${subjectCode}: at least ${sharedStatus.threshold} distinct installations reported that quiz review was restricted in this course within the last ${sharedStatus.windowDays} days. This does not prove that every quiz has the same policy.`);
+        }
+        if (locallyObservedRestricted) {
+            notices.push(`This browser also observed a quiz that blocked review. Its overall grade cannot verify individual answers.`);
+        }
+        notices.push('Answers suggested by study guides or AI are unverified and should not be treated as harvested answers.');
+        notice.textContent = notices.join(' ');
+        if (!existing) target.prepend(notice);
+    }
+
     // Removed dashboard guide banner per user request to keep My Courses clean and unboxed
     function injectDashboardGuideBanner() {
         const existing = document.getElementById('amaes-dashboard-guide-banner');
         if (existing) existing.remove();
     }
-
     // ==========================================
     // Theme Management
     // ==========================================
@@ -2499,26 +2554,24 @@
         return text.trim();
     }
 
-    function questionTextMatches(left, right) {
-        const leftNorm = normalizeText(left);
-        const rightNorm = normalizeText(right);
-        if (!leftNorm || !rightNorm) return false;
-        if (leftNorm === rightNorm) return true;
-
-        // Moodle may render answer blanks as underscores, inputs, or spacing
-        // that is absent from the stored question text.
-        const stripBlanks = text => text
+    function normalizeQuestionMatchKey(value) {
+        return normalizeText(value)
+            .replace(/\[\s*_{2,}\s*(?::\s*\d+)?\s*\]/g, ' ')
             .replace(/[_\u00a0]+/g, ' ')
             .replace(/\s+/g, ' ')
             .replace(/[.:?!;,]+$/g, '')
             .trim();
-        const leftClean = stripBlanks(leftNorm);
-        const rightClean = stripBlanks(rightNorm);
-        if (leftClean === rightClean) return true;
+    }
+
+    function questionTextMatches(left, right) {
+        const leftNorm = normalizeQuestionMatchKey(left);
+        const rightNorm = normalizeQuestionMatchKey(right);
+        if (!leftNorm || !rightNorm) return false;
+        if (leftNorm === rightNorm) return true;
 
         // Permit harmless prompt markup differences, but never short-token matches.
-        return leftClean.length > 20 &&
-            (leftClean.includes(rightClean) || rightClean.includes(leftClean));
+        return leftNorm.length > 20 &&
+            (leftNorm.includes(rightNorm) || rightNorm.includes(leftNorm));
     }
 
     // Helper to unscript unicode superscript and subscript digits to standard digits
@@ -2590,7 +2643,6 @@
             return null;
         }).filter(Boolean);
     }
-
     // ==========================================
     // AMAUOED Engine (Fetch, Cache & Match)
     // ==========================================
@@ -3146,6 +3198,7 @@
 
 const jennysonlineSessionCache = new Map();
 const JENNYSONLINE_CACHE_TTL = 30 * 24 * 60 * 60 * 1000;
+const JENNYSONLINE_SESSION_RECHECK_TTL = 2 * 60 * 1000;
 
 function getJennysonlineCacheKey(code) {
     return `amaes_jennysonline_cache_v1_${code}`;
@@ -3235,163 +3288,6 @@ function fetchJennysonlineText(url) {
     });
 }
 
-function parseJennysonlineCsv(csv, sourceUrl) {
-    const rows = [];
-    let row = [];
-    let cell = '';
-    let quoted = false;
-
-    for (let i = 0; i < csv.length; i++) {
-        const char = csv[i];
-        if (quoted) {
-            if (char === '"' && csv[i + 1] === '"') {
-                cell += '"';
-                i++;
-            } else if (char === '"') {
-                quoted = false;
-            } else {
-                cell += char;
-            }
-        } else if (char === '"') {
-            quoted = true;
-        } else if (char === ',') {
-            row.push(cell);
-            cell = '';
-        } else if (char === '\n' || char === '\r') {
-            if (char === '\r' && csv[i + 1] === '\n') i++;
-            row.push(cell);
-            rows.push(row);
-            row = [];
-            cell = '';
-        } else {
-            cell += char;
-        }
-    }
-    if (cell || row.length > 0) {
-        row.push(cell);
-        rows.push(row);
-    }
-
-    const answers = [];
-    const seen = new Set();
-    rows.forEach(cells => {
-        if (cells.length < 2) return;
-        const answer = String(cells[0] || '').replace(/\s+/g, ' ').trim();
-        const question = String(cells[1] || '').replace(/\s+/g, ' ').trim();
-        if (!answer || !question || /^(?:answer|correct answer)$/i.test(answer) || /^(?:question|prompt)$/i.test(question)) return;
-        const qNorm = normalizeText(question);
-        const ansNorm = normalizeChoice(answer);
-        if (!qNorm || !ansNorm) return;
-        const identity = `${qNorm}::${ansNorm}`;
-        if (seen.has(identity)) return;
-        seen.add(identity);
-        answers.push({
-            qRaw: question,
-            qNorm,
-            ansRaw: answer,
-            ansNorm,
-            choices: [],
-            verified: false,
-            confirmations: 1,
-            source: 'jennysonline',
-            evidenceType: 'study_guide_candidate',
-            sourceUrl
-        });
-    });
-    return answers;
-}
-
-function getJennysonlineEntryUrl(entry) {
-    const alternate = (entry && Array.isArray(entry.link) ? entry.link : [])
-        .find(link => link && link.rel === 'alternate' && link.href);
-    if (!alternate) return '';
-    try {
-        const url = new URL(alternate.href);
-        return url.protocol === 'https:' && url.hostname === 'jennysonline.blogspot.com' ? url.href : '';
-    } catch (_) {
-        return '';
-    }
-}
-
-function selectJennysonlineCourseEntries(feed, subjectCode, courseTitle) {
-    const entries = feed && feed.feed && Array.isArray(feed.feed.entry) ? feed.feed.entry : [];
-    const code = String(subjectCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const title = String(courseTitle || '').replace(/\b[A-Z]{2,6}\d{3,4}[A-Z]*\b/ig, ' ').toLowerCase();
-    const titleTokens = title.match(/[a-z]{3,}|\d+/g) || [];
-    const stopWords = new Set(['and', 'the', 'for', 'with', 'from', 'course']);
-    const requiredTokens = titleTokens.filter(token => !stopWords.has(token));
-
-    return entries.map((entry, index) => {
-        const entryTitle = String(entry && entry.title && entry.title.$t || '');
-        const content = String(entry && entry.content && entry.content.$t || '');
-        const haystack = `${entryTitle} ${content}`.toUpperCase();
-        const exactCodeMatch = Boolean(code && haystack.replace(/[^A-Z0-9]/g, '').includes(code));
-        const titleCodeMatch = Boolean(code && entryTitle.toUpperCase().replace(/[^A-Z0-9]/g, '').includes(code));
-        const titleTokensInEntry = new Set(entryTitle.toLowerCase().match(/[a-z]{3,}|\d+/g) || []);
-        if (!exactCodeMatch && requiredTokens.length === 0) return null;
-        if (!exactCodeMatch && requiredTokens.some(token => /^\d+$/.test(token) && !titleTokensInEntry.has(token))) return null;
-        const overlap = requiredTokens.filter(token => titleTokensInEntry.has(token)).length;
-        const titleScore = requiredTokens.length ? overlap / requiredTokens.length : 0;
-        if (requiredTokens.length > 0 && !titleCodeMatch &&
-            (requiredTokens.some(token => /^\d+$/.test(token) && !titleTokensInEntry.has(token)) || titleScore < 0.8)) return null;
-        const score = titleCodeMatch ? 2 : (titleScore || (exactCodeMatch ? 1 : 0));
-        if (!titleCodeMatch && !exactCodeMatch && score < 0.8) return null;
-        const url = getJennysonlineEntryUrl(entry);
-        return url ? { url, score, index } : null;
-    }).filter(Boolean).sort((a, b) => b.score - a.score || a.index - b.index)
-        .filter((candidate, index, matches) => {
-            if (index === 0 || candidate.score === 2) return true;
-            return matches[0].score - candidate.score < 0.15;
-        })
-        .map(candidate => candidate.url);
-}
-
-async function fetchJennysonlineSheetAnswers(pageUrl) {
-    const pageHtml = await fetchJennysonlineText(pageUrl);
-    const page = new DOMParser().parseFromString(pageHtml, 'text/html');
-    const sheetFrame = Array.from(page.querySelectorAll('iframe[src]')).find(frame => {
-        try {
-            const url = new URL(frame.src, pageUrl);
-            return url.hostname === 'docs.google.com' && /\/spreadsheets\/d\/e\/[^/]+\/pubhtml$/.test(url.pathname);
-        } catch (_) {
-            return false;
-        }
-    });
-    if (!sheetFrame) return [];
-
-    const csvUrl = new URL(sheetFrame.src, pageUrl);
-    if (csvUrl.protocol !== 'https:' || csvUrl.hostname !== 'docs.google.com' || csvUrl.username || csvUrl.password) {
-        throw new Error('Unapproved public spreadsheet URL');
-    }
-    csvUrl.pathname = csvUrl.pathname.replace(/\/pubhtml$/, '/pub');
-    csvUrl.search = '?output=csv';
-    const csv = await fetchJennysonlineText(csvUrl.href);
-    return parseJennysonlineCsv(csv, pageUrl);
-}
-
-async function searchJennysonlineForCourse(subjectCode, courseTitle) {
-    const code = String(subjectCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const queries = Array.from(new Set([code, String(courseTitle || '').trim()].filter(Boolean)));
-    const candidateUrls = [];
-    for (const query of queries) {
-        const feedUrl = new URL('https://jennysonline.blogspot.com/feeds/posts/default');
-        feedUrl.searchParams.set('q', query);
-        feedUrl.searchParams.set('alt', 'json');
-        feedUrl.searchParams.set('max-results', '100');
-        const feed = JSON.parse(await fetchJennysonlineText(feedUrl.href));
-        selectJennysonlineCourseEntries(feed, code, courseTitle).forEach(url => {
-            if (!candidateUrls.includes(url)) candidateUrls.push(url);
-        });
-    }
-
-    for (const pageUrl of candidateUrls.slice(0, 5)) {
-        const answers = await fetchJennysonlineSheetAnswers(pageUrl);
-        if (answers.length > 0) return answers;
-    }
-
-    return [];
-}
-
 function parseJennysonlineSharedSnapshot(registry) {
     if (!Array.isArray(registry.questions) || registry.questions.length === 0) return [];
     return registry.questions
@@ -3416,20 +3312,18 @@ function parseJennysonlineSharedSnapshot(registry) {
         .filter(question => question.qNorm && question.ansNorm);
 }
 
-async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
+async function loadJennysonlineAnswersForCourse(subjectCode) {
     const code = String(subjectCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!code || code === 'GENERAL' || code === 'DEFAULT') return [];
-    if (jennysonlineSessionCache.has(code)) return jennysonlineSessionCache.get(code);
+    const sessionEntry = jennysonlineSessionCache.get(code);
+    if (sessionEntry) {
+        if (typeof sessionEntry.then === 'function') return sessionEntry;
+        if (sessionEntry.expiresAt > Date.now()) return sessionEntry.answers;
+        jennysonlineSessionCache.delete(code);
+    }
     const cachedAnswers = readJennysonlinePersistentCache(code);
 
     const loading = (async () => {
-        let matchedTitle = String(courseTitle || '').trim();
-        if (!matchedTitle && typeof detectCourseInfo === 'function') {
-            const info = detectCourseInfo();
-            if (String(info.subjectCode || '').toUpperCase() === code) matchedTitle = info.subjectName || '';
-        }
-
-        let registeredUrl = '';
         let staleSharedAnswers = [];
         try {
             const registryUrl = `${CLOUD_DB_JENNYSONLINE_URL}${code}.json`;
@@ -3437,15 +3331,17 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
             if (registry.subjectCode !== code || registry.verified !== false) {
                 throw new Error(`Invalid or unverified Jenny's Online snapshot for ${code}`);
             }
-            registeredUrl = typeof registry.sourceUrl === 'string' ? registry.sourceUrl : '';
             const sharedAnswers = parseJennysonlineSharedSnapshot(registry);
             if (sharedAnswers.length > 0) {
                 staleSharedAnswers = sharedAnswers;
                 const updatedAt = Date.parse(registry.refreshedAt || registry.updatedAt || '');
-                if (Number.isFinite(updatedAt) && Date.now() - updatedAt >= 0 &&
-                    Date.now() - updatedAt < JENNYSONLINE_CACHE_TTL) {
+                const age = Date.now() - updatedAt;
+                if (Number.isFinite(updatedAt) && age >= 0 && age < JENNYSONLINE_CACHE_TTL) {
                     writeJennysonlinePersistentCache(code, sharedAnswers, updatedAt);
-                    return sharedAnswers;
+                    return {
+                        answers: sharedAnswers,
+                        expiresAt: updatedAt + JENNYSONLINE_CACHE_TTL
+                    };
                 }
             }
         } catch (error) {
@@ -3454,44 +3350,25 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
             }
         }
 
-        if (cachedAnswers) {
-            queueStudyGuideRefresh(code);
-            return cachedAnswers;
-        }
-
-        let liveAnswers = [];
-        try {
-            const liveUrl = registeredUrl ? [registeredUrl] : [];
-            if (liveUrl.length) {
-                const pageUrl = new URL(liveUrl[0]);
-                if (pageUrl.protocol !== 'https:' || pageUrl.hostname !== 'jennysonline.blogspot.com' ||
-                    pageUrl.port || pageUrl.username || pageUrl.password) {
-                    throw new Error(`Unapproved Jenny's Online source host for ${code}`);
-                }
-                liveAnswers = await fetchJennysonlineSheetAnswers(pageUrl.href);
-            }
-            if (!liveAnswers.length) liveAnswers = await searchJennysonlineForCourse(code, matchedTitle);
-        } catch (error) {
-            logDebug(`Jenny's Online live lookup note for ${code}: ${error.message}`);
-        }
-        if (liveAnswers.length > 0) {
-            writeJennysonlinePersistentCache(code, liveAnswers);
-            queueStudyGuideRefresh(code);
-            return liveAnswers;
-        }
         queueStudyGuideRefresh(code);
-        return staleSharedAnswers.length ? staleSharedAnswers : [];
+        const fallbackAnswers = staleSharedAnswers.length > 0
+            ? staleSharedAnswers
+            : cachedAnswers || [];
+        return {
+            answers: fallbackAnswers,
+            expiresAt: Date.now() + JENNYSONLINE_SESSION_RECHECK_TTL
+        };
     })();
 
-    jennysonlineSessionCache.set(code, loading);
-    try {
-        const answers = await loading;
-        jennysonlineSessionCache.set(code, answers);
-        return answers;
-    } catch (error) {
+    const pending = loading.then(result => {
+        jennysonlineSessionCache.set(code, result);
+        return result.answers;
+    }).catch(error => {
         jennysonlineSessionCache.delete(code);
         throw error;
-    }
+    });
+    jennysonlineSessionCache.set(code, pending);
+    return pending;
 }
     // ==========================================
     // Robust Quiz Navigation & Autonomous Solver Engine
@@ -3892,11 +3769,45 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
         const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
         try {
             localStorage.setItem(`amaes_quiz_summary_${sCode}`, JSON.stringify(data));
+            if (data.isReviewPermitted === false) {
+                localStorage.setItem(`amaes_course_reviewability_${sCode}`, JSON.stringify({
+                    status: 'restricted-observed',
+                    observedAt: data.recordedAt || Date.now()
+                }));
+            }
             const quizId = getQuizStorageId();
             if (quizId) {
                 localStorage.setItem(`amaes_quiz_summary_${sCode}_${quizId}`, JSON.stringify(data));
             }
         } catch (_) {}
+    }
+
+    function reportCourseReviewRestriction(subCode) {
+        const code = String(subCode || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+        if (!code || code === 'GENERAL' || code === 'DEFAULT') return;
+        const key = `amaes_reviewability_reported_${code}`;
+        try {
+            const reportedAt = Number(localStorage.getItem(key) || 0);
+            if (Date.now() - reportedAt < 24 * 60 * 60 * 1000) return;
+            localStorage.setItem(key, String(Date.now()));
+            fetch(`${communityRelayUrl}/course-reviewability/report`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-AMAES-Installation': getAnonymousContributorId(),
+                    'X-AMAES-Client-Version': CLIENT_VERSION
+                },
+                body: JSON.stringify({ subjectCode: code, reviewPermitted: false })
+            }).then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                logDebug(`Restricted quiz review observed for ${code}; anonymous course status report submitted.`);
+            }).catch(error => {
+                localStorage.removeItem(key);
+                logDebug(`Course reviewability report note for ${code}: ${error.message}`);
+            });
+        } catch (error) {
+            logDebug(`Course reviewability report note for ${code}: ${error.message}`);
+        }
     }
 
     function getQuizAttemptSummary(subCode = '') {
@@ -4171,7 +4082,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
         showUnreviewableQuizRetryWarning(getQuizAttemptSummary(initialCourseCode));
         let earned = null;
         let maximum = null;
-        let isReviewPermitted = true;
+        let isReviewPermitted = null;
 
         document.querySelectorAll('table, .quizattemptsummary, .generaltable').forEach(table => {
             if (earned !== null) return;
@@ -4216,12 +4127,12 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
                 const revText = (latest.children[reviewIndex].innerText || '').toLowerCase();
                 if (revText.includes('not permitted') || revText.includes('not allowed')) {
                     isReviewPermitted = false;
+                } else if (latest.querySelector('a[href*="review.php"]')) {
+                    isReviewPermitted = true;
                 }
             } else {
                 const hasReviewLink = Boolean(latest.querySelector('a[href*="review.php"]'));
-                if (!hasReviewLink) {
-                    isReviewPermitted = false;
-                }
+                if (hasReviewLink) isReviewPermitted = true;
             }
         });
 
@@ -4250,6 +4161,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
             isReviewPermitted,
             recordedAt: Date.now()
         });
+        if (isReviewPermitted === false) reportCourseReviewRestriction(subCode);
         showUnreviewableQuizRetryWarning({ percentage, isReviewPermitted });
 
         let evidence = [];
@@ -4258,10 +4170,16 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
         } catch (_) {}
         if (!Array.isArray(evidence) || evidence.length === 0) return;
 
+        if (isReviewPermitted !== true) {
+            saveUnreviewedAttemptEvidence(subCode, evidence, earned, maximum, isReviewPermitted);
+            setLog(`Attempt score recorded (${earned}/${maximum} - ${percentage}%). Review permission is ${isReviewPermitted === false ? 'restricted' : 'unknown'}; overall scores cannot verify individual answers, so these answers were not promoted or shared.`, 'var(--accent-amber)');
+            return;
+        }
+
         if (earned < maximum) {
             saveUnreviewedAttemptEvidence(subCode, evidence, earned, maximum, isReviewPermitted);
             recordAdaptiveProbeAttempt(subCode, evidence, earned, maximum, isReviewPermitted);
-            setLog(`Attempt score recorded (${earned}/${maximum} - ${Math.round((earned/maximum)*100)}%). This overall score does not identify which individual answers were correct. Unconfirmed choices remain unverified.`, 'var(--accent-amber)');
+            setLog(`Attempt score recorded (${earned}/${maximum} - ${percentage}%). This overall score does not identify which individual answers were correct. Unconfirmed choices remain unverified.`, 'var(--accent-amber)');
             return;
         }
 
@@ -4438,6 +4356,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
     }
 
     let isSolverRunning = false;
+    const quizStudyGuideLoads = new Map();
 
     async function runAutoQuizSolver(forceRun = false) {
         if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') {
@@ -4473,7 +4392,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
             const courseInfo = detectCourseInfo();
             const subCode = courseInfo.subjectCode || 'CS6301';
             let cached = getCachedAnswers(subCode);
-            let externalStudyGuideAnswers = [];
+            const externalStudyGuideAnswers = typeof readJennysonlinePersistentCache === 'function'
+                ? (readJennysonlinePersistentCache(subCode) || [])
+                : [];
             const queContainers = document.querySelectorAll('.que');
             // Restore per-question controls when the solver is no longer
             // blocked; they are hidden below when the full waiting HUD exists.
@@ -4511,18 +4432,28 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
                 }
             }
 
-            try {
-                const courseName = (typeof detectCourseInfo === 'function' ? detectCourseInfo().subjectName : '');
-                externalStudyGuideAnswers = await loadJennysonlineAnswersForCourse(subCode, courseName);
-            } catch (error) {
-                logDebug(`Jenny's Online source note for ${subCode}: ${error.message}`);
-            }
-
             const availableAnswers = (cached || []).concat(externalStudyGuideAnswers);
             if (availableAnswers.length > 0) {
                 res = highlightQuizAnswers(availableAnswers, autoPickQuiz || autoQuizMode);
             } else {
                 setLog(`<b>No Answers in DB:</b> Open amauoed or click Cloud Sync for <b>${subCode}</b>!`, "var(--accent-amber)");
+            }
+
+            if (typeof loadJennysonlineAnswersForCourse === 'function' && !quizStudyGuideLoads.has(subCode)) {
+                const attemptUrl = window.location.href;
+                const guideLoad = loadJennysonlineAnswersForCourse(subCode)
+                    .then(answers => {
+                        if (!answers.length || window.location.href !== attemptUrl || !checkIsQuizAttemptPage()) return;
+                        const freshCache = getCachedAnswers(subCode) || [];
+                        highlightQuizAnswers(freshCache.concat(answers), false);
+                    })
+                    .catch(error => {
+                        logDebug(`Jenny's Online source note for ${subCode}: ${error.message}`);
+                    })
+                    .finally(() => {
+                        quizStudyGuideLoads.delete(subCode);
+                    });
+                quizStudyGuideLoads.set(subCode, guideLoad);
             }
 
             // 2. Identify questions verified by the database vs unverified/unknown questions
@@ -5116,7 +5047,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
             logDebug(`Auto-Solver Error: ${err.message}`);
             console.error("Auto-Solver Exception:", err);
         } finally {
-            setTimeout(() => { isSolverRunning = false; }, 1200);
+            isSolverRunning = false;
         }
     }
 
@@ -6050,6 +5981,13 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
         let probedThisPageCount = 0;
         const sCode = (detectCourseInfo().subjectCode) || 'GENERAL';
         const quizSummary = typeof getQuizAttemptSummary === 'function' ? getQuizAttemptSummary(sCode) : null;
+        const questionCandidateIndex = new Map();
+        questionsDb.forEach(item => {
+            const key = normalizeQuestionMatchKey(item.qNorm || item.qRaw || item.question);
+            if (!key) return;
+            if (!questionCandidateIndex.has(key)) questionCandidateIndex.set(key, []);
+            questionCandidateIndex.get(key).push(item);
+        });
 
         queContainers.forEach(que => {
             if (identifyQuestionType(que) === 'unknown') {
@@ -6066,12 +6004,27 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
             const moodleQRaw = qClone.innerText.trim();
             const moodleQNorm = normalizeText(moodleQRaw);
 
-            // Find all matching questions from database/AMAUOED (handles multiple answers for same question and inline blanks)
-            const candidates = questionsDb.filter(item => questionTextMatches(item.qNorm || item.qRaw || item.question, moodleQNorm));
+            const currentQuestionKey = normalizeQuestionMatchKey(moodleQNorm);
+            let matchingCandidates = questionCandidateIndex.get(currentQuestionKey) || [];
+            const exactCandidates = matchingCandidates;
+            const matchingQuestionKeys = new Set(exactCandidates.length > 0 ? [currentQuestionKey] : []);
+            if (exactCandidates.length === 0) {
+                matchingCandidates = [];
+                questionCandidateIndex.forEach((items, candidateKey) => {
+                    if (questionTextMatches(candidateKey, currentQuestionKey)) {
+                        matchingQuestionKeys.add(candidateKey);
+                        matchingCandidates.push(...items);
+                    }
+                });
+            }
+            const hasAmbiguousQuestionMatch = exactCandidates.length === 0 && matchingQuestionKeys.size > 1;
+            const candidates = exactCandidates.length > 0
+                ? exactCandidates
+                : (hasAmbiguousQuestionMatch ? [] : matchingCandidates);
             const hasAnyVerifiedCandidate = candidates.some(item => isConfirmedCandidate(item));
 
             // Clean up any prior hints
-            que.querySelectorAll('.amaes-unanswered-hint, .amaes-unreviewed-history-note').forEach(b => b.remove());
+            que.querySelectorAll('.amaes-unanswered-hint, .amaes-unreviewed-history-note, .amaes-ambiguous-question-match-note').forEach(b => b.remove());
 
             // Check if this question was previously answered under an unreviewed attempt (<100% score)
             const unreviewed = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(moodleQNorm, sCode) : null;
@@ -6147,6 +6100,16 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
                     };
                 }
                 formulation.insertBefore(note, formulation.firstChild);
+            }
+
+            if (hasAmbiguousQuestionMatch) {
+                const formulation = que.querySelector('.formulation, .content') || que;
+                const warning = document.createElement('div');
+                warning.className = 'amaes-ambiguous-question-match-note';
+                warning.style.cssText = 'margin-bottom: 8px; padding: 5px 9px; border-left: 3px solid #f59e0b; background: rgba(245, 158, 11, 0.1); color: #b45309; font-size: 10.5px;';
+                warning.textContent = 'Similar saved questions have different wording. Auto-answer is paused here to avoid using an answer from the wrong question.';
+                formulation.insertBefore(warning, formulation.firstChild);
+                return;
             }
 
             if (candidates.length === 0) {
@@ -6758,9 +6721,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
                         // USER OVERRIDE SAFETY: If user already selected a choice on this question, NEVER overwrite their decision!
                         // EXCEPTION: When a verified/confirmed answer exists, auto-pick applies it even if a pre-checked radio exists from a prior manual attempt
                         const canSelectAnswer = (isManualSelect && hasVerifiedSource) || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                            (hasVerifiedSource || (hasStudyGuideSource && !hasStudyGuideConflict) || (hasAiSource && aiAutoSelect)));
+                            (hasVerifiedSource || (hasAiSource && aiAutoSelect)));
                         const anyRadioChecked = isRadio && Boolean(que.querySelector('.answer input[type="radio"]:checked'));
-                        const shouldSelect = canSelectAnswer && input && !input.checked && (!anyRadioChecked || hasVerifiedSource || (hasStudyGuideSource && !hasStudyGuideConflict) || isManualSelect);
+                        const shouldSelect = canSelectAnswer && input && !input.checked && (!anyRadioChecked || hasVerifiedSource || isManualSelect);
                         if (shouldSelect) {
                             input.checked = true;
                             input.click();
@@ -7055,11 +7018,14 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
                         }
 
                         // Auto-fill when autoPickQuiz is enabled and auto-quiz is running, or user triggered manual select
-                        const hasStudyGuideSuggestion = Boolean(getStudyGuideInfo(bestCand));
                         const canAutoFill = (isManualSelect && isConfirmedCandidate(bestCand)) ||
                             (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                                (isConfirmedCandidate(bestCand) || (hasStudyGuideSuggestion && !hasStudyGuideConflict)));
-                        if (canAutoFill && !textInput.value) {
+                                isConfirmedCandidate(bestCand));
+                        const currentInputNorm = normalizeChoice(textInput.value || '');
+                        const currentInputIsKnownWrong = currentInputNorm && allWrongList.some(w =>
+                            normalizeChoice(w.norm || w.text || w) === currentInputNorm
+                        );
+                        if (canAutoFill && (!textInput.value || currentInputIsKnownWrong)) {
                             textInput.value = targetAns;
                             textInput.dispatchEvent(new Event('input', { bubbles: true }));
                             textInput.dispatchEvent(new Event('change', { bubbles: true }));
@@ -7264,10 +7230,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
                             }
 
                             // Auto-select when autoPickQuiz is enabled and auto-quiz is running, or user triggered manual select
-                            const hasStudyGuideSuggestion = Boolean(getStudyGuideInfo(bestCand));
                             const canAutoPick = (isManualSelect && (isConfirmedCandidate(bestCand) || isDeducedSelect)) ||
                                 (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                                (isConfirmedCandidate(bestCand) || (hasStudyGuideSuggestion && !hasStudyGuideConflict)) && !isDeducedSelect);
+                                isConfirmedCandidate(bestCand) && !isDeducedSelect);
                             if (canAutoPick && (!selectInput.value || selectInput.value === '0')) {
                                 selectInput.value = matchedOption.value;
                                 selectInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -7407,10 +7372,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
                                 }
 
                                 // Auto-place when autoPickQuiz is enabled and auto-quiz is running, or user triggered manual select
-                                const hasStudyGuideSuggestion = Boolean(getStudyGuideInfo(bestCand));
                                 const canAutoPick = (isManualSelect && isConfirmedCandidate(bestCand)) ||
                                     (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                                        (isConfirmedCandidate(bestCand) || (hasStudyGuideSuggestion && !hasStudyGuideConflict)));
+                                        isConfirmedCandidate(bestCand));
                                 if (canAutoPick) {
                                     placeFn();
                                 }
@@ -13442,7 +13406,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
             const load = (async () => {
                 const results = await Promise.allSettled([
                     loadAmauoedStudyGuideForCourse(cleanCode, courseTitle),
-                    loadJennysonlineAnswersForCourse(cleanCode, courseTitle)
+                    loadJennysonlineAnswersForCourse(cleanCode)
                 ]);
                 const answers = [];
                 results.forEach((result, index) => {
@@ -18577,7 +18541,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
                     if (res && res.count > 0) {
                         const finalDb = getCachedAnswers(targetCode) || [];
                         const jennyCount = res.jennysonlineCount || 0;
-                        const jennyAnswers = jennyCount > 0 ? await loadJennysonlineAnswersForCourse(targetCode, detectCourseInfo().subjectName || '') : [];
+                        const jennyAnswers = jennyCount > 0 ? await loadJennysonlineAnswersForCourse(targetCode) : [];
                         const cachedCount = res.cachedCount || 0;
                         showToast(`Cloud Sync Success! (${cachedCount} cached; ${jennyCount} unconfirmed Jenny suggestions)`);
                         setLog(`Synced <b>${cachedCount}</b> cached entries and <b>${jennyCount}</b> locally cached Jenny suggestions for <b>${targetCode}</b>.`, "var(--accent-green)", "Jenny guide suggestions are unconfirmed");
@@ -19365,6 +19329,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
         }
         showWelcomeOnboardingModal(false);
         injectDashboardCourseBadges();
+        injectCourseReviewabilityNotice();
         sendPassiveTelemetryPulse();
 
         if (checkIsQuizViewPage() || checkIsQuizSummaryPage()) {
@@ -19425,7 +19390,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
                             const lbl = document.getElementById('fetch-btn-label');
                             if (lbl && fresh) lbl.innerText = `Refresh Answers (${fresh.length} cached)`;
                             if (checkIsQuizPage()) {
-                                const jennyAnswers = jennyCount > 0 ? await loadJennysonlineAnswersForCourse(sc, cInfo.subjectName || '') : [];
+                                const jennyAnswers = jennyCount > 0 ? await loadJennysonlineAnswersForCourse(sc) : [];
                                 highlightQuizAnswers((fresh || []).concat(jennyAnswers), false);
                             }
                         } else if (autoScrapeAmauoed) {

@@ -397,11 +397,45 @@
         const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
         try {
             localStorage.setItem(`amaes_quiz_summary_${sCode}`, JSON.stringify(data));
+            if (data.isReviewPermitted === false) {
+                localStorage.setItem(`amaes_course_reviewability_${sCode}`, JSON.stringify({
+                    status: 'restricted-observed',
+                    observedAt: data.recordedAt || Date.now()
+                }));
+            }
             const quizId = getQuizStorageId();
             if (quizId) {
                 localStorage.setItem(`amaes_quiz_summary_${sCode}_${quizId}`, JSON.stringify(data));
             }
         } catch (_) {}
+    }
+
+    function reportCourseReviewRestriction(subCode) {
+        const code = String(subCode || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+        if (!code || code === 'GENERAL' || code === 'DEFAULT') return;
+        const key = `amaes_reviewability_reported_${code}`;
+        try {
+            const reportedAt = Number(localStorage.getItem(key) || 0);
+            if (Date.now() - reportedAt < 24 * 60 * 60 * 1000) return;
+            localStorage.setItem(key, String(Date.now()));
+            fetch(`${communityRelayUrl}/course-reviewability/report`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-AMAES-Installation': getAnonymousContributorId(),
+                    'X-AMAES-Client-Version': CLIENT_VERSION
+                },
+                body: JSON.stringify({ subjectCode: code, reviewPermitted: false })
+            }).then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                logDebug(`Restricted quiz review observed for ${code}; anonymous course status report submitted.`);
+            }).catch(error => {
+                localStorage.removeItem(key);
+                logDebug(`Course reviewability report note for ${code}: ${error.message}`);
+            });
+        } catch (error) {
+            logDebug(`Course reviewability report note for ${code}: ${error.message}`);
+        }
     }
 
     function getQuizAttemptSummary(subCode = '') {
@@ -676,7 +710,7 @@
         showUnreviewableQuizRetryWarning(getQuizAttemptSummary(initialCourseCode));
         let earned = null;
         let maximum = null;
-        let isReviewPermitted = true;
+        let isReviewPermitted = null;
 
         document.querySelectorAll('table, .quizattemptsummary, .generaltable').forEach(table => {
             if (earned !== null) return;
@@ -721,12 +755,12 @@
                 const revText = (latest.children[reviewIndex].innerText || '').toLowerCase();
                 if (revText.includes('not permitted') || revText.includes('not allowed')) {
                     isReviewPermitted = false;
+                } else if (latest.querySelector('a[href*="review.php"]')) {
+                    isReviewPermitted = true;
                 }
             } else {
                 const hasReviewLink = Boolean(latest.querySelector('a[href*="review.php"]'));
-                if (!hasReviewLink) {
-                    isReviewPermitted = false;
-                }
+                if (hasReviewLink) isReviewPermitted = true;
             }
         });
 
@@ -755,6 +789,7 @@
             isReviewPermitted,
             recordedAt: Date.now()
         });
+        if (isReviewPermitted === false) reportCourseReviewRestriction(subCode);
         showUnreviewableQuizRetryWarning({ percentage, isReviewPermitted });
 
         let evidence = [];
@@ -763,10 +798,16 @@
         } catch (_) {}
         if (!Array.isArray(evidence) || evidence.length === 0) return;
 
+        if (isReviewPermitted !== true) {
+            saveUnreviewedAttemptEvidence(subCode, evidence, earned, maximum, isReviewPermitted);
+            setLog(`Attempt score recorded (${earned}/${maximum} - ${percentage}%). Review permission is ${isReviewPermitted === false ? 'restricted' : 'unknown'}; overall scores cannot verify individual answers, so these answers were not promoted or shared.`, 'var(--accent-amber)');
+            return;
+        }
+
         if (earned < maximum) {
             saveUnreviewedAttemptEvidence(subCode, evidence, earned, maximum, isReviewPermitted);
             recordAdaptiveProbeAttempt(subCode, evidence, earned, maximum, isReviewPermitted);
-            setLog(`Attempt score recorded (${earned}/${maximum} - ${Math.round((earned/maximum)*100)}%). This overall score does not identify which individual answers were correct. Unconfirmed choices remain unverified.`, 'var(--accent-amber)');
+            setLog(`Attempt score recorded (${earned}/${maximum} - ${percentage}%). This overall score does not identify which individual answers were correct. Unconfirmed choices remain unverified.`, 'var(--accent-amber)');
             return;
         }
 
@@ -943,6 +984,7 @@
     }
 
     let isSolverRunning = false;
+    const quizStudyGuideLoads = new Map();
 
     async function runAutoQuizSolver(forceRun = false) {
         if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') {
@@ -978,7 +1020,9 @@
             const courseInfo = detectCourseInfo();
             const subCode = courseInfo.subjectCode || 'CS6301';
             let cached = getCachedAnswers(subCode);
-            let externalStudyGuideAnswers = [];
+            const externalStudyGuideAnswers = typeof readJennysonlinePersistentCache === 'function'
+                ? (readJennysonlinePersistentCache(subCode) || [])
+                : [];
             const queContainers = document.querySelectorAll('.que');
             // Restore per-question controls when the solver is no longer
             // blocked; they are hidden below when the full waiting HUD exists.
@@ -1016,18 +1060,28 @@
                 }
             }
 
-            try {
-                const courseName = (typeof detectCourseInfo === 'function' ? detectCourseInfo().subjectName : '');
-                externalStudyGuideAnswers = await loadJennysonlineAnswersForCourse(subCode, courseName);
-            } catch (error) {
-                logDebug(`Jenny's Online source note for ${subCode}: ${error.message}`);
-            }
-
             const availableAnswers = (cached || []).concat(externalStudyGuideAnswers);
             if (availableAnswers.length > 0) {
                 res = highlightQuizAnswers(availableAnswers, autoPickQuiz || autoQuizMode);
             } else {
                 setLog(`<b>No Answers in DB:</b> Open amauoed or click Cloud Sync for <b>${subCode}</b>!`, "var(--accent-amber)");
+            }
+
+            if (typeof loadJennysonlineAnswersForCourse === 'function' && !quizStudyGuideLoads.has(subCode)) {
+                const attemptUrl = window.location.href;
+                const guideLoad = loadJennysonlineAnswersForCourse(subCode)
+                    .then(answers => {
+                        if (!answers.length || window.location.href !== attemptUrl || !checkIsQuizAttemptPage()) return;
+                        const freshCache = getCachedAnswers(subCode) || [];
+                        highlightQuizAnswers(freshCache.concat(answers), false);
+                    })
+                    .catch(error => {
+                        logDebug(`Jenny's Online source note for ${subCode}: ${error.message}`);
+                    })
+                    .finally(() => {
+                        quizStudyGuideLoads.delete(subCode);
+                    });
+                quizStudyGuideLoads.set(subCode, guideLoad);
             }
 
             // 2. Identify questions verified by the database vs unverified/unknown questions
@@ -1621,7 +1675,7 @@
             logDebug(`Auto-Solver Error: ${err.message}`);
             console.error("Auto-Solver Exception:", err);
         } finally {
-            setTimeout(() => { isSolverRunning = false; }, 1200);
+            isSolverRunning = false;
         }
     }
 
@@ -2555,6 +2609,13 @@
         let probedThisPageCount = 0;
         const sCode = (detectCourseInfo().subjectCode) || 'GENERAL';
         const quizSummary = typeof getQuizAttemptSummary === 'function' ? getQuizAttemptSummary(sCode) : null;
+        const questionCandidateIndex = new Map();
+        questionsDb.forEach(item => {
+            const key = normalizeQuestionMatchKey(item.qNorm || item.qRaw || item.question);
+            if (!key) return;
+            if (!questionCandidateIndex.has(key)) questionCandidateIndex.set(key, []);
+            questionCandidateIndex.get(key).push(item);
+        });
 
         queContainers.forEach(que => {
             if (identifyQuestionType(que) === 'unknown') {
@@ -2571,12 +2632,27 @@
             const moodleQRaw = qClone.innerText.trim();
             const moodleQNorm = normalizeText(moodleQRaw);
 
-            // Find all matching questions from database/AMAUOED (handles multiple answers for same question and inline blanks)
-            const candidates = questionsDb.filter(item => questionTextMatches(item.qNorm || item.qRaw || item.question, moodleQNorm));
+            const currentQuestionKey = normalizeQuestionMatchKey(moodleQNorm);
+            let matchingCandidates = questionCandidateIndex.get(currentQuestionKey) || [];
+            const exactCandidates = matchingCandidates;
+            const matchingQuestionKeys = new Set(exactCandidates.length > 0 ? [currentQuestionKey] : []);
+            if (exactCandidates.length === 0) {
+                matchingCandidates = [];
+                questionCandidateIndex.forEach((items, candidateKey) => {
+                    if (questionTextMatches(candidateKey, currentQuestionKey)) {
+                        matchingQuestionKeys.add(candidateKey);
+                        matchingCandidates.push(...items);
+                    }
+                });
+            }
+            const hasAmbiguousQuestionMatch = exactCandidates.length === 0 && matchingQuestionKeys.size > 1;
+            const candidates = exactCandidates.length > 0
+                ? exactCandidates
+                : (hasAmbiguousQuestionMatch ? [] : matchingCandidates);
             const hasAnyVerifiedCandidate = candidates.some(item => isConfirmedCandidate(item));
 
             // Clean up any prior hints
-            que.querySelectorAll('.amaes-unanswered-hint, .amaes-unreviewed-history-note').forEach(b => b.remove());
+            que.querySelectorAll('.amaes-unanswered-hint, .amaes-unreviewed-history-note, .amaes-ambiguous-question-match-note').forEach(b => b.remove());
 
             // Check if this question was previously answered under an unreviewed attempt (<100% score)
             const unreviewed = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(moodleQNorm, sCode) : null;
@@ -2652,6 +2728,16 @@
                     };
                 }
                 formulation.insertBefore(note, formulation.firstChild);
+            }
+
+            if (hasAmbiguousQuestionMatch) {
+                const formulation = que.querySelector('.formulation, .content') || que;
+                const warning = document.createElement('div');
+                warning.className = 'amaes-ambiguous-question-match-note';
+                warning.style.cssText = 'margin-bottom: 8px; padding: 5px 9px; border-left: 3px solid #f59e0b; background: rgba(245, 158, 11, 0.1); color: #b45309; font-size: 10.5px;';
+                warning.textContent = 'Similar saved questions have different wording. Auto-answer is paused here to avoid using an answer from the wrong question.';
+                formulation.insertBefore(warning, formulation.firstChild);
+                return;
             }
 
             if (candidates.length === 0) {
@@ -3263,9 +3349,9 @@
                         // USER OVERRIDE SAFETY: If user already selected a choice on this question, NEVER overwrite their decision!
                         // EXCEPTION: When a verified/confirmed answer exists, auto-pick applies it even if a pre-checked radio exists from a prior manual attempt
                         const canSelectAnswer = (isManualSelect && hasVerifiedSource) || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                            (hasVerifiedSource || (hasStudyGuideSource && !hasStudyGuideConflict) || (hasAiSource && aiAutoSelect)));
+                            (hasVerifiedSource || (hasAiSource && aiAutoSelect)));
                         const anyRadioChecked = isRadio && Boolean(que.querySelector('.answer input[type="radio"]:checked'));
-                        const shouldSelect = canSelectAnswer && input && !input.checked && (!anyRadioChecked || hasVerifiedSource || (hasStudyGuideSource && !hasStudyGuideConflict) || isManualSelect);
+                        const shouldSelect = canSelectAnswer && input && !input.checked && (!anyRadioChecked || hasVerifiedSource || isManualSelect);
                         if (shouldSelect) {
                             input.checked = true;
                             input.click();
@@ -3560,11 +3646,14 @@
                         }
 
                         // Auto-fill when autoPickQuiz is enabled and auto-quiz is running, or user triggered manual select
-                        const hasStudyGuideSuggestion = Boolean(getStudyGuideInfo(bestCand));
                         const canAutoFill = (isManualSelect && isConfirmedCandidate(bestCand)) ||
                             (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                                (isConfirmedCandidate(bestCand) || (hasStudyGuideSuggestion && !hasStudyGuideConflict)));
-                        if (canAutoFill && !textInput.value) {
+                                isConfirmedCandidate(bestCand));
+                        const currentInputNorm = normalizeChoice(textInput.value || '');
+                        const currentInputIsKnownWrong = currentInputNorm && allWrongList.some(w =>
+                            normalizeChoice(w.norm || w.text || w) === currentInputNorm
+                        );
+                        if (canAutoFill && (!textInput.value || currentInputIsKnownWrong)) {
                             textInput.value = targetAns;
                             textInput.dispatchEvent(new Event('input', { bubbles: true }));
                             textInput.dispatchEvent(new Event('change', { bubbles: true }));
@@ -3769,10 +3858,9 @@
                             }
 
                             // Auto-select when autoPickQuiz is enabled and auto-quiz is running, or user triggered manual select
-                            const hasStudyGuideSuggestion = Boolean(getStudyGuideInfo(bestCand));
                             const canAutoPick = (isManualSelect && (isConfirmedCandidate(bestCand) || isDeducedSelect)) ||
                                 (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                                (isConfirmedCandidate(bestCand) || (hasStudyGuideSuggestion && !hasStudyGuideConflict)) && !isDeducedSelect);
+                                isConfirmedCandidate(bestCand) && !isDeducedSelect);
                             if (canAutoPick && (!selectInput.value || selectInput.value === '0')) {
                                 selectInput.value = matchedOption.value;
                                 selectInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -3912,10 +4000,9 @@
                                 }
 
                                 // Auto-place when autoPickQuiz is enabled and auto-quiz is running, or user triggered manual select
-                                const hasStudyGuideSuggestion = Boolean(getStudyGuideInfo(bestCand));
                                 const canAutoPick = (isManualSelect && isConfirmedCandidate(bestCand)) ||
                                     (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) &&
-                                        (isConfirmedCandidate(bestCand) || (hasStudyGuideSuggestion && !hasStudyGuideConflict)));
+                                        isConfirmedCandidate(bestCand));
                                 if (canAutoPick) {
                                     placeFn();
                                 }

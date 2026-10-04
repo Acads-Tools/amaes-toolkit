@@ -250,26 +250,24 @@
         return text.trim();
     }
 
-    function questionTextMatches(left, right) {
-        const leftNorm = normalizeText(left);
-        const rightNorm = normalizeText(right);
-        if (!leftNorm || !rightNorm) return false;
-        if (leftNorm === rightNorm) return true;
-
-        // Moodle may render answer blanks as underscores, inputs, or spacing
-        // that is absent from the stored question text.
-        const stripBlanks = text => text
+    function normalizeQuestionMatchKey(value) {
+        return normalizeText(value)
+            .replace(/\[\s*_{2,}\s*(?::\s*\d+)?\s*\]/g, ' ')
             .replace(/[_\u00a0]+/g, ' ')
             .replace(/\s+/g, ' ')
             .replace(/[.:?!;,]+$/g, '')
             .trim();
-        const leftClean = stripBlanks(leftNorm);
-        const rightClean = stripBlanks(rightNorm);
-        if (leftClean === rightClean) return true;
+    }
+
+    function questionTextMatches(left, right) {
+        const leftNorm = normalizeQuestionMatchKey(left);
+        const rightNorm = normalizeQuestionMatchKey(right);
+        if (!leftNorm || !rightNorm) return false;
+        if (leftNorm === rightNorm) return true;
 
         // Permit harmless prompt markup differences, but never short-token matches.
-        return leftClean.length > 20 &&
-            (leftClean.includes(rightClean) || rightClean.includes(leftClean));
+        return leftNorm.length > 20 &&
+            (leftNorm.includes(rightNorm) || rightNorm.includes(leftNorm));
     }
 
     // Helper to unscript unicode superscript and subscript digits to standard digits
@@ -341,4 +339,3 @@
             return null;
         }).filter(Boolean);
     }
-

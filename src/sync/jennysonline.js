@@ -4,6 +4,7 @@
 
 const jennysonlineSessionCache = new Map();
 const JENNYSONLINE_CACHE_TTL = 30 * 24 * 60 * 60 * 1000;
+const JENNYSONLINE_SESSION_RECHECK_TTL = 2 * 60 * 1000;
 
 function getJennysonlineCacheKey(code) {
     return `amaes_jennysonline_cache_v1_${code}`;
@@ -93,163 +94,6 @@ function fetchJennysonlineText(url) {
     });
 }
 
-function parseJennysonlineCsv(csv, sourceUrl) {
-    const rows = [];
-    let row = [];
-    let cell = '';
-    let quoted = false;
-
-    for (let i = 0; i < csv.length; i++) {
-        const char = csv[i];
-        if (quoted) {
-            if (char === '"' && csv[i + 1] === '"') {
-                cell += '"';
-                i++;
-            } else if (char === '"') {
-                quoted = false;
-            } else {
-                cell += char;
-            }
-        } else if (char === '"') {
-            quoted = true;
-        } else if (char === ',') {
-            row.push(cell);
-            cell = '';
-        } else if (char === '\n' || char === '\r') {
-            if (char === '\r' && csv[i + 1] === '\n') i++;
-            row.push(cell);
-            rows.push(row);
-            row = [];
-            cell = '';
-        } else {
-            cell += char;
-        }
-    }
-    if (cell || row.length > 0) {
-        row.push(cell);
-        rows.push(row);
-    }
-
-    const answers = [];
-    const seen = new Set();
-    rows.forEach(cells => {
-        if (cells.length < 2) return;
-        const answer = String(cells[0] || '').replace(/\s+/g, ' ').trim();
-        const question = String(cells[1] || '').replace(/\s+/g, ' ').trim();
-        if (!answer || !question || /^(?:answer|correct answer)$/i.test(answer) || /^(?:question|prompt)$/i.test(question)) return;
-        const qNorm = normalizeText(question);
-        const ansNorm = normalizeChoice(answer);
-        if (!qNorm || !ansNorm) return;
-        const identity = `${qNorm}::${ansNorm}`;
-        if (seen.has(identity)) return;
-        seen.add(identity);
-        answers.push({
-            qRaw: question,
-            qNorm,
-            ansRaw: answer,
-            ansNorm,
-            choices: [],
-            verified: false,
-            confirmations: 1,
-            source: 'jennysonline',
-            evidenceType: 'study_guide_candidate',
-            sourceUrl
-        });
-    });
-    return answers;
-}
-
-function getJennysonlineEntryUrl(entry) {
-    const alternate = (entry && Array.isArray(entry.link) ? entry.link : [])
-        .find(link => link && link.rel === 'alternate' && link.href);
-    if (!alternate) return '';
-    try {
-        const url = new URL(alternate.href);
-        return url.protocol === 'https:' && url.hostname === 'jennysonline.blogspot.com' ? url.href : '';
-    } catch (_) {
-        return '';
-    }
-}
-
-function selectJennysonlineCourseEntries(feed, subjectCode, courseTitle) {
-    const entries = feed && feed.feed && Array.isArray(feed.feed.entry) ? feed.feed.entry : [];
-    const code = String(subjectCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const title = String(courseTitle || '').replace(/\b[A-Z]{2,6}\d{3,4}[A-Z]*\b/ig, ' ').toLowerCase();
-    const titleTokens = title.match(/[a-z]{3,}|\d+/g) || [];
-    const stopWords = new Set(['and', 'the', 'for', 'with', 'from', 'course']);
-    const requiredTokens = titleTokens.filter(token => !stopWords.has(token));
-
-    return entries.map((entry, index) => {
-        const entryTitle = String(entry && entry.title && entry.title.$t || '');
-        const content = String(entry && entry.content && entry.content.$t || '');
-        const haystack = `${entryTitle} ${content}`.toUpperCase();
-        const exactCodeMatch = Boolean(code && haystack.replace(/[^A-Z0-9]/g, '').includes(code));
-        const titleCodeMatch = Boolean(code && entryTitle.toUpperCase().replace(/[^A-Z0-9]/g, '').includes(code));
-        const titleTokensInEntry = new Set(entryTitle.toLowerCase().match(/[a-z]{3,}|\d+/g) || []);
-        if (!exactCodeMatch && requiredTokens.length === 0) return null;
-        if (!exactCodeMatch && requiredTokens.some(token => /^\d+$/.test(token) && !titleTokensInEntry.has(token))) return null;
-        const overlap = requiredTokens.filter(token => titleTokensInEntry.has(token)).length;
-        const titleScore = requiredTokens.length ? overlap / requiredTokens.length : 0;
-        if (requiredTokens.length > 0 && !titleCodeMatch &&
-            (requiredTokens.some(token => /^\d+$/.test(token) && !titleTokensInEntry.has(token)) || titleScore < 0.8)) return null;
-        const score = titleCodeMatch ? 2 : (titleScore || (exactCodeMatch ? 1 : 0));
-        if (!titleCodeMatch && !exactCodeMatch && score < 0.8) return null;
-        const url = getJennysonlineEntryUrl(entry);
-        return url ? { url, score, index } : null;
-    }).filter(Boolean).sort((a, b) => b.score - a.score || a.index - b.index)
-        .filter((candidate, index, matches) => {
-            if (index === 0 || candidate.score === 2) return true;
-            return matches[0].score - candidate.score < 0.15;
-        })
-        .map(candidate => candidate.url);
-}
-
-async function fetchJennysonlineSheetAnswers(pageUrl) {
-    const pageHtml = await fetchJennysonlineText(pageUrl);
-    const page = new DOMParser().parseFromString(pageHtml, 'text/html');
-    const sheetFrame = Array.from(page.querySelectorAll('iframe[src]')).find(frame => {
-        try {
-            const url = new URL(frame.src, pageUrl);
-            return url.hostname === 'docs.google.com' && /\/spreadsheets\/d\/e\/[^/]+\/pubhtml$/.test(url.pathname);
-        } catch (_) {
-            return false;
-        }
-    });
-    if (!sheetFrame) return [];
-
-    const csvUrl = new URL(sheetFrame.src, pageUrl);
-    if (csvUrl.protocol !== 'https:' || csvUrl.hostname !== 'docs.google.com' || csvUrl.username || csvUrl.password) {
-        throw new Error('Unapproved public spreadsheet URL');
-    }
-    csvUrl.pathname = csvUrl.pathname.replace(/\/pubhtml$/, '/pub');
-    csvUrl.search = '?output=csv';
-    const csv = await fetchJennysonlineText(csvUrl.href);
-    return parseJennysonlineCsv(csv, pageUrl);
-}
-
-async function searchJennysonlineForCourse(subjectCode, courseTitle) {
-    const code = String(subjectCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const queries = Array.from(new Set([code, String(courseTitle || '').trim()].filter(Boolean)));
-    const candidateUrls = [];
-    for (const query of queries) {
-        const feedUrl = new URL('https://jennysonline.blogspot.com/feeds/posts/default');
-        feedUrl.searchParams.set('q', query);
-        feedUrl.searchParams.set('alt', 'json');
-        feedUrl.searchParams.set('max-results', '100');
-        const feed = JSON.parse(await fetchJennysonlineText(feedUrl.href));
-        selectJennysonlineCourseEntries(feed, code, courseTitle).forEach(url => {
-            if (!candidateUrls.includes(url)) candidateUrls.push(url);
-        });
-    }
-
-    for (const pageUrl of candidateUrls.slice(0, 5)) {
-        const answers = await fetchJennysonlineSheetAnswers(pageUrl);
-        if (answers.length > 0) return answers;
-    }
-
-    return [];
-}
-
 function parseJennysonlineSharedSnapshot(registry) {
     if (!Array.isArray(registry.questions) || registry.questions.length === 0) return [];
     return registry.questions
@@ -274,20 +118,18 @@ function parseJennysonlineSharedSnapshot(registry) {
         .filter(question => question.qNorm && question.ansNorm);
 }
 
-async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
+async function loadJennysonlineAnswersForCourse(subjectCode) {
     const code = String(subjectCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!code || code === 'GENERAL' || code === 'DEFAULT') return [];
-    if (jennysonlineSessionCache.has(code)) return jennysonlineSessionCache.get(code);
+    const sessionEntry = jennysonlineSessionCache.get(code);
+    if (sessionEntry) {
+        if (typeof sessionEntry.then === 'function') return sessionEntry;
+        if (sessionEntry.expiresAt > Date.now()) return sessionEntry.answers;
+        jennysonlineSessionCache.delete(code);
+    }
     const cachedAnswers = readJennysonlinePersistentCache(code);
 
     const loading = (async () => {
-        let matchedTitle = String(courseTitle || '').trim();
-        if (!matchedTitle && typeof detectCourseInfo === 'function') {
-            const info = detectCourseInfo();
-            if (String(info.subjectCode || '').toUpperCase() === code) matchedTitle = info.subjectName || '';
-        }
-
-        let registeredUrl = '';
         let staleSharedAnswers = [];
         try {
             const registryUrl = `${CLOUD_DB_JENNYSONLINE_URL}${code}.json`;
@@ -295,15 +137,17 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
             if (registry.subjectCode !== code || registry.verified !== false) {
                 throw new Error(`Invalid or unverified Jenny's Online snapshot for ${code}`);
             }
-            registeredUrl = typeof registry.sourceUrl === 'string' ? registry.sourceUrl : '';
             const sharedAnswers = parseJennysonlineSharedSnapshot(registry);
             if (sharedAnswers.length > 0) {
                 staleSharedAnswers = sharedAnswers;
                 const updatedAt = Date.parse(registry.refreshedAt || registry.updatedAt || '');
-                if (Number.isFinite(updatedAt) && Date.now() - updatedAt >= 0 &&
-                    Date.now() - updatedAt < JENNYSONLINE_CACHE_TTL) {
+                const age = Date.now() - updatedAt;
+                if (Number.isFinite(updatedAt) && age >= 0 && age < JENNYSONLINE_CACHE_TTL) {
                     writeJennysonlinePersistentCache(code, sharedAnswers, updatedAt);
-                    return sharedAnswers;
+                    return {
+                        answers: sharedAnswers,
+                        expiresAt: updatedAt + JENNYSONLINE_CACHE_TTL
+                    };
                 }
             }
         } catch (error) {
@@ -312,42 +156,23 @@ async function loadJennysonlineAnswersForCourse(subjectCode, courseTitle = '') {
             }
         }
 
-        if (cachedAnswers) {
-            queueStudyGuideRefresh(code);
-            return cachedAnswers;
-        }
-
-        let liveAnswers = [];
-        try {
-            const liveUrl = registeredUrl ? [registeredUrl] : [];
-            if (liveUrl.length) {
-                const pageUrl = new URL(liveUrl[0]);
-                if (pageUrl.protocol !== 'https:' || pageUrl.hostname !== 'jennysonline.blogspot.com' ||
-                    pageUrl.port || pageUrl.username || pageUrl.password) {
-                    throw new Error(`Unapproved Jenny's Online source host for ${code}`);
-                }
-                liveAnswers = await fetchJennysonlineSheetAnswers(pageUrl.href);
-            }
-            if (!liveAnswers.length) liveAnswers = await searchJennysonlineForCourse(code, matchedTitle);
-        } catch (error) {
-            logDebug(`Jenny's Online live lookup note for ${code}: ${error.message}`);
-        }
-        if (liveAnswers.length > 0) {
-            writeJennysonlinePersistentCache(code, liveAnswers);
-            queueStudyGuideRefresh(code);
-            return liveAnswers;
-        }
         queueStudyGuideRefresh(code);
-        return staleSharedAnswers.length ? staleSharedAnswers : [];
+        const fallbackAnswers = staleSharedAnswers.length > 0
+            ? staleSharedAnswers
+            : cachedAnswers || [];
+        return {
+            answers: fallbackAnswers,
+            expiresAt: Date.now() + JENNYSONLINE_SESSION_RECHECK_TTL
+        };
     })();
 
-    jennysonlineSessionCache.set(code, loading);
-    try {
-        const answers = await loading;
-        jennysonlineSessionCache.set(code, answers);
-        return answers;
-    } catch (error) {
+    const pending = loading.then(result => {
+        jennysonlineSessionCache.set(code, result);
+        return result.answers;
+    }).catch(error => {
         jennysonlineSessionCache.delete(code);
         throw error;
-    }
+    });
+    jennysonlineSessionCache.set(code, pending);
+    return pending;
 }

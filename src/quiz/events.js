@@ -771,7 +771,7 @@
                     if (res && res.count > 0) {
                         const finalDb = getCachedAnswers(targetCode) || [];
                         const jennyCount = res.jennysonlineCount || 0;
-                        const jennyAnswers = jennyCount > 0 ? await loadJennysonlineAnswersForCourse(targetCode, detectCourseInfo().subjectName || '') : [];
+                        const jennyAnswers = jennyCount > 0 ? await loadJennysonlineAnswersForCourse(targetCode) : [];
                         const cachedCount = res.cachedCount || 0;
                         showToast(`Cloud Sync Success! (${cachedCount} cached; ${jennyCount} unconfirmed Jenny suggestions)`);
                         setLog(`Synced <b>${cachedCount}</b> cached entries and <b>${jennyCount}</b> locally cached Jenny suggestions for <b>${targetCode}</b>.`, "var(--accent-green)", "Jenny guide suggestions are unconfirmed");

@@ -54,6 +54,7 @@
         }
         showWelcomeOnboardingModal(false);
         injectDashboardCourseBadges();
+        injectCourseReviewabilityNotice();
         sendPassiveTelemetryPulse();
 
         if (checkIsQuizViewPage() || checkIsQuizSummaryPage()) {
@@ -114,7 +115,7 @@
                             const lbl = document.getElementById('fetch-btn-label');
                             if (lbl && fresh) lbl.innerText = `Refresh Answers (${fresh.length} cached)`;
                             if (checkIsQuizPage()) {
-                                const jennyAnswers = jennyCount > 0 ? await loadJennysonlineAnswersForCourse(sc, cInfo.subjectName || '') : [];
+                                const jennyAnswers = jennyCount > 0 ? await loadJennysonlineAnswersForCourse(sc) : [];
                                 highlightQuizAnswers((fresh || []).concat(jennyAnswers), false);
                             }
                         } else if (autoScrapeAmauoed) {

@@ -569,9 +569,64 @@
         });
     }
 
+    async function injectCourseReviewabilityNotice() {
+        const existing = document.getElementById('amaes-course-reviewability-notice');
+        if (!window.location.pathname.includes('/course/view.php')) {
+            existing?.remove();
+            return;
+        }
+
+        const subjectCode = detectCourseInfo().subjectCode;
+        if (!subjectCode) {
+            existing?.remove();
+            return;
+        }
+
+        let locallyObservedRestricted = false;
+        try {
+            const localStatus = JSON.parse(localStorage.getItem(`amaes_course_reviewability_${subjectCode}`) || 'null');
+            locallyObservedRestricted = localStatus && localStatus.status === 'restricted-observed';
+        } catch (error) {
+            logDebug(`Course reviewability status read note: ${error.message}`);
+        }
+
+        let sharedStatus = null;
+        try {
+            const statusUrl = new URL(`${communityRelayUrl}/course-reviewability`);
+            statusUrl.searchParams.set('subjectCode', subjectCode);
+            const response = await fetch(statusUrl.href);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            sharedStatus = await response.json();
+        } catch (error) {
+            logDebug(`Shared course reviewability lookup note for ${subjectCode}: ${error.message}`);
+        }
+
+        const sharedRestricted = sharedStatus && sharedStatus.subjectCode === subjectCode &&
+            sharedStatus.status === 'restricted-reported';
+        if (!locallyObservedRestricted && !sharedRestricted) {
+            existing?.remove();
+            return;
+        }
+        const target = document.querySelector('#region-main .course-content, #region-main, .course-content');
+        if (!target) return;
+        const notice = existing || document.createElement('div');
+        notice.id = 'amaes-course-reviewability-notice';
+        notice.setAttribute('role', 'status');
+        notice.style.cssText = 'margin: 12px 0; padding: 10px 12px; border-left: 4px solid #f59e0b; border-radius: 5px; background: rgba(245, 158, 11, 0.12); color: inherit; font-size: 13px; line-height: 1.5;';
+        const notices = [];
+        if (sharedRestricted) {
+            notices.push(`Review access reports for ${subjectCode}: at least ${sharedStatus.threshold} distinct installations reported that quiz review was restricted in this course within the last ${sharedStatus.windowDays} days. This does not prove that every quiz has the same policy.`);
+        }
+        if (locallyObservedRestricted) {
+            notices.push(`This browser also observed a quiz that blocked review. Its overall grade cannot verify individual answers.`);
+        }
+        notices.push('Answers suggested by study guides or AI are unverified and should not be treated as harvested answers.');
+        notice.textContent = notices.join(' ');
+        if (!existing) target.prepend(notice);
+    }
+
     // Removed dashboard guide banner per user request to keep My Courses clean and unboxed
     function injectDashboardGuideBanner() {
         const existing = document.getElementById('amaes-dashboard-guide-banner');
         if (existing) existing.remove();
     }
-
