@@ -1063,6 +1063,7 @@
                         autoQuizMode: typeof autoQuizMode !== 'undefined' ? autoQuizMode : false,
                         autoPickQuiz: typeof autoPickQuiz !== 'undefined' ? autoPickQuiz : true,
                         autoNextVerified: typeof autoNextVerified !== 'undefined' ? autoNextVerified : true,
+                        autoPickStudyGuideFallback: typeof autoPickStudyGuideFallback !== 'undefined' ? autoPickStudyGuideFallback : false,
                         autoNextQuiz: typeof autoNextQuiz !== 'undefined' ? autoNextQuiz : false,
                         autoHighlightQuiz: typeof autoHighlightQuiz !== 'undefined' ? autoHighlightQuiz : true,
                         smartSkipQuiz: typeof smartSkipQuiz !== 'undefined' ? smartSkipQuiz : false,

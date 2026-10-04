@@ -2672,7 +2672,7 @@ test("In-question stop control stays right-aligned after solver updates", () => 
 // --------------------------------------------------
 // 77. AMAUOED Direct Links, Warning Badge Styling & Universal Auto-Pick
 // --------------------------------------------------
-test("AMAUOED Links & Verified-Only Auto-Pick: links directly to AMAUOED and never auto-selects an unconfirmed guide suggestion", () => {
+test("Study-Guide Links & Opt-In Auto-Pick: links sources and keeps unverified fallback disabled by default", () => {
     const fs = require('fs');
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
@@ -2691,8 +2691,10 @@ test("AMAUOED Links & Verified-Only Auto-Pick: links directly to AMAUOED and nev
     assert.ok(script.includes("!ANSWER_SHARING_DISABLED_COURSES.has(String(sCode || '').toUpperCase())"), "Test Another Choice must be omitted for courses whose overall scores cannot validate answers");
     assert.ok(script.includes("STUDY-GUIDE MATCH") && script.includes("(Unverified — review before submitting)"), "Study-guide banner must not imply AI or verified evidence");
 
-    // 3. Automatic selection/fill requires confirmed evidence; guide suggestions remain manually selectable.
+    // 3. Automatic selection/fill requires confirmed evidence unless study-guide fallback is explicitly enabled in Auto-Quiz.
     assert.ok(script.includes("(isManualSelect && hasVerifiedSource)") && script.includes("(hasVerifiedSource || (hasAiSource && aiAutoSelect))"), "Radio auto-select must require confirmed evidence or the separate AI opt-in");
+    assert.ok(script.includes("isStudyGuide && autoQuizMode && autoPickStudyGuideFallback"), "Study-guide fallback auto-pick must require both Auto-Quiz and explicit opt-in");
+    assert.ok(script.includes("que.dataset.amaesStudyGuideFallbackPicked === 'true'"), "Only selected study-guide fallback answers may bypass the unknown-answer pause");
     assert.ok(script.includes("input.dispatchEvent(new Event('change', { bubbles: true }));"), "Radio auto-select must dispatch change event");
     assert.ok(script.includes("const canAutoFill = (isManualSelect && isConfirmedCandidate(bestCand)) ||") && script.includes("isConfirmedCandidate(bestCand));"), "Text inputs may auto-fill only confirmed answers");
     assert.ok(script.includes("const canAutoPick = (isManualSelect && (isConfirmedCandidate(bestCand) || isDeducedSelect)) ||"), "Dropdown Auto-Pick must require confirmed evidence");
@@ -2733,6 +2735,13 @@ test("Simplified Quiz Layout & True Default Reset: verifies minimal core toggles
     assert.ok(coreSection.includes('id="chk-auto-hl-quiz"'), "Core settings must include Highlight Answers");
     assert.ok(coreSection.includes('id="chk-auto-pick"'), "Core settings must include Auto-Pick verified choices");
     assert.ok(coreSection.includes('id="chk-auto-next-verified"'), "Core settings must include Auto-Next when Answered");
+    assert.ok(coreSection.includes('id="chk-auto-pick-study-guide-fallback"'), "Core settings must offer opt-in study-guide fallback auto-picking below Smart Next");
+    assert.ok(coreSection.indexOf('id="chk-auto-submit-quiz"') > coreSection.indexOf('id="chk-auto-pick-study-guide-fallback"'), "Auto-Submit must appear directly below study-guide fallback");
+    assert.strictEqual((script.match(/id="chk-auto-submit-quiz"/g) || []).length, 1, "Auto-Submit must have one UI control");
+    assert.ok(script.includes("localStorage.getItem('amaes_auto_pick_study_guide_fallback') === 'true'"), "Study-guide fallback auto-picking must default OFF");
+    assert.ok(script.includes("localStorage.setItem('amaes_auto_pick_study_guide_fallback', String(autoPickStudyGuideFallback))"), "Study-guide fallback preference must persist locally");
+    assert.ok(script.includes("localStorage.getItem('amaes_auto_submit_quiz') === 'true'"), "Auto-Submit must remain opt-in by default");
+    assert.ok(script.includes("chkAutoSubmitQuiz.onchange"), "Moved Auto-Submit setting must retain its existing handler");
 
     // 5. Advanced settings grouped into clean sections without redundant keys button
     assert.ok(script.includes("Navigation & Interface"), "Advanced settings must have Navigation & Interface sub-header");
@@ -2744,6 +2753,8 @@ test("Simplified Quiz Layout & True Default Reset: verifies minimal core toggles
     const resetEnd = script.indexOf('function detectTermFromText');
     const resetSection = script.substring(resetStart, resetEnd);
     assert.ok(resetSection.includes("localStorage.setItem('amaes_auto_pick_quiz', 'true');"), "Reset must set auto_pick_quiz to true so auto-quiz works when started");
+    assert.ok(resetSection.includes("localStorage.setItem('amaes_auto_pick_study_guide_fallback', 'false');"), "Reset must disable unverified study-guide fallback auto-picking");
+    assert.ok(resetSection.includes("localStorage.setItem('amaes_auto_submit_quiz', 'false');"), "Reset must disable automatic quiz submission");
     assert.ok(resetSection.includes("localStorage.setItem('amaes_auto_min_quiz', 'false');"), "Reset must NOT auto-minimize panel by default");
     assert.ok(resetSection.includes("clearTimeout(autoNextTimer);"), "Reset must clear running navigation timers");
     assert.ok(resetSection.includes("syncAutoQuizUI(false);"), "Reset must refresh UI buttons to start state");
@@ -2885,8 +2896,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.11.2'), "Userscript header must specify v1.11.2");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.2";'), "Constant SCRIPT_VERSION must be v1.11.2");
+    assert.ok(script.includes('@version      1.11.4'), "Userscript header must specify v1.11.4");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.4";'), "Constant SCRIPT_VERSION must be v1.11.4");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4019,10 +4030,10 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.11.2-blue.svg"), "README badge must show v1.11.2");
+    assert.ok(readme.includes("version-1.11.4-blue.svg"), "README badge must show v1.11.4");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.11.2<"), "Website must display v1.11.2 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.11.4<"), "Website must display v1.11.4 badge");
     assert.ok(indexHtml.includes("Built-in Google Gemini AI"), "Website must present Built-in Google Gemini AI in about grid");
 });
 
@@ -4829,7 +4840,7 @@ test("Fast Answer (Turbo) Mode: accelerates next-page transitions, batch-fills v
     assert.ok(script.includes("const questionCandidateIndex = new Map();"), "Must index cached questions once per lookup pass");
     assert.ok(script.includes("questionCandidateIndex.get(currentQuestionKey) || []"), "Must query exact local question keys before fuzzy matching");
     assert.ok(script.includes("const externalStudyGuideAnswers = typeof readJennysonlinePersistentCache === 'function'"), "Quiz lookup must use locally cached guide suggestions immediately");
-    assert.ok(script.includes("loadJennysonlineAnswersForCourse(subCode)") && script.includes("highlightQuizAnswers(freshCache.concat(answers), false)"), "Optional online guide updates must not block local answer lookup or auto-pick");
+    assert.ok(script.includes("loadJennysonlineAnswersForCourse(subCode)") && script.includes("highlightQuizAnswers(freshCache.concat(answers), autoPickFallback)"), "Optional online guide updates must not block local answer lookup and may auto-pick only when the fallback setting is enabled");
     assert.ok(script.includes("finally {\n            isSolverRunning = false;"), "Solver must not impose a fixed post-run cooldown");
 });
 

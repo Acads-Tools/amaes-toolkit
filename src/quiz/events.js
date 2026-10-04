@@ -5,6 +5,7 @@
         const chkFastQuizMode = document.getElementById('chk-fast-quiz-mode');
         const chkAutoPick = document.getElementById('chk-auto-pick');
         const chkAutoNextVerified = document.getElementById('chk-auto-next-verified');
+        const chkAutoPickStudyGuideFallback = document.getElementById('chk-auto-pick-study-guide-fallback');
         const chkAutoNext = document.getElementById('chk-auto-next');
         const chkAiPromptHint = document.getElementById('chk-ai-prompt-hint');
         const chkAutoHlQuiz = document.getElementById('chk-auto-hl-quiz');
@@ -143,6 +144,16 @@
                 showToast(`Auto-Next (Verified): ${autoNextVerified ? 'Enabled' : 'Disabled'}`);
                 setLog(`Auto-Next on Verified Answers: <b>${autoNextVerified ? 'ON' : 'OFF'}</b>`, autoNextVerified ? "var(--accent-green)" : "var(--accent-amber)");
                 if (autoNextVerified && checkIsQuizAttemptPage()) runAutoQuizSolver();
+            };
+        }
+
+        if (chkAutoPickStudyGuideFallback) {
+            chkAutoPickStudyGuideFallback.onchange = () => {
+                autoPickStudyGuideFallback = chkAutoPickStudyGuideFallback.checked;
+                localStorage.setItem('amaes_auto_pick_study_guide_fallback', String(autoPickStudyGuideFallback));
+                showToast(`Study-guide fallback Auto-Pick: ${autoPickStudyGuideFallback ? 'Enabled in Auto-Quiz' : 'Disabled'}`);
+                setLog(`Study-guide fallback Auto-Pick: <b>${autoPickStudyGuideFallback ? 'ON (unverified suggestions)' : 'OFF'}</b>`, autoPickStudyGuideFallback ? 'var(--accent-amber)' : 'var(--text-secondary)', 'Auto-Quiz only; Smart Next controls automatic advancement');
+                if (autoPickStudyGuideFallback && autoQuizMode && checkIsQuizAttemptPage()) runAutoQuizSolver();
             };
         }
 

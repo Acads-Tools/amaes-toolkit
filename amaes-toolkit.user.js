@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.11.2
+// @version      1.11.4
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -31,7 +31,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.2";
+    const SCRIPT_VERSION = "v1.11.4";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -1243,6 +1243,8 @@
         localStorage.setItem('amaes_auto_pick_quiz', 'true');
         localStorage.setItem('amaes_auto_next_quiz', 'false');
         localStorage.setItem('amaes_auto_next_verified', 'true');
+        localStorage.setItem('amaes_auto_pick_study_guide_fallback', 'false');
+        localStorage.setItem('amaes_auto_submit_quiz', 'false');
         localStorage.setItem('amaes_auto_push_github', 'false');
         localStorage.setItem('amaes_auto_copy_search', 'true');
         localStorage.setItem('amaes_auto_cloud_sync', 'true');
@@ -1264,6 +1266,8 @@
         autoQuizMode = false;
         autoPickQuiz = true;
         autoNextVerified = true;
+        autoPickStudyGuideFallback = false;
+        autoSubmitQuiz = false;
         autoNextQuiz = false;
         isWaitingForUserAnswer = false;
         smartSkipQuiz = false;
@@ -1310,6 +1314,8 @@
         updateCheck('chk-keyboard-shortcuts', true);
         updateCheck('chk-auto-pick', true);
         updateCheck('chk-auto-next-verified', true);
+        updateCheck('chk-auto-pick-study-guide-fallback', false);
+        updateCheck('chk-auto-submit-quiz', false);
         updateCheck('chk-auto-next', false);
         updateCheck('chk-auto-dl-json', false);
         updateCheck('chk-auto-push-github', false);
@@ -1784,6 +1790,7 @@
     let fastQuizMode = localStorage.getItem('amaes_fast_quiz_mode') === 'true'; // default false (⚡ Speed Mode)
     let autoPickQuiz = localStorage.getItem('amaes_auto_pick_quiz') !== 'false'; // default true: auto-select verified answers
     let autoNextVerified = localStorage.getItem('amaes_auto_next_verified') !== 'false'; // default true: auto-advance when solver answers verified question
+    let autoPickStudyGuideFallback = localStorage.getItem('amaes_auto_pick_study_guide_fallback') === 'true'; // default false: explicitly opt in to unverified web suggestions
     let autoNextQuiz = localStorage.getItem('amaes_auto_next_quiz') === 'true'; // default false: manual answers do NOT auto-advance by default (safe review)
     let adaptiveProbeQuiz = localStorage.getItem('amaes_adaptive_probe_quiz') !== 'false'; // default true: rotate choices across unreviewed attempts until 100%
     let adaptiveProbeBudget = parseInt(localStorage.getItem('amaes_adaptive_probe_budget') || '2', 10); // default: probe at most 2 unverified questions per attempt
@@ -4409,6 +4416,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     }
 
     let isSolverRunning = false;
+    let studyGuideFallbackRunPending = false;
     const quizStudyGuideLoads = new Map();
 
     async function runAutoQuizSolver(forceRun = false) {
@@ -4498,7 +4506,15 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     .then(answers => {
                         if (!answers.length || window.location.href !== attemptUrl || !checkIsQuizAttemptPage()) return;
                         const freshCache = getCachedAnswers(subCode) || [];
-                        highlightQuizAnswers(freshCache.concat(answers), false);
+                        const autoPickFallback = autoQuizMode && autoPickStudyGuideFallback;
+                        highlightQuizAnswers(freshCache.concat(answers), autoPickFallback);
+                        if (autoPickFallback) {
+                            studyGuideFallbackRunPending = true;
+                            if (!isSolverRunning) {
+                                studyGuideFallbackRunPending = false;
+                                runAutoQuizSolver();
+                            }
+                        }
                     })
                     .catch(error => {
                         logDebug(`Jenny's Online source note for ${subCode}: ${error.message}`);
@@ -4524,7 +4540,10 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 const hasSelectHint = que.querySelector('.amaes-select-hint');
 
                 // Track unverified, AI-suggested, or prior unreviewed attempts
-                if (hasUnreviewedNote || hasAdaptiveBadge || hasAiBadge || hasUnverifiedBadge) {
+                const isAutoPickedStudyGuideFallback = autoQuizMode && autoPickStudyGuideFallback &&
+                    que.dataset.amaesStudyGuideFallbackPicked === 'true';
+                if (!isAutoPickedStudyGuideFallback &&
+                    (hasUnreviewedNote || hasAdaptiveBadge || hasAiBadge || hasUnverifiedBadge)) {
                     unreviewedOrProbeQuestions.push(que);
                 }
 
@@ -5101,6 +5120,12 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             console.error("Auto-Solver Exception:", err);
         } finally {
             isSolverRunning = false;
+            if (studyGuideFallbackRunPending && autoQuizMode && autoPickStudyGuideFallback && checkIsQuizAttemptPage()) {
+                studyGuideFallbackRunPending = false;
+                setTimeout(() => runAutoQuizSolver(), 0);
+            } else {
+                studyGuideFallbackRunPending = false;
+            }
         }
     }
 
@@ -6043,6 +6068,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         });
 
         queContainers.forEach(que => {
+            delete que.dataset.amaesStudyGuideFallbackPicked;
             if (identifyQuestionType(que) === 'unknown') {
                 recordUnknownQuestionType(que);
                 return;
@@ -6794,6 +6820,10 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                                 verified: hasVerifiedSource,
                                 isAdaptiveProbe: false
                             });
+                        }
+                        if (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback && Boolean(autoSelect) &&
+                            input && input.checked) {
+                            que.dataset.amaesStudyGuideFallbackPicked = 'true';
                         }
 
                         return;
@@ -9730,6 +9760,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         autoQuizMode: typeof autoQuizMode !== 'undefined' ? autoQuizMode : false,
                         autoPickQuiz: typeof autoPickQuiz !== 'undefined' ? autoPickQuiz : true,
                         autoNextVerified: typeof autoNextVerified !== 'undefined' ? autoNextVerified : true,
+                        autoPickStudyGuideFallback: typeof autoPickStudyGuideFallback !== 'undefined' ? autoPickStudyGuideFallback : false,
                         autoNextQuiz: typeof autoNextQuiz !== 'undefined' ? autoNextQuiz : false,
                         autoHighlightQuiz: typeof autoHighlightQuiz !== 'undefined' ? autoHighlightQuiz : true,
                         smartSkipQuiz: typeof smartSkipQuiz !== 'undefined' ? smartSkipQuiz : false,
@@ -16366,6 +16397,14 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             <input id="chk-auto-next-verified" type="checkbox" ${autoNextVerified ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                             <span>Smart Next</span>
                         </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="In Auto-Quiz, select an exact Jenny's Online or AMAUOED choice match when no verified answer is available. These suggestions are unverified; Smart Next must be on to advance automatically.">
+                            <input id="chk-auto-pick-study-guide-fallback" type="checkbox" ${autoPickStudyGuideFallback ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                            <span>Auto-Pick Study-Guide Fallback (Unverified)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically click Submit all and finish after reaching the quiz summary. This submits without a final manual review.">
+                            <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                            <span>Auto-Submit Quiz on Completion</span>
+                        </label>
                         <label id="amaes-fast-answer-card" style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Fast Answer Mode: Answers visible questions instantly & speeds up moving to next page">
                             <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                             <span id="amaes-fast-quiz-title" style="display: inline-flex; align-items: center; gap: 4px;">
@@ -16456,10 +16495,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="When enabled, advances automatically after manual typing or choice selection on unknown questions (Default: OFF for safe review)">
                                 <input id="chk-auto-next" type="checkbox" ${autoNextQuiz ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Auto-Advance on Manual Click</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Auto-submit attempt from review/summary page and play completion chime">
-                                <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Auto-Submit on Summary Review</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Adaptive Probe: When an unreviewed quiz attempt scores < 100%, automatically rotate choices on unverified questions on next attempts until 100% is reached">
                                 <input id="chk-adaptive-probe" type="checkbox" ${adaptiveProbeQuiz ? 'checked' : ''} style="cursor: pointer;" />
@@ -17830,6 +17865,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         const chkFastQuizMode = document.getElementById('chk-fast-quiz-mode');
         const chkAutoPick = document.getElementById('chk-auto-pick');
         const chkAutoNextVerified = document.getElementById('chk-auto-next-verified');
+        const chkAutoPickStudyGuideFallback = document.getElementById('chk-auto-pick-study-guide-fallback');
         const chkAutoNext = document.getElementById('chk-auto-next');
         const chkAiPromptHint = document.getElementById('chk-ai-prompt-hint');
         const chkAutoHlQuiz = document.getElementById('chk-auto-hl-quiz');
@@ -17968,6 +18004,16 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 showToast(`Auto-Next (Verified): ${autoNextVerified ? 'Enabled' : 'Disabled'}`);
                 setLog(`Auto-Next on Verified Answers: <b>${autoNextVerified ? 'ON' : 'OFF'}</b>`, autoNextVerified ? "var(--accent-green)" : "var(--accent-amber)");
                 if (autoNextVerified && checkIsQuizAttemptPage()) runAutoQuizSolver();
+            };
+        }
+
+        if (chkAutoPickStudyGuideFallback) {
+            chkAutoPickStudyGuideFallback.onchange = () => {
+                autoPickStudyGuideFallback = chkAutoPickStudyGuideFallback.checked;
+                localStorage.setItem('amaes_auto_pick_study_guide_fallback', String(autoPickStudyGuideFallback));
+                showToast(`Study-guide fallback Auto-Pick: ${autoPickStudyGuideFallback ? 'Enabled in Auto-Quiz' : 'Disabled'}`);
+                setLog(`Study-guide fallback Auto-Pick: <b>${autoPickStudyGuideFallback ? 'ON (unverified suggestions)' : 'OFF'}</b>`, autoPickStudyGuideFallback ? 'var(--accent-amber)' : 'var(--text-secondary)', 'Auto-Quiz only; Smart Next controls automatic advancement');
+                if (autoPickStudyGuideFallback && autoQuizMode && checkIsQuizAttemptPage()) runAutoQuizSolver();
             };
         }
 

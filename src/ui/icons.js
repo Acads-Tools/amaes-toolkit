@@ -216,6 +216,8 @@
         localStorage.setItem('amaes_auto_pick_quiz', 'true');
         localStorage.setItem('amaes_auto_next_quiz', 'false');
         localStorage.setItem('amaes_auto_next_verified', 'true');
+        localStorage.setItem('amaes_auto_pick_study_guide_fallback', 'false');
+        localStorage.setItem('amaes_auto_submit_quiz', 'false');
         localStorage.setItem('amaes_auto_push_github', 'false');
         localStorage.setItem('amaes_auto_copy_search', 'true');
         localStorage.setItem('amaes_auto_cloud_sync', 'true');
@@ -237,6 +239,8 @@
         autoQuizMode = false;
         autoPickQuiz = true;
         autoNextVerified = true;
+        autoPickStudyGuideFallback = false;
+        autoSubmitQuiz = false;
         autoNextQuiz = false;
         isWaitingForUserAnswer = false;
         smartSkipQuiz = false;
@@ -283,6 +287,8 @@
         updateCheck('chk-keyboard-shortcuts', true);
         updateCheck('chk-auto-pick', true);
         updateCheck('chk-auto-next-verified', true);
+        updateCheck('chk-auto-pick-study-guide-fallback', false);
+        updateCheck('chk-auto-submit-quiz', false);
         updateCheck('chk-auto-next', false);
         updateCheck('chk-auto-dl-json', false);
         updateCheck('chk-auto-push-github', false);

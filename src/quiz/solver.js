@@ -1020,6 +1020,7 @@
     }
 
     let isSolverRunning = false;
+    let studyGuideFallbackRunPending = false;
     const quizStudyGuideLoads = new Map();
 
     async function runAutoQuizSolver(forceRun = false) {
@@ -1109,7 +1110,15 @@
                     .then(answers => {
                         if (!answers.length || window.location.href !== attemptUrl || !checkIsQuizAttemptPage()) return;
                         const freshCache = getCachedAnswers(subCode) || [];
-                        highlightQuizAnswers(freshCache.concat(answers), false);
+                        const autoPickFallback = autoQuizMode && autoPickStudyGuideFallback;
+                        highlightQuizAnswers(freshCache.concat(answers), autoPickFallback);
+                        if (autoPickFallback) {
+                            studyGuideFallbackRunPending = true;
+                            if (!isSolverRunning) {
+                                studyGuideFallbackRunPending = false;
+                                runAutoQuizSolver();
+                            }
+                        }
                     })
                     .catch(error => {
                         logDebug(`Jenny's Online source note for ${subCode}: ${error.message}`);
@@ -1135,7 +1144,10 @@
                 const hasSelectHint = que.querySelector('.amaes-select-hint');
 
                 // Track unverified, AI-suggested, or prior unreviewed attempts
-                if (hasUnreviewedNote || hasAdaptiveBadge || hasAiBadge || hasUnverifiedBadge) {
+                const isAutoPickedStudyGuideFallback = autoQuizMode && autoPickStudyGuideFallback &&
+                    que.dataset.amaesStudyGuideFallbackPicked === 'true';
+                if (!isAutoPickedStudyGuideFallback &&
+                    (hasUnreviewedNote || hasAdaptiveBadge || hasAiBadge || hasUnverifiedBadge)) {
                     unreviewedOrProbeQuestions.push(que);
                 }
 
@@ -1712,6 +1724,12 @@
             console.error("Auto-Solver Exception:", err);
         } finally {
             isSolverRunning = false;
+            if (studyGuideFallbackRunPending && autoQuizMode && autoPickStudyGuideFallback && checkIsQuizAttemptPage()) {
+                studyGuideFallbackRunPending = false;
+                setTimeout(() => runAutoQuizSolver(), 0);
+            } else {
+                studyGuideFallbackRunPending = false;
+            }
         }
     }
 
@@ -2654,6 +2672,7 @@
         });
 
         queContainers.forEach(que => {
+            delete que.dataset.amaesStudyGuideFallbackPicked;
             if (identifyQuestionType(que) === 'unknown') {
                 recordUnknownQuestionType(que);
                 return;
@@ -3405,6 +3424,10 @@
                                 verified: hasVerifiedSource,
                                 isAdaptiveProbe: false
                             });
+                        }
+                        if (isStudyGuide && autoQuizMode && autoPickStudyGuideFallback && Boolean(autoSelect) &&
+                            input && input.checked) {
+                            que.dataset.amaesStudyGuideFallbackPicked = 'true';
                         }
 
                         return;

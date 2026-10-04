@@ -177,6 +177,14 @@
                             <input id="chk-auto-next-verified" type="checkbox" ${autoNextVerified ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                             <span>Smart Next</span>
                         </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="In Auto-Quiz, select an exact Jenny's Online or AMAUOED choice match when no verified answer is available. These suggestions are unverified; Smart Next must be on to advance automatically.">
+                            <input id="chk-auto-pick-study-guide-fallback" type="checkbox" ${autoPickStudyGuideFallback ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                            <span>Auto-Pick Study-Guide Fallback (Unverified)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically click Submit all and finish after reaching the quiz summary. This submits without a final manual review.">
+                            <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                            <span>Auto-Submit Quiz on Completion</span>
+                        </label>
                         <label id="amaes-fast-answer-card" style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Fast Answer Mode: Answers visible questions instantly & speeds up moving to next page">
                             <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                             <span id="amaes-fast-quiz-title" style="display: inline-flex; align-items: center; gap: 4px;">
@@ -267,10 +275,6 @@
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="When enabled, advances automatically after manual typing or choice selection on unknown questions (Default: OFF for safe review)">
                                 <input id="chk-auto-next" type="checkbox" ${autoNextQuiz ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Auto-Advance on Manual Click</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Auto-submit attempt from review/summary page and play completion chime">
-                                <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Auto-Submit on Summary Review</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Adaptive Probe: When an unreviewed quiz attempt scores < 100%, automatically rotate choices on unverified questions on next attempts until 100% is reached">
                                 <input id="chk-adaptive-probe" type="checkbox" ${adaptiveProbeQuiz ? 'checked' : ''} style="cursor: pointer;" />
