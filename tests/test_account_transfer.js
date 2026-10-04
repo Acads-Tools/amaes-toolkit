@@ -89,7 +89,7 @@ async function run() {
     });
     let sentBody = '';
     context.communityRelayUrl = 'https://relay.example';
-    context.CLIENT_VERSION = '1.11.13';
+    context.CLIENT_VERSION = '1.11.14';
     context.getAnonymousContributorId = () => 'anonymous-installation-id';
     context.fetch = async (_url, options) => {
         sentBody = options.body;

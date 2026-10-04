@@ -72,6 +72,66 @@
         }
     }
 
+    function getMatchingAiRows(que) {
+        if (!que) return [];
+        return Array.from(que.querySelectorAll('.answer table tr, .answer tr'))
+            .map(row => {
+                const promptCell = row.querySelector('td.text, td:first-child');
+                const select = row.querySelector('td.control select, select');
+                const prompt = promptCell ? cleanDOMToAI(promptCell).trim() : '';
+                return prompt && select ? { row, select, prompt } : null;
+            })
+            .filter(Boolean);
+    }
+
+    function parseMatchingAiResponse(answerText, matchingRows) {
+        if (!answerText || !Array.isArray(matchingRows) || matchingRows.length === 0) return [];
+        const byIndex = new Map();
+        const ambiguousIndexes = new Set();
+        const lines = answerText
+            .replace(/```(?:text|json)?/gi, '')
+            .split(/\r?\n/)
+            .map(line => line.replace(/^\s*(?:[-*]|\d+[.)])\s*/, '').replace(/\*\*/g, '').trim())
+            .filter(Boolean);
+
+        lines.forEach(line => {
+            const match = line.match(/^(?:row\s*)?(\d+)\s*[:.)-]\s*(.+)$/i);
+            if (!match) return;
+            const rowIndex = Number(match[1]) - 1;
+            if (!Number.isInteger(rowIndex) || rowIndex < 0 || rowIndex >= matchingRows.length) return;
+            const target = match[2].trim().replace(/^["']|["']$/g, '');
+            const matchingRow = matchingRows[rowIndex];
+            const options = Array.from(matchingRow.select.options || []);
+            const option = options.find(candidate =>
+                candidate.value && candidate.value !== '0' &&
+                !candidate.text.toLowerCase().includes('choose') &&
+                normalizeChoice(candidate.text) === normalizeChoice(target)
+            );
+            if (!option) return;
+
+            let wrongAnswers = [];
+            try {
+                wrongAnswers = JSON.parse(matchingRow.select.dataset.amaesKnownWrongAnswers || '[]');
+            } catch (error) {
+                console.warn('Could not read matching-row AI answer evidence:', error);
+                return;
+            }
+            const optionNorm = normalizeChoice(option.text);
+            if (wrongAnswers.some(wrong =>
+                wrong && (wrong.norm === optionNorm || normalizeChoice(wrong.text || wrong.answer || '') === optionNorm)
+            )) return;
+
+            const previous = byIndex.get(rowIndex);
+            if (previous && previous.option.value !== option.value) {
+                ambiguousIndexes.add(rowIndex);
+                byIndex.delete(rowIndex);
+                return;
+            }
+            if (!ambiguousIndexes.has(rowIndex)) byIndex.set(rowIndex, { ...matchingRow, option, rowIndex });
+        });
+        return Array.from(byIndex.values()).sort((left, right) => left.rowIndex - right.rowIndex);
+    }
+
     // Ultra-Compact Prompt Builder: 0 fluff, max token efficiency (~60-120 tokens total)
     function buildGeminiCompactPrompt(qData, courseCode = '', que = null) {
         const lines = [];
@@ -79,6 +139,29 @@
             lines.push(`[Course: ${courseCode}]`);
         }
         lines.push(`Question: ${qData.qText || ''}`);
+
+        if (qData.questionType === 'match' && Array.isArray(qData.matchPairs) && qData.matchPairs.length > 0) {
+            const matchingRows = getMatchingAiRows(que);
+            lines.push('[Matching rows: choose one listed option for each row]');
+            matchingRows.forEach((matchingRow, index) => {
+                const options = Array.from(matchingRow.select.options || [])
+                    .filter(option => option.value && option.value !== '0' && !option.text.toLowerCase().includes('choose'))
+                    .map(option => option.text.trim());
+                lines.push(`Row ${index + 1}: ${matchingRow.prompt}`);
+                lines.push(`Options: ${options.join(' | ')}`);
+                try {
+                    const wrongAnswers = JSON.parse(matchingRow.select.dataset.amaesKnownWrongAnswers || '[]');
+                    const wrongTexts = wrongAnswers.filter(item => item && item.text).map(item => item.text);
+                    if (wrongTexts.length > 0) {
+                        lines.push(`Confirmed wrong for this row; do not use: ${wrongTexts.join(' | ')}`);
+                    }
+                } catch (error) {
+                    console.warn('Could not read matching-row AI prompt evidence:', error);
+                }
+            });
+            lines.push('Reply with one line per row in exactly this format: Row 1: exact option text. Use each row number and an exact option from that row. Do not add explanations.');
+            return lines.join('\n');
+        }
 
         // Handle Gapselect / Inline Dropdowns
         if (qData.isGapSelect || (que && que.querySelectorAll('select').length > 0 && (!qData.choices || qData.choices.length === 0))) {
@@ -190,13 +273,22 @@
         if (que.classList.contains('ddwtos') || que.classList.contains('ddimageortext') || que.classList.contains('ddmarker')) return false;
         if (que.querySelectorAll('.draghome, .drop, .dropzone, span.droptarget, .droppable').length > 0) return false;
 
-        // Dropdown / Select matching questions MUST fall back to manual copy
-        if (que.querySelectorAll('select').length > 0) return false;
-        if (qData.matchPairs && qData.matchPairs.length > 0) return false;
-
         // Text inputs / Essay questions MUST fall back to manual copy
         if (qData.isShortAnswer || qData.isEssay) return false;
         if (que.querySelectorAll('input[type="text"]:not([type="hidden"]), textarea').length > 0) return false;
+
+        if (qData.questionType === 'match') {
+            const matchingRows = getMatchingAiRows(que);
+            return Array.isArray(qData.matchPairs) && matchingRows.length > 0 &&
+                matchingRows.length === qData.matchPairs.length &&
+                matchingRows.every(item => Array.from(item.select.options || []).filter(option =>
+                    option.value && option.value !== '0' && !option.text.toLowerCase().includes('choose')
+                ).length >= 2);
+        }
+
+        // Gapselect, essay, and unsupported dropdown questions stay on the manual-copy path.
+        if (que.querySelectorAll('select').length > 0) return false;
+        if (qData.matchPairs && qData.matchPairs.length > 0) return false;
 
         // Must have at least 2 choices
         if (!Array.isArray(qData.choices) || qData.choices.length < 2) return false;
@@ -896,7 +988,7 @@
         }
 
         const cachedAns = getCachedAiAnswer(qData);
-        if (cachedAns && cachedAns.choiceText) {
+        if (cachedAns && cachedAns.choiceText && qData.questionType !== 'match') {
             const textInput = que.querySelector('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"], textarea');
             if (textInput && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0)) && !qData.isGapSelect) {
                 textInput.value = cachedAns.choiceText;
@@ -1039,6 +1131,9 @@
         const retryAttempts = getAiRetryCount();
         const maxAttempts = 1 + retryAttempts; // 1 initial request + configurable retries (default: 1 + 2 = 3)
         let sharedFallbackAttempted = false;
+        const maxOutputTokens = qData && qData.questionType === 'match'
+            ? Math.max(256, (qData.matchPairs || []).length * 32)
+            : 64;
 
         while (attempt < maxAttempts && !answerText && !isAborted && !timedOut) {
             if (isQuestionAnswered(que) && !que.querySelector('.amaes-ai-suggested-choice')) {
@@ -1065,7 +1160,7 @@
                         try {
                             const sharedResult = await callSharedAiFallback({
                                 prompt: promptText,
-                                maxOutputTokens: 64,
+                                maxOutputTokens,
                                 signal: abortCtrl.signal
                             });
                             if (sharedResult && sharedResult.text) {
@@ -1091,7 +1186,7 @@
                     const res = await callGeminiApi({
                         apiKey: apiKey,
                         prompt: promptText,
-                        maxOutputTokens: 64,
+                        maxOutputTokens,
                         signal: abortCtrl.signal
                     });
                     if (res && res.text) {
@@ -1123,7 +1218,7 @@
                         try {
                             const sharedResult = await callSharedAiFallback({
                                 prompt: promptText,
-                                maxOutputTokens: 64,
+                                maxOutputTokens,
                                 signal: abortCtrl.signal
                             });
                             if (sharedResult && sharedResult.text) {
@@ -1207,9 +1302,39 @@
                 }
             }
 
-            // Check for Dropdown / Select elements (gapselect / matching)
+            if (qData.questionType === 'match' && Array.isArray(qData.matchPairs) && qData.matchPairs.length > 0) {
+                const matchingRows = getMatchingAiRows(que);
+                const suggestions = parseMatchingAiResponse(answerText, matchingRows);
+                if (suggestions.length > 0) {
+                    suggestions.forEach(suggestion => {
+                        suggestion.select.value = suggestion.option.value;
+                        suggestion.select.dispatchEvent(new Event('input', { bubbles: true }));
+                        suggestion.select.dispatchEvent(new Event('change', { bubbles: true }));
+                        suggestion.select.dispatchEvent(new Event('blur', { bubbles: true }));
+                        suggestion.select.style.outline = '2px solid #a855f7';
+                        suggestion.select.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+                        suggestion.row.querySelectorAll('.amaes-ai-matching-suggestion').forEach(el => el.remove());
+                        const badge = document.createElement('div');
+                        badge.className = 'amaes-ai-matching-suggestion';
+                        badge.setAttribute('role', 'status');
+                        badge.textContent = `AI suggestion (unverified): ${suggestion.option.text.trim()}`;
+                        badge.style.cssText = 'margin: 4px 0; color: #7e22ce; font-size: 11px; font-weight: 700;';
+                        suggestion.select.insertAdjacentElement('afterend', badge);
+                    });
+                    const summary = suggestions.map(item => `Row ${item.rowIndex + 1}: ${item.option.text.trim()}`).join('; ');
+                    const partial = suggestions.length < matchingRows.length;
+                    setLog(`[AI Suggestion] Gemini suggested ${suggestions.length} of ${matchingRows.length} matching rows${partial ? '; unmatched rows were left unchanged' : ''}. Review each unverified row before continuing.`, "var(--accent-purple)");
+                    showToast(`Gemini suggested ${suggestions.length} matching answer${suggestions.length === 1 ? '' : 's'}; review before continuing.`, 3500);
+                    if (typeof onSuccess === 'function') {
+                        await onSuccess({ choiceText: summary, matchingRows: suggestions });
+                    }
+                    return;
+                }
+            }
+
+            // Check for Dropdown / Select elements (gapselect)
             const selectInputs = Array.from(que.querySelectorAll('select'));
-            if (selectInputs.length > 0 && (!qData.choices || qData.choices.length === 0)) {
+            if (qData.questionType !== 'match' && selectInputs.length > 0 && (!qData.choices || qData.choices.length === 0)) {
                 const cleaned = answerText
                     .replace(/^Answer:\s*/i, '')
                     .replace(/^The correct answer is:\s*/i, '')
@@ -1914,4 +2039,3 @@
             };
         }
     }
-

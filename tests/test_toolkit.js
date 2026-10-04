@@ -2924,8 +2924,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.11.13'), "Userscript header must specify v1.11.13");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.13";'), "Constant SCRIPT_VERSION must be v1.11.13");
+    assert.ok(script.includes('@version      1.11.14'), "Userscript header must specify v1.11.14");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.14";'), "Constant SCRIPT_VERSION must be v1.11.14");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3820,7 +3820,7 @@ test("Review Screen Ground Truth Override, Jargon Elimination & Clutter Removal:
 // --------------------------------------------------
 // 86. Gemini AI Question Type Eligibility Guard
 // --------------------------------------------------
-test("Gemini AI: Question Type Eligibility Guard strictly restricts AI inference to Multiple Choice & True/False, blocking drag-and-drop, dropdowns, and short answers", () => {
+test("Gemini AI: Question Type Eligibility Guard supports matching rows while blocking drag-and-drop, gapselect, and short answers", () => {
     const fs = require('fs');
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
@@ -3828,7 +3828,8 @@ test("Gemini AI: Question Type Eligibility Guard strictly restricts AI inference
     assert.ok(script.includes("function isEligibleForAiSolver(que, qData)"), "Must define isEligibleForAiSolver guard function");
     assert.ok(script.includes("if (qData.isDragDrop) return false;"), "Must reject drag and drop questions by qData");
     assert.ok(script.includes("ddwtos") && script.includes("ddimageortext"), "Must reject Moodle drag and drop css classes");
-    assert.ok(script.includes("if (que.querySelectorAll('select').length > 0) return false;"), "Must reject dropdown questions");
+    assert.ok(script.includes("if (qData.questionType === 'match')"), "Must handle matching questions separately");
+    assert.ok(script.includes("if (que.querySelectorAll('select').length > 0) return false;"), "Must reject unsupported dropdown questions");
     assert.ok(script.includes("if (qData.isShortAnswer || qData.isEssay) return false;"), "Must reject short answer and essay questions");
     assert.ok(script.includes("const isEligibleChoice = isEligibleForAiSolver(firstBlockedQue, qData);"), "Solver must invoke isEligibleForAiSolver before triggering AI");
 
@@ -3838,10 +3839,12 @@ test("Gemini AI: Question Type Eligibility Guard strictly restricts AI inference
         if (qData.isDragDrop) return false;
         if (que.classes && (que.classes.includes('ddwtos') || que.classes.includes('ddimageortext'))) return false;
         if (que.hasDragElements) return false;
-        if (que.hasSelectElements) return false;
-        if (qData.matchPairs && qData.matchPairs.length > 0) return false;
         if (qData.isShortAnswer || qData.isEssay) return false;
         if (que.hasTextInput) return false;
+        if (qData.questionType === 'match') {
+            return que.hasMatchingRows && qData.matchPairs && qData.matchPairs.length > 0;
+        }
+        if (que.hasSelectElements || (qData.matchPairs && qData.matchPairs.length > 0)) return false;
         if (!Array.isArray(qData.choices) || qData.choices.length < 2) return false;
         if (!que.hasRadioOrCheckbox) return false;
         return true;
@@ -3862,15 +3865,75 @@ test("Gemini AI: Question Type Eligibility Guard strictly restricts AI inference
     const ddData = { isDragDrop: true, qText: "Match components [[1]] and [[2]]", choices: ["a. CPU", "b. RAM"] };
     assert.strictEqual(mockIsEligibleForAiSolver(ddQue, ddData), false, "Drag and drop question must NOT be eligible");
 
-    // Scenario D: Dropdown Matching Question -> strictly Ineligible
-    const selQue = { classes: ['match', 'que'], hasRadioOrCheckbox: false, hasTextInput: false, hasSelectElements: true, hasDragElements: false };
-    const selData = { matchPairs: [{ subQ: "Input", options: ["Mouse", "Screen"] }], choices: ["Mouse", "Screen"] };
-    assert.strictEqual(mockIsEligibleForAiSolver(selQue, selData), false, "Dropdown question must NOT be eligible");
+    // Scenario D: Matching Type with row-specific dropdowns -> eligible
+    const selQue = { classes: ['match', 'que'], hasRadioOrCheckbox: false, hasTextInput: false, hasSelectElements: true, hasMatchingRows: true, hasDragElements: false };
+    const selData = { questionType: 'match', matchPairs: [{ subQ: "Input", options: ["Mouse", "Screen"] }], choices: [] };
+    assert.strictEqual(mockIsEligibleForAiSolver(selQue, selData), true, "Matching rows with prompt-specific dropdown options must be eligible");
+
+    // Gapselect remains on the manual-copy path; it must not be mistaken for Matching Type.
+    assert.strictEqual(mockIsEligibleForAiSolver({ ...selQue, hasMatchingRows: false }, { ...selData, questionType: 'gapselect', isGapSelect: true }), false, "Gapselect question must remain ineligible");
 
     // Scenario E: Short Answer / Cloze Text Field -> strictly Ineligible
     const saQue = { classes: ['shortanswer', 'que'], hasRadioOrCheckbox: false, hasTextInput: true, hasSelectElements: false, hasDragElements: false };
     const saData = { isShortAnswer: true, qText: "Type the abbreviation for Operating System:", choices: [] };
     assert.strictEqual(mockIsEligibleForAiSolver(saQue, saData), false, "Short answer question must NOT be eligible");
+});
+
+test("Gemini AI Matching: builds row-specific prompts and only maps explicit, non-eliminated options", () => {
+    const vm = require('vm');
+    const gemini = fs.readFileSync('src/ai/gemini.js', 'utf8');
+    const start = gemini.indexOf('    function getMatchingAiRows(');
+    const end = gemini.indexOf('    // Multi-Model Fallback Registry', start);
+    assert.ok(start >= 0 && end > start, "Matching AI prompt and response helpers must be available");
+
+    const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9$]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const sandbox = {
+        cleanDOMToAI: element => element.text,
+        normalizeChoice: normalize,
+        console: { warn() {} }
+    };
+    vm.runInNewContext(
+        `${gemini.slice(start, end)}\nglobalThis.getRows = getMatchingAiRows; globalThis.parse = parseMatchingAiResponse; globalThis.build = buildGeminiCompactPrompt; globalThis.eligible = isEligibleForAiSolver;`,
+        sandbox
+    );
+
+    const makeRow = (prompt, options, wrong = []) => {
+        const select = {
+            options: options.map((text, index) => ({ value: String(index + 1), text })),
+            dataset: { amaesKnownWrongAnswers: JSON.stringify(wrong.map(text => ({ text, norm: normalize(text) }))) }
+        };
+        return {
+            select,
+            querySelector: selector => selector.includes('td.text') || selector.includes('td:first-child') ? { text: prompt } :
+                selector.includes('select') ? select : null
+        };
+    };
+    const rows = [
+        makeRow('runs a back-end database query and displays information', ['Reports', 'single report page'], ['single report page']),
+        makeRow('are templates for reports', ['autoload config', 'helper'])
+    ];
+    const question = {
+        classList: { contains: () => false },
+        querySelectorAll: selector => selector.includes('tr') ? rows : []
+    };
+    const pairs = [
+        { subQ: 'runs a back-end database query and displays information', options: ['Reports', 'single report page'] },
+        { subQ: 'are templates for reports', options: ['autoload config', 'helper'] }
+    ];
+
+    const prompt = sandbox.build({ qText: 'Matching Type', questionType: 'match', matchPairs: pairs }, 'ITE6200', question);
+    assert.ok(prompt.includes('Row 1: runs a back-end database query'), "Prompt must include each matching row's own prompt");
+    assert.ok(prompt.includes('Options: Reports | single report page'), "Prompt must include the options available for that row");
+    assert.ok(prompt.includes('Confirmed wrong for this row; do not use: single report page'), "Prompt must tell AI about row-specific Moodle eliminations");
+
+    const mapped = sandbox.parse('Row 1: Reports\nRow 2: autoload config', sandbox.getRows(question));
+    assert.deepStrictEqual(Array.from(mapped, item => [item.rowIndex + 1, item.option.text]), [
+        [1, 'Reports'],
+        [2, 'autoload config']
+    ]);
+    assert.deepStrictEqual(Array.from(sandbox.parse('Reports\nautoload config', sandbox.getRows(question))), [], "Unlabeled answer lists must not be mapped by position");
+    assert.deepStrictEqual(Array.from(sandbox.parse('Row 1: single report page\nRow 2: autoload config', sandbox.getRows(question)), item => item.rowIndex), [1], "A choice disproved for one row must not be suggested there");
+    assert.strictEqual(sandbox.eligible(question, { questionType: 'match', matchPairs: pairs, choices: [] }), true, "Matching questions with usable row dropdowns must be eligible");
 });
 
 // --------------------------------------------------
@@ -4060,11 +4123,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.11.13-blue.svg"), "README badge must show v1.11.13");
+    assert.ok(readme.includes("version-1.11.14-blue.svg"), "README badge must show v1.11.14");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.11.13<"), "Website must display v1.11.13 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.11.14<"), "Website must display v1.11.14 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -4220,7 +4283,7 @@ test("Gemini AI v1.7.5: Unverified AI Suggestion Safeguards, Copy Question Filte
 
     // 8. Redundant Blockage HUD Suppression & Auto-Copy Indication
     assert.ok(script.includes("firstBlockedQue.querySelectorAll('.amaes-blockage-hud').forEach(el => el.remove());"), "Must clean up blockage HUD when AI starts solving or succeeds");
-    assert.ok(script.includes("if (firstBlockedQue.querySelector('.amaes-ai-suggested-choice')) {\n                        isSolverRunning = false;\n                        return;\n                    }"), "Must return immediately and suppress blockage HUD when AI solves question");
+    assert.ok(script.includes("if (firstBlockedQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-matching-suggestion')) {\n                        isSolverRunning = false;\n                        return;\n                    }"), "Must return immediately and suppress blockage HUD when AI solves a matching or choice question");
     assert.ok(script.includes("(Prompt copied)"), "Status log must indicate prompt was copied to clipboard");
 
     // 9. Real Lifecycle Simulation: AI Suggestion -> Rejection/Wrong Choice -> Elimination & Deduction

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.11.13
+// @version      1.11.14
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -31,7 +31,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.13";
+    const SCRIPT_VERSION = "v1.11.14";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -4703,8 +4703,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
                 const navState = getQuizNavQuestionStates();
 
-                // GOOGLE GEMINI AI ASSISTANT: Only trigger on uncertain Multiple Choice & True/False questions!
-                // Fall back to manual copy for complex types (drag & drop, dropdown, text inputs) or if AI not configured
+                // GOOGLE GEMINI AI ASSISTANT: Handle uncertain Multiple Choice, True/False, and row-mapped Matching questions.
+                // Other complex types (drag & drop, gapselect, text inputs) fall back to manual copy.
                 const isEligibleChoice = isEligibleForAiSolver(firstBlockedQue, qData);
                 const existingAiChoice = firstBlockedQue.querySelector('.amaes-ai-suggested-choice');
                 if (existingAiChoice && !isChoiceRowEliminated(existingAiChoice)) {
@@ -4768,7 +4768,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         qData: qData,
                         promptText: promptText,
                         onSuccess: async (matched) => {
-                            if (matched && matched.choiceText) {
+                            if (matched && matched.choiceText && !matched.matchingRows) {
                                 recordAttemptAnswerEvidence(firstBlockedQue, matched.choiceText, 'ai_inference');
                             }
                             // Ensure blockage HUD is removed upon successful AI resolution
@@ -4779,7 +4779,10 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             firstBlockedQue.style.outline = '2px solid rgba(139, 92, 246, 0.7)';
                             firstBlockedQue.style.borderRadius = '8px';
                             setQuestionAiTag(firstBlockedQue, true);
-                            if (aiAutoSelect && matched && matched.input) {
+                            if (matched && Array.isArray(matched.matchingRows)) {
+                                showToast(`Gemini suggested ${matched.matchingRows.length} matching answer${matched.matchingRows.length === 1 ? '' : 's'} (unverified).`, 3500);
+                                setLog(`[AI Suggestion] Gemini suggested ${matched.matchingRows.length} matching row answers (unverified). Review them before continuing.`, "var(--accent-purple)");
+                            } else if (aiAutoSelect && matched && matched.input) {
                                 const anyChecked = Boolean(firstBlockedQue.querySelector('.answer input[type="radio"]:checked, .answer input[type="checkbox"]:checked'));
                                 if (!anyChecked) {
                                     matched.input.checked = true;
@@ -4810,14 +4813,14 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         otherQue.forEach(oQue => {
                             if (oQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-text-badge') || isQuestionAnswered(oQue)) return;
                             const oQData = extractQuestionData(oQue);
-                            if (oQData && (oQData.questionType === 'multichoice' || oQData.questionType === 'truefalse')) {
+                            if (oQData && isEligibleForAiSolver(oQue, oQData)) {
                                 const oPrompt = buildGeminiCompactPrompt(oQData, courseCode, oQue);
                                 handleGeminiQuestionInference({
                                     que: oQue,
                                     qData: oQData,
                                     promptText: oPrompt,
                                     onSuccess: async (oMatched) => {
-                                        if (oMatched && oMatched.choiceText) {
+                                        if (oMatched && oMatched.choiceText && !oMatched.matchingRows) {
                                             recordAttemptAnswerEvidence(oQue, oMatched.choiceText, 'ai_inference');
                                         }
                                         oQue.querySelectorAll('.amaes-blockage-hud, .amaes-unanswered-hint').forEach(el => el.remove());
@@ -4837,7 +4840,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     }
 
                     // If AI successfully resolved and highlighted a choice, finish here without showing redundant blockage HUD!
-                    if (firstBlockedQue.querySelector('.amaes-ai-suggested-choice')) {
+                    if (firstBlockedQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-matching-suggestion')) {
                         isSolverRunning = false;
                         return;
                     }
@@ -4856,14 +4859,14 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             unverifiedQuestions.slice(1).forEach(oQue => {
                                 if (oQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-text-badge') || isQuestionAnswered(oQue)) return;
                                 const oQData = extractQuestionData(oQue);
-                                if (oQData && (oQData.questionType === 'multichoice' || oQData.questionType === 'truefalse')) {
+                                if (oQData && isEligibleForAiSolver(oQue, oQData)) {
                                     const oPrompt = buildGeminiCompactPrompt(oQData, courseCode, oQue);
                                     handleGeminiQuestionInference({
                                         que: oQue,
                                         qData: oQData,
                                         promptText: oPrompt,
                                         onSuccess: async (oMatched) => {
-                                            if (oMatched && oMatched.choiceText) {
+                                            if (oMatched && oMatched.choiceText && !oMatched.matchingRows) {
                                                 recordAttemptAnswerEvidence(oQue, oMatched.choiceText, 'ai_inference');
                                             }
                                             oQue.querySelectorAll('.amaes-blockage-hud, .amaes-unanswered-hint').forEach(el => el.remove());
@@ -4888,7 +4891,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 // IMPORTANT: If AI was triggered and is still processing (thinking indicator visible), do NOT show
                 // the "WAITING FOR ANSWER" HUD — it would conflict with the AI thinking indicator.
                 const aiIsHandling = firstBlockedQue.querySelector('.amaes-ai-thinking-indicator');
-                const aiAlreadySolved = firstBlockedQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-text-badge');
+                const aiAlreadySolved = firstBlockedQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-text-badge, .amaes-ai-matching-suggestion');
                 if (aiIsHandling || aiAlreadySolved) {
                     isSolverRunning = false;
                     return;
@@ -6633,7 +6636,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 el.style.backgroundColor = '';
                 el.style.borderRadius = '';
             });
-            que.querySelectorAll('.amaes-verified-badge, .amaes-unverified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-select-elim-hint, .amaes-matching-row-conflict-note, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag, .amaes-study-guide-question-tag, .amaes-pool-changed-hint').forEach(b => b.remove());
+            que.querySelectorAll('.amaes-verified-badge, .amaes-unverified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-select-elim-hint, .amaes-matching-row-conflict-note, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-matching-suggestion, .amaes-ai-suggested-badge, .amaes-ai-question-tag, .amaes-study-guide-question-tag, .amaes-pool-changed-hint').forEach(b => b.remove());
 
             // Safety: collect all verified/confirmed answers for this question
             const verifiedNorms = new Set();
@@ -12028,6 +12031,66 @@ function setupAccountTransferUI() {
         }
     }
 
+    function getMatchingAiRows(que) {
+        if (!que) return [];
+        return Array.from(que.querySelectorAll('.answer table tr, .answer tr'))
+            .map(row => {
+                const promptCell = row.querySelector('td.text, td:first-child');
+                const select = row.querySelector('td.control select, select');
+                const prompt = promptCell ? cleanDOMToAI(promptCell).trim() : '';
+                return prompt && select ? { row, select, prompt } : null;
+            })
+            .filter(Boolean);
+    }
+
+    function parseMatchingAiResponse(answerText, matchingRows) {
+        if (!answerText || !Array.isArray(matchingRows) || matchingRows.length === 0) return [];
+        const byIndex = new Map();
+        const ambiguousIndexes = new Set();
+        const lines = answerText
+            .replace(/```(?:text|json)?/gi, '')
+            .split(/\r?\n/)
+            .map(line => line.replace(/^\s*(?:[-*]|\d+[.)])\s*/, '').replace(/\*\*/g, '').trim())
+            .filter(Boolean);
+
+        lines.forEach(line => {
+            const match = line.match(/^(?:row\s*)?(\d+)\s*[:.)-]\s*(.+)$/i);
+            if (!match) return;
+            const rowIndex = Number(match[1]) - 1;
+            if (!Number.isInteger(rowIndex) || rowIndex < 0 || rowIndex >= matchingRows.length) return;
+            const target = match[2].trim().replace(/^["']|["']$/g, '');
+            const matchingRow = matchingRows[rowIndex];
+            const options = Array.from(matchingRow.select.options || []);
+            const option = options.find(candidate =>
+                candidate.value && candidate.value !== '0' &&
+                !candidate.text.toLowerCase().includes('choose') &&
+                normalizeChoice(candidate.text) === normalizeChoice(target)
+            );
+            if (!option) return;
+
+            let wrongAnswers = [];
+            try {
+                wrongAnswers = JSON.parse(matchingRow.select.dataset.amaesKnownWrongAnswers || '[]');
+            } catch (error) {
+                console.warn('Could not read matching-row AI answer evidence:', error);
+                return;
+            }
+            const optionNorm = normalizeChoice(option.text);
+            if (wrongAnswers.some(wrong =>
+                wrong && (wrong.norm === optionNorm || normalizeChoice(wrong.text || wrong.answer || '') === optionNorm)
+            )) return;
+
+            const previous = byIndex.get(rowIndex);
+            if (previous && previous.option.value !== option.value) {
+                ambiguousIndexes.add(rowIndex);
+                byIndex.delete(rowIndex);
+                return;
+            }
+            if (!ambiguousIndexes.has(rowIndex)) byIndex.set(rowIndex, { ...matchingRow, option, rowIndex });
+        });
+        return Array.from(byIndex.values()).sort((left, right) => left.rowIndex - right.rowIndex);
+    }
+
     // Ultra-Compact Prompt Builder: 0 fluff, max token efficiency (~60-120 tokens total)
     function buildGeminiCompactPrompt(qData, courseCode = '', que = null) {
         const lines = [];
@@ -12035,6 +12098,29 @@ function setupAccountTransferUI() {
             lines.push(`[Course: ${courseCode}]`);
         }
         lines.push(`Question: ${qData.qText || ''}`);
+
+        if (qData.questionType === 'match' && Array.isArray(qData.matchPairs) && qData.matchPairs.length > 0) {
+            const matchingRows = getMatchingAiRows(que);
+            lines.push('[Matching rows: choose one listed option for each row]');
+            matchingRows.forEach((matchingRow, index) => {
+                const options = Array.from(matchingRow.select.options || [])
+                    .filter(option => option.value && option.value !== '0' && !option.text.toLowerCase().includes('choose'))
+                    .map(option => option.text.trim());
+                lines.push(`Row ${index + 1}: ${matchingRow.prompt}`);
+                lines.push(`Options: ${options.join(' | ')}`);
+                try {
+                    const wrongAnswers = JSON.parse(matchingRow.select.dataset.amaesKnownWrongAnswers || '[]');
+                    const wrongTexts = wrongAnswers.filter(item => item && item.text).map(item => item.text);
+                    if (wrongTexts.length > 0) {
+                        lines.push(`Confirmed wrong for this row; do not use: ${wrongTexts.join(' | ')}`);
+                    }
+                } catch (error) {
+                    console.warn('Could not read matching-row AI prompt evidence:', error);
+                }
+            });
+            lines.push('Reply with one line per row in exactly this format: Row 1: exact option text. Use each row number and an exact option from that row. Do not add explanations.');
+            return lines.join('\n');
+        }
 
         // Handle Gapselect / Inline Dropdowns
         if (qData.isGapSelect || (que && que.querySelectorAll('select').length > 0 && (!qData.choices || qData.choices.length === 0))) {
@@ -12146,13 +12232,22 @@ function setupAccountTransferUI() {
         if (que.classList.contains('ddwtos') || que.classList.contains('ddimageortext') || que.classList.contains('ddmarker')) return false;
         if (que.querySelectorAll('.draghome, .drop, .dropzone, span.droptarget, .droppable').length > 0) return false;
 
-        // Dropdown / Select matching questions MUST fall back to manual copy
-        if (que.querySelectorAll('select').length > 0) return false;
-        if (qData.matchPairs && qData.matchPairs.length > 0) return false;
-
         // Text inputs / Essay questions MUST fall back to manual copy
         if (qData.isShortAnswer || qData.isEssay) return false;
         if (que.querySelectorAll('input[type="text"]:not([type="hidden"]), textarea').length > 0) return false;
+
+        if (qData.questionType === 'match') {
+            const matchingRows = getMatchingAiRows(que);
+            return Array.isArray(qData.matchPairs) && matchingRows.length > 0 &&
+                matchingRows.length === qData.matchPairs.length &&
+                matchingRows.every(item => Array.from(item.select.options || []).filter(option =>
+                    option.value && option.value !== '0' && !option.text.toLowerCase().includes('choose')
+                ).length >= 2);
+        }
+
+        // Gapselect, essay, and unsupported dropdown questions stay on the manual-copy path.
+        if (que.querySelectorAll('select').length > 0) return false;
+        if (qData.matchPairs && qData.matchPairs.length > 0) return false;
 
         // Must have at least 2 choices
         if (!Array.isArray(qData.choices) || qData.choices.length < 2) return false;
@@ -12852,7 +12947,7 @@ function setupAccountTransferUI() {
         }
 
         const cachedAns = getCachedAiAnswer(qData);
-        if (cachedAns && cachedAns.choiceText) {
+        if (cachedAns && cachedAns.choiceText && qData.questionType !== 'match') {
             const textInput = que.querySelector('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"], textarea');
             if (textInput && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0)) && !qData.isGapSelect) {
                 textInput.value = cachedAns.choiceText;
@@ -12995,6 +13090,9 @@ function setupAccountTransferUI() {
         const retryAttempts = getAiRetryCount();
         const maxAttempts = 1 + retryAttempts; // 1 initial request + configurable retries (default: 1 + 2 = 3)
         let sharedFallbackAttempted = false;
+        const maxOutputTokens = qData && qData.questionType === 'match'
+            ? Math.max(256, (qData.matchPairs || []).length * 32)
+            : 64;
 
         while (attempt < maxAttempts && !answerText && !isAborted && !timedOut) {
             if (isQuestionAnswered(que) && !que.querySelector('.amaes-ai-suggested-choice')) {
@@ -13021,7 +13119,7 @@ function setupAccountTransferUI() {
                         try {
                             const sharedResult = await callSharedAiFallback({
                                 prompt: promptText,
-                                maxOutputTokens: 64,
+                                maxOutputTokens,
                                 signal: abortCtrl.signal
                             });
                             if (sharedResult && sharedResult.text) {
@@ -13047,7 +13145,7 @@ function setupAccountTransferUI() {
                     const res = await callGeminiApi({
                         apiKey: apiKey,
                         prompt: promptText,
-                        maxOutputTokens: 64,
+                        maxOutputTokens,
                         signal: abortCtrl.signal
                     });
                     if (res && res.text) {
@@ -13079,7 +13177,7 @@ function setupAccountTransferUI() {
                         try {
                             const sharedResult = await callSharedAiFallback({
                                 prompt: promptText,
-                                maxOutputTokens: 64,
+                                maxOutputTokens,
                                 signal: abortCtrl.signal
                             });
                             if (sharedResult && sharedResult.text) {
@@ -13163,9 +13261,39 @@ function setupAccountTransferUI() {
                 }
             }
 
-            // Check for Dropdown / Select elements (gapselect / matching)
+            if (qData.questionType === 'match' && Array.isArray(qData.matchPairs) && qData.matchPairs.length > 0) {
+                const matchingRows = getMatchingAiRows(que);
+                const suggestions = parseMatchingAiResponse(answerText, matchingRows);
+                if (suggestions.length > 0) {
+                    suggestions.forEach(suggestion => {
+                        suggestion.select.value = suggestion.option.value;
+                        suggestion.select.dispatchEvent(new Event('input', { bubbles: true }));
+                        suggestion.select.dispatchEvent(new Event('change', { bubbles: true }));
+                        suggestion.select.dispatchEvent(new Event('blur', { bubbles: true }));
+                        suggestion.select.style.outline = '2px solid #a855f7';
+                        suggestion.select.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+                        suggestion.row.querySelectorAll('.amaes-ai-matching-suggestion').forEach(el => el.remove());
+                        const badge = document.createElement('div');
+                        badge.className = 'amaes-ai-matching-suggestion';
+                        badge.setAttribute('role', 'status');
+                        badge.textContent = `AI suggestion (unverified): ${suggestion.option.text.trim()}`;
+                        badge.style.cssText = 'margin: 4px 0; color: #7e22ce; font-size: 11px; font-weight: 700;';
+                        suggestion.select.insertAdjacentElement('afterend', badge);
+                    });
+                    const summary = suggestions.map(item => `Row ${item.rowIndex + 1}: ${item.option.text.trim()}`).join('; ');
+                    const partial = suggestions.length < matchingRows.length;
+                    setLog(`[AI Suggestion] Gemini suggested ${suggestions.length} of ${matchingRows.length} matching rows${partial ? '; unmatched rows were left unchanged' : ''}. Review each unverified row before continuing.`, "var(--accent-purple)");
+                    showToast(`Gemini suggested ${suggestions.length} matching answer${suggestions.length === 1 ? '' : 's'}; review before continuing.`, 3500);
+                    if (typeof onSuccess === 'function') {
+                        await onSuccess({ choiceText: summary, matchingRows: suggestions });
+                    }
+                    return;
+                }
+            }
+
+            // Check for Dropdown / Select elements (gapselect)
             const selectInputs = Array.from(que.querySelectorAll('select'));
-            if (selectInputs.length > 0 && (!qData.choices || qData.choices.length === 0)) {
+            if (qData.questionType !== 'match' && selectInputs.length > 0 && (!qData.choices || qData.choices.length === 0)) {
                 const cleaned = answerText
                     .replace(/^Answer:\s*/i, '')
                     .replace(/^The correct answer is:\s*/i, '')
@@ -13870,7 +13998,6 @@ function setupAccountTransferUI() {
             };
         }
     }
-
     // ==========================================
     // Quiz Review Harvester & Answer Sharing
     // ==========================================

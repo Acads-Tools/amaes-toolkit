@@ -1305,8 +1305,8 @@
 
                 const navState = getQuizNavQuestionStates();
 
-                // GOOGLE GEMINI AI ASSISTANT: Only trigger on uncertain Multiple Choice & True/False questions!
-                // Fall back to manual copy for complex types (drag & drop, dropdown, text inputs) or if AI not configured
+                // GOOGLE GEMINI AI ASSISTANT: Handle uncertain Multiple Choice, True/False, and row-mapped Matching questions.
+                // Other complex types (drag & drop, gapselect, text inputs) fall back to manual copy.
                 const isEligibleChoice = isEligibleForAiSolver(firstBlockedQue, qData);
                 const existingAiChoice = firstBlockedQue.querySelector('.amaes-ai-suggested-choice');
                 if (existingAiChoice && !isChoiceRowEliminated(existingAiChoice)) {
@@ -1370,7 +1370,7 @@
                         qData: qData,
                         promptText: promptText,
                         onSuccess: async (matched) => {
-                            if (matched && matched.choiceText) {
+                            if (matched && matched.choiceText && !matched.matchingRows) {
                                 recordAttemptAnswerEvidence(firstBlockedQue, matched.choiceText, 'ai_inference');
                             }
                             // Ensure blockage HUD is removed upon successful AI resolution
@@ -1381,7 +1381,10 @@
                             firstBlockedQue.style.outline = '2px solid rgba(139, 92, 246, 0.7)';
                             firstBlockedQue.style.borderRadius = '8px';
                             setQuestionAiTag(firstBlockedQue, true);
-                            if (aiAutoSelect && matched && matched.input) {
+                            if (matched && Array.isArray(matched.matchingRows)) {
+                                showToast(`Gemini suggested ${matched.matchingRows.length} matching answer${matched.matchingRows.length === 1 ? '' : 's'} (unverified).`, 3500);
+                                setLog(`[AI Suggestion] Gemini suggested ${matched.matchingRows.length} matching row answers (unverified). Review them before continuing.`, "var(--accent-purple)");
+                            } else if (aiAutoSelect && matched && matched.input) {
                                 const anyChecked = Boolean(firstBlockedQue.querySelector('.answer input[type="radio"]:checked, .answer input[type="checkbox"]:checked'));
                                 if (!anyChecked) {
                                     matched.input.checked = true;
@@ -1412,14 +1415,14 @@
                         otherQue.forEach(oQue => {
                             if (oQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-text-badge') || isQuestionAnswered(oQue)) return;
                             const oQData = extractQuestionData(oQue);
-                            if (oQData && (oQData.questionType === 'multichoice' || oQData.questionType === 'truefalse')) {
+                            if (oQData && isEligibleForAiSolver(oQue, oQData)) {
                                 const oPrompt = buildGeminiCompactPrompt(oQData, courseCode, oQue);
                                 handleGeminiQuestionInference({
                                     que: oQue,
                                     qData: oQData,
                                     promptText: oPrompt,
                                     onSuccess: async (oMatched) => {
-                                        if (oMatched && oMatched.choiceText) {
+                                        if (oMatched && oMatched.choiceText && !oMatched.matchingRows) {
                                             recordAttemptAnswerEvidence(oQue, oMatched.choiceText, 'ai_inference');
                                         }
                                         oQue.querySelectorAll('.amaes-blockage-hud, .amaes-unanswered-hint').forEach(el => el.remove());
@@ -1439,7 +1442,7 @@
                     }
 
                     // If AI successfully resolved and highlighted a choice, finish here without showing redundant blockage HUD!
-                    if (firstBlockedQue.querySelector('.amaes-ai-suggested-choice')) {
+                    if (firstBlockedQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-matching-suggestion')) {
                         isSolverRunning = false;
                         return;
                     }
@@ -1458,14 +1461,14 @@
                             unverifiedQuestions.slice(1).forEach(oQue => {
                                 if (oQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-text-badge') || isQuestionAnswered(oQue)) return;
                                 const oQData = extractQuestionData(oQue);
-                                if (oQData && (oQData.questionType === 'multichoice' || oQData.questionType === 'truefalse')) {
+                                if (oQData && isEligibleForAiSolver(oQue, oQData)) {
                                     const oPrompt = buildGeminiCompactPrompt(oQData, courseCode, oQue);
                                     handleGeminiQuestionInference({
                                         que: oQue,
                                         qData: oQData,
                                         promptText: oPrompt,
                                         onSuccess: async (oMatched) => {
-                                            if (oMatched && oMatched.choiceText) {
+                                            if (oMatched && oMatched.choiceText && !oMatched.matchingRows) {
                                                 recordAttemptAnswerEvidence(oQue, oMatched.choiceText, 'ai_inference');
                                             }
                                             oQue.querySelectorAll('.amaes-blockage-hud, .amaes-unanswered-hint').forEach(el => el.remove());
@@ -1490,7 +1493,7 @@
                 // IMPORTANT: If AI was triggered and is still processing (thinking indicator visible), do NOT show
                 // the "WAITING FOR ANSWER" HUD — it would conflict with the AI thinking indicator.
                 const aiIsHandling = firstBlockedQue.querySelector('.amaes-ai-thinking-indicator');
-                const aiAlreadySolved = firstBlockedQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-text-badge');
+                const aiAlreadySolved = firstBlockedQue.querySelector('.amaes-ai-suggested-choice, .amaes-ai-text-badge, .amaes-ai-matching-suggestion');
                 if (aiIsHandling || aiAlreadySolved) {
                     isSolverRunning = false;
                     return;
@@ -3235,7 +3238,7 @@
                 el.style.backgroundColor = '';
                 el.style.borderRadius = '';
             });
-            que.querySelectorAll('.amaes-verified-badge, .amaes-unverified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-select-elim-hint, .amaes-matching-row-conflict-note, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-question-tag, .amaes-study-guide-question-tag, .amaes-pool-changed-hint').forEach(b => b.remove());
+            que.querySelectorAll('.amaes-verified-badge, .amaes-unverified-badge, .amaes-eliminated-badge, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-select-elim-hint, .amaes-matching-row-conflict-note, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-matching-suggestion, .amaes-ai-suggested-badge, .amaes-ai-question-tag, .amaes-study-guide-question-tag, .amaes-pool-changed-hint').forEach(b => b.remove());
 
             // Safety: collect all verified/confirmed answers for this question
             const verifiedNorms = new Set();
