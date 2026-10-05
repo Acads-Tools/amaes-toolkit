@@ -1102,7 +1102,7 @@
                 : externalStudyGuideAnswers;
             const availableAnswers = (cached || []).concat(freshExternalStudyGuideAnswers);
             if (availableAnswers.length > 0) {
-                res = highlightQuizAnswers(availableAnswers, autoPickQuiz || autoQuizMode);
+                res = highlightQuizAnswers(availableAnswers, Boolean(autoQuizMode && autoPickQuiz));
             } else {
                 setLog(`<b>No Answers in DB:</b> Open amauoed or click Cloud Sync for <b>${subCode}</b>!`, "var(--accent-amber)");
             }
@@ -1842,6 +1842,7 @@
         }
 
         if (autoSubmitQuiz && !summaryAutoSubmitAttempted && !summaryAutoSubmitTimer) {
+            if (!autoQuizMode) return;
             if (!submitBtn) {
                 showQuizSubmitFallback(
                     'Auto-submit could not find Moodle’s “Submit all and finish” button. Locate Moodle’s submission control on this page and click it to finish.',

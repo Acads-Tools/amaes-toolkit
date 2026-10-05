@@ -343,13 +343,10 @@
                         </div>
                     </div>
 
-                    <!-- Primary 1-Click Actions: Sync & Share -->
-                    <div style="display: flex; gap: 6px;">
+                    <!-- Primary 1-Click Action: Sync Library -->
+                    <div style="display: flex;">
                         <button id="btn-cloud-sync" class="amaes-btn amaes-btn-blue" style="flex: 1; justify-content: center; padding: 8px 10px; font-size: 11px; font-weight: 700; border-radius: 6px;" title="Sync verified answers with the shared community library">
-                            ${ICONS.cloudDownload} <span>Sync Answers</span>
-                        </button>
-                        <button id="btn-harvest-grades-db" class="amaes-btn" style="flex: 1; justify-content: center; padding: 8px 10px; font-weight: 800; font-size: 11px; border: none; border-radius: 6px; background: linear-gradient(135deg, #10b981, #059669); color: #fff; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.25);" title="Collect answers from completed quizzes and share them anonymously to help classmates">
-                            ${ICONS.download} <span>Collect & Share Answers</span>
+                            ${ICONS.cloudDownload} <span>Sync Community Answers</span>
                         </button>
                     </div>
 
