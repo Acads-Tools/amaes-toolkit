@@ -2766,7 +2766,7 @@ test("Simplified Quiz Layout & True Default Reset: verifies minimal core toggles
     assert.ok(coreSection.includes('id="chk-auto-pick-study-guide-fallback"'), "Core settings must offer opt-in study-guide fallback auto-picking below Smart Next");
     assert.ok(coreSection.indexOf('id="chk-auto-submit-quiz"') > coreSection.indexOf('id="chk-auto-pick-study-guide-fallback"'), "Auto-Submit must appear directly below study-guide fallback");
     assert.strictEqual((script.match(/id="chk-auto-submit-quiz"/g) || []).length, 1, "Auto-Submit must have one UI control");
-    assert.ok(script.includes("localStorage.getItem('amaes_auto_pick_study_guide_fallback') === 'true'"), "Study-guide fallback auto-picking must default OFF");
+    assert.ok(script.includes("localStorage.getItem('amaes_auto_pick_study_guide_fallback') !== 'false'"), "Study-guide fallback auto-picking must default ON");
     assert.ok(script.includes("localStorage.setItem('amaes_auto_pick_study_guide_fallback', String(autoPickStudyGuideFallback))"), "Study-guide fallback preference must persist locally");
     assert.ok(script.includes("localStorage.getItem('amaes_auto_submit_quiz') === 'true'"), "Auto-Submit must remain opt-in by default");
     assert.ok(script.includes("chkAutoSubmitQuiz.onchange"), "Moved Auto-Submit setting must retain its existing handler");
@@ -2781,7 +2781,7 @@ test("Simplified Quiz Layout & True Default Reset: verifies minimal core toggles
     const resetEnd = script.indexOf('function detectTermFromText');
     const resetSection = script.substring(resetStart, resetEnd);
     assert.ok(resetSection.includes("localStorage.setItem('amaes_auto_pick_quiz', 'true');"), "Reset must set auto_pick_quiz to true so auto-quiz works when started");
-    assert.ok(resetSection.includes("localStorage.setItem('amaes_auto_pick_study_guide_fallback', 'false');"), "Reset must disable unverified study-guide fallback auto-picking");
+    assert.ok(resetSection.includes("localStorage.setItem('amaes_auto_pick_study_guide_fallback', 'true');"), "Reset must default unverified study-guide fallback auto-picking to true");
     assert.ok(resetSection.includes("localStorage.setItem('amaes_auto_submit_quiz', 'false');"), "Reset must disable automatic quiz submission");
     assert.ok(resetSection.includes("localStorage.setItem('amaes_auto_min_quiz', 'false');"), "Reset must NOT auto-minimize panel by default");
     assert.ok(resetSection.includes("clearTimeout(autoNextTimer);"), "Reset must clear running navigation timers");

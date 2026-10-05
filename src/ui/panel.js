@@ -168,7 +168,7 @@
                         <!-- Assistive Visual Highlighting -->
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Highlight verified database and study guide answers with color codes">
                             <input id="chk-auto-hl-quiz" type="checkbox" ${autoHighlightQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span>Show Answers (Color Highlights)</span>
+                            <span>Highlight Answers</span>
                         </label>
 
                         <!-- Autonomous Pilot Automation Options -->
@@ -180,24 +180,24 @@
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Advances smoothly to next question when answered; pauses on unknown questions">
                                 <input id="chk-auto-next-verified" type="checkbox" ${autoNextVerified ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                                <span>Smart Next (Auto-Advance)</span>
+                                <span>Auto-Advance to Next Question</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="In Auto-Quiz, select an exact Jenny's Online or AMAUOED choice match when no verified answer is available. These suggestions are unverified; Smart Next must be on to advance automatically.">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="In Auto-Quiz, select Jenny's Online or AMAUOED study guide choices when no verified answer is available in the database.">
                                 <input id="chk-auto-pick-study-guide-fallback" type="checkbox" ${autoPickStudyGuideFallback ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                                <span>Study-Guide Fallback (Unverified)</span>
+                                <span>Online Study Guides (Jenny &amp; AMA)</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically click Submit all and finish after reaching the quiz summary. This submits without a final manual review.">
                                 <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                                <span>Auto-Submit Quiz on Completion</span>
+                                <span>Auto-Submit Quiz</span>
                             </label>
                         </div>
 
                         <!-- Speed Mode Card -->
-                        <label id="amaes-fast-answer-card" style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Fast Answer Mode: Answers visible questions instantly & speeds up moving to next page">
+                        <label id="amaes-fast-answer-card" style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Speed Mode: Answers visible questions instantly and moves quickly to the next page">
                             <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                             <span id="amaes-fast-quiz-title" style="display: inline-flex; align-items: center; gap: 4px;">
                                 <span id="amaes-fast-quiz-icon" style="display: inline-flex; align-items: center; color: var(--text-muted);">${ICONS.zap}</span>
-                                <span>Speed Mode (200ms Nav)</span>
+                                <span>Speed Mode</span>
                             </span>
                         </label>
                     </div>

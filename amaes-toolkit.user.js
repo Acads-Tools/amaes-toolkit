@@ -1243,7 +1243,7 @@
         localStorage.setItem('amaes_auto_pick_quiz', 'true');
         localStorage.setItem('amaes_auto_next_quiz', 'false');
         localStorage.setItem('amaes_auto_next_verified', 'true');
-        localStorage.setItem('amaes_auto_pick_study_guide_fallback', 'false');
+        localStorage.setItem('amaes_auto_pick_study_guide_fallback', 'true');
         localStorage.setItem('amaes_auto_submit_quiz', 'false');
         localStorage.setItem('amaes_auto_push_github', 'false');
         localStorage.setItem('amaes_auto_copy_search', 'true');
@@ -1266,7 +1266,7 @@
         autoQuizMode = false;
         autoPickQuiz = true;
         autoNextVerified = true;
-        autoPickStudyGuideFallback = false;
+        autoPickStudyGuideFallback = true;
         autoSubmitQuiz = false;
         autoNextQuiz = false;
         isWaitingForUserAnswer = false;
@@ -1311,7 +1311,7 @@
         updateCheck('chk-keyboard-shortcuts', true);
         updateCheck('chk-auto-pick', true);
         updateCheck('chk-auto-next-verified', true);
-        updateCheck('chk-auto-pick-study-guide-fallback', false);
+        updateCheck('chk-auto-pick-study-guide-fallback', true);
         updateCheck('chk-auto-submit-quiz', false);
         updateCheck('chk-auto-dl-json', false);
         updateCheck('chk-auto-push-github', false);
@@ -1786,7 +1786,7 @@
     let fastQuizMode = localStorage.getItem('amaes_fast_quiz_mode') === 'true'; // default false (⚡ Speed Mode)
     let autoPickQuiz = localStorage.getItem('amaes_auto_pick_quiz') !== 'false'; // default true: auto-select verified answers
     let autoNextVerified = localStorage.getItem('amaes_auto_next_verified') !== 'false'; // default true: auto-advance when solver answers verified question
-    let autoPickStudyGuideFallback = localStorage.getItem('amaes_auto_pick_study_guide_fallback') === 'true'; // default false: explicitly opt in to unverified web suggestions
+    let autoPickStudyGuideFallback = localStorage.getItem('amaes_auto_pick_study_guide_fallback') !== 'false'; // default true: automatically use online study guides (Jenny & AMA)
     let autoNextQuiz = localStorage.getItem('amaes_auto_next_quiz') === 'true'; // default false: manual answers do NOT auto-advance by default (safe review)
     let adaptiveProbeQuiz = localStorage.getItem('amaes_adaptive_probe_quiz') !== 'false'; // default true: rotate choices across unreviewed attempts until 100%
     let adaptiveProbeBudget = parseInt(localStorage.getItem('amaes_adaptive_probe_budget') || '2', 10); // default: probe at most 2 unverified questions per attempt
@@ -10847,7 +10847,7 @@ function setupAccountTransferUI() {
                         autoQuizMode: typeof autoQuizMode !== 'undefined' ? autoQuizMode : false,
                         autoPickQuiz: typeof autoPickQuiz !== 'undefined' ? autoPickQuiz : true,
                         autoNextVerified: typeof autoNextVerified !== 'undefined' ? autoNextVerified : true,
-                        autoPickStudyGuideFallback: typeof autoPickStudyGuideFallback !== 'undefined' ? autoPickStudyGuideFallback : false,
+                        autoPickStudyGuideFallback: typeof autoPickStudyGuideFallback !== 'undefined' ? autoPickStudyGuideFallback : true,
                         autoNextQuiz: typeof autoNextQuiz !== 'undefined' ? autoNextQuiz : false,
                         autoHighlightQuiz: typeof autoHighlightQuiz !== 'undefined' ? autoHighlightQuiz : true,
                         smartSkipQuiz: typeof smartSkipQuiz !== 'undefined' ? smartSkipQuiz : false,
@@ -17706,7 +17706,7 @@ function setupAccountTransferUI() {
                         <!-- Assistive Visual Highlighting -->
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Highlight verified database and study guide answers with color codes">
                             <input id="chk-auto-hl-quiz" type="checkbox" ${autoHighlightQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span>Show Answers (Color Highlights)</span>
+                            <span>Highlight Answers</span>
                         </label>
 
                         <!-- Autonomous Pilot Automation Options -->
@@ -17718,24 +17718,24 @@ function setupAccountTransferUI() {
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Advances smoothly to next question when answered; pauses on unknown questions">
                                 <input id="chk-auto-next-verified" type="checkbox" ${autoNextVerified ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                                <span>Smart Next (Auto-Advance)</span>
+                                <span>Auto-Advance to Next Question</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="In Auto-Quiz, select an exact Jenny's Online or AMAUOED choice match when no verified answer is available. These suggestions are unverified; Smart Next must be on to advance automatically.">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="In Auto-Quiz, select Jenny's Online or AMAUOED study guide choices when no verified answer is available in the database.">
                                 <input id="chk-auto-pick-study-guide-fallback" type="checkbox" ${autoPickStudyGuideFallback ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                                <span>Study-Guide Fallback (Unverified)</span>
+                                <span>Online Study Guides (Jenny &amp; AMA)</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically click Submit all and finish after reaching the quiz summary. This submits without a final manual review.">
                                 <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                                <span>Auto-Submit Quiz on Completion</span>
+                                <span>Auto-Submit Quiz</span>
                             </label>
                         </div>
 
                         <!-- Speed Mode Card -->
-                        <label id="amaes-fast-answer-card" style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Fast Answer Mode: Answers visible questions instantly & speeds up moving to next page">
+                        <label id="amaes-fast-answer-card" style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Speed Mode: Answers visible questions instantly and moves quickly to the next page">
                             <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                             <span id="amaes-fast-quiz-title" style="display: inline-flex; align-items: center; gap: 4px;">
                                 <span id="amaes-fast-quiz-icon" style="display: inline-flex; align-items: center; color: var(--text-muted);">${ICONS.zap}</span>
-                                <span>Speed Mode (200ms Nav)</span>
+                                <span>Speed Mode</span>
                             </span>
                         </label>
                     </div>

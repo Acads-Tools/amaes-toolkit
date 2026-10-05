@@ -121,7 +121,7 @@
     let fastQuizMode = localStorage.getItem('amaes_fast_quiz_mode') === 'true'; // default false (⚡ Speed Mode)
     let autoPickQuiz = localStorage.getItem('amaes_auto_pick_quiz') !== 'false'; // default true: auto-select verified answers
     let autoNextVerified = localStorage.getItem('amaes_auto_next_verified') !== 'false'; // default true: auto-advance when solver answers verified question
-    let autoPickStudyGuideFallback = localStorage.getItem('amaes_auto_pick_study_guide_fallback') === 'true'; // default false: explicitly opt in to unverified web suggestions
+    let autoPickStudyGuideFallback = localStorage.getItem('amaes_auto_pick_study_guide_fallback') !== 'false'; // default true: automatically use online study guides (Jenny & AMA)
     let autoNextQuiz = localStorage.getItem('amaes_auto_next_quiz') === 'true'; // default false: manual answers do NOT auto-advance by default (safe review)
     let adaptiveProbeQuiz = localStorage.getItem('amaes_adaptive_probe_quiz') !== 'false'; // default true: rotate choices across unreviewed attempts until 100%
     let adaptiveProbeBudget = parseInt(localStorage.getItem('amaes_adaptive_probe_budget') || '2', 10); // default: probe at most 2 unverified questions per attempt
