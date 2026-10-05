@@ -61,6 +61,7 @@
                     if (isQuizLanding) {
                         const startBtn = document.querySelector('form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], .quizstartbutton button, .quizstartbutton input[type="submit"], #region-main button.btn-primary, #region-main input.btn-primary');
                         if (startBtn) {
+                            toggleAutoQuizMode(true);
                             showToast("Starting quiz attempt...", 2000);
                             setLog("Starting quiz attempt from introduction page...", "var(--accent-green)");
                             startBtn.click();
@@ -470,15 +471,21 @@
                 linkDisplay.title = linkUrl;
                 if (copyBtn) copyBtn.disabled = false;
                 if (urlMatchBadge) {
-                    const res = checkUrlCourseMatch(linkUrl, courseInfo);
-                    urlMatchBadge.style.display = 'block';
-                    urlMatchBadge.innerHTML = res.html;
+                    const activeCourseContext = { ...courseInfo, subjectCode: code || subCode || (courseInfo && courseInfo.subjectCode) };
+                    const res = checkUrlCourseMatch(linkUrl, activeCourseContext);
+                    const isInCourse = (typeof checkIsCoursePage === 'function' && checkIsCoursePage()) ||
+                                       (typeof checkIsQuizPage === 'function' && checkIsQuizPage()) ||
+                                       Boolean(courseInfo && courseInfo.subjectCode && !document.getElementById('amaes-select-active-course'));
 
                     if (res.status === 'match') {
+                        urlMatchBadge.style.display = 'block';
+                        urlMatchBadge.innerHTML = res.html;
                         urlMatchBadge.style.background = 'rgba(16, 185, 129, 0.12)';
                         urlMatchBadge.style.border = '1px solid rgba(16, 185, 129, 0.3)';
                         urlMatchBadge.style.color = 'var(--accent-green)';
-                    } else if (res.status === 'mismatch' || res.status === 'invalid') {
+                    } else if (res.status === 'mismatch' && isInCourse) {
+                        urlMatchBadge.style.display = 'block';
+                        urlMatchBadge.innerHTML = res.html;
                         urlMatchBadge.style.background = 'rgba(244, 63, 94, 0.12)';
                         urlMatchBadge.style.border = '1px solid rgba(244, 63, 94, 0.3)';
                         urlMatchBadge.style.color = 'var(--accent-pink)';
@@ -495,12 +502,76 @@
                                 }
                             };
                         }
+                    } else if (res.status === 'invalid' && isInCourse) {
+                        urlMatchBadge.style.display = 'block';
+                        urlMatchBadge.innerHTML = res.html;
+                        urlMatchBadge.style.background = 'rgba(244, 63, 94, 0.12)';
+                        urlMatchBadge.style.border = '1px solid rgba(244, 63, 94, 0.3)';
+                        urlMatchBadge.style.color = 'var(--accent-pink)';
                     } else {
-                        urlMatchBadge.style.background = 'var(--surface-subtle)';
-                        urlMatchBadge.style.border = '1px solid var(--border-subtle)';
-                        urlMatchBadge.style.color = 'var(--text-secondary)';
+                        urlMatchBadge.style.display = 'none';
                     }
                 }
+            }
+
+            updateJennysonlineDisplay(code);
+        }
+
+        async function updateJennysonlineDisplay(targetCode) {
+            const code = targetCode || subCode;
+            const linkDisplay = document.getElementById('jennysonline-link-display');
+            const copyBtn = document.getElementById('btn-copy-jennysonline-link');
+            const badge = document.getElementById('jennysonline-match-badge');
+            const statusPill = document.getElementById('jennysonline-status-pill');
+            if (!linkDisplay) return;
+
+            if (!code || code === 'GENERAL' || code === 'DEFAULT') {
+                linkDisplay.textContent = 'No course selected';
+                linkDisplay.removeAttribute('href');
+                if (copyBtn) copyBtn.disabled = true;
+                if (badge) badge.style.display = 'none';
+                if (statusPill) statusPill.textContent = '';
+                return;
+            }
+
+            let cached = typeof readJennysonlinePersistentCache === 'function' ? readJennysonlinePersistentCache(code) : null;
+            let url = '';
+            let count = 0;
+            if (Array.isArray(cached) && cached.length > 0) {
+                count = cached.length;
+                url = cached[0].sourceUrl || (typeof CLOUD_DB_JENNYSONLINE_URL !== 'undefined' ? `${CLOUD_DB_JENNYSONLINE_URL}${code}.json` : '');
+            }
+
+            if (!url && typeof loadJennysonlineAnswersForCourse === 'function' && autoScrapeAmauoed) {
+                linkDisplay.textContent = "Checking Jenny's Online...";
+                try {
+                    const answers = await loadJennysonlineAnswersForCourse(code);
+                    if (Array.isArray(answers) && answers.length > 0) {
+                        count = answers.length;
+                        url = answers[0].sourceUrl || (typeof CLOUD_DB_JENNYSONLINE_URL !== 'undefined' ? `${CLOUD_DB_JENNYSONLINE_URL}${code}.json` : '');
+                    }
+                } catch (_) {}
+            }
+
+            if (url) {
+                linkDisplay.textContent = url;
+                linkDisplay.href = url;
+                linkDisplay.title = url;
+                if (copyBtn) copyBtn.disabled = false;
+                if (badge) {
+                    badge.style.display = 'block';
+                    badge.style.background = 'rgba(168, 85, 247, 0.12)';
+                    badge.style.border = '1px solid rgba(168, 85, 247, 0.3)';
+                    badge.style.color = 'var(--accent-purple, #c084fc)';
+                    badge.innerHTML = `<span style="font-weight:600;">Jenny's Online: <b>${count}</b> unconfirmed study guide candidates available</span>`;
+                }
+                if (statusPill) statusPill.textContent = `${count} Qs`;
+            } else {
+                linkDisplay.textContent = `No Jenny's Online guide available for ${code}`;
+                linkDisplay.removeAttribute('href');
+                if (copyBtn) copyBtn.disabled = true;
+                if (badge) badge.style.display = 'none';
+                if (statusPill) statusPill.textContent = 'Not in snapshot';
             }
         }
 
@@ -532,9 +603,9 @@
             questions.forEach(q => {
                 const s = (q.source || '').toLowerCase();
                 const sources = Array.isArray(q.sources) ? q.sources.map(x => (x || '').toLowerCase()) : [];
-                const isAmauoed = s.includes('amauoed') || sources.some(x => x.includes('amauoed'));
+                const isStudyGuide = s.includes('amauoed') || s.includes('jennysonline') || sources.some(x => x.includes('amauoed') || x.includes('jennysonline'));
 
-                if (isAmauoed) {
+                if (isStudyGuide) {
                     amauoedCount++;
                 } else {
                     verifiedCount++;
@@ -636,6 +707,31 @@
                     setLog(`Copied study guide link to clipboard: <b>${url}</b>`, "var(--accent-green)");
                     setTimeout(() => {
                         btnCopyAmauoedLink.innerHTML = `${ICONS.copy} <span>Copy Link</span>`;
+                    }, 1800);
+                } catch (err) {
+                    showToast("Failed to copy link to clipboard.");
+                }
+            };
+        }
+
+        const btnCopyJennysonlineLink = document.getElementById('btn-copy-jennysonline-link');
+        if (btnCopyJennysonlineLink) {
+            btnCopyJennysonlineLink.onclick = async () => {
+                const linkDisplay = document.getElementById('jennysonline-link-display');
+                const url = (linkDisplay && linkDisplay.getAttribute('href') && linkDisplay.getAttribute('href') !== '#')
+                    ? linkDisplay.getAttribute('href')
+                    : '';
+                if (!url) {
+                    showToast("No Jenny's Online link to copy!");
+                    return;
+                }
+                try {
+                    await navigator.clipboard.writeText(url);
+                    btnCopyJennysonlineLink.innerHTML = `${ICONS.check} <span>Copied!</span>`;
+                    showToast("Jenny's Online link copied to clipboard!");
+                    setLog(`Copied Jenny's Online link to clipboard: <b>${url}</b>`, "var(--accent-green)");
+                    setTimeout(() => {
+                        btnCopyJennysonlineLink.innerHTML = `${ICONS.copy} <span>Copy Link</span>`;
                     }, 1800);
                 } catch (err) {
                     showToast("Failed to copy link to clipboard.");

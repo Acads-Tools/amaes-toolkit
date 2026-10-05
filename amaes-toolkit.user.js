@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.11.16
+// @version      1.11.17
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -31,7 +31,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.16";
+    const SCRIPT_VERSION = "v1.11.17";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -4495,7 +4495,10 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 }
             }
 
-            const availableAnswers = (cached || []).concat(externalStudyGuideAnswers);
+            const freshExternalStudyGuideAnswers = typeof readJennysonlinePersistentCache === 'function'
+                ? (readJennysonlinePersistentCache(subCode) || [])
+                : externalStudyGuideAnswers;
+            const availableAnswers = (cached || []).concat(freshExternalStudyGuideAnswers);
             if (availableAnswers.length > 0) {
                 res = highlightQuizAnswers(availableAnswers, autoPickQuiz || autoQuizMode);
             } else {
@@ -4532,6 +4535,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             const unreviewedOrProbeQuestions = [];
 
             queContainers.forEach(que => {
+                if (isQuestionAnswered(que)) return;
+
                 const hasVerifiedBadge = que.querySelector('.amaes-verified-badge');
                 const hasAdaptiveBadge = que.querySelector('.amaes-adaptive-probe-badge');
                 const hasUnreviewedNote = que.querySelector('.amaes-unreviewed-history-note');
@@ -4548,8 +4553,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     (hasUnreviewedNote || hasAdaptiveBadge || hasAiBadge || hasUnverifiedBadge)) {
                     unreviewedOrProbeQuestions.push(que);
                 }
-
-                if (isQuestionAnswered(que)) return;
 
                 const dropZones = que.querySelectorAll('.drop, .dropzone, span.droptarget, .droppable');
                 const selectInputs = que.querySelectorAll('select');
@@ -4577,7 +4580,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
             // Safe review pause: If any question on this page was an unreviewed probe or unverified suggestion,
             // do NOT silently breeze through unless user explicitly enabled auto-advance on manual/unverified clicks!
-            if (unreviewedOrProbeQuestions.length > 0 && !autoNextQuiz && !fastQuizMode) {
+            // When autoQuizMode is running, let Case B proceed to AI resolution or auto-copy without halting automation.
+            if (unreviewedOrProbeQuestions.length > 0 && !autoNextQuiz && !fastQuizMode && !autoQuizMode) {
                 const firstProbeQue = unreviewedOrProbeQuestions[0];
                 setActiveQuestion(firstProbeQue, false);
                 firstProbeQue.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -17904,21 +17908,23 @@ function setupAccountTransferUI() {
                     </div>
 
 
-                    <!-- Online Study Guides (AMAUOED) -->
+                    <!-- Online Study Guides (AMAUOED & Jenny's Online) -->
                     <details style="border: 1px solid var(--border-subtle); border-radius: 6px; padding: 5px 7px; background: rgba(0,0,0,0.15);">
                         <summary style="font-size: 10px; font-weight: 700; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 5px; user-select: none;">
                             <span style="display: flex; align-items: center; gap: 5px;">
                                 ${ICONS.book}
                                 <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
-                                <span>Online Study Guides (AMAUOED)</span>
+                                <span>Online Study Guides (AMAUOED & Jenny's Online)</span>
                             </span>
                         </summary>
-                        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
+                        <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically check online study guides if questions are not yet in your library (Default: ON)">
                                 <input id="chk-auto-scrape-amauoed" type="checkbox" ${autoScrapeAmauoed ? 'checked' : ''} style="cursor: pointer;" />
                                 <span style="font-weight: 500; color: var(--text-secondary);">Auto-check study guides when missing</span>
                             </label>
 
+                            <!-- AMAUOED Guide Row -->
+                            <div style="font-size: 9px; font-weight: 600; color: var(--text-muted); margin-top: 1px;">AMAUOED Course Guide:</div>
                             <div style="display: flex; gap: 6px; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 4px 6px;">
                                 <a id="amauoed-link-display" href="${defaultAmauoedUrl || '#'}" target="_blank" rel="noopener noreferrer" style="
                                     flex: 1;
@@ -17934,7 +17940,29 @@ function setupAccountTransferUI() {
                                     ${ICONS.copy} <span>Copy Link</span>
                                 </button>
                             </div>
-                            <div id="amauoed-url-match-badge" style="display: none; font-size: 10px; padding: 3px 5px; border-radius: 4px; line-height: 1.35; box-sizing: border-box;"></div>
+                            <div id="amauoed-url-match-badge" style="display: none; font-size: 9px; padding: 2px 5px; border-radius: 4px; line-height: 1.3; box-sizing: border-box;"></div>
+
+                            <!-- Jenny's Online Guide Row -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9px; font-weight: 600; color: var(--text-muted); margin-top: 3px;">
+                                <span>Jenny's Online Blog Guide:</span>
+                                <span id="jennysonline-status-pill" style="font-size: 8.5px; font-weight: 600; color: var(--accent-purple, #c084fc);"></span>
+                            </div>
+                            <div style="display: flex; gap: 6px; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 4px 6px;">
+                                <a id="jennysonline-link-display" href="#" target="_blank" rel="noopener noreferrer" style="
+                                    flex: 1;
+                                    min-width: 0;
+                                    font-size: 10px;
+                                    color: var(--accent-purple, #c084fc);
+                                    text-decoration: underline;
+                                    overflow: hidden;
+                                    text-overflow: ellipsis;
+                                    white-space: nowrap;
+                                " title="Jenny's Online study guide link">Checking Jenny's Online...</a>
+                                <button id="btn-copy-jennysonline-link" type="button" class="amaes-btn amaes-btn-outline" style="width: auto; padding: 3px 6px; font-size: 9.5px; font-weight: 600; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;" title="Copy Jenny's Online link to clipboard" disabled>
+                                    ${ICONS.copy} <span>Copy Link</span>
+                                </button>
+                            </div>
+                            <div id="jennysonline-match-badge" style="display: none; font-size: 9.5px; padding: 3px 5px; border-radius: 4px; line-height: 1.35; box-sizing: border-box;"></div>
                         </div>
                     </details>
 
@@ -17967,36 +17995,36 @@ function setupAccountTransferUI() {
                             <button id="amaes-account-switcher-cancel-edit" type="button" class="amaes-btn amaes-btn-outline" style="display: none; justify-content: center; padding: 6px; font-size: 10px;">Cancel edit</button>
                         </form>
                         <div id="amaes-account-switcher-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
-                        <details id="amaes-account-transfer" style="border: 1px solid var(--border-subtle); border-radius: 5px; padding: 6px;">
-                            <summary style="cursor: pointer; font-size: 10px; font-weight: 600; color: var(--text-secondary);">Transfer setup to another device</summary>
-                            <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 7px;">
-                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9.5px; color: var(--text-secondary);">
+                        <details id="amaes-account-transfer" style="border: 1px solid var(--border-subtle); border-radius: 5px; padding: 5px 6px;">
+                            <summary style="cursor: pointer; font-size: 9.5px; font-weight: 600; color: var(--text-secondary);">Transfer setup to another device</summary>
+                            <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 5px;">
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
                                     <input id="amaes-transfer-include-settings" type="checkbox" checked />
                                     <span>Toolkit preferences (automation, AI, appearance, and panel layout)</span>
                                 </label>
-                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9.5px; color: var(--text-secondary);">
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
                                     <input id="amaes-transfer-include-accounts" type="checkbox" checked />
                                     <span>Moodle account profiles (usernames, passwords, nicknames)</span>
                                 </label>
-                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9.5px; color: var(--text-secondary);">
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
                                     <input id="amaes-transfer-include-api-keys" type="checkbox" checked />
                                     <span>Personal Gemini API keys</span>
                                 </label>
-                                <label style="display: flex; gap: 5px; align-items: flex-start; font-size: 9px; color: var(--accent-amber, #f59e0b); line-height: 1.35;">
+                                <label style="display: flex; gap: 5px; align-items: flex-start; font-size: 8.5px; color: var(--accent-amber, #f59e0b); line-height: 1.3;">
                                     <input id="amaes-transfer-secret-consent" type="checkbox" style="margin-top: 1px;" />
                                     <span>I understand anyone with the one-time code can import the selected passwords and API keys.</span>
                                 </label>
-                                <button id="amaes-transfer-create" type="button" class="amaes-btn amaes-btn-outline" style="justify-content: center; font-size: 9.5px;">Create one-time transfer code</button>
-                                <input id="amaes-transfer-code" type="text" readonly hidden aria-label="One-time transfer code" style="width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px; border-radius: 4px; font-family: monospace;" />
-                                <button id="amaes-transfer-copy" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px;">Copy code</button>
-                                <div style="font-size: 9px; color: var(--text-muted); line-height: 1.35;">The code does not expire, but works once only. The relay keeps encrypted data until it is imported, then deletes it. Anyone with the code can import it, so keep it private. Service tokens, Moodle sessions, caches, and installation identity are not included. Imported credentials are saved in this browser's userscript storage.</div>
-                                <div style="display: flex; gap: 4px;">
-                                    <input id="amaes-transfer-import-code" type="password" autocomplete="off" placeholder="Enter transfer code" aria-label="Transfer code" style="flex: 1; min-width: 0; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px; border-radius: 4px; font-family: monospace;" />
-                                    <button id="amaes-transfer-import" type="button" class="amaes-btn amaes-btn-outline" style="font-size: 9px;">Preview</button>
+                                <button id="amaes-transfer-create" type="button" class="amaes-btn amaes-btn-outline" style="justify-content: center; font-size: 9px; padding: 5px;">Create one-time transfer code</button>
+                                <input id="amaes-transfer-code" type="text" readonly hidden aria-label="One-time transfer code" style="width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 5px 6px; border-radius: 4px; font-size: 9px; font-family: monospace;" />
+                                <button id="amaes-transfer-copy" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Copy code</button>
+                                <div style="font-size: 8.5px; color: var(--text-muted); line-height: 1.3;">The code does not expire, but works once only. The relay keeps encrypted data until it is imported, then deletes it. Anyone with the code can import it, so keep it private. Service tokens, Moodle sessions, caches, and installation identity are not included. Imported credentials are saved in this browser's userscript storage.</div>
+                                <div style="display: flex; gap: 4px; align-items: center;">
+                                    <input id="amaes-transfer-import-code" type="password" autocomplete="off" placeholder="Enter transfer code" aria-label="Transfer code" style="flex: 1; min-width: 0; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 5px 7px; border-radius: 4px; font-size: 9.5px; font-family: monospace;" />
+                                    <button id="amaes-transfer-import" type="button" class="amaes-btn amaes-btn-outline" style="width: auto; flex-shrink: 0; white-space: nowrap; justify-content: center; font-size: 9px; padding: 5px 9px;">Preview</button>
                                 </div>
                                 <div id="amaes-transfer-preview" hidden role="status" style="font-size: 9px; color: var(--text-secondary); line-height: 1.4;"></div>
-                                <button id="amaes-transfer-apply" type="button" class="amaes-btn amaes-btn-monotone" hidden style="justify-content: center; font-size: 9px;">Import into this device</button>
-                                <button id="amaes-transfer-discard" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px;">Discard preview</button>
+                                <button id="amaes-transfer-apply" type="button" class="amaes-btn amaes-btn-monotone" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Import into this device</button>
+                                <button id="amaes-transfer-discard" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Discard preview</button>
                                 <div id="amaes-account-transfer-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
                             </div>
                         </details>
@@ -19274,6 +19302,7 @@ function setupAccountTransferUI() {
                     if (isQuizLanding) {
                         const startBtn = document.querySelector('form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], .quizstartbutton button, .quizstartbutton input[type="submit"], #region-main button.btn-primary, #region-main input.btn-primary');
                         if (startBtn) {
+                            toggleAutoQuizMode(true);
                             showToast("Starting quiz attempt...", 2000);
                             setLog("Starting quiz attempt from introduction page...", "var(--accent-green)");
                             startBtn.click();
@@ -19683,15 +19712,21 @@ function setupAccountTransferUI() {
                 linkDisplay.title = linkUrl;
                 if (copyBtn) copyBtn.disabled = false;
                 if (urlMatchBadge) {
-                    const res = checkUrlCourseMatch(linkUrl, courseInfo);
-                    urlMatchBadge.style.display = 'block';
-                    urlMatchBadge.innerHTML = res.html;
+                    const activeCourseContext = { ...courseInfo, subjectCode: code || subCode || (courseInfo && courseInfo.subjectCode) };
+                    const res = checkUrlCourseMatch(linkUrl, activeCourseContext);
+                    const isInCourse = (typeof checkIsCoursePage === 'function' && checkIsCoursePage()) ||
+                                       (typeof checkIsQuizPage === 'function' && checkIsQuizPage()) ||
+                                       Boolean(courseInfo && courseInfo.subjectCode && !document.getElementById('amaes-select-active-course'));
 
                     if (res.status === 'match') {
+                        urlMatchBadge.style.display = 'block';
+                        urlMatchBadge.innerHTML = res.html;
                         urlMatchBadge.style.background = 'rgba(16, 185, 129, 0.12)';
                         urlMatchBadge.style.border = '1px solid rgba(16, 185, 129, 0.3)';
                         urlMatchBadge.style.color = 'var(--accent-green)';
-                    } else if (res.status === 'mismatch' || res.status === 'invalid') {
+                    } else if (res.status === 'mismatch' && isInCourse) {
+                        urlMatchBadge.style.display = 'block';
+                        urlMatchBadge.innerHTML = res.html;
                         urlMatchBadge.style.background = 'rgba(244, 63, 94, 0.12)';
                         urlMatchBadge.style.border = '1px solid rgba(244, 63, 94, 0.3)';
                         urlMatchBadge.style.color = 'var(--accent-pink)';
@@ -19708,12 +19743,76 @@ function setupAccountTransferUI() {
                                 }
                             };
                         }
+                    } else if (res.status === 'invalid' && isInCourse) {
+                        urlMatchBadge.style.display = 'block';
+                        urlMatchBadge.innerHTML = res.html;
+                        urlMatchBadge.style.background = 'rgba(244, 63, 94, 0.12)';
+                        urlMatchBadge.style.border = '1px solid rgba(244, 63, 94, 0.3)';
+                        urlMatchBadge.style.color = 'var(--accent-pink)';
                     } else {
-                        urlMatchBadge.style.background = 'var(--surface-subtle)';
-                        urlMatchBadge.style.border = '1px solid var(--border-subtle)';
-                        urlMatchBadge.style.color = 'var(--text-secondary)';
+                        urlMatchBadge.style.display = 'none';
                     }
                 }
+            }
+
+            updateJennysonlineDisplay(code);
+        }
+
+        async function updateJennysonlineDisplay(targetCode) {
+            const code = targetCode || subCode;
+            const linkDisplay = document.getElementById('jennysonline-link-display');
+            const copyBtn = document.getElementById('btn-copy-jennysonline-link');
+            const badge = document.getElementById('jennysonline-match-badge');
+            const statusPill = document.getElementById('jennysonline-status-pill');
+            if (!linkDisplay) return;
+
+            if (!code || code === 'GENERAL' || code === 'DEFAULT') {
+                linkDisplay.textContent = 'No course selected';
+                linkDisplay.removeAttribute('href');
+                if (copyBtn) copyBtn.disabled = true;
+                if (badge) badge.style.display = 'none';
+                if (statusPill) statusPill.textContent = '';
+                return;
+            }
+
+            let cached = typeof readJennysonlinePersistentCache === 'function' ? readJennysonlinePersistentCache(code) : null;
+            let url = '';
+            let count = 0;
+            if (Array.isArray(cached) && cached.length > 0) {
+                count = cached.length;
+                url = cached[0].sourceUrl || (typeof CLOUD_DB_JENNYSONLINE_URL !== 'undefined' ? `${CLOUD_DB_JENNYSONLINE_URL}${code}.json` : '');
+            }
+
+            if (!url && typeof loadJennysonlineAnswersForCourse === 'function' && autoScrapeAmauoed) {
+                linkDisplay.textContent = "Checking Jenny's Online...";
+                try {
+                    const answers = await loadJennysonlineAnswersForCourse(code);
+                    if (Array.isArray(answers) && answers.length > 0) {
+                        count = answers.length;
+                        url = answers[0].sourceUrl || (typeof CLOUD_DB_JENNYSONLINE_URL !== 'undefined' ? `${CLOUD_DB_JENNYSONLINE_URL}${code}.json` : '');
+                    }
+                } catch (_) {}
+            }
+
+            if (url) {
+                linkDisplay.textContent = url;
+                linkDisplay.href = url;
+                linkDisplay.title = url;
+                if (copyBtn) copyBtn.disabled = false;
+                if (badge) {
+                    badge.style.display = 'block';
+                    badge.style.background = 'rgba(168, 85, 247, 0.12)';
+                    badge.style.border = '1px solid rgba(168, 85, 247, 0.3)';
+                    badge.style.color = 'var(--accent-purple, #c084fc)';
+                    badge.innerHTML = `<span style="font-weight:600;">Jenny's Online: <b>${count}</b> unconfirmed study guide candidates available</span>`;
+                }
+                if (statusPill) statusPill.textContent = `${count} Qs`;
+            } else {
+                linkDisplay.textContent = `No Jenny's Online guide available for ${code}`;
+                linkDisplay.removeAttribute('href');
+                if (copyBtn) copyBtn.disabled = true;
+                if (badge) badge.style.display = 'none';
+                if (statusPill) statusPill.textContent = 'Not in snapshot';
             }
         }
 
@@ -19745,9 +19844,9 @@ function setupAccountTransferUI() {
             questions.forEach(q => {
                 const s = (q.source || '').toLowerCase();
                 const sources = Array.isArray(q.sources) ? q.sources.map(x => (x || '').toLowerCase()) : [];
-                const isAmauoed = s.includes('amauoed') || sources.some(x => x.includes('amauoed'));
+                const isStudyGuide = s.includes('amauoed') || s.includes('jennysonline') || sources.some(x => x.includes('amauoed') || x.includes('jennysonline'));
 
-                if (isAmauoed) {
+                if (isStudyGuide) {
                     amauoedCount++;
                 } else {
                     verifiedCount++;
@@ -19849,6 +19948,31 @@ function setupAccountTransferUI() {
                     setLog(`Copied study guide link to clipboard: <b>${url}</b>`, "var(--accent-green)");
                     setTimeout(() => {
                         btnCopyAmauoedLink.innerHTML = `${ICONS.copy} <span>Copy Link</span>`;
+                    }, 1800);
+                } catch (err) {
+                    showToast("Failed to copy link to clipboard.");
+                }
+            };
+        }
+
+        const btnCopyJennysonlineLink = document.getElementById('btn-copy-jennysonline-link');
+        if (btnCopyJennysonlineLink) {
+            btnCopyJennysonlineLink.onclick = async () => {
+                const linkDisplay = document.getElementById('jennysonline-link-display');
+                const url = (linkDisplay && linkDisplay.getAttribute('href') && linkDisplay.getAttribute('href') !== '#')
+                    ? linkDisplay.getAttribute('href')
+                    : '';
+                if (!url) {
+                    showToast("No Jenny's Online link to copy!");
+                    return;
+                }
+                try {
+                    await navigator.clipboard.writeText(url);
+                    btnCopyJennysonlineLink.innerHTML = `${ICONS.check} <span>Copied!</span>`;
+                    showToast("Jenny's Online link copied to clipboard!");
+                    setLog(`Copied Jenny's Online link to clipboard: <b>${url}</b>`, "var(--accent-green)");
+                    setTimeout(() => {
+                        btnCopyJennysonlineLink.innerHTML = `${ICONS.copy} <span>Copy Link</span>`;
                     }, 1800);
                 } catch (err) {
                     showToast("Failed to copy link to clipboard.");

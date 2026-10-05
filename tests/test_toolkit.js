@@ -2924,8 +2924,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.11.16'), "Userscript header must specify v1.11.16");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.16";'), "Constant SCRIPT_VERSION must be v1.11.16");
+    assert.ok(script.includes('@version      1.11.17'), "Userscript header must specify v1.11.17");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.17";'), "Constant SCRIPT_VERSION must be v1.11.17");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3423,7 +3423,7 @@ test("Web Scraper Answers: simplified accordion, auto-scrape, removed manual inp
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Accordion summary header renamed
-    assert.ok(script.includes("<span>Online Study Guides (AMAUOED)</span>"), "Accordion summary must be 'Online Study Guides (AMAUOED)'");
+    assert.ok(script.includes("<span>Online Study Guides (AMAUOED & Jenny's Online)</span>") || script.includes("<span>Online Study Guides (AMAUOED)</span>"), "Accordion summary must identify study guide sources");
     assert.ok(!script.includes("<span>AMAUOED Study Guide Scraper</span>"), "Legacy summary header must be removed");
 
     // 2. Manual URL input, Auto-Find button, and Scrape & Cache button removed
@@ -4136,11 +4136,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.11.16-blue.svg"), "README badge must show v1.11.16");
+    assert.ok(readme.includes("version-1.11.17-blue.svg"), "README badge must show v1.11.17");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.11.16<"), "Website must display v1.11.16 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.11.17<"), "Website must display v1.11.17 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -5587,6 +5587,29 @@ test("Matching questions: maps answers by row prompt, blocks reviewed wrong answ
     assert.ok(harvester.includes('if (isZeroMark && !isMatchingQuestion)'), "A partial or zero score must not label every selected matching-row answer as wrong");
     assert.ok(harvester.includes("evidenceType: rowIsWrong ? 'moodle_review_elimination' : 'moodle_review'"), "Review harvesting must save correctness evidence against each matching sub-question");
     assert.ok(solver.includes("selectInput.dataset.amaesKnownWrongAnswers = JSON.stringify(rowWrongAnswers)"), "Matching-row warnings must use row-scoped wrong-answer evidence, even when that evidence is empty");
+});
+
+test("Study Library & Transfer Layout: keeps transfer input flexible, matches study guide URLs against selected course, and exposes Jenny's Online", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    assert.ok(script.includes('id="amaes-transfer-import" type="button" class="amaes-btn amaes-btn-outline" style="width: auto; flex-shrink: 0;'), "Transfer Preview button must stay compact so import code input is not squished");
+    assert.ok(script.includes("activeCourseContext = { ...courseInfo, subjectCode: code || subCode"), "Study guide URL matcher must use active/selected subject code on dashboard");
+    assert.ok(script.includes("isStudyGuide = s.includes('amauoed') || s.includes('jennysonline')"), "Term coverage breakdown must count Jenny's Online under Study Guides");
+    assert.ok(script.includes('id="jennysonline-link-display"'), "Jenny's Online link display must be present in Study Library");
+    assert.ok(script.includes('id="btn-copy-jennysonline-link"'), "Jenny's Online copy button must be present in Study Library");
+    assert.ok(script.includes("updateJennysonlineDisplay"), "updateJennysonlineDisplay function must be defined");
+    assert.ok(script.includes("res.status === 'mismatch' && isInCourse"), "Subject mismatch warning must smart-detect if in an active course before showing");
+});
+
+test("Autonomous Background Overhaul: prevents solver freeze during autoQuizMode and excludes answered questions from review pause", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    assert.ok(script.includes("if (unreviewedOrProbeQuestions.length > 0 && !autoNextQuiz && !fastQuizMode && !autoQuizMode)"), "Review pause must be bypassed during active autoQuizMode so background operation never freezes");
+    const checkIdx = script.indexOf("queContainers.forEach(que => {");
+    assert.ok(checkIdx !== -1, "queContainers loop must exist");
+    const answeredIdx = script.indexOf("if (isQuestionAnswered(que)) return;", checkIdx);
+    const pushIdx = script.indexOf("unreviewedOrProbeQuestions.push(que);", checkIdx);
+    assert.ok(answeredIdx !== -1 && pushIdx !== -1 && answeredIdx < pushIdx, "isQuestionAnswered must be evaluated before unreviewedOrProbeQuestions push so answered questions are excluded");
+    assert.ok(script.includes("const freshExternalStudyGuideAnswers = typeof readJennysonlinePersistentCache === 'function'"), "Solver must refresh external study guide cache before concatenating availableAnswers to eliminate cold-start race conditions");
+    assert.ok(script.includes("toggleAutoQuizMode(true);\n                            showToast(\"Starting quiz attempt...\", 2000);"), "Master Start Auto-Quiz button must arm autoQuizMode when starting from quiz landing page");
 });
 
 console.log("\n==================================================");

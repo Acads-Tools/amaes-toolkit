@@ -366,21 +366,23 @@
                     </div>
 
 
-                    <!-- Online Study Guides (AMAUOED) -->
+                    <!-- Online Study Guides (AMAUOED & Jenny's Online) -->
                     <details style="border: 1px solid var(--border-subtle); border-radius: 6px; padding: 5px 7px; background: rgba(0,0,0,0.15);">
                         <summary style="font-size: 10px; font-weight: 700; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 5px; user-select: none;">
                             <span style="display: flex; align-items: center; gap: 5px;">
                                 ${ICONS.book}
                                 <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
-                                <span>Online Study Guides (AMAUOED)</span>
+                                <span>Online Study Guides (AMAUOED & Jenny's Online)</span>
                             </span>
                         </summary>
-                        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
+                        <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically check online study guides if questions are not yet in your library (Default: ON)">
                                 <input id="chk-auto-scrape-amauoed" type="checkbox" ${autoScrapeAmauoed ? 'checked' : ''} style="cursor: pointer;" />
                                 <span style="font-weight: 500; color: var(--text-secondary);">Auto-check study guides when missing</span>
                             </label>
 
+                            <!-- AMAUOED Guide Row -->
+                            <div style="font-size: 9px; font-weight: 600; color: var(--text-muted); margin-top: 1px;">AMAUOED Course Guide:</div>
                             <div style="display: flex; gap: 6px; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 4px 6px;">
                                 <a id="amauoed-link-display" href="${defaultAmauoedUrl || '#'}" target="_blank" rel="noopener noreferrer" style="
                                     flex: 1;
@@ -396,7 +398,29 @@
                                     ${ICONS.copy} <span>Copy Link</span>
                                 </button>
                             </div>
-                            <div id="amauoed-url-match-badge" style="display: none; font-size: 10px; padding: 3px 5px; border-radius: 4px; line-height: 1.35; box-sizing: border-box;"></div>
+                            <div id="amauoed-url-match-badge" style="display: none; font-size: 9px; padding: 2px 5px; border-radius: 4px; line-height: 1.3; box-sizing: border-box;"></div>
+
+                            <!-- Jenny's Online Guide Row -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9px; font-weight: 600; color: var(--text-muted); margin-top: 3px;">
+                                <span>Jenny's Online Blog Guide:</span>
+                                <span id="jennysonline-status-pill" style="font-size: 8.5px; font-weight: 600; color: var(--accent-purple, #c084fc);"></span>
+                            </div>
+                            <div style="display: flex; gap: 6px; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 4px 6px;">
+                                <a id="jennysonline-link-display" href="#" target="_blank" rel="noopener noreferrer" style="
+                                    flex: 1;
+                                    min-width: 0;
+                                    font-size: 10px;
+                                    color: var(--accent-purple, #c084fc);
+                                    text-decoration: underline;
+                                    overflow: hidden;
+                                    text-overflow: ellipsis;
+                                    white-space: nowrap;
+                                " title="Jenny's Online study guide link">Checking Jenny's Online...</a>
+                                <button id="btn-copy-jennysonline-link" type="button" class="amaes-btn amaes-btn-outline" style="width: auto; padding: 3px 6px; font-size: 9.5px; font-weight: 600; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;" title="Copy Jenny's Online link to clipboard" disabled>
+                                    ${ICONS.copy} <span>Copy Link</span>
+                                </button>
+                            </div>
+                            <div id="jennysonline-match-badge" style="display: none; font-size: 9.5px; padding: 3px 5px; border-radius: 4px; line-height: 1.35; box-sizing: border-box;"></div>
                         </div>
                     </details>
 
@@ -429,36 +453,36 @@
                             <button id="amaes-account-switcher-cancel-edit" type="button" class="amaes-btn amaes-btn-outline" style="display: none; justify-content: center; padding: 6px; font-size: 10px;">Cancel edit</button>
                         </form>
                         <div id="amaes-account-switcher-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
-                        <details id="amaes-account-transfer" style="border: 1px solid var(--border-subtle); border-radius: 5px; padding: 6px;">
-                            <summary style="cursor: pointer; font-size: 10px; font-weight: 600; color: var(--text-secondary);">Transfer setup to another device</summary>
-                            <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 7px;">
-                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9.5px; color: var(--text-secondary);">
+                        <details id="amaes-account-transfer" style="border: 1px solid var(--border-subtle); border-radius: 5px; padding: 5px 6px;">
+                            <summary style="cursor: pointer; font-size: 9.5px; font-weight: 600; color: var(--text-secondary);">Transfer setup to another device</summary>
+                            <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 5px;">
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
                                     <input id="amaes-transfer-include-settings" type="checkbox" checked />
                                     <span>Toolkit preferences (automation, AI, appearance, and panel layout)</span>
                                 </label>
-                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9.5px; color: var(--text-secondary);">
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
                                     <input id="amaes-transfer-include-accounts" type="checkbox" checked />
                                     <span>Moodle account profiles (usernames, passwords, nicknames)</span>
                                 </label>
-                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9.5px; color: var(--text-secondary);">
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
                                     <input id="amaes-transfer-include-api-keys" type="checkbox" checked />
                                     <span>Personal Gemini API keys</span>
                                 </label>
-                                <label style="display: flex; gap: 5px; align-items: flex-start; font-size: 9px; color: var(--accent-amber, #f59e0b); line-height: 1.35;">
+                                <label style="display: flex; gap: 5px; align-items: flex-start; font-size: 8.5px; color: var(--accent-amber, #f59e0b); line-height: 1.3;">
                                     <input id="amaes-transfer-secret-consent" type="checkbox" style="margin-top: 1px;" />
                                     <span>I understand anyone with the one-time code can import the selected passwords and API keys.</span>
                                 </label>
-                                <button id="amaes-transfer-create" type="button" class="amaes-btn amaes-btn-outline" style="justify-content: center; font-size: 9.5px;">Create one-time transfer code</button>
-                                <input id="amaes-transfer-code" type="text" readonly hidden aria-label="One-time transfer code" style="width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px; border-radius: 4px; font-family: monospace;" />
-                                <button id="amaes-transfer-copy" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px;">Copy code</button>
-                                <div style="font-size: 9px; color: var(--text-muted); line-height: 1.35;">The code does not expire, but works once only. The relay keeps encrypted data until it is imported, then deletes it. Anyone with the code can import it, so keep it private. Service tokens, Moodle sessions, caches, and installation identity are not included. Imported credentials are saved in this browser's userscript storage.</div>
-                                <div style="display: flex; gap: 4px;">
-                                    <input id="amaes-transfer-import-code" type="password" autocomplete="off" placeholder="Enter transfer code" aria-label="Transfer code" style="flex: 1; min-width: 0; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px; border-radius: 4px; font-family: monospace;" />
-                                    <button id="amaes-transfer-import" type="button" class="amaes-btn amaes-btn-outline" style="font-size: 9px;">Preview</button>
+                                <button id="amaes-transfer-create" type="button" class="amaes-btn amaes-btn-outline" style="justify-content: center; font-size: 9px; padding: 5px;">Create one-time transfer code</button>
+                                <input id="amaes-transfer-code" type="text" readonly hidden aria-label="One-time transfer code" style="width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 5px 6px; border-radius: 4px; font-size: 9px; font-family: monospace;" />
+                                <button id="amaes-transfer-copy" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Copy code</button>
+                                <div style="font-size: 8.5px; color: var(--text-muted); line-height: 1.3;">The code does not expire, but works once only. The relay keeps encrypted data until it is imported, then deletes it. Anyone with the code can import it, so keep it private. Service tokens, Moodle sessions, caches, and installation identity are not included. Imported credentials are saved in this browser's userscript storage.</div>
+                                <div style="display: flex; gap: 4px; align-items: center;">
+                                    <input id="amaes-transfer-import-code" type="password" autocomplete="off" placeholder="Enter transfer code" aria-label="Transfer code" style="flex: 1; min-width: 0; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 5px 7px; border-radius: 4px; font-size: 9.5px; font-family: monospace;" />
+                                    <button id="amaes-transfer-import" type="button" class="amaes-btn amaes-btn-outline" style="width: auto; flex-shrink: 0; white-space: nowrap; justify-content: center; font-size: 9px; padding: 5px 9px;">Preview</button>
                                 </div>
                                 <div id="amaes-transfer-preview" hidden role="status" style="font-size: 9px; color: var(--text-secondary); line-height: 1.4;"></div>
-                                <button id="amaes-transfer-apply" type="button" class="amaes-btn amaes-btn-monotone" hidden style="justify-content: center; font-size: 9px;">Import into this device</button>
-                                <button id="amaes-transfer-discard" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px;">Discard preview</button>
+                                <button id="amaes-transfer-apply" type="button" class="amaes-btn amaes-btn-monotone" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Import into this device</button>
+                                <button id="amaes-transfer-discard" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Discard preview</button>
                                 <div id="amaes-account-transfer-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
                             </div>
                         </details>

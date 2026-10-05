@@ -1097,7 +1097,10 @@
                 }
             }
 
-            const availableAnswers = (cached || []).concat(externalStudyGuideAnswers);
+            const freshExternalStudyGuideAnswers = typeof readJennysonlinePersistentCache === 'function'
+                ? (readJennysonlinePersistentCache(subCode) || [])
+                : externalStudyGuideAnswers;
+            const availableAnswers = (cached || []).concat(freshExternalStudyGuideAnswers);
             if (availableAnswers.length > 0) {
                 res = highlightQuizAnswers(availableAnswers, autoPickQuiz || autoQuizMode);
             } else {
@@ -1134,6 +1137,8 @@
             const unreviewedOrProbeQuestions = [];
 
             queContainers.forEach(que => {
+                if (isQuestionAnswered(que)) return;
+
                 const hasVerifiedBadge = que.querySelector('.amaes-verified-badge');
                 const hasAdaptiveBadge = que.querySelector('.amaes-adaptive-probe-badge');
                 const hasUnreviewedNote = que.querySelector('.amaes-unreviewed-history-note');
@@ -1150,8 +1155,6 @@
                     (hasUnreviewedNote || hasAdaptiveBadge || hasAiBadge || hasUnverifiedBadge)) {
                     unreviewedOrProbeQuestions.push(que);
                 }
-
-                if (isQuestionAnswered(que)) return;
 
                 const dropZones = que.querySelectorAll('.drop, .dropzone, span.droptarget, .droppable');
                 const selectInputs = que.querySelectorAll('select');
@@ -1179,7 +1182,8 @@
 
             // Safe review pause: If any question on this page was an unreviewed probe or unverified suggestion,
             // do NOT silently breeze through unless user explicitly enabled auto-advance on manual/unverified clicks!
-            if (unreviewedOrProbeQuestions.length > 0 && !autoNextQuiz && !fastQuizMode) {
+            // When autoQuizMode is running, let Case B proceed to AI resolution or auto-copy without halting automation.
+            if (unreviewedOrProbeQuestions.length > 0 && !autoNextQuiz && !fastQuizMode && !autoQuizMode) {
                 const firstProbeQue = unreviewedOrProbeQuestions[0];
                 setActiveQuestion(firstProbeQue, false);
                 firstProbeQue.scrollIntoView({ behavior: 'smooth', block: 'center' });
