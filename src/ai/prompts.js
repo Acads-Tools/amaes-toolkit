@@ -30,7 +30,7 @@
         return false;
     }
 
-    function buildAiContextIntro() {
+    function buildAiContextIntro(qType = null) {
         const courseInfo = detectCourseInfo();
         const details = [];
         if (courseInfo.subjectCode) details.push(`Course Code: ${courseInfo.subjectCode}`);
@@ -39,8 +39,14 @@
 
         const header = details.length > 0 ? details.join(' | ') : 'AMAES Online Course Quiz';
 
-        return `[Context: ${header}]\n` +
-               `Act as an expert academic assistant for this course. For each quiz question I provide, analyze carefully and reply ONLY with the correct option letter (a, b, c, or d) and the exact choice text. Keep it direct with no explanations.\n\n---\n\n`;
+        let directive = 'Act as an expert academic assistant for this course. For each quiz question I provide, analyze carefully and reply ONLY with the correct option letter (a, b, c, or d) and the exact choice text. Keep it direct with no explanations.';
+        if (qType === 'shortanswer' || qType === 'identification') {
+            directive = 'Act as an expert academic assistant for this course. For each quiz question I provide, analyze carefully and reply ONLY with the exact word, phrase, term, or method name. Keep it direct with no explanations.';
+        } else if (qType === 'all' || !qType) {
+            directive = 'Act as an expert academic assistant for this course. Analyze each quiz question carefully. For multiple-choice, reply with the correct option letter and exact text. For identification/short-answer, reply ONLY with the exact word, phrase, or method name. Keep answers direct with no explanations.';
+        }
+
+        return `[Context: ${header}]\n${directive}\n\n---\n\n`;
     }
 
     // Format a single question and choices cleanly for AI with strict A/B/C/D direct response directive
@@ -238,7 +244,8 @@
 
         const includeContext = forceContext !== null ? forceContext : shouldInjectAiContext(data.qNum);
         if (includeContext) {
-            const intro = buildAiContextIntro();
+            const qType = data.isShortAnswer || (!data.choices || data.choices.length === 0) ? 'shortanswer' : 'multichoice';
+            const intro = buildAiContextIntro(qType);
             output = `${intro}${output}`;
             markAiContextSent();
         }
@@ -271,7 +278,7 @@
                    `- Format answers in numerical order with zero extraneous conversational filler.`;
         }
 
-        const intro = buildAiContextIntro();
+        const intro = buildAiContextIntro('all');
         markAiContextSent();
         return `${intro}${res}`.trim();
     }

@@ -500,6 +500,7 @@
         let clean = String(ans).trim();
         clean = clean.replace(/^["'“”]+|["'“”]+$/g, '').trim();
         clean = clean.replace(/^(?:(?:question|item|q)\s*(?:no\.?|#)?\s*\d+[\s:.-]+|\(\d+\)|\d+[.)])\s+|^answer\s*[:.-]\s*/i, '').trim();
+        clean = clean.replace(/^[a-e][.)]\s*/i, '').trim();
         return clean;
     }
 
@@ -4095,7 +4096,18 @@
             if (!foundMatchForQuestion) {
                 const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
                 if (textInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()) {
-                    const bestCand = validCandidates[0];
+                    // Exclude multiple-choice, True/False, and choice-letter candidates from text inputs
+                    const shortAnsCandidates = validCandidates.filter(cand => {
+                        if (cand.questionType && ['multichoice', 'match', 'gapselect', 'ddwtos'].includes(cand.questionType)) return false;
+                        if (Array.isArray(cand.choices) && cand.choices.length > 1) return false;
+                        const raw = String(cand.ansRaw || cand.answer || '').trim();
+                        if (/^[a-d][.)]\s*(true|false)$/i.test(raw)) return false;
+                        if (/^(true|false)$/i.test(raw)) return false;
+                        if (/^[a-d][.)]?$/i.test(raw)) return false;
+                        return true;
+                    });
+                    if (shortAnsCandidates.length === 0) return;
+                    const bestCand = shortAnsCandidates[0];
                     const bestAnswer = bestCand ? (bestCand.ansRaw || bestCand.answer || '') : '';
                     const studyGuide = isConfirmedCandidate(bestCand) ? null : getStudyGuideInfo(bestCand);
                     const isStudyGuide = Boolean(studyGuide);

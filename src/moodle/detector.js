@@ -256,6 +256,8 @@
             .replace(/\[\s*_{2,}(?:\s*:\s*[\s\S]*?)?\s*\]/g, ' ')
             .replace(/^(?:identification|identify)\s*:\s*/i, '')
             .replace(/^(?:answer\s+)?question\s*(?:no\.?|#)?\s*\d+[\s:.-]*/i, '')
+            .replace(/^(?:(?:this\s+(?:command|method|function)|jquery\s+(?:method|command|function)|it)\s+(?:is\s+)?(?:used\s+to\s+|that\s+is\s+used\s+to\s+))/i, '')
+            .replace(/\bcreates\b/gi, 'create')
             .replace(/[_\u00a0]+/g, ' ')
             .replace(/\s+/g, ' ')
             .replace(/[.:?!;,]+$/g, '')
@@ -268,9 +270,22 @@
         if (!leftNorm || !rightNorm) return false;
         if (leftNorm === rightNorm) return true;
 
-        // Permit harmless prompt markup differences, but never short-token matches.
-        return leftNorm.length > 20 &&
-            (leftNorm.includes(rightNorm) || rightNorm.includes(leftNorm));
+        const longer = leftNorm.length >= rightNorm.length ? leftNorm : rightNorm;
+        const shorter = leftNorm.length >= rightNorm.length ? rightNorm : leftNorm;
+
+        // Permit harmless prompt markup differences, but never short-token matches
+        // or collisions where extra content contains code identifiers or qualifiers.
+        if (shorter.length > 20 && longer.includes(shorter)) {
+            const idx = longer.indexOf(shorter);
+            const prefix = longer.slice(0, idx).trim();
+            const suffix = longer.slice(idx + shorter.length).trim();
+            const extra = `${prefix} ${suffix}`.trim();
+            if (/\b(?:not|never|no|false|true)\b/i.test(extra)) return false;
+            if (/^\.[a-z0-9_]+/i.test(prefix) || /\.[a-z0-9_]+\s*\(/i.test(extra)) return false;
+            return (shorter.length / longer.length) >= 0.70;
+        }
+
+        return false;
     }
 
     // Helper to unscript unicode superscript and subscript digits to standard digits

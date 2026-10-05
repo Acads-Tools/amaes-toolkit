@@ -2569,6 +2569,8 @@
             .replace(/\[\s*_{2,}(?:\s*:\s*[\s\S]*?)?\s*\]/g, ' ')
             .replace(/^(?:identification|identify)\s*:\s*/i, '')
             .replace(/^(?:answer\s+)?question\s*(?:no\.?|#)?\s*\d+[\s:.-]*/i, '')
+            .replace(/^(?:(?:this\s+(?:command|method|function)|jquery\s+(?:method|command|function)|it)\s+(?:is\s+)?(?:used\s+to\s+|that\s+is\s+used\s+to\s+))/i, '')
+            .replace(/\bcreates\b/gi, 'create')
             .replace(/[_\u00a0]+/g, ' ')
             .replace(/\s+/g, ' ')
             .replace(/[.:?!;,]+$/g, '')
@@ -2581,9 +2583,22 @@
         if (!leftNorm || !rightNorm) return false;
         if (leftNorm === rightNorm) return true;
 
-        // Permit harmless prompt markup differences, but never short-token matches.
-        return leftNorm.length > 20 &&
-            (leftNorm.includes(rightNorm) || rightNorm.includes(leftNorm));
+        const longer = leftNorm.length >= rightNorm.length ? leftNorm : rightNorm;
+        const shorter = leftNorm.length >= rightNorm.length ? rightNorm : leftNorm;
+
+        // Permit harmless prompt markup differences, but never short-token matches
+        // or collisions where extra content contains code identifiers or qualifiers.
+        if (shorter.length > 20 && longer.includes(shorter)) {
+            const idx = longer.indexOf(shorter);
+            const prefix = longer.slice(0, idx).trim();
+            const suffix = longer.slice(idx + shorter.length).trim();
+            const extra = `${prefix} ${suffix}`.trim();
+            if (/\b(?:not|never|no|false|true)\b/i.test(extra)) return false;
+            if (/^\.[a-z0-9_]+/i.test(prefix) || /\.[a-z0-9_]+\s*\(/i.test(extra)) return false;
+            return (shorter.length / longer.length) >= 0.70;
+        }
+
+        return false;
     }
 
     // Helper to unscript unicode superscript and subscript digits to standard digits
@@ -3895,6 +3910,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         let clean = String(ans).trim();
         clean = clean.replace(/^["'“”]+|["'“”]+$/g, '').trim();
         clean = clean.replace(/^(?:(?:question|item|q)\s*(?:no\.?|#)?\s*\d+[\s:.-]+|\(\d+\)|\d+[.)])\s+|^answer\s*[:.-]\s*/i, '').trim();
+        clean = clean.replace(/^[a-e][.)]\s*/i, '').trim();
         return clean;
     }
 
@@ -7490,7 +7506,18 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             if (!foundMatchForQuestion) {
                 const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
                 if (textInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()) {
-                    const bestCand = validCandidates[0];
+                    // Exclude multiple-choice, True/False, and choice-letter candidates from text inputs
+                    const shortAnsCandidates = validCandidates.filter(cand => {
+                        if (cand.questionType && ['multichoice', 'match', 'gapselect', 'ddwtos'].includes(cand.questionType)) return false;
+                        if (Array.isArray(cand.choices) && cand.choices.length > 1) return false;
+                        const raw = String(cand.ansRaw || cand.answer || '').trim();
+                        if (/^[a-d][.)]\s*(true|false)$/i.test(raw)) return false;
+                        if (/^(true|false)$/i.test(raw)) return false;
+                        if (/^[a-d][.)]?$/i.test(raw)) return false;
+                        return true;
+                    });
+                    if (shortAnsCandidates.length === 0) return;
+                    const bestCand = shortAnsCandidates[0];
                     const bestAnswer = bestCand ? (bestCand.ansRaw || bestCand.answer || '') : '';
                     const studyGuide = isConfirmedCandidate(bestCand) ? null : getStudyGuideInfo(bestCand);
                     const isStudyGuide = Boolean(studyGuide);
@@ -11486,7 +11513,7 @@ function setupAccountTransferUI() {
         return false;
     }
 
-    function buildAiContextIntro() {
+    function buildAiContextIntro(qType = null) {
         const courseInfo = detectCourseInfo();
         const details = [];
         if (courseInfo.subjectCode) details.push(`Course Code: ${courseInfo.subjectCode}`);
@@ -11495,8 +11522,14 @@ function setupAccountTransferUI() {
 
         const header = details.length > 0 ? details.join(' | ') : 'AMAES Online Course Quiz';
 
-        return `[Context: ${header}]\n` +
-               `Act as an expert academic assistant for this course. For each quiz question I provide, analyze carefully and reply ONLY with the correct option letter (a, b, c, or d) and the exact choice text. Keep it direct with no explanations.\n\n---\n\n`;
+        let directive = 'Act as an expert academic assistant for this course. For each quiz question I provide, analyze carefully and reply ONLY with the correct option letter (a, b, c, or d) and the exact choice text. Keep it direct with no explanations.';
+        if (qType === 'shortanswer' || qType === 'identification') {
+            directive = 'Act as an expert academic assistant for this course. For each quiz question I provide, analyze carefully and reply ONLY with the exact word, phrase, term, or method name. Keep it direct with no explanations.';
+        } else if (qType === 'all' || !qType) {
+            directive = 'Act as an expert academic assistant for this course. Analyze each quiz question carefully. For multiple-choice, reply with the correct option letter and exact text. For identification/short-answer, reply ONLY with the exact word, phrase, or method name. Keep answers direct with no explanations.';
+        }
+
+        return `[Context: ${header}]\n${directive}\n\n---\n\n`;
     }
 
     // Format a single question and choices cleanly for AI with strict A/B/C/D direct response directive
@@ -11694,7 +11727,8 @@ function setupAccountTransferUI() {
 
         const includeContext = forceContext !== null ? forceContext : shouldInjectAiContext(data.qNum);
         if (includeContext) {
-            const intro = buildAiContextIntro();
+            const qType = data.isShortAnswer || (!data.choices || data.choices.length === 0) ? 'shortanswer' : 'multichoice';
+            const intro = buildAiContextIntro(qType);
             output = `${intro}${output}`;
             markAiContextSent();
         }
@@ -11727,7 +11761,7 @@ function setupAccountTransferUI() {
                    `- Format answers in numerical order with zero extraneous conversational filler.`;
         }
 
-        const intro = buildAiContextIntro();
+        const intro = buildAiContextIntro('all');
         markAiContextSent();
         return `${intro}${res}`.trim();
     }

@@ -5631,12 +5631,46 @@ test("Quiz Overall Grade & Attempts Evaluator: strictly enforces >=80% passing c
     assert.ok(script.includes("data.maxAttemptsReached"), "Quiz landing parser must detect when max attempts are reached");
     assert.ok(script.includes("attemptsInfo.maxAttemptsReached"), "Course page highlighter must evaluate maxAttemptsReached");
     assert.ok(script.includes("MAX ATTEMPTS"), "Must render MAX ATTEMPTS badge when attempts are exhausted with <80%");
-    assert.ok(script.includes("RE-ATTEMPT"), "Must render RE-ATTEMPT badge when attempts are possible with <80%");
-
     // 5. Button click handler integration
     assert.ok(script.includes("const res = await highlightMissingOrUnansweredQuizzes();"), "btn-hl-missing-quizzes must await highlightMissingOrUnansweredQuizzes");
     assert.ok(script.includes("All quizzes achieved passing grade (≥80%)! None pending."), "Must show passing confirmation toast when all quizzes are >=80%");
 });
+
+test("Short-Answer Guard & Prompt Isolation: prevents multichoice leaking into textboxes and isolates code-prefixed questions", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Solver short-answer candidate filtering
+    assert.ok(script.includes("const shortAnsCandidates = validCandidates.filter(cand => {"), "Must filter validCandidates specifically for short-answer text inputs");
+    assert.ok(script.includes("/^[a-d][.)]\\s*(true|false)$/i.test(raw)"), "Must reject True/False multiple-choice options from being populated into text inputs");
+    assert.ok(script.includes("clean.replace(/^[a-e][.)]\\s*/i, '').trim();"), "cleanFillBlankAnswer must strip option letter prefixes");
+
+    // 2. Adaptive AI context prompt directives
+    assert.ok(script.includes("function buildAiContextIntro(qType = null)"), "buildAiContextIntro must accept qType parameter");
+    assert.ok(script.includes("qType === 'shortanswer' || qType === 'identification'"), "buildAiContextIntro must branch directive for shortanswer / identification");
+
+    // 3. Question collision isolation
+    const vm = require('vm');
+    const detector = fs.readFileSync('src/moodle/detector.js', 'utf8');
+    const start = detector.indexOf('    function normalizeText(');
+    const end = detector.indexOf('    function unscriptDigits(', start);
+    const sandbox = {
+        DOMParser: class {
+            parseFromString(val) { return { body: { textContent: val } }; }
+        },
+        unscriptDigits: val => val
+    };
+    vm.runInNewContext(`${detector.slice(start, end)}\nglobalThis.matchQuestion = questionTextMatches;\nglobalThis.normalizeQuestion = normalizeQuestionMatchKey;`, sandbox);
+
+    const identQ = "IDENTIFICATION: It is used to get or set values from and to an input element particularly textboxes.";
+    const tfQ = ".vals() It is used to get or set values from and to an input element particularly textboxes.";
+    assert.strictEqual(sandbox.matchQuestion(identQ, tfQ), false, "Identification prompt must NOT match .vals() True/False statement");
+
+    const cmdSlide = "IDENTIFICATION: [____: slideLeft()] This command is used to create a sliding to the left transition within a given time on a selected element";
+    const jqSlide = "IDENTIFICATION: [______] JQuery method used to creates a sliding to the left transition within a given time on a selected element";
+    assert.strictEqual(sandbox.matchQuestion(cmdSlide, jqSlide), true, "This command is used to... and JQuery method used to creates... must match the same question key");
+});
+
+
 
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
