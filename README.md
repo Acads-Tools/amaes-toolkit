@@ -68,6 +68,10 @@ Before installing, ensure your environment meets the following specifications:
 ### 1. Real-Time Answer Verification & Auto-Quiz Assistance
 * **Visual Answer Highlighting:** Automatically matches quiz questions against verified ground truth and highlights correct choices in clean green indicators.
 * **Autonomous Progression (`Auto-Next`):** Automatically selects verified answers and smoothly advances to the next question.
+* **Autonomous Background Execution:** Runs hands-free across questions and pages in background tabs while multitasking. Fully un-gated progression ensures the solver does not freeze or pause when questions are answered via verified database matches, Jenny's Online / AMAUOED study-guide candidates, adaptive choice probing, or Gemini AI.
+* **Landing Page 1-Click Auto-Arming:** Clicking "Start Auto-Quiz" directly on the quiz introduction page (`/mod/quiz/view.php`) arms the engine in advance, so answer resolution and page transitions begin immediately upon quiz attempt load.
+* **Online Study Guides (AMAUOED & Jenny's Online):** Study Library features dedicated status pills, course match indicators, and 1-click link copying for Jenny's Online study guides alongside AMAUOED.
+* **Smart Dashboard Course Detection:** Eliminates false-positive subject mismatch alerts when browsing the Moodle dashboard by verifying active course context before displaying warnings.
 * **Ground-Truth Safety Gate:** Only Moodle-confirmed answers are auto-selected or auto-filled. AMAUOED and Jenny's Online suggestions remain clearly labeled and require manual selection, even when Auto-Pick is enabled.
 * **Source Confidence Labels:** Jenny's Online and AMAUOED are equal-priority study-guide suggestions, not verified answers; only Moodle review evidence, a matching 100% attempt, or explicit review-backed deduction can confirm an answer. An overall quiz score alone never proves which question was right or wrong.
 * **Non-Reviewable Quiz Safety:** A 100% overall score is not used to verify or share individual answers when Moodle explicitly blocks review or review permission cannot be confirmed. GE6301 (Gender and Society) is designated non-reviewable: its shared verified answer bank is cleared, answer sharing is blocked locally and at the relay, while unverified study-guide/AI suggestions remain separate. Other explicit restrictions are reported using only the course code and a random anonymous installation ID, hashed before database storage; shared warnings require three distinct installations within 90 days.
@@ -135,7 +139,7 @@ flowchart TD
     T1 -- Found Full Mark Ground Truth --> V1["Highlight Green Verified<br>(Confidence: 100%)"]
     T1 -- Not in Local Cache --> T2{"Tier 2: Community Consensus Bank"}
     T2 -- Found in Cloud Database --> V2["Highlight Blue Verified<br>(Confidence: 95%+)"]
-    T2 -- Not in Community DB --> T3{"Tier 3: Online Study Scraper (AMAUOED)"}
+    T2 -- Not in Community DB --> T3{"Tier 3: Online Study Guides (AMAUOED & Jenny's Online)"}
     T3 -- Found in Web Guide --> V3["Highlight Amber Warning<br>(Scraped from Student Guide)"]
     T3 -- No Online Match --> T4{"Tier 4: Google Gemini AI"}
     T4 -- AI Key Configured --> V4["Highlight Purple AI Suggestion<br>(or Auto-Pick if Enabled)"]
@@ -144,7 +148,7 @@ flowchart TD
 
 1. **Tier 1 (Local Verified Review Key - 100% Ground Truth):** Scraped directly from your own graded quizzes scoring 1.00/1.00. Marked with a green checkmark pill.
 2. **Tier 2 (Community Verified Consensus Bank):** Merged from anonymous peer review keys via [`Acads-Tools/database`](https://github.com/Acads-Tools/database).
-3. **Tier 3 (Online Study Guide Scraper - AMAUOED):** Scrapes student study guides when the local library has no match. Marked with an amber warning badge.
+3. **Tier 3 (Online Study Guides - AMAUOED & Jenny's Online):** Checks cached student study guides when the local library has no match. Marked with an amber unverified candidate badge.
 4. **Tier 4 (Google Gemini AI Engine):** Solves remaining Multiple Choice or True/False questions on-the-fly. Marked with an `AI Suggestion` purple pill.
 
 ### Multi-Course Grades Harvester (Batch Scanner)
@@ -159,9 +163,10 @@ The Grades Harvester allows you to quickly build an answer library for all your 
 The toolkit offers two distinct operational modes depending on your preference:
 
 * **Companion Mode (Default):** Highlights verified choices visually on screen but **never clicks or advances automatically**. You retain 100% control of every choice and button click.
-* **Autonomous Auto-Quiz Solver:** Selects verified answers and clicks "Next page" automatically.
-  * **How to Enable:** In the **Quiz** tab, toggle **Auto-Quiz Mode: ON** (or press keyboard shortcut `P`).
-  * **Safety Gate:** If a question has no confirmed answer, the solver pauses automatically, brings up the in-question toolbar, and sounds an intervention chime.
+* **Autonomous Auto-Quiz Solver:** Selects verified answers and clicks "Next page" automatically in background tabs.
+  * **How to Enable:** In the **Quiz** tab, toggle **Auto-Quiz Mode: ON** (or press keyboard shortcut `P`), or click **Start Auto-Quiz** directly from the quiz introduction landing page.
+  * **Hands-Free Background Execution:** Answers questions and advances smoothly without freezing. Fully un-gated progression ensures resolved questions do not stall automation.
+  * **Safety Gate:** If a question has no confirmed answer and AI cannot resolve it, the solver pauses automatically, brings up the in-question toolbar, and sounds a gentle intervention chime.
 * **⚡ Fast Answer (Turbo) Mode:**
   * **What it does:** Reduces the toolkit's post-answer navigation delay to **200ms** and enables 1-click batch solving for visible questions. Locally cached verified answers are checked first; optional online study-guide refreshes run in the background. Turbo does not accelerate Moodle's page/network response or turn unconfirmed suggestions into auto-answers.
   * **Multi-Question Pages:** Adds a 1-click **"Fill Verified Answers"** button that selects all verified answers on the current page simultaneously in 0.1s. If unknown questions remain and AI is enabled, it resolves them concurrently in parallel.
