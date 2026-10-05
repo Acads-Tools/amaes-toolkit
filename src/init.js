@@ -67,6 +67,15 @@
             }, 800);
         }
 
+        if (checkIsQuizViewPage()) {
+            try {
+                const landingData = parseQuizLandingData();
+                if (landingData && landingData.cmid) {
+                    localStorage.setItem('amaes_quiz_attempts_' + landingData.cmid, JSON.stringify(landingData));
+                }
+            } catch (_) {}
+        }
+
         // Auto-Harvest past quizzes: scan Grade Report once per session per course or all courses on dashboard
         if (autoHarvestGrades) {
             try {

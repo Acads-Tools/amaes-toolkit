@@ -1120,17 +1120,18 @@
 
         const btnHlMissingQuizzes = document.getElementById('btn-hl-missing-quizzes');
         if (btnHlMissingQuizzes) {
-            btnHlMissingQuizzes.onclick = () => {
-                const res = highlightMissingOrUnansweredQuizzes();
+            btnHlMissingQuizzes.onclick = async () => {
+                showToast("Checking quiz grades and attempt statuses...", 1500);
+                const res = await highlightMissingOrUnansweredQuizzes();
                 if (res.count > 0) {
-                    showToast(`Highlighted ${res.count} missing/unattempted quizzes!`);
-                    setLog(`Found and highlighted <b>${res.count}</b> missing/unattempted quizzes.`, "var(--accent-amber)");
+                    showToast(`Highlighted ${res.count} missing/re-attemptable quizzes!`);
+                    setLog(`Found and highlighted <b>${res.count}</b> quizzes needing completion/re-attempt (<80%).`, "var(--accent-amber)");
                 } else if (res.message) {
                     showToast(res.message);
                     setLog(res.message, "var(--accent-green)");
                 } else {
-                    showToast("No missing quizzes found on this page! All completed.");
-                    setLog("No missing quizzes found on this page. All activities completed!", "var(--accent-green)");
+                    showToast("All quizzes achieved passing grade (≥80%)! None pending.");
+                    setLog("All quizzes achieved passing grade (≥80%). No pending or missing quizzes!", "var(--accent-green)");
                 }
             };
         }

@@ -5612,6 +5612,32 @@ test("Autonomous Background Overhaul: prevents solver freeze during autoQuizMode
     assert.ok(script.includes("toggleAutoQuizMode(true);\n                            showToast(\"Starting quiz attempt...\", 2000);"), "Master Start Auto-Quiz button must arm autoQuizMode when starting from quiz landing page");
 });
 
+test("Quiz Overall Grade & Attempts Evaluator: strictly enforces >=80% passing cutoff, detects Moodle 4 Done buttons, and evaluates attempt limits", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Parser and Evaluator Definitions
+    assert.ok(script.includes("function parseQuizLandingData("), "Must define parseQuizLandingData helper");
+    assert.ok(script.includes("async function highlightMissingOrUnansweredQuizzes()"), "highlightMissingOrUnansweredQuizzes must be async");
+
+    // 2. Strict >=80% Acceptance Cutoff Enforcement
+    assert.ok(script.includes("gradeInfo.percentage >= 80"), "Quizzes with overall grade >= 80% must be accepted and skipped from missing highlight");
+    assert.ok(script.includes("isAccepted = Boolean(hasGrade && pct !== null && pct >= 80)"), "Grades report row evaluation must strictly enforce >= 80% cutoff");
+
+    // 3. Moodle 4 Manual Completion Button Recognition
+    assert.ok(script.includes("button[data-toggletype=\"manual:undo\"]"), "isActivityAlreadyComplete must detect Moodle 4 manual undo buttons");
+    assert.ok(script.includes("button.btn-outline-success"), "isActivityAlreadyComplete must detect btn-outline-success buttons");
+
+    // 4. Attempt Possibility & Max Attempt Limits
+    assert.ok(script.includes("data.maxAttemptsReached"), "Quiz landing parser must detect when max attempts are reached");
+    assert.ok(script.includes("attemptsInfo.maxAttemptsReached"), "Course page highlighter must evaluate maxAttemptsReached");
+    assert.ok(script.includes("MAX ATTEMPTS"), "Must render MAX ATTEMPTS badge when attempts are exhausted with <80%");
+    assert.ok(script.includes("RE-ATTEMPT"), "Must render RE-ATTEMPT badge when attempts are possible with <80%");
+
+    // 5. Button click handler integration
+    assert.ok(script.includes("const res = await highlightMissingOrUnansweredQuizzes();"), "btn-hl-missing-quizzes must await highlightMissingOrUnansweredQuizzes");
+    assert.ok(script.includes("All quizzes achieved passing grade (≥80%)! None pending."), "Must show passing confirmation toast when all quizzes are >=80%");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

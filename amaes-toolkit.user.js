@@ -8281,25 +8281,34 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         const map = gradesMap || (typeof window !== 'undefined' ? window.__amaesCourseGradesCache : null);
         if (map && Object.keys(map).length > 0) {
             // Check by container cmid if available (id="module-123" or data-id="123")
-            const moduleId = (container.id || '').replace(/^module-/, '') || container.dataset.id || '';
+            let moduleId = (container && container.id ? container.id.replace(/^module-/, '') : '') || (container && container.dataset ? container.dataset.id : '') || '';
+            if (!moduleId && container && container.querySelector) {
+                const link = container.querySelector('a[href*="/mod/quiz/view.php?id="], a[href*="id="]');
+                if (link) {
+                    const m = (link.getAttribute('href') || link.href || '').match(/[?&]id=(\d+)/);
+                    if (m) moduleId = m[1];
+                }
+            }
             if (moduleId && map[`cmid_${moduleId}`]) {
                 const entry = map[`cmid_${moduleId}`];
                 return {
                     isPassable: entry.isPassable,
                     hasGrade: entry.hasGrade,
                     percentage: entry.percentage,
+                    cmid: moduleId,
                     source: 'grades-report'
                 };
             }
 
             // Check by normalized title
-            const normTitle = (title || container.innerText.split('\n')[0] || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            if (map[normTitle]) {
+            const normTitle = (title || (container && container.innerText ? container.innerText.split('\n')[0] : '') || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (normTitle && map[normTitle]) {
                 const entry = map[normTitle];
                 return {
                     isPassable: entry.isPassable,
                     hasGrade: entry.hasGrade,
                     percentage: entry.percentage,
+                    cmid: entry.cmid || moduleId,
                     source: 'grades-report'
                 };
             }
@@ -8361,7 +8370,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         if (container.classList.contains('completed')) return true;
 
         // 2. Completed icons or toggled buttons
-        if (container.querySelector('.iscompleted, [data-toggled="true"], button[aria-checked="true"], button.btn-success')) return true;
+        if (container.querySelector(
+            '.iscompleted, [data-toggled="true"], button[aria-checked="true"], button.btn-success, button.btn-outline-success, button[data-toggletype="manual:undo"]'
+        )) return true;
 
         // 3. Scan completion area for completion markers
         const completionArea = container.querySelector(
@@ -8372,8 +8383,20 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
         // 4. Check entire completionArea text content for "Done" or "Completed"
         const fullText = (completionArea.innerText || completionArea.textContent || '').trim().toLowerCase();
-        if (fullText.includes('done:') || fullText.includes('done :') || fullText === 'done' || fullText.includes('completed')) {
+        if (fullText.includes('done:') || fullText.includes('done :') || /\bdone\b/i.test(fullText) || fullText.includes('completed')) {
             return true;
+        }
+
+        // 5. Scan all buttons inside container for manual undo or done text
+        const btns = container.querySelectorAll(
+            'button[data-action="toggle-manual-completion"], button[data-toggletype], button.btn-outline-success, button.btn-success, button'
+        );
+        for (const b of btns) {
+            const bText = (b.innerText || b.getAttribute('aria-label') || b.textContent || '').trim().toLowerCase();
+            const bToggle = (b.getAttribute('data-toggletype') || '').toLowerCase();
+            if (bToggle === 'manual:undo' || /\bdone\b/i.test(bText) || bText.includes('✓') || bText.includes('✔') || b.classList.contains('btn-outline-success') || b.classList.contains('btn-success')) {
+                return true;
+            }
         }
 
         return false;
@@ -8415,8 +8438,12 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 const isCurrentlyDone =
                     toggleType === 'manual:undo' ||
                     text === 'done' ||
+                    /\bdone\b/i.test(text) ||
+                    text.includes('✓') ||
+                    text.includes('✔') ||
                     text.includes('completed') ||
-                    btn.classList.contains('btn-success');
+                    btn.classList.contains('btn-success') ||
+                    btn.classList.contains('btn-outline-success');
 
                 const isCurrentlyUncompleted =
                     toggleType === 'manual:mark-done' ||
@@ -8723,21 +8750,191 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         return { count, targetCategory };
     }
 
-    // Auto-Highlight unanswered / missing quizzes on Grades or Course pages
-    function highlightMissingOrUnansweredQuizzes() {
+    // ==========================================
+    // Quiz Landing Page Data & Attempt Parser
+    // ==========================================
+
+    function parseQuizLandingData(doc = document, pageUrl = (typeof window !== 'undefined' ? window.location.href : '')) {
+        let cmid = null;
+        const mId = (pageUrl || '').match(/[?&]id=(\d+)/);
+        if (mId) cmid = mId[1];
+
+        const text = (doc.body ? doc.body.innerText : (doc.documentElement ? doc.documentElement.innerText : '')) || '';
+
+        // 1. Attempts allowed
+        let attemptsAllowed = null;
+        const mAllowed = text.match(/attempts allowed:\s*(\d+)/i);
+        if (mAllowed) {
+            attemptsAllowed = parseInt(mAllowed[1], 10);
+        }
+
+        // 2. Count finished attempts from summary table
+        let attemptsUsed = 0;
+        const attemptRows = doc.querySelectorAll('.generaltable tbody tr, table.generaltable tr');
+        attemptRows.forEach(r => {
+            const rText = r.innerText.toLowerCase();
+            if (rText.includes('finished') || rText.includes('submitted') || rText.includes('review') || /attempt\s*\d+/i.test(rText)) {
+                if (/\d/.test(r.querySelector('td') ? r.querySelector('td').innerText : '')) {
+                    attemptsUsed++;
+                }
+            }
+        });
+
+        if (attemptsUsed === 0) {
+            const matches = Array.from(text.matchAll(/(?:attempt|preview)\s+(\d+)/gi));
+            if (matches.length > 0) {
+                const nums = matches.map(m => parseInt(m[1], 10)).filter(n => !isNaN(n));
+                if (nums.length > 0) attemptsUsed = Math.max(...nums);
+            }
+        }
+
+        // 3. Highest grade / Overall grade
+        let highestGradeStr = '';
+        let highestPct = null;
+        let hasGrade = false;
+
+        const mHighest = text.match(/highest grade:\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/i)
+                      || text.match(/overall grade for this quiz:\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/i);
+        if (mHighest) {
+            const earned = parseFloat(mHighest[1]);
+            const max = parseFloat(mHighest[2]);
+            if (max > 0) {
+                highestPct = Math.round((earned / max) * 100);
+                highestGradeStr = `${earned} / ${max} (${highestPct}%)`;
+                hasGrade = true;
+            }
+        }
+
+        if (highestPct === null) {
+            const gradeCells = doc.querySelectorAll('.generaltable td.c3, .generaltable td.c2, .generaltable td');
+            let maxFoundPct = -1;
+            gradeCells.forEach(cell => {
+                const cText = cell.innerText.trim();
+                const mCellFrac = cText.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
+                if (mCellFrac) {
+                    const earned = parseFloat(mCellFrac[1]);
+                    const max = parseFloat(mCellFrac[2]);
+                    if (max > 0) {
+                        const p = Math.round((earned / max) * 100);
+                        if (p > maxFoundPct) {
+                            maxFoundPct = p;
+                            highestGradeStr = cText;
+                            hasGrade = true;
+                        }
+                    }
+                } else {
+                    const mNum = cText.match(/^(\d+(?:\.\d+)?)$/);
+                    if (mNum) {
+                        const val = parseFloat(mNum[1]);
+                        if (val <= 100 && val > maxFoundPct) {
+                            maxFoundPct = val;
+                            highestGradeStr = `${val}%`;
+                            hasGrade = true;
+                        }
+                    }
+                }
+            });
+            if (maxFoundPct >= 0) {
+                highestPct = maxFoundPct;
+            }
+        }
+
+        // 4. Can re-attempt / start attempt
+        const startBtn = doc.querySelector(
+            'form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], ' +
+            '.quizstartbutton button, .quizstartbutton input[type="submit"], ' +
+            '#region-main button.btn-primary, #region-main input.btn-primary'
+        );
+        const noMoreAllowed = text.toLowerCase().includes('no more attempts are allowed');
+        const maxAttemptsReached = Boolean(noMoreAllowed || (attemptsAllowed !== null && attemptsUsed >= attemptsAllowed));
+        const canReattempt = Boolean(startBtn && !maxAttemptsReached);
+
+        const isPassable = Boolean(hasGrade && highestPct !== null && highestPct >= 80);
+
+        return {
+            cmid,
+            attemptsAllowed,
+            attemptsUsed,
+            highestGradeStr,
+            highestPct,
+            hasGrade,
+            isPassable,
+            canReattempt,
+            maxAttemptsReached
+        };
+    }
+
+    // Auto-Highlight unanswered / missing quizzes on Grades, Course, or Quiz view pages
+    async function highlightMissingOrUnansweredQuizzes() {
         clearAllHighlights();
 
         const isGrades = typeof window !== 'undefined' && window.location.pathname.includes('/grade/report/user/index.php');
         const isCourse = checkIsCoursePage();
+        const isQuizLanding = typeof window !== 'undefined' && window.location.pathname.includes('/mod/quiz/view.php');
 
-        if (!isGrades && !isCourse) {
-            return { count: 0, error: 'Not on a course or grades page', message: 'Open a course or Grades page first to highlight missing quizzes.' };
+        if (!isGrades && !isCourse && !isQuizLanding) {
+            return { count: 0, error: 'Not on a course, grades, or quiz page', message: 'Open a course, Grades, or Quiz page first to highlight missing quizzes.' };
         }
 
         let count = 0;
         let firstScrolled = false;
 
-        if (isGrades) {
+        if (isQuizLanding) {
+            const data = parseQuizLandingData(document, window.location.href);
+            if (data.cmid) {
+                try {
+                    localStorage.setItem('amaes_quiz_attempts_' + data.cmid, JSON.stringify(data));
+                } catch (e) {}
+            }
+
+            if (data.isPassable) {
+                return {
+                    count: 0,
+                    isQuizLanding: true,
+                    passed: true,
+                    message: `Quiz already completed with passing grade (${data.highestPct}% ≥ 80%)! No further attempts required.`
+                };
+            }
+
+            const startBtn = document.querySelector(
+                'form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], ' +
+                '.quizstartbutton button, .quizstartbutton input[type="submit"], ' +
+                '#region-main button.btn-primary, #region-main input.btn-primary'
+            );
+            if (startBtn) {
+                count++;
+                startBtn.classList.add('amaes-highlighted-item');
+                startBtn.style.outline = '3px solid #f59e0b';
+                startBtn.style.boxShadow = '0 0 15px rgba(245, 158, 11, 0.6)';
+
+                const badge = document.createElement('span');
+                badge.className = 'amaes-type-badge';
+                badge.innerText = data.hasGrade
+                    ? `NEEDS 80%+ (Current: ${data.highestPct}%)`
+                    : 'UNATTEMPTED';
+                badge.style.cssText = `
+                    background: #f59e0b;
+                    color: #000;
+                    font-size: 10px;
+                    font-weight: 800;
+                    padding: 3px 8px;
+                    border-radius: 4px;
+                    margin-left: 8px;
+                    display: inline-block;
+                    vertical-align: middle;
+                `;
+                startBtn.parentNode.insertBefore(badge, startBtn.nextSibling);
+                startBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else if (data.maxAttemptsReached) {
+                return {
+                    count: 0,
+                    isQuizLanding: true,
+                    message: `Max attempts reached (${data.attemptsUsed}/${data.attemptsAllowed}). Score: ${data.highestPct}%. No more attempts allowed.`
+                };
+            }
+
+            return { count, isQuizLanding: true, attemptsUsed: data.attemptsUsed, attemptsAllowed: data.attemptsAllowed };
+        } else if (isGrades) {
             const rows = Array.from(document.querySelectorAll('.user-grade tr, .generaltable tr, table.table tr, tr'));
             rows.forEach(r => {
                 const quizLink = r.querySelector('a[href*="/mod/quiz/"], a[href*="quiz"], a.gradeitemheader')
@@ -8755,94 +8952,190 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 const gradeCell = r.querySelector('.column-grade, [headers*="grade"], td.grade');
                 const pctCell = r.querySelector('.column-percentage, [headers*="percentage"]');
                 let hasGrade = false;
+                let pct = null;
+
+                if (pctCell) {
+                    const pText = pctCell.innerText.trim();
+                    const mPct = pText.match(/(\d+(?:\.\d+)?)\s*%/);
+                    if (mPct) {
+                        pct = parseFloat(mPct[1]);
+                        hasGrade = true;
+                    }
+                }
+
                 if (gradeCell) {
                     const gText = gradeCell.innerText.trim();
                     if (gText && gText !== '-' && gText !== '–' && /\d/.test(gText)) {
                         hasGrade = true;
+                        if (pct === null) {
+                            const mFrac = gText.match(/(\d+(?:\.\d+)?)\s*(?:\/|\s*out of\s*)\s*(\d+(?:\.\d+)?)/i);
+                            if (mFrac) {
+                                const earned = parseFloat(mFrac[1]);
+                                const max = parseFloat(mFrac[2]);
+                                if (max > 0) pct = Math.round((earned / max) * 100);
+                            } else {
+                                const mNum = gText.match(/(\d+(?:\.\d+)?)/);
+                                if (mNum && parseFloat(mNum[1]) <= 100) {
+                                    pct = parseFloat(mNum[1]);
+                                }
+                            }
+                        }
                     }
                 }
-                if (!hasGrade && pctCell) {
-                    const pText = pctCell.innerText.trim();
-                    if (pText && pText !== '-' && pText !== '–' && !pText.includes('0.00') && /\d/.test(pText)) {
-                        hasGrade = true;
-                    }
+
+                // Strict 80%+ Rule: Only grades >= 80% are accepted!
+                const isAccepted = Boolean(hasGrade && pct !== null && pct >= 80);
+                if (isAccepted) {
+                    return; // Quiz passed and accepted! Do NOT highlight!
                 }
 
-                if (!hasGrade) {
-                    count++;
-                    r.classList.add('amaes-highlighted-item');
-                    r.style.background = 'rgba(245, 158, 11, 0.18)';
-                    r.style.outline = '2px solid #f59e0b';
+                count++;
+                r.classList.add('amaes-highlighted-item');
+                r.style.background = 'rgba(245, 158, 11, 0.18)';
+                r.style.outline = '2px solid #f59e0b';
 
-                    const badge = document.createElement('span');
-                    badge.className = 'amaes-type-badge';
-                    badge.innerText = 'UNATTEMPTED';
-                    badge.style.cssText = `
-                        background: #f59e0b;
-                        color: #000;
-                        font-size: 9px;
-                        font-weight: 800;
-                        padding: 1px 5px;
-                        border-radius: 3px;
-                        margin-left: 6px;
-                        display: inline-block;
-                        vertical-align: middle;
-                    `;
-                    quizLink.appendChild(badge);
+                const badge = document.createElement('span');
+                badge.className = 'amaes-type-badge';
+                badge.innerText = (hasGrade && pct !== null) ? `NEEDS 80%+ (${pct}%)` : 'UNATTEMPTED';
+                badge.style.cssText = `
+                    background: #f59e0b;
+                    color: #000;
+                    font-size: 9px;
+                    font-weight: 800;
+                    padding: 1px 5px;
+                    border-radius: 3px;
+                    margin-left: 6px;
+                    display: inline-block;
+                    vertical-align: middle;
+                `;
+                quizLink.appendChild(badge);
 
-                    if (!firstScrolled) {
-                        r.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        firstScrolled = true;
-                    }
+                if (!firstScrolled) {
+                    r.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    firstScrolled = true;
                 }
             });
         } else if (isCourse) {
+            const gradesMap = await fetchCourseGradesMap();
             const activities = Array.from(document.querySelectorAll(
                 'li.activity, .activity-item, .course-section .activity, div[data-region="activity-card"]'
             ));
-            activities.forEach(el => {
-                const cls = classifyActivity(el);
-                if (cls.type !== 'quiz') return;
 
-                // Check if activity is already marked completed
-                const isCompleted = el.classList.contains('completed') ||
-                                    el.querySelector('.iscompleted, .badge-success, .text-success, button[aria-checked="true"], button[data-toggled="true"]');
-                if (!isCompleted) {
-                    count++;
-                    el.classList.add('amaes-highlighted-item');
-                    el.style.position = 'relative';
-                    el.style.outline = '2px solid #f59e0b';
-                    el.style.borderRadius = '8px';
-                    el.style.boxShadow = '0 0 12px rgba(245, 158, 11, 0.4)';
+            const quizActivities = activities.filter(el => classifyActivity(el).type === 'quiz');
 
-                    const badge = document.createElement('span');
-                    badge.className = 'amaes-type-badge';
-                    badge.innerText = 'MISSING / PENDING';
-                    badge.style.cssText = `
-                        position: absolute;
-                        top: 6px;
-                        right: 6px;
-                        background: #f59e0b;
-                        color: #000000;
-                        font-size: 9px;
-                        font-weight: 800;
-                        padding: 2px 6px;
-                        border-radius: 4px;
-                        z-index: 10;
-                        pointer-events: none;
-                        text-transform: uppercase;
-                    `;
-                    el.appendChild(badge);
+            for (const el of quizActivities) {
+                const titleElem = el.querySelector('.instancename, .activityname, a.aal_link, .activity-title');
+                const rawTitle = titleElem ? titleElem.innerText.trim() : (el.innerText.split('\n')[0] || '');
+                const gradeInfo = evaluateQuizPassableGrade(el, rawTitle, gradesMap);
 
-                    if (!firstScrolled) {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        firstScrolled = true;
+                // 1. Strict Acceptance Guard: Overall grade >= 80% is accepted! Never highlight as missing!
+                if (gradeInfo.hasGrade && gradeInfo.percentage !== null && gradeInfo.percentage >= 80) {
+                    continue;
+                }
+
+                // If gradesMap has no grade, check fallback completion only if gradesMap was empty
+                if (!gradeInfo.hasGrade && (!gradesMap || Object.keys(gradesMap).length === 0)) {
+                    if (isActivityAlreadyComplete(el)) {
+                        continue;
                     }
                 }
-            });
+
+                let cmid = gradeInfo.cmid;
+                const linkElem = el.querySelector('a[href*="/mod/quiz/view.php?id="], a[href*="id="]');
+                if (!cmid && linkElem) {
+                    const m = (linkElem.getAttribute('href') || linkElem.href || '').match(/[?&]id=(\d+)/);
+                    if (m) cmid = m[1];
+                }
+
+                // Check cached attempt details
+                let attemptsInfo = null;
+                if (cmid) {
+                    try {
+                        const raw = localStorage.getItem('amaes_quiz_attempts_' + cmid);
+                        if (raw) attemptsInfo = JSON.parse(raw);
+                    } catch (e) {}
+                }
+
+                // If not cached and quiz link is available, fetch quiz landing to check attempt limits
+                if (!attemptsInfo && linkElem && linkElem.href) {
+                    try {
+                        const resp = await fetch(linkElem.href);
+                        if (resp.ok) {
+                            const html = await resp.text();
+                            const doc = new DOMParser().parseFromString(html, 'text/html');
+                            attemptsInfo = parseQuizLandingData(doc, linkElem.href);
+                            if (cmid) {
+                                try {
+                                    localStorage.setItem('amaes_quiz_attempts_' + cmid, JSON.stringify(attemptsInfo));
+                                } catch (e) {}
+                            }
+                            if (attemptsInfo.hasGrade && attemptsInfo.highestPct !== null && attemptsInfo.highestPct >= 80) {
+                                // Passed with >= 80%!
+                                continue;
+                            }
+                        }
+                    } catch (e) {}
+                }
+
+                const isMaxReached = attemptsInfo && attemptsInfo.maxAttemptsReached;
+                const attemptsAllowed = attemptsInfo ? attemptsInfo.attemptsAllowed : null;
+                const attemptsUsed = attemptsInfo ? attemptsInfo.attemptsUsed : null;
+                const pct = (attemptsInfo && attemptsInfo.highestPct !== null) ? attemptsInfo.highestPct : gradeInfo.percentage;
+
+                let badgeText = 'MISSING / PENDING';
+                let badgeColor = '#f59e0b';
+                let badgeTextColor = '#000000';
+
+                if (isMaxReached) {
+                    badgeText = pct !== null ? `MAX ATTEMPTS (${pct}%)` : 'MAX ATTEMPTS REACHED';
+                    badgeColor = '#ef4444';
+                    badgeTextColor = '#ffffff';
+                } else if (pct !== null) {
+                    if (attemptsAllowed !== null && attemptsUsed !== null) {
+                        badgeText = `RE-ATTEMPT (${pct}% | ${attemptsUsed}/${attemptsAllowed})`;
+                    } else {
+                        badgeText = `NEEDS 80%+ (${pct}%)`;
+                    }
+                } else if (attemptsAllowed !== null) {
+                    badgeText = `UNATTEMPTED (0/${attemptsAllowed})`;
+                } else {
+                    badgeText = 'MISSING / PENDING';
+                }
+
+                count++;
+                el.classList.add('amaes-highlighted-item');
+                el.style.position = 'relative';
+                el.style.outline = `2px solid ${badgeColor}`;
+                el.style.borderRadius = '8px';
+                el.style.boxShadow = `0 0 12px ${badgeColor}66`;
+
+                const badge = document.createElement('span');
+                badge.className = 'amaes-type-badge';
+                badge.innerText = badgeText;
+                badge.style.cssText = `
+                    position: absolute;
+                    top: 6px;
+                    right: 6px;
+                    background: ${badgeColor};
+                    color: ${badgeTextColor};
+                    font-size: 9px;
+                    font-weight: 800;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    z-index: 10;
+                    pointer-events: none;
+                    text-transform: uppercase;
+                `;
+                el.appendChild(badge);
+
+                if (!firstScrolled) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    firstScrolled = true;
+                }
+            }
         }
 
-        return { count, isGrades, isCourse };
+        return { count, isGrades, isCourse, isQuizLanding };
     }
 
     const ACCOUNT_SWITCHER_ACCOUNTS_KEY = 'amaes_account_switcher_accounts';
@@ -20318,17 +20611,18 @@ function setupAccountTransferUI() {
 
         const btnHlMissingQuizzes = document.getElementById('btn-hl-missing-quizzes');
         if (btnHlMissingQuizzes) {
-            btnHlMissingQuizzes.onclick = () => {
-                const res = highlightMissingOrUnansweredQuizzes();
+            btnHlMissingQuizzes.onclick = async () => {
+                showToast("Checking quiz grades and attempt statuses...", 1500);
+                const res = await highlightMissingOrUnansweredQuizzes();
                 if (res.count > 0) {
-                    showToast(`Highlighted ${res.count} missing/unattempted quizzes!`);
-                    setLog(`Found and highlighted <b>${res.count}</b> missing/unattempted quizzes.`, "var(--accent-amber)");
+                    showToast(`Highlighted ${res.count} missing/re-attemptable quizzes!`);
+                    setLog(`Found and highlighted <b>${res.count}</b> quizzes needing completion/re-attempt (<80%).`, "var(--accent-amber)");
                 } else if (res.message) {
                     showToast(res.message);
                     setLog(res.message, "var(--accent-green)");
                 } else {
-                    showToast("No missing quizzes found on this page! All completed.");
-                    setLog("No missing quizzes found on this page. All activities completed!", "var(--accent-green)");
+                    showToast("All quizzes achieved passing grade (≥80%)! None pending.");
+                    setLog("All quizzes achieved passing grade (≥80%). No pending or missing quizzes!", "var(--accent-green)");
                 }
             };
         }
@@ -20884,6 +21178,15 @@ function setupAccountTransferUI() {
             setTimeout(() => {
                 try { promoteAttemptEvidenceFromScore(); } catch (_) {}
             }, 800);
+        }
+
+        if (checkIsQuizViewPage()) {
+            try {
+                const landingData = parseQuizLandingData();
+                if (landingData && landingData.cmid) {
+                    localStorage.setItem('amaes_quiz_attempts_' + landingData.cmid, JSON.stringify(landingData));
+                }
+            } catch (_) {}
         }
 
         // Auto-Harvest past quizzes: scan Grade Report once per session per course or all courses on dashboard
