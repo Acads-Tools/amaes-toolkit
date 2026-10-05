@@ -1302,21 +1302,17 @@
         updateCheck('chk-auto-community-share', true);
         updateCheck('chk-auto-harvest-grades', true);
         updateCheck('chk-auto-hl-quiz', true);
-        updateCheck('chk-copy-confidence', true);
         updateCheck('chk-auto-copy-ai', true);
-        updateCheck('chk-smart-skip', false);
         updateCheck('chk-auto-min-quiz', false);
         updateCheck('chk-audio-alerts', true);
         updateCheck('chk-in-question-ai', true);
         updateCheck('chk-show-in-q-btns', true);
         updateCheck('chk-ai-hint', true);
-        updateCheck('chk-ai-prompt-hint', true);
         updateCheck('chk-keyboard-shortcuts', true);
         updateCheck('chk-auto-pick', true);
         updateCheck('chk-auto-next-verified', true);
         updateCheck('chk-auto-pick-study-guide-fallback', false);
         updateCheck('chk-auto-submit-quiz', false);
-        updateCheck('chk-auto-next', false);
         updateCheck('chk-auto-dl-json', false);
         updateCheck('chk-auto-push-github', false);
         updateCheck('chk-auto-scrape-amauoed-quiz', true);
@@ -17705,33 +17701,41 @@ function setupAccountTransferUI() {
                         </button>
                     </div>
 
-                    <!-- Primary Core Settings (The 4-Step Pipeline: Highlight -> Pick -> Next -> Speed) -->
+                    <!-- Primary Core Settings -->
                     <div style="margin-top: 2px; border-top: 1px solid var(--border-subtle); padding-top: 6px; display: flex; flex-direction: column; gap: 6px;">
+                        <!-- Assistive Visual Highlighting -->
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Highlight verified database and study guide answers with color codes">
                             <input id="chk-auto-hl-quiz" type="checkbox" ${autoHighlightQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span>Show Answers</span>
+                            <span>Show Answers (Color Highlights)</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Automatically select choice inputs when verified answers are matched">
-                            <input id="chk-auto-pick" type="checkbox" ${autoPickQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span>Auto-Pick Answers</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Advances smoothly to next question when answered; pauses on unknown questions">
-                            <input id="chk-auto-next-verified" type="checkbox" ${autoNextVerified ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span>Smart Next</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="In Auto-Quiz, select an exact Jenny's Online or AMAUOED choice match when no verified answer is available. These suggestions are unverified; Smart Next must be on to advance automatically.">
-                            <input id="chk-auto-pick-study-guide-fallback" type="checkbox" ${autoPickStudyGuideFallback ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span>Auto-Pick Study-Guide Fallback (Unverified)</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically click Submit all and finish after reaching the quiz summary. This submits without a final manual review.">
-                            <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span>Auto-Submit Quiz on Completion</span>
-                        </label>
+
+                        <!-- Autonomous Pilot Automation Options -->
+                        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 5px;">
+                            <div style="font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Auto-Pilot Automation</div>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Automatically select choice inputs when verified answers are matched">
+                                <input id="chk-auto-pick" type="checkbox" ${autoPickQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Auto-Pick Answers</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Advances smoothly to next question when answered; pauses on unknown questions">
+                                <input id="chk-auto-next-verified" type="checkbox" ${autoNextVerified ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Smart Next (Auto-Advance)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="In Auto-Quiz, select an exact Jenny's Online or AMAUOED choice match when no verified answer is available. These suggestions are unverified; Smart Next must be on to advance automatically.">
+                                <input id="chk-auto-pick-study-guide-fallback" type="checkbox" ${autoPickStudyGuideFallback ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Study-Guide Fallback (Unverified)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically click Submit all and finish after reaching the quiz summary. This submits without a final manual review.">
+                                <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Auto-Submit Quiz on Completion</span>
+                            </label>
+                        </div>
+
+                        <!-- Speed Mode Card -->
                         <label id="amaes-fast-answer-card" style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Fast Answer Mode: Answers visible questions instantly & speeds up moving to next page">
                             <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                             <span id="amaes-fast-quiz-title" style="display: inline-flex; align-items: center; gap: 4px;">
                                 <span id="amaes-fast-quiz-icon" style="display: inline-flex; align-items: center; color: var(--text-muted);">${ICONS.zap}</span>
-                                <span>Speed Mode</span>
+                                <span>Speed Mode (200ms Nav)</span>
                             </span>
                         </label>
                     </div>
@@ -17772,10 +17776,6 @@ function setupAccountTransferUI() {
                                         <input id="chk-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                                         <span>Auto-Copy on Fail</span>
                                     </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically moves to next page 1.5s after AI selects a choice">
-                                        <input id="chk-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                                        <span>Auto-Next on AI</span>
-                                    </label>
                                     <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
                                         <span style="font-size: 10px; color: var(--text-secondary); font-weight: 500;">Retries on Failure:</span>
                                         <select id="sel-ai-retry-count" style="background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 6px; cursor: pointer;">
@@ -17810,14 +17810,6 @@ function setupAccountTransferUI() {
                                 <input id="chk-auto-min-quiz" type="checkbox" ${autoMinimizeQuiz ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Auto-Minimize During Quiz</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Smart Navigation: Bypass questions already answered and jump straight to unanswered questions">
-                                <input id="chk-smart-skip" type="checkbox" ${smartSkipQuiz ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Smart Skip Unanswered</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="When enabled, advances automatically after manual typing or choice selection on unknown questions (Default: OFF for safe review)">
-                                <input id="chk-auto-next" type="checkbox" ${autoNextQuiz ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Auto-Advance on Manual Click</span>
-                            </label>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Adaptive Probe: When an unreviewed quiz attempt scores < 100%, automatically rotate choices on unverified questions on next attempts until 100% is reached">
                                 <input id="chk-adaptive-probe" type="checkbox" ${adaptiveProbeQuiz ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Adaptive Probe (Unreviewed Quizzes)</span>
@@ -17837,14 +17829,6 @@ function setupAccountTransferUI() {
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Inject convenient 'Copy Question' and 'Copy Image' buttons directly above question cards">
                                 <input id="chk-show-in-q-btns" type="checkbox" ${showInQuestionAiBtns ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Show In-Question Copy Buttons</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Appends strict directive 'Answer ONLY with option letter and exact text' to AI prompt">
-                                <input id="chk-ai-prompt-hint" type="checkbox" ${aiPromptHint ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Strict Prompt Format (Letters Only)</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Include saved answer suggestion and confidence in copied prompt">
-                                <input id="chk-copy-confidence" type="checkbox" ${copyIncludeConfidence ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Include Saved Answer in Prompt</span>
                             </label>
                         </div>
                     </details>
@@ -18117,10 +18101,6 @@ function setupAccountTransferUI() {
                                 <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically copy question to clipboard if AI inference fails or times out">
                                     <input id="chk-course-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer;" />
                                     <span>Auto-Copy Question on AI Failure (Default: ON)</span>
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically moves to next page after AI selects a choice">
-                                    <input id="chk-course-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer;" />
-                                    <span>Auto-Advance After AI Answer (Default: ON)</span>
                                 </label>
                                 <div style="display: flex; align-items: center; justify-content: space-between;">
                                     <span style="font-size: 10px; color: var(--text-secondary);">AI Retry Attempts:</span>
@@ -19247,10 +19227,7 @@ function setupAccountTransferUI() {
         const chkAutoPick = document.getElementById('chk-auto-pick');
         const chkAutoNextVerified = document.getElementById('chk-auto-next-verified');
         const chkAutoPickStudyGuideFallback = document.getElementById('chk-auto-pick-study-guide-fallback');
-        const chkAutoNext = document.getElementById('chk-auto-next');
-        const chkAiPromptHint = document.getElementById('chk-ai-prompt-hint');
         const chkAutoHlQuiz = document.getElementById('chk-auto-hl-quiz');
-        const chkCopyConfidence = document.getElementById('chk-copy-confidence');
 
         if (chkFastQuizMode) {
             chkFastQuizMode.onchange = () => {
@@ -19349,12 +19326,34 @@ function setupAccountTransferUI() {
             };
         }
 
+        const chkCopyConfidence = document.getElementById('chk-copy-confidence');
         if (chkCopyConfidence) {
             chkCopyConfidence.onchange = () => {
                 copyIncludeConfidence = chkCopyConfidence.checked;
                 localStorage.setItem('amaes_copy_include_confidence', copyIncludeConfidence);
                 showToast(`Include DB Hints: ${copyIncludeConfidence ? 'Enabled' : 'Disabled'}`);
                 setLog(`Include DB Hints on Copy: <b>${copyIncludeConfidence ? 'ON' : 'OFF'}</b>`, "var(--accent-blue)", copyIncludeConfidence ? "Prompt will include verified answer hints & confidence" : "Question & choices only");
+            };
+        }
+
+        const chkAutoNext = document.getElementById('chk-auto-next');
+        if (chkAutoNext) {
+            chkAutoNext.onchange = () => {
+                autoNextQuiz = chkAutoNext.checked;
+                localStorage.setItem('amaes_auto_next_quiz', autoNextQuiz);
+                showToast(`Auto-Next (Manual): ${autoNextQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-Next Navigation: <b>${autoNextQuiz ? 'ON (Auto-advancing)' : 'OFF (Safe Manual Review)'}</b>`, autoNextQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoNextQuiz ? "Advances automatically on manual choice selection" : "Stay on question until manual Next / N press");
+                if (autoNextQuiz && checkIsQuizAttemptPage()) runAutoQuizSolver();
+            };
+        }
+
+        const chkSmartSkip = document.getElementById('chk-smart-skip');
+        if (chkSmartSkip) {
+            chkSmartSkip.onchange = () => {
+                smartSkipQuiz = chkSmartSkip.checked;
+                localStorage.setItem('amaes_smart_skip_quiz', smartSkipQuiz);
+                showToast(`Smart Skip: ${smartSkipQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Smart Skip Unverified: <b>${smartSkipQuiz ? 'ON (Pause on unverified)' : 'OFF'}</b>`, smartSkipQuiz ? "var(--accent-green)" : "var(--accent-amber)", smartSkipQuiz ? "Pauses auto-next on unverified questions" : "Attempts all matching questions");
             };
         }
 
@@ -19396,26 +19395,6 @@ function setupAccountTransferUI() {
                 showToast(`Study-guide fallback Auto-Pick: ${autoPickStudyGuideFallback ? 'Enabled in Auto-Quiz' : 'Disabled'}`);
                 setLog(`Study-guide fallback Auto-Pick: <b>${autoPickStudyGuideFallback ? 'ON (unverified suggestions)' : 'OFF'}</b>`, autoPickStudyGuideFallback ? 'var(--accent-amber)' : 'var(--text-secondary)', 'Auto-Quiz only; Smart Next controls automatic advancement');
                 if (autoPickStudyGuideFallback && autoQuizMode && checkIsQuizAttemptPage()) runAutoQuizSolver();
-            };
-        }
-
-        if (chkAutoNext) {
-            chkAutoNext.onchange = () => {
-                autoNextQuiz = chkAutoNext.checked;
-                localStorage.setItem('amaes_auto_next_quiz', autoNextQuiz);
-                showToast(`Auto-Next (Manual): ${autoNextQuiz ? 'Enabled' : 'Disabled'}`);
-                setLog(`Auto-Next Navigation: <b>${autoNextQuiz ? 'ON (Auto-advancing)' : 'OFF (Safe Manual Review)'}</b>`, autoNextQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoNextQuiz ? "Advances automatically on manual choice selection" : "Stay on question until manual Next / N press");
-                if (autoNextQuiz && checkIsQuizAttemptPage()) runAutoQuizSolver();
-            };
-        }
-
-        const chkSmartSkip = document.getElementById('chk-smart-skip');
-        if (chkSmartSkip) {
-            chkSmartSkip.onchange = () => {
-                smartSkipQuiz = chkSmartSkip.checked;
-                localStorage.setItem('amaes_smart_skip_quiz', smartSkipQuiz);
-                showToast(`Smart Skip: ${smartSkipQuiz ? 'Enabled' : 'Disabled'}`);
-                setLog(`Smart Skip Unverified: <b>${smartSkipQuiz ? 'ON (Pause on unverified)' : 'OFF'}</b>`, smartSkipQuiz ? "var(--accent-green)" : "var(--accent-amber)", smartSkipQuiz ? "Pauses auto-next on unverified questions" : "Attempts all matching questions");
             };
         }
 
@@ -19480,15 +19459,6 @@ function setupAccountTransferUI() {
                 if (enableAudioAlerts) {
                     playToolkitSound('quest_done');
                 }
-            };
-        }
-
-        if (chkAiPromptHint) {
-            chkAiPromptHint.onchange = () => {
-                aiPromptHint = chkAiPromptHint.checked;
-                localStorage.setItem('amaes_ai_prompt_hint', aiPromptHint);
-                showToast(`Strict AI Prompt: ${aiPromptHint ? 'Enabled' : 'Disabled'}`);
-                setLog(`Strict AI Prompt Format: <b>${aiPromptHint ? 'ON (1-Shot Output)' : 'OFF (Standard)'}</b>`, "var(--accent-blue)", "Directs AI to respond with choice letter only");
             };
         }
 
@@ -19569,26 +19539,6 @@ function setupAccountTransferUI() {
                 const quizChk = document.getElementById('chk-ai-auto-copy-on-fail');
                 if (quizChk) quizChk.checked = getAiAutoCopyOnFail();
                 showToast(`Auto-Copy on AI Failure: ${getAiAutoCopyOnFail() ? 'ON' : 'OFF'}`);
-            };
-        }
-
-        const chkAiAutoNextOnAi = document.getElementById('chk-ai-auto-next-on-ai');
-        if (chkAiAutoNextOnAi) {
-            chkAiAutoNextOnAi.onchange = () => {
-                setAiAutoNextOnAiAnswer(chkAiAutoNextOnAi.checked);
-                const courseChk = document.getElementById('chk-course-ai-auto-next-on-ai');
-                if (courseChk) courseChk.checked = getAiAutoNextOnAiAnswer();
-                showToast(`Auto-Advance After AI Answer: ${getAiAutoNextOnAiAnswer() ? 'ON' : 'OFF'}`);
-            };
-        }
-
-        const chkCourseAiAutoNextOnAi = document.getElementById('chk-course-ai-auto-next-on-ai');
-        if (chkCourseAiAutoNextOnAi) {
-            chkCourseAiAutoNextOnAi.onchange = () => {
-                setAiAutoNextOnAiAnswer(chkCourseAiAutoNextOnAi.checked);
-                const quizChk = document.getElementById('chk-ai-auto-next-on-ai');
-                if (quizChk) quizChk.checked = getAiAutoNextOnAiAnswer();
-                showToast(`Auto-Advance After AI Answer: ${getAiAutoNextOnAiAnswer() ? 'ON' : 'OFF'}`);
             };
         }
 

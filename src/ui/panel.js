@@ -163,33 +163,41 @@
                         </button>
                     </div>
 
-                    <!-- Primary Core Settings (The 4-Step Pipeline: Highlight -> Pick -> Next -> Speed) -->
+                    <!-- Primary Core Settings -->
                     <div style="margin-top: 2px; border-top: 1px solid var(--border-subtle); padding-top: 6px; display: flex; flex-direction: column; gap: 6px;">
+                        <!-- Assistive Visual Highlighting -->
                         <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Highlight verified database and study guide answers with color codes">
                             <input id="chk-auto-hl-quiz" type="checkbox" ${autoHighlightQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span>Show Answers</span>
+                            <span>Show Answers (Color Highlights)</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Automatically select choice inputs when verified answers are matched">
-                            <input id="chk-auto-pick" type="checkbox" ${autoPickQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span>Auto-Pick Answers</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Advances smoothly to next question when answered; pauses on unknown questions">
-                            <input id="chk-auto-next-verified" type="checkbox" ${autoNextVerified ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span>Smart Next</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="In Auto-Quiz, select an exact Jenny's Online or AMAUOED choice match when no verified answer is available. These suggestions are unverified; Smart Next must be on to advance automatically.">
-                            <input id="chk-auto-pick-study-guide-fallback" type="checkbox" ${autoPickStudyGuideFallback ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span>Auto-Pick Study-Guide Fallback (Unverified)</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically click Submit all and finish after reaching the quiz summary. This submits without a final manual review.">
-                            <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span>Auto-Submit Quiz on Completion</span>
-                        </label>
+
+                        <!-- Autonomous Pilot Automation Options -->
+                        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 5px;">
+                            <div style="font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Auto-Pilot Automation</div>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Automatically select choice inputs when verified answers are matched">
+                                <input id="chk-auto-pick" type="checkbox" ${autoPickQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Auto-Pick Answers</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Advances smoothly to next question when answered; pauses on unknown questions">
+                                <input id="chk-auto-next-verified" type="checkbox" ${autoNextVerified ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Smart Next (Auto-Advance)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="In Auto-Quiz, select an exact Jenny's Online or AMAUOED choice match when no verified answer is available. These suggestions are unverified; Smart Next must be on to advance automatically.">
+                                <input id="chk-auto-pick-study-guide-fallback" type="checkbox" ${autoPickStudyGuideFallback ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Study-Guide Fallback (Unverified)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically click Submit all and finish after reaching the quiz summary. This submits without a final manual review.">
+                                <input id="chk-auto-submit-quiz" type="checkbox" ${autoSubmitQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <span>Auto-Submit Quiz on Completion</span>
+                            </label>
+                        </div>
+
+                        <!-- Speed Mode Card -->
                         <label id="amaes-fast-answer-card" style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Fast Answer Mode: Answers visible questions instantly & speeds up moving to next page">
                             <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                             <span id="amaes-fast-quiz-title" style="display: inline-flex; align-items: center; gap: 4px;">
                                 <span id="amaes-fast-quiz-icon" style="display: inline-flex; align-items: center; color: var(--text-muted);">${ICONS.zap}</span>
-                                <span>Speed Mode</span>
+                                <span>Speed Mode (200ms Nav)</span>
                             </span>
                         </label>
                     </div>
@@ -230,10 +238,6 @@
                                         <input id="chk-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
                                         <span>Auto-Copy on Fail</span>
                                     </label>
-                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically moves to next page 1.5s after AI selects a choice">
-                                        <input id="chk-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                                        <span>Auto-Next on AI</span>
-                                    </label>
                                     <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
                                         <span style="font-size: 10px; color: var(--text-secondary); font-weight: 500;">Retries on Failure:</span>
                                         <select id="sel-ai-retry-count" style="background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 6px; cursor: pointer;">
@@ -268,14 +272,6 @@
                                 <input id="chk-auto-min-quiz" type="checkbox" ${autoMinimizeQuiz ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Auto-Minimize During Quiz</span>
                             </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Smart Navigation: Bypass questions already answered and jump straight to unanswered questions">
-                                <input id="chk-smart-skip" type="checkbox" ${smartSkipQuiz ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Smart Skip Unanswered</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="When enabled, advances automatically after manual typing or choice selection on unknown questions (Default: OFF for safe review)">
-                                <input id="chk-auto-next" type="checkbox" ${autoNextQuiz ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Auto-Advance on Manual Click</span>
-                            </label>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Adaptive Probe: When an unreviewed quiz attempt scores < 100%, automatically rotate choices on unverified questions on next attempts until 100% is reached">
                                 <input id="chk-adaptive-probe" type="checkbox" ${adaptiveProbeQuiz ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Adaptive Probe (Unreviewed Quizzes)</span>
@@ -295,14 +291,6 @@
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Inject convenient 'Copy Question' and 'Copy Image' buttons directly above question cards">
                                 <input id="chk-show-in-q-btns" type="checkbox" ${showInQuestionAiBtns ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Show In-Question Copy Buttons</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Appends strict directive 'Answer ONLY with option letter and exact text' to AI prompt">
-                                <input id="chk-ai-prompt-hint" type="checkbox" ${aiPromptHint ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Strict Prompt Format (Letters Only)</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Include saved answer suggestion and confidence in copied prompt">
-                                <input id="chk-copy-confidence" type="checkbox" ${copyIncludeConfidence ? 'checked' : ''} style="cursor: pointer;" />
-                                <span>Include Saved Answer in Prompt</span>
                             </label>
                         </div>
                     </details>
@@ -575,10 +563,6 @@
                                 <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically copy question to clipboard if AI inference fails or times out">
                                     <input id="chk-course-ai-auto-copy-on-fail" type="checkbox" ${aiAutoCopyOnFail ? 'checked' : ''} style="cursor: pointer;" />
                                     <span>Auto-Copy Question on AI Failure (Default: ON)</span>
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Automatically moves to next page after AI selects a choice">
-                                    <input id="chk-course-ai-auto-next-on-ai" type="checkbox" ${aiAutoNextOnAiAnswer ? 'checked' : ''} style="cursor: pointer;" />
-                                    <span>Auto-Advance After AI Answer (Default: ON)</span>
                                 </label>
                                 <div style="display: flex; align-items: center; justify-content: space-between;">
                                     <span style="font-size: 10px; color: var(--text-secondary);">AI Retry Attempts:</span>

@@ -6,10 +6,7 @@
         const chkAutoPick = document.getElementById('chk-auto-pick');
         const chkAutoNextVerified = document.getElementById('chk-auto-next-verified');
         const chkAutoPickStudyGuideFallback = document.getElementById('chk-auto-pick-study-guide-fallback');
-        const chkAutoNext = document.getElementById('chk-auto-next');
-        const chkAiPromptHint = document.getElementById('chk-ai-prompt-hint');
         const chkAutoHlQuiz = document.getElementById('chk-auto-hl-quiz');
-        const chkCopyConfidence = document.getElementById('chk-copy-confidence');
 
         if (chkFastQuizMode) {
             chkFastQuizMode.onchange = () => {
@@ -108,12 +105,34 @@
             };
         }
 
+        const chkCopyConfidence = document.getElementById('chk-copy-confidence');
         if (chkCopyConfidence) {
             chkCopyConfidence.onchange = () => {
                 copyIncludeConfidence = chkCopyConfidence.checked;
                 localStorage.setItem('amaes_copy_include_confidence', copyIncludeConfidence);
                 showToast(`Include DB Hints: ${copyIncludeConfidence ? 'Enabled' : 'Disabled'}`);
                 setLog(`Include DB Hints on Copy: <b>${copyIncludeConfidence ? 'ON' : 'OFF'}</b>`, "var(--accent-blue)", copyIncludeConfidence ? "Prompt will include verified answer hints & confidence" : "Question & choices only");
+            };
+        }
+
+        const chkAutoNext = document.getElementById('chk-auto-next');
+        if (chkAutoNext) {
+            chkAutoNext.onchange = () => {
+                autoNextQuiz = chkAutoNext.checked;
+                localStorage.setItem('amaes_auto_next_quiz', autoNextQuiz);
+                showToast(`Auto-Next (Manual): ${autoNextQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-Next Navigation: <b>${autoNextQuiz ? 'ON (Auto-advancing)' : 'OFF (Safe Manual Review)'}</b>`, autoNextQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoNextQuiz ? "Advances automatically on manual choice selection" : "Stay on question until manual Next / N press");
+                if (autoNextQuiz && checkIsQuizAttemptPage()) runAutoQuizSolver();
+            };
+        }
+
+        const chkSmartSkip = document.getElementById('chk-smart-skip');
+        if (chkSmartSkip) {
+            chkSmartSkip.onchange = () => {
+                smartSkipQuiz = chkSmartSkip.checked;
+                localStorage.setItem('amaes_smart_skip_quiz', smartSkipQuiz);
+                showToast(`Smart Skip: ${smartSkipQuiz ? 'Enabled' : 'Disabled'}`);
+                setLog(`Smart Skip Unverified: <b>${smartSkipQuiz ? 'ON (Pause on unverified)' : 'OFF'}</b>`, smartSkipQuiz ? "var(--accent-green)" : "var(--accent-amber)", smartSkipQuiz ? "Pauses auto-next on unverified questions" : "Attempts all matching questions");
             };
         }
 
@@ -155,26 +174,6 @@
                 showToast(`Study-guide fallback Auto-Pick: ${autoPickStudyGuideFallback ? 'Enabled in Auto-Quiz' : 'Disabled'}`);
                 setLog(`Study-guide fallback Auto-Pick: <b>${autoPickStudyGuideFallback ? 'ON (unverified suggestions)' : 'OFF'}</b>`, autoPickStudyGuideFallback ? 'var(--accent-amber)' : 'var(--text-secondary)', 'Auto-Quiz only; Smart Next controls automatic advancement');
                 if (autoPickStudyGuideFallback && autoQuizMode && checkIsQuizAttemptPage()) runAutoQuizSolver();
-            };
-        }
-
-        if (chkAutoNext) {
-            chkAutoNext.onchange = () => {
-                autoNextQuiz = chkAutoNext.checked;
-                localStorage.setItem('amaes_auto_next_quiz', autoNextQuiz);
-                showToast(`Auto-Next (Manual): ${autoNextQuiz ? 'Enabled' : 'Disabled'}`);
-                setLog(`Auto-Next Navigation: <b>${autoNextQuiz ? 'ON (Auto-advancing)' : 'OFF (Safe Manual Review)'}</b>`, autoNextQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoNextQuiz ? "Advances automatically on manual choice selection" : "Stay on question until manual Next / N press");
-                if (autoNextQuiz && checkIsQuizAttemptPage()) runAutoQuizSolver();
-            };
-        }
-
-        const chkSmartSkip = document.getElementById('chk-smart-skip');
-        if (chkSmartSkip) {
-            chkSmartSkip.onchange = () => {
-                smartSkipQuiz = chkSmartSkip.checked;
-                localStorage.setItem('amaes_smart_skip_quiz', smartSkipQuiz);
-                showToast(`Smart Skip: ${smartSkipQuiz ? 'Enabled' : 'Disabled'}`);
-                setLog(`Smart Skip Unverified: <b>${smartSkipQuiz ? 'ON (Pause on unverified)' : 'OFF'}</b>`, smartSkipQuiz ? "var(--accent-green)" : "var(--accent-amber)", smartSkipQuiz ? "Pauses auto-next on unverified questions" : "Attempts all matching questions");
             };
         }
 
@@ -239,15 +238,6 @@
                 if (enableAudioAlerts) {
                     playToolkitSound('quest_done');
                 }
-            };
-        }
-
-        if (chkAiPromptHint) {
-            chkAiPromptHint.onchange = () => {
-                aiPromptHint = chkAiPromptHint.checked;
-                localStorage.setItem('amaes_ai_prompt_hint', aiPromptHint);
-                showToast(`Strict AI Prompt: ${aiPromptHint ? 'Enabled' : 'Disabled'}`);
-                setLog(`Strict AI Prompt Format: <b>${aiPromptHint ? 'ON (1-Shot Output)' : 'OFF (Standard)'}</b>`, "var(--accent-blue)", "Directs AI to respond with choice letter only");
             };
         }
 
@@ -328,26 +318,6 @@
                 const quizChk = document.getElementById('chk-ai-auto-copy-on-fail');
                 if (quizChk) quizChk.checked = getAiAutoCopyOnFail();
                 showToast(`Auto-Copy on AI Failure: ${getAiAutoCopyOnFail() ? 'ON' : 'OFF'}`);
-            };
-        }
-
-        const chkAiAutoNextOnAi = document.getElementById('chk-ai-auto-next-on-ai');
-        if (chkAiAutoNextOnAi) {
-            chkAiAutoNextOnAi.onchange = () => {
-                setAiAutoNextOnAiAnswer(chkAiAutoNextOnAi.checked);
-                const courseChk = document.getElementById('chk-course-ai-auto-next-on-ai');
-                if (courseChk) courseChk.checked = getAiAutoNextOnAiAnswer();
-                showToast(`Auto-Advance After AI Answer: ${getAiAutoNextOnAiAnswer() ? 'ON' : 'OFF'}`);
-            };
-        }
-
-        const chkCourseAiAutoNextOnAi = document.getElementById('chk-course-ai-auto-next-on-ai');
-        if (chkCourseAiAutoNextOnAi) {
-            chkCourseAiAutoNextOnAi.onchange = () => {
-                setAiAutoNextOnAiAnswer(chkCourseAiAutoNextOnAi.checked);
-                const quizChk = document.getElementById('chk-ai-auto-next-on-ai');
-                if (quizChk) quizChk.checked = getAiAutoNextOnAiAnswer();
-                showToast(`Auto-Advance After AI Answer: ${getAiAutoNextOnAiAnswer() ? 'ON' : 'OFF'}`);
             };
         }
 
