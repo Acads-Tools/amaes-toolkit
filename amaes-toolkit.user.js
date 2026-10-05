@@ -6909,6 +6909,21 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             // Contradiction Guard: A multiple-choice question cannot have 100% of choices wrong!
             // If all choices are marked wrong, keep only those with higher failure counts, preserving at least 1 candidate.
             if (choiceRows.length >= 2 && allWrongList.length >= choiceRows.length) {
+                if (typeof detectAndReportQuestionAnomaly === 'function') {
+                    detectAndReportQuestionAnomaly({
+                        anomalyType: 'ALL_CHOICES_ELIMINATED',
+                        subjectCode: sCode,
+                        activityTitle: document.title || '',
+                        questionRaw: moodleQRaw,
+                        questionNorm: moodleQNorm,
+                        domType: identifyQuestionType(que) || 'multichoice',
+                        submittedAnswer: '',
+                        markScored: 0,
+                        maxMark: 1,
+                        attemptHistory: allWrongList.map(w => w.text || w.norm),
+                        dbCandidate: candidates[0] || null
+                    });
+                }
                 allWrongList.sort((a, b) => (b.count || 1) - (a.count || 1));
                 allWrongList.splice(choiceRows.length - 1);
             }
@@ -7516,7 +7531,24 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         if (/^[a-d][.)]?$/i.test(raw)) return false;
                         return true;
                     });
-                    if (shortAnsCandidates.length === 0) return;
+                    if (shortAnsCandidates.length === 0) {
+                        if (typeof detectAndReportQuestionAnomaly === 'function') {
+                            detectAndReportQuestionAnomaly({
+                                anomalyType: 'TYPE_MISMATCH_LEAK',
+                                subjectCode: sCode,
+                                activityTitle: document.title || '',
+                                questionRaw: moodleQRaw,
+                                questionNorm: moodleQNorm,
+                                domType: 'shortanswer',
+                                submittedAnswer: '',
+                                markScored: 0,
+                                maxMark: 1,
+                                attemptHistory: [],
+                                dbCandidate: validCandidates[0] || null
+                            });
+                        }
+                        return;
+                    }
                     const bestCand = shortAnsCandidates[0];
                     const bestAnswer = bestCand ? (bestCand.ansRaw || bestCand.answer || '') : '';
                     const studyGuide = isConfirmedCandidate(bestCand) ? null : getStudyGuideInfo(bestCand);
@@ -10973,6 +11005,97 @@ function setupAccountTransferUI() {
             } catch (e) {
                 reject(e);
             }
+        });
+    }
+
+    function submitAnomalyReportToRelay(payload) {
+        return new Promise((resolve) => {
+            try {
+                const relayUrl = (typeof communityRelayUrl !== 'undefined' && communityRelayUrl) ? communityRelayUrl : COMMUNITY_RELAY_URL;
+                if (!relayUrl) return resolve({ success: false, error: 'No relay configured' });
+
+                const body = JSON.stringify({
+                    event: 'quiz_anomaly',
+                    anomalyType: payload.anomalyType || 'UNKNOWN_ANOMALY',
+                    subjectCode: (payload.subjectCode || 'GENERAL').toUpperCase(),
+                    activityTitle: payload.activityTitle || '',
+                    questionRaw: String(payload.questionRaw || '').slice(0, 1000),
+                    questionNorm: String(payload.questionNorm || '').slice(0, 1000),
+                    domType: payload.domType || 'unknown',
+                    submittedAnswer: String(payload.submittedAnswer || '').slice(0, 500),
+                    markScored: Number(payload.markScored || 0),
+                    maxMark: Number(payload.maxMark || 1),
+                    attemptHistory: Array.isArray(payload.attemptHistory) ? payload.attemptHistory.slice(0, 10) : [],
+                    dbCandidate: payload.dbCandidate || null,
+                    clientVersion: SCRIPT_VERSION.replace(/^v/i, ''),
+                    contributorId: (typeof getAnonymousContributorId === 'function') ? getAnonymousContributorId() : 'anon'
+                });
+
+                const gmReq = (typeof GM_xmlhttpRequest !== 'undefined') ? GM_xmlhttpRequest :
+                              (typeof GM !== 'undefined' && GM.xmlHttpRequest) ? GM.xmlHttpRequest : null;
+
+                if (gmReq) {
+                    gmReq({
+                        method: 'POST',
+                        url: `${relayUrl}/telemetry/anomaly`,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-AMAES-Client-Version': SCRIPT_VERSION.replace(/^v/i, '')
+                        },
+                        data: body,
+                        onload: (res) => {
+                            try {
+                                const data = JSON.parse(res.responseText || '{}');
+                                resolve(data);
+                            } catch (_) {
+                                resolve({ success: true, mode: 'raw' });
+                            }
+                        },
+                        onerror: () => resolve({ success: false, error: 'Network error' })
+                    });
+                } else if (typeof fetch !== 'undefined') {
+                    fetch(`${relayUrl}/telemetry/anomaly`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-AMAES-Client-Version': SCRIPT_VERSION.replace(/^v/i, '')
+                        },
+                        body: body,
+                        keepalive: true
+                    }).then(r => r.json()).then(resolve).catch(err => resolve({ success: false, error: err.message }));
+                } else {
+                    resolve({ success: false, error: 'No transport available' });
+                }
+            } catch (err) {
+                resolve({ success: false, error: err.message });
+            }
+        });
+    }
+
+    function detectAndReportQuestionAnomaly(anomalyData) {
+        if (!anomalyData || !anomalyData.anomalyType || !anomalyData.questionRaw) return;
+        const subCode = String(anomalyData.subjectCode || 'GENERAL').toUpperCase();
+        const qNorm = anomalyData.questionNorm || (typeof normalizeText === 'function' ? normalizeText(anomalyData.questionRaw) : anomalyData.questionRaw.toLowerCase());
+        const hash = Array.from(qNorm).reduce((acc, char) => ((acc << 5) - acc) + char.charCodeAt(0), 0) >>> 0;
+        const dedupKey = `amaes_anomaly_${subCode}_${anomalyData.anomalyType}_${hash}`;
+
+        // 1. Session deduplication: do not send the exact same anomaly twice in one session
+        if (sessionStorage.getItem(dedupKey)) return;
+        sessionStorage.setItem(dedupKey, '1');
+
+        // 2. Rate limit: max 5 anomalies per session attempt
+        const countKey = `amaes_anomalies_sent_${subCode}`;
+        const count = Number(sessionStorage.getItem(countKey) || '0');
+        if (count >= 5) return;
+        sessionStorage.setItem(countKey, String(count + 1));
+
+        logDebug(`[Anomaly Detector] Logging ${anomalyData.anomalyType} for ${subCode}: "${anomalyData.questionRaw.slice(0, 60)}..."`);
+        if (typeof setLog === 'function') {
+            setLog(`[Anomaly Auto-Reported] Dispatched <b>${anomalyData.anomalyType}</b> diagnostic report to database maintainers.`, 'var(--accent-amber)');
+        }
+
+        submitAnomalyReportToRelay(anomalyData).catch(err => {
+            logDebug(`[Anomaly Dispatch Note]: ${err.message}`);
         });
     }
 
@@ -15503,12 +15626,81 @@ function setupAccountTransferUI() {
 
             // 2. If question was marked INCORRECT (0 marks): the checked/entered choice(s) are confirmed WRONG!
             if (isZeroMark && !isMatchingQuestion) {
-                [...checkedTexts, ...filledInputTexts, ...selectedDropdownTexts, ...placedDropTexts].forEach(txt => {
+                const submittedAnswers = [...checkedTexts, ...filledInputTexts, ...selectedDropdownTexts, ...placedDropTexts];
+                submittedAnswers.forEach(txt => {
                     const norm = normalizeChoice(txt);
                     if (norm && !wrongAnswers.some(w => normalizeChoice(w) === norm)) {
                         wrongAnswers.push(txt);
                     }
                 });
+
+                // Auto-detect and report anomaly if student failed despite matching a verified candidate or if answer oscillates
+                if (typeof detectAndReportQuestionAnomaly === 'function' && submittedAnswers.length > 0) {
+                    try {
+                        const cachedDb = typeof getCachedAnswers === 'function' ? getCachedAnswers(subCode) : [];
+                        const qNorm = normalizeText(qData.qText);
+                        const candidate = (cachedDb || []).find(c => {
+                            const cText = c.qText || c.question || c.qRaw || '';
+                            if (typeof questionTextMatches === 'function') {
+                                return questionTextMatches(qData.qText, cText);
+                            }
+                            const cNorm = normalizeText(cText);
+                            return cNorm === qNorm || (cNorm.length > 25 && (cNorm.includes(qNorm) || qNorm.includes(cNorm)));
+                        });
+
+                        if (candidate) {
+                            const candAns = candidate.answer || candidate.ansRaw || candidate.ansNorm || '';
+                            const candNorm = candidate.ansNorm || normalizeChoice(candAns);
+                            const candVerified = Boolean(candidate.verified);
+                            const matchesSubmitted = submittedAnswers.some(s => {
+                                const sNorm = normalizeChoice(s);
+                                return sNorm === candNorm || unscriptDigits(sNorm) === unscriptDigits(candNorm);
+                            });
+
+                            if (candVerified && matchesSubmitted) {
+                                detectAndReportQuestionAnomaly({
+                                    anomalyType: 'VERIFIED_ANSWER_FAILED',
+                                    subjectCode: subCode,
+                                    activityTitle: quizTitle,
+                                    questionRaw: qData.qText,
+                                    questionNorm: qNorm,
+                                    domType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : 'unknown'),
+                                    submittedAnswer: submittedAnswers.join(', '),
+                                    markScored: gradeInfo.earned ?? 0,
+                                    maxMark: gradeInfo.max ?? 1,
+                                    attemptHistory: [...(candidate.wrongAnswers || []), ...wrongAnswers],
+                                    dbCandidate: {
+                                        answer: candAns,
+                                        questionType: candidate.questionType,
+                                        verified: candidate.verified,
+                                        wrongAnswers: candidate.wrongAnswers || []
+                                    }
+                                });
+                            } else if (Array.isArray(candidate.wrongAnswers) && candidate.wrongAnswers.length > 0) {
+                                detectAndReportQuestionAnomaly({
+                                    anomalyType: 'ANSWER_OSCILLATION',
+                                    subjectCode: subCode,
+                                    activityTitle: quizTitle,
+                                    questionRaw: qData.qText,
+                                    questionNorm: qNorm,
+                                    domType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : 'unknown'),
+                                    submittedAnswer: submittedAnswers.join(', '),
+                                    markScored: gradeInfo.earned ?? 0,
+                                    maxMark: gradeInfo.max ?? 1,
+                                    attemptHistory: [...(candidate.wrongAnswers || []), ...wrongAnswers],
+                                    dbCandidate: {
+                                        answer: candAns,
+                                        questionType: candidate.questionType,
+                                        verified: candidate.verified,
+                                        wrongAnswers: candidate.wrongAnswers || []
+                                    }
+                                });
+                            }
+                        }
+                    } catch (err) {
+                        if (typeof logDebug === 'function') logDebug('Review anomaly detection note:', err.message);
+                    }
+                }
             }
 
             // Also check Moodle's per-choice incorrect indicators on non-standard containers

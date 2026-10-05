@@ -3499,6 +3499,21 @@
             // Contradiction Guard: A multiple-choice question cannot have 100% of choices wrong!
             // If all choices are marked wrong, keep only those with higher failure counts, preserving at least 1 candidate.
             if (choiceRows.length >= 2 && allWrongList.length >= choiceRows.length) {
+                if (typeof detectAndReportQuestionAnomaly === 'function') {
+                    detectAndReportQuestionAnomaly({
+                        anomalyType: 'ALL_CHOICES_ELIMINATED',
+                        subjectCode: sCode,
+                        activityTitle: document.title || '',
+                        questionRaw: moodleQRaw,
+                        questionNorm: moodleQNorm,
+                        domType: identifyQuestionType(que) || 'multichoice',
+                        submittedAnswer: '',
+                        markScored: 0,
+                        maxMark: 1,
+                        attemptHistory: allWrongList.map(w => w.text || w.norm),
+                        dbCandidate: candidates[0] || null
+                    });
+                }
                 allWrongList.sort((a, b) => (b.count || 1) - (a.count || 1));
                 allWrongList.splice(choiceRows.length - 1);
             }
@@ -4106,7 +4121,24 @@
                         if (/^[a-d][.)]?$/i.test(raw)) return false;
                         return true;
                     });
-                    if (shortAnsCandidates.length === 0) return;
+                    if (shortAnsCandidates.length === 0) {
+                        if (typeof detectAndReportQuestionAnomaly === 'function') {
+                            detectAndReportQuestionAnomaly({
+                                anomalyType: 'TYPE_MISMATCH_LEAK',
+                                subjectCode: sCode,
+                                activityTitle: document.title || '',
+                                questionRaw: moodleQRaw,
+                                questionNorm: moodleQNorm,
+                                domType: 'shortanswer',
+                                submittedAnswer: '',
+                                markScored: 0,
+                                maxMark: 1,
+                                attemptHistory: [],
+                                dbCandidate: validCandidates[0] || null
+                            });
+                        }
+                        return;
+                    }
                     const bestCand = shortAnsCandidates[0];
                     const bestAnswer = bestCand ? (bestCand.ansRaw || bestCand.answer || '') : '';
                     const studyGuide = isConfirmedCandidate(bestCand) ? null : getStudyGuideInfo(bestCand);

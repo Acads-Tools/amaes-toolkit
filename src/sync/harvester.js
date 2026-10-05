@@ -1074,12 +1074,81 @@
 
             // 2. If question was marked INCORRECT (0 marks): the checked/entered choice(s) are confirmed WRONG!
             if (isZeroMark && !isMatchingQuestion) {
-                [...checkedTexts, ...filledInputTexts, ...selectedDropdownTexts, ...placedDropTexts].forEach(txt => {
+                const submittedAnswers = [...checkedTexts, ...filledInputTexts, ...selectedDropdownTexts, ...placedDropTexts];
+                submittedAnswers.forEach(txt => {
                     const norm = normalizeChoice(txt);
                     if (norm && !wrongAnswers.some(w => normalizeChoice(w) === norm)) {
                         wrongAnswers.push(txt);
                     }
                 });
+
+                // Auto-detect and report anomaly if student failed despite matching a verified candidate or if answer oscillates
+                if (typeof detectAndReportQuestionAnomaly === 'function' && submittedAnswers.length > 0) {
+                    try {
+                        const cachedDb = typeof getCachedAnswers === 'function' ? getCachedAnswers(subCode) : [];
+                        const qNorm = normalizeText(qData.qText);
+                        const candidate = (cachedDb || []).find(c => {
+                            const cText = c.qText || c.question || c.qRaw || '';
+                            if (typeof questionTextMatches === 'function') {
+                                return questionTextMatches(qData.qText, cText);
+                            }
+                            const cNorm = normalizeText(cText);
+                            return cNorm === qNorm || (cNorm.length > 25 && (cNorm.includes(qNorm) || qNorm.includes(cNorm)));
+                        });
+
+                        if (candidate) {
+                            const candAns = candidate.answer || candidate.ansRaw || candidate.ansNorm || '';
+                            const candNorm = candidate.ansNorm || normalizeChoice(candAns);
+                            const candVerified = Boolean(candidate.verified);
+                            const matchesSubmitted = submittedAnswers.some(s => {
+                                const sNorm = normalizeChoice(s);
+                                return sNorm === candNorm || unscriptDigits(sNorm) === unscriptDigits(candNorm);
+                            });
+
+                            if (candVerified && matchesSubmitted) {
+                                detectAndReportQuestionAnomaly({
+                                    anomalyType: 'VERIFIED_ANSWER_FAILED',
+                                    subjectCode: subCode,
+                                    activityTitle: quizTitle,
+                                    questionRaw: qData.qText,
+                                    questionNorm: qNorm,
+                                    domType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : 'unknown'),
+                                    submittedAnswer: submittedAnswers.join(', '),
+                                    markScored: gradeInfo.earned ?? 0,
+                                    maxMark: gradeInfo.max ?? 1,
+                                    attemptHistory: [...(candidate.wrongAnswers || []), ...wrongAnswers],
+                                    dbCandidate: {
+                                        answer: candAns,
+                                        questionType: candidate.questionType,
+                                        verified: candidate.verified,
+                                        wrongAnswers: candidate.wrongAnswers || []
+                                    }
+                                });
+                            } else if (Array.isArray(candidate.wrongAnswers) && candidate.wrongAnswers.length > 0) {
+                                detectAndReportQuestionAnomaly({
+                                    anomalyType: 'ANSWER_OSCILLATION',
+                                    subjectCode: subCode,
+                                    activityTitle: quizTitle,
+                                    questionRaw: qData.qText,
+                                    questionNorm: qNorm,
+                                    domType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : 'unknown'),
+                                    submittedAnswer: submittedAnswers.join(', '),
+                                    markScored: gradeInfo.earned ?? 0,
+                                    maxMark: gradeInfo.max ?? 1,
+                                    attemptHistory: [...(candidate.wrongAnswers || []), ...wrongAnswers],
+                                    dbCandidate: {
+                                        answer: candAns,
+                                        questionType: candidate.questionType,
+                                        verified: candidate.verified,
+                                        wrongAnswers: candidate.wrongAnswers || []
+                                    }
+                                });
+                            }
+                        }
+                    } catch (err) {
+                        if (typeof logDebug === 'function') logDebug('Review anomaly detection note:', err.message);
+                    }
+                }
             }
 
             // Also check Moodle's per-choice incorrect indicators on non-standard containers

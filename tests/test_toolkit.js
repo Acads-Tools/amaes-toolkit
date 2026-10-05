@@ -5670,6 +5670,65 @@ test("Short-Answer Guard & Prompt Isolation: prevents multichoice leaking into t
     assert.strictEqual(sandbox.matchQuestion(cmdSlide, jqSlide), true, "This command is used to... and JQuery method used to creates... must match the same question key");
 });
 
+test("Automated Anomaly Detection & Reporting: detects verified answer failures, oscillations, contradictions, and type leaks", () => {
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Diagnostics endpoint & dispatcher declarations
+    assert.ok(script.includes("function submitAnomalyReportToRelay(payload)"), "submitAnomalyReportToRelay must be defined");
+    assert.ok(script.includes("function detectAndReportQuestionAnomaly(anomalyData)"), "detectAndReportQuestionAnomaly must be defined");
+    assert.ok(script.includes("url: `${relayUrl}/telemetry/anomaly`") || script.includes("/telemetry/anomaly"), "Must dispatch to /telemetry/anomaly endpoint");
+
+    // 2. Anomaly hooks in review harvester and solver
+    assert.ok(script.includes("anomalyType: 'VERIFIED_ANSWER_FAILED'"), "Harvester must detect and dispatch VERIFIED_ANSWER_FAILED");
+    assert.ok(script.includes("anomalyType: 'ANSWER_OSCILLATION'"), "Harvester must detect and dispatch ANSWER_OSCILLATION");
+    assert.ok(script.includes("anomalyType: 'ALL_CHOICES_ELIMINATED'"), "Solver must detect and dispatch ALL_CHOICES_ELIMINATED");
+    assert.ok(script.includes("anomalyType: 'TYPE_MISMATCH_LEAK'"), "Solver must detect and dispatch TYPE_MISMATCH_LEAK");
+
+    // 3. Deduplication and rate limiting logic verification
+    const vm = require('vm');
+    const storageMap = new Map();
+    const mockSessionStorage = {
+        getItem: k => storageMap.get(k) || null,
+        setItem: (k, v) => storageMap.set(k, String(v))
+    };
+    let dispatched = [];
+    const sandbox = {
+        sessionStorage: mockSessionStorage,
+        normalizeText: s => s.toLowerCase().trim(),
+        logDebug: () => {},
+        setLog: () => {},
+        submitAnomalyReportToRelay: (data) => {
+            dispatched.push(data);
+            return Promise.resolve({ success: true });
+        }
+    };
+
+    const diagnostics = fs.readFileSync('src/dev/diagnostics.js', 'utf8');
+    const start = diagnostics.indexOf('    function detectAndReportQuestionAnomaly(');
+    const end = diagnostics.indexOf('    function showBugReportModal(', start);
+    assert.ok(start > 0 && end > start, "detectAndReportQuestionAnomaly slice must be found");
+
+    vm.runInNewContext(`${diagnostics.slice(start, end)}\nglobalThis.detect = detectAndReportQuestionAnomaly;`, sandbox);
+
+    // First call: should be dispatched
+    sandbox.detect({
+        anomalyType: 'VERIFIED_ANSWER_FAILED',
+        subjectCode: 'ITE6200',
+        questionRaw: 'It is used to get or set values from and to an input element',
+        submittedAnswer: 'b. False'
+    });
+    assert.strictEqual(dispatched.length, 1, "First anomaly report must be dispatched");
+
+    // Duplicate call: must be deduplicated
+    sandbox.detect({
+        anomalyType: 'VERIFIED_ANSWER_FAILED',
+        subjectCode: 'ITE6200',
+        questionRaw: 'It is used to get or set values from and to an input element',
+        submittedAnswer: 'b. False'
+    });
+    assert.strictEqual(dispatched.length, 1, "Duplicate anomaly in same session must be suppressed");
+});
+
 
 
 console.log("\n==================================================");
