@@ -1135,6 +1135,33 @@
             };
         }
 
+        const btnTriggerHlAnswers = document.getElementById('btn-trigger-hl-answers');
+        if (btnTriggerHlAnswers) {
+            btnTriggerHlAnswers.onclick = () => {
+                const courseInfo = detectCourseInfo();
+                const subCode = courseInfo.subjectCode || 'CS6301';
+                const cached = getCachedAnswers(subCode);
+                if (cached && cached.length > 0) {
+                    const res = highlightQuizAnswers(cached, false, true);
+                    showToast(`Highlighted ${res.matched}/${res.total} questions!`);
+                    setLog(`Highlighted <b>${res.matched}/${res.total}</b> questions.`, "var(--accent-green)");
+                } else if (typeof autoFetchCloudAnswersIfMissing === 'function') {
+                    showToast("Checking cloud database for answers...");
+                    autoFetchCloudAnswersIfMissing(subCode).then(ok => {
+                        if (ok) {
+                            const fresh = getCachedAnswers(subCode);
+                            const res = highlightQuizAnswers(fresh, false, true);
+                            showToast(`Highlighted ${res.matched}/${res.total} questions from cloud!`);
+                        } else {
+                            showToast(`No answers found in database for ${subCode}`);
+                        }
+                    });
+                } else {
+                    showToast(`No answers cached for ${subCode}`);
+                }
+            };
+        }
+
         // --- MODULE 3: Search Module Elements ---
         const keywordInput = document.getElementById('search-keyword-input');
         const copyKeywordBtn = document.getElementById('btn-copy-keyword');

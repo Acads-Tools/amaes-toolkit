@@ -1094,6 +1094,7 @@
         chatgpt: `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M22.28 9.82a6 6 0 0 0-.52-4.91 6.05 6.05 0 0 0-6.51-2.9A6.06 6.06 0 0 0 4.98 4.18a6 6 0 0 0-4 2.9 6.05 6.05 0 0 0 .74 7.1 6 6 0 0 0 .51 4.91 6.05 6.05 0 0 0 6.52 2.9A6 6 0 0 0 13.26 24a6.05 6.05 0 0 0 5.77-4.2 6 6 0 0 0 4-2.9 6.05 6.05 0 0 0-.75-7.08zm-9.02 12.61a4.48 4.48 0 0 1-2.88-1.04l.14-.08 4.78-2.76a.8.8 0 0 0 .39-.68v-6.74l2.02 1.17a.07.07 0 0 1 .04.05v5.59a4.5 4.5 0 0 1-4.49 4.49zm-9.66-4.13a4.47 4.47 0 0 1-.54-3.01l.15.08 4.78 2.76a.77.77 0 0 0 .78 0l5.84-3.37v2.33a.08.08 0 0 1-.03.06L9.74 19.95a4.5 4.5 0 0 1-6.14-1.65zM2.34 7.9a4.49 4.49 0 0 1 2.37-1.98V11.6a.77.77 0 0 0 .38.68l5.82 3.35-2.02 1.17a.08.08 0 0 1-.07 0l-4.83-2.79A4.5 4.5 0 0 1 2.34 7.9zm16.1 3.85L12.6 8.38l2.02-1.16a.08.08 0 0 1 .07 0l4.83 2.79a4.5 4.5 0 0 1-.67 8.1v-5.67a.8.8 0 0 0-.41-.69zm2.01-3.02l-.14-.09-4.78-2.78a.78.78 0 0 0-.78 0L9.4 9.23V6.9a.07.07 0 0 1 .03-.06l4.83-2.79a4.5 4.5 0 0 1 6.68 4.66zM8.31 12.86l-2.02-1.16a.08.08 0 0 1-.04-.06V6.07a4.5 4.5 0 0 1 7.38-3.45l-.14.08L8.7 5.46a.8.8 0 0 0-.39.68v6.72zm1.3-1.9l2.42-1.4 2.43 1.4v2.8l-2.43 1.4-2.42-1.4z"/></svg>`,
         gemini: `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/></svg>`,
         perplexity: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>`,
+        user: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
     };
 
     // Web Audio API Procedural Sound Engine (Zero external dependencies)
@@ -17703,10 +17704,13 @@ function setupAccountTransferUI() {
                         ${ICONS.target} <span>Quiz</span>
                     </button>
                     <button class="amaes-tab-btn" data-tab="db" title="Saved Question Library, Verified Answers & Online Study Guides">
-                        ${ICONS.database} <span>Study Library</span>
+                        ${ICONS.database} <span>Library</span>
                     </button>
                     <button class="amaes-tab-btn" data-tab="course" title="Course Tools, Lecture Auto-Marker & Study Helpers">
-                        ${ICONS.tools} <span>Course Tools</span>
+                        ${ICONS.tools} <span>Course</span>
+                    </button>
+                    <button class="amaes-tab-btn" data-tab="accounts" title="Switch accounts or manage saved logins">
+                        ${ICONS.user} <span>Accounts</span>
                     </button>
                 </div>
 
@@ -17742,6 +17746,21 @@ function setupAccountTransferUI() {
                             ${ICONS.copy} <span>Copy All</span>
                         </button>
                     </div>
+
+                    <!-- Seamless Quiz Highlighter -->
+                    ${!isQuiz ? `
+                    <div style="display: flex; gap: 4px; margin-top: 2px;">
+                        <button id="btn-hl-missing-quizzes" class="amaes-btn amaes-btn-outline" style="flex: 1; justify-content: center; padding: 6px 8px; font-size: 10.5px; font-weight: 600; border-radius: 6px; gap: 5px;" title="Highlight unanswered, unattempted, or missing quizzes on Course or Grades page">
+                            ${ICONS.target} <span>Highlight Missing Quizzes</span>
+                        </button>
+                    </div>
+                    ` : `
+                    <div style="display: flex; gap: 4px; margin-top: 2px;">
+                        <button id="btn-trigger-hl-answers" class="amaes-btn amaes-btn-outline" style="flex: 1; justify-content: center; padding: 6px 8px; font-size: 10px; font-weight: 600; border-radius: 6px; gap: 5px;" title="Highlight answers from database and study guides (Shortcut: H)">
+                            ${ICONS.preview} <span>Highlight Answers (H)</span>
+                        </button>
+                    </div>
+                    `}
 
                     <!-- Primary Core Settings -->
                     <div style="margin-top: 2px; border-top: 1px solid var(--border-subtle); padding-top: 6px; display: flex; flex-direction: column; gap: 6px;">
@@ -17878,17 +17897,6 @@ function setupAccountTransferUI() {
 
                 <!-- TAB PANE 2: Verified Answer Database -->
                 <div id="tab-pane-db" class="amaes-tab-pane" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
-                    <!-- Course Selector for Dashboard / Non-Course Pages -->
-                    ${!courseInfo.subjectCode && detectedCodes.length > 0 ? `
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; background: var(--surface-subtle); padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border-subtle); font-size: 11px;">
-                            <span style="font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">${ICONS.book} Current Subject:</span>
-                            <select id="amaes-select-active-course" style="background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-weight: 700; font-size: 11px; cursor: pointer;">
-                                ${detectedCodes.map(c => `<option value="${c}" ${c === subCode ? 'selected' : ''}>${c} (${(allLocalDbs[c] || []).length} Qs)</option>`).join('')}
-                                <option value="_custom">+ Enter Custom Code...</option>
-                            </select>
-                        </div>
-                    ` : ''}
-
                     <!-- Course-Wide Coverage Breakdown Card -->
                     <div id="amaes-term-coverage-card" style="background: rgba(0,0,0,0.2); padding: 7px 9px; border-radius: 6px; border: 1px solid var(--border-subtle); display: ${hasActiveCourse ? 'flex' : 'none'}; flex-direction: column; gap: 6px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; padding-bottom: 3px; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
@@ -17921,13 +17929,6 @@ function setupAccountTransferUI() {
                         <div id="amaes-term-pills" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 2px;">
                             <!-- Populated dynamically by updateTermCoverageUI -->
                         </div>
-                    </div>
-
-                    <!-- Primary 1-Click Action: Sync Library -->
-                    <div style="display: flex;">
-                        <button id="btn-cloud-sync" class="amaes-btn amaes-btn-blue" style="flex: 1; justify-content: center; padding: 8px 10px; font-size: 11px; font-weight: 700; border-radius: 6px;" title="Sync verified answers with the shared community library">
-                            ${ICONS.cloudDownload} <span>Sync Community Answers</span>
-                        </button>
                     </div>
 
 
@@ -18007,75 +18008,16 @@ function setupAccountTransferUI() {
                 </div>
 
                 <!-- TAB PANE 3: Course Automation Tools -->
-                <div id="tab-pane-course" class="amaes-tab-pane" style="display: none;">
-                    <div id="amaes-account-switcher-card" class="amaes-card" style="padding: 8px; display: flex; flex-direction: column; gap: 7px;">
-                        <div style="font-size: 11px; font-weight: 700; color: var(--text-primary);">Account Switcher</div>
-                        <form id="amaes-account-switcher-form" style="display: flex; flex-direction: column; gap: 5px;">
-                            <input id="amaes-account-switcher-username" type="text" autocomplete="off" placeholder="Username / USN" aria-label="Username / USN" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
-                            <input id="amaes-account-switcher-password" type="password" autocomplete="new-password" placeholder="Password" aria-label="Password" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
-                            <input id="amaes-account-switcher-nickname" type="text" autocomplete="off" placeholder="Nickname / Display name" aria-label="Nickname / Display name" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
-                            <button id="amaes-account-switcher-submit" type="submit" class="amaes-btn amaes-btn-monotone" style="justify-content: center; padding: 6px; font-size: 10px;">Add account</button>
-                            <button id="amaes-account-switcher-cancel-edit" type="button" class="amaes-btn amaes-btn-outline" style="display: none; justify-content: center; padding: 6px; font-size: 10px;">Cancel edit</button>
-                        </form>
-                        <div id="amaes-account-switcher-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
-                        <details id="amaes-account-transfer" style="border: 1px solid var(--border-subtle); border-radius: 5px; padding: 5px 6px;">
-                            <summary style="cursor: pointer; font-size: 9.5px; font-weight: 600; color: var(--text-secondary);">Transfer setup to another device</summary>
-                            <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 5px;">
-                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
-                                    <input id="amaes-transfer-include-settings" type="checkbox" checked />
-                                    <span>Toolkit preferences (automation, AI, appearance, and panel layout)</span>
-                                </label>
-                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
-                                    <input id="amaes-transfer-include-accounts" type="checkbox" checked />
-                                    <span>Moodle account profiles (usernames, passwords, nicknames)</span>
-                                </label>
-                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
-                                    <input id="amaes-transfer-include-api-keys" type="checkbox" checked />
-                                    <span>Personal Gemini API keys</span>
-                                </label>
-                                <label style="display: flex; gap: 5px; align-items: flex-start; font-size: 8.5px; color: var(--accent-amber, #f59e0b); line-height: 1.3;">
-                                    <input id="amaes-transfer-secret-consent" type="checkbox" style="margin-top: 1px;" />
-                                    <span>I understand anyone with the one-time code can import the selected passwords and API keys.</span>
-                                </label>
-                                <button id="amaes-transfer-create" type="button" class="amaes-btn amaes-btn-outline" style="justify-content: center; font-size: 9px; padding: 5px;">Create one-time transfer code</button>
-                                <input id="amaes-transfer-code" type="text" readonly hidden aria-label="One-time transfer code" style="width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 5px 6px; border-radius: 4px; font-size: 9px; font-family: monospace;" />
-                                <button id="amaes-transfer-copy" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Copy code</button>
-                                <div style="font-size: 8.5px; color: var(--text-muted); line-height: 1.3;">The code does not expire, but works once only. The relay keeps encrypted data until it is imported, then deletes it. Anyone with the code can import it, so keep it private. Service tokens, Moodle sessions, caches, and installation identity are not included. Imported credentials are saved in this browser's userscript storage.</div>
-                                <div style="display: flex; gap: 4px; align-items: center;">
-                                    <input id="amaes-transfer-import-code" type="password" autocomplete="off" placeholder="Enter transfer code" aria-label="Transfer code" style="flex: 1; min-width: 0; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 5px 7px; border-radius: 4px; font-size: 9.5px; font-family: monospace;" />
-                                    <button id="amaes-transfer-import" type="button" class="amaes-btn amaes-btn-outline" style="width: auto; flex-shrink: 0; white-space: nowrap; justify-content: center; font-size: 9px; padding: 5px 9px;">Preview</button>
-                                </div>
-                                <div id="amaes-transfer-preview" hidden role="status" style="font-size: 9px; color: var(--text-secondary); line-height: 1.4;"></div>
-                                <button id="amaes-transfer-apply" type="button" class="amaes-btn amaes-btn-monotone" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Import into this device</button>
-                                <button id="amaes-transfer-discard" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Discard preview</button>
-                                <div id="amaes-account-transfer-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
-                            </div>
-                        </details>
-                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 9.5px; color: var(--text-secondary); cursor: pointer;">
-                            <input id="amaes-account-switcher-return" type="checkbox" style="margin: 1px 0 0; cursor: pointer;" />
-                            <span>Return to current page after switch</span>
-                        </label>
-                        <div style="font-size: 9px; color: var(--text-muted); line-height: 1.4;">Accounts are saved only in your userscript manager on this device. They are not sent to the toolkit relay; your login details are entered only on Moodle.</div>
-                        <div id="amaes-account-switcher-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
-                    </div>
-
+                <div id="tab-pane-course" class="amaes-tab-pane" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
                     <div id="mod-marker-card" class="amaes-card">
                         ${renderCardContent('mod-marker', ICONS.check, 'Activity Auto-Marker', '', `
-                            <div style="font-size: 9.5px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">
-                                ${ICONS.check} <span>Mark Complete:</span>
-                            </div>
-                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
-                                ${renderToolBtn({ id: 'btn-mark-lec', icon: ICONS.book, text: 'Lectures', title: 'Mark Lectures & Videos as done' })}
-                                ${renderToolBtn({ id: 'btn-mark-quiz', icon: ICONS.edit, text: 'Quizzes', title: 'Mark quizzes & exams with a passable grade (≥80%) as done' })}
-                                ${renderToolBtn({ id: 'btn-mark-all', icon: ICONS.zap, text: 'All', title: 'Mark all eligible activities as done' })}
-                            </div>
-                            <div style="font-size: 9.5px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 4px; margin-top: 4px;">
-                                ${ICONS.undo} <span>Undo Complete:</span>
-                            </div>
-                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
-                                ${renderToolBtn({ id: 'btn-undo-lec', icon: ICONS.book, text: 'Lectures', title: 'Undo completion for Lectures & Videos' })}
-                                ${renderToolBtn({ id: 'btn-undo-quiz', icon: ICONS.edit, text: 'Quizzes', title: 'Undo completion for Quizzes' })}
-                                ${renderToolBtn({ id: 'btn-undo-all', icon: ICONS.zap, text: 'All', title: 'Undo all completions' })}
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                ${renderToolBtn({ id: 'btn-mark-all', icon: ICONS.zap, text: 'Auto-Mark All Eligible as Done', title: 'Mark all lectures and passed quizzes (≥80%) as done', style: 'width: 100%; padding: 6px; font-weight: 700; background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(5,150,105,0.2)); border: 1px solid rgba(16,185,129,0.4); color: var(--accent-green, #10b981);' })}
+                                <div style="display: flex; gap: 4px;">
+                                    ${renderToolBtn({ id: 'btn-mark-lec', icon: ICONS.book, text: 'Lectures', title: 'Mark lectures as done', style: 'flex: 1;' })}
+                                    ${renderToolBtn({ id: 'btn-mark-quiz', icon: ICONS.edit, text: 'Quizzes (≥80%)', title: 'Mark quizzes with passable grade as done', style: 'flex: 1;' })}
+                                    ${renderToolBtn({ id: 'btn-undo-all', icon: ICONS.undo, text: 'Undo', title: 'Undo all completions', style: 'width: auto; padding: 5px 8px;' })}
+                                </div>
                             </div>
                         `)}
                     </div>
@@ -18083,15 +18025,13 @@ function setupAccountTransferUI() {
                     <div id="mod-highlighter-card" class="amaes-card">
                         ${renderCardContent('mod-highlighter', ICONS.preview, 'Activity Highlighter', '', `
                             <div style="display: flex; gap: 4px;">
-                                ${renderToolBtn({ id: 'btn-hl-quiz', icon: ICONS.edit, text: 'Quiz', title: 'Highlight Quizzes & Exams', style: 'flex: 1;' })}
-                                ${renderToolBtn({ id: 'btn-hl-lec', icon: ICONS.book, text: 'Lec', title: 'Highlight Lectures & Lessons', style: 'flex: 1;' })}
-                                ${renderToolBtn({ id: 'btn-hl-vid', icon: ICONS.video, text: 'Vid', title: 'Highlight Video Lectures', style: 'flex: 1;' })}
-                            </div>
-                            <div style="display: flex; gap: 4px;">
                                 ${renderToolBtn({ id: 'btn-hl-all', icon: '', text: 'Highlight All', style: 'flex: 2; font-weight: 600;' })}
                                 ${renderToolBtn({ id: 'btn-hl-clear', icon: ICONS.clear, text: 'Clear', style: 'flex: 1;' })}
                             </div>
-                            ${renderToolBtn({ id: 'btn-hl-missing-quizzes', icon: ICONS.alertTriangle || ICONS.preview, text: 'Highlight Missing Quizzes', title: 'Highlight unanswered, unattempted, or missing quizzes on Grades or Course page', style: 'width: 100%; margin-top: 2px;' })}
+                            <div style="display: flex; gap: 4px; margin-top: 4px;">
+                                ${renderToolBtn({ id: 'btn-hl-lec', icon: ICONS.book, text: 'Lectures', title: 'Highlight Lectures & Lessons', style: 'flex: 1;' })}
+                                ${renderToolBtn({ id: 'btn-hl-vid', icon: ICONS.video, text: 'Videos', title: 'Highlight Video Lectures', style: 'flex: 1;' })}
+                            </div>
                         `)}
                     </div>
 
@@ -18169,67 +18109,64 @@ function setupAccountTransferUI() {
                     </div>
                 </div>
 
+                <!-- TAB PANE 4: Account Switcher -->
+                <div id="tab-pane-accounts" class="amaes-tab-pane" style="display: none; padding: 8px; flex-direction: column; gap: 7px;">
+                    <div id="amaes-account-switcher-card" class="amaes-card" style="padding: 8px; display: flex; flex-direction: column; gap: 7px;">
+                        <div style="font-size: 11px; font-weight: 700; color: var(--text-primary);">Account Switcher</div>
+                        <form id="amaes-account-switcher-form" style="display: flex; flex-direction: column; gap: 5px;">
+                            <input id="amaes-account-switcher-username" type="text" autocomplete="off" placeholder="Username / USN" aria-label="Username / USN" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                            <input id="amaes-account-switcher-password" type="password" autocomplete="new-password" placeholder="Password" aria-label="Password" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                            <input id="amaes-account-switcher-nickname" type="text" autocomplete="off" placeholder="Nickname / Display name" aria-label="Nickname / Display name" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                            <button id="amaes-account-switcher-submit" type="submit" class="amaes-btn amaes-btn-monotone" style="justify-content: center; padding: 6px; font-size: 10px;">Add account</button>
+                            <button id="amaes-account-switcher-cancel-edit" type="button" class="amaes-btn amaes-btn-outline" style="display: none; justify-content: center; padding: 6px; font-size: 10px;">Cancel edit</button>
+                        </form>
+                        <div id="amaes-account-switcher-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
+                        <details id="amaes-account-transfer" style="border: 1px solid var(--border-subtle); border-radius: 5px; padding: 5px 6px;">
+                            <summary style="cursor: pointer; font-size: 9.5px; font-weight: 600; color: var(--text-secondary);">Transfer setup to another device</summary>
+                            <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 5px;">
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
+                                    <input id="amaes-transfer-include-settings" type="checkbox" checked />
+                                    <span>Toolkit preferences (automation, AI, appearance, and panel layout)</span>
+                                </label>
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
+                                    <input id="amaes-transfer-include-accounts" type="checkbox" checked />
+                                    <span>Moodle account profiles (usernames, passwords, nicknames)</span>
+                                </label>
+                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
+                                    <input id="amaes-transfer-include-api-keys" type="checkbox" checked />
+                                    <span>Personal Gemini API keys</span>
+                                </label>
+                                <label style="display: flex; gap: 5px; align-items: flex-start; font-size: 8.5px; color: var(--accent-amber, #f59e0b); line-height: 1.3;">
+                                    <input id="amaes-transfer-secret-consent" type="checkbox" style="margin-top: 1px;" />
+                                    <span>I understand anyone with the one-time code can import the selected passwords and API keys.</span>
+                                </label>
+                                <button id="amaes-transfer-create" type="button" class="amaes-btn amaes-btn-outline" style="justify-content: center; font-size: 9px; padding: 5px;">Create one-time transfer code</button>
+                                <input id="amaes-transfer-code" type="text" readonly hidden aria-label="One-time transfer code" style="width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 5px 6px; border-radius: 4px; font-size: 9px; font-family: monospace;" />
+                                <button id="amaes-transfer-copy" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Copy code</button>
+                                <div style="font-size: 8.5px; color: var(--text-muted); line-height: 1.3;">The code does not expire, but works once only. The relay keeps encrypted data until it is imported, then deletes it. Anyone with the code can import it, so keep it private. Service tokens, Moodle sessions, caches, and installation identity are not included. Imported credentials are saved in this browser's userscript storage.</div>
+                                <div style="display: flex; gap: 4px; align-items: center;">
+                                    <input id="amaes-transfer-import-code" type="password" autocomplete="off" placeholder="Enter transfer code" aria-label="Transfer code" style="flex: 1; min-width: 0; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 5px 7px; border-radius: 4px; font-size: 9.5px; font-family: monospace;" />
+                                    <button id="amaes-transfer-import" type="button" class="amaes-btn amaes-btn-outline" style="width: auto; flex-shrink: 0; white-space: nowrap; justify-content: center; font-size: 9px; padding: 5px 9px;">Preview</button>
+                                </div>
+                                <div id="amaes-transfer-preview" hidden role="status" style="font-size: 9px; color: var(--text-secondary); line-height: 1.4;"></div>
+                                <button id="amaes-transfer-apply" type="button" class="amaes-btn amaes-btn-monotone" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Import into this device</button>
+                                <button id="amaes-transfer-discard" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Discard preview</button>
+                                <div id="amaes-account-transfer-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
+                            </div>
+                        </details>
+                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 9.5px; color: var(--text-secondary); cursor: pointer;">
+                            <input id="amaes-account-switcher-return" type="checkbox" style="margin: 1px 0 0; cursor: pointer;" />
+                            <span>Return to current page after switch</span>
+                        </label>
+                        <div style="font-size: 9px; color: var(--text-muted); line-height: 1.4;">Accounts are saved only in your userscript manager on this device. They are not sent to the toolkit relay; your login details are entered only on Moodle.</div>
+                        <div id="amaes-account-switcher-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
+                    </div>
+                </div>
+
                 <!-- Stop Button -->
                 <button id="amaes-stop-btn" class="amaes-btn amaes-btn-stop" style="display: none; margin-bottom: 6px;">
                     ${ICONS.stop} <span>Stop Execution</span>
                 </button>
-
-                <!-- Live Monitor & Activity Logger (Doing / Plan / Done) -->
-                <div id="amaes-monitor" class="amaes-monitor-card" style="
-                    background: var(--surface-subtle);
-                    border: 1px solid var(--border-subtle);
-                    border-radius: 8px;
-                    padding: 7px 9px;
-                    margin-top: 4px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 4px;
-                    font-size: 11px;
-                ">
-                    <!-- Doing (Current Action) -->
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-width: 0;">
-                        <div style="display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; overflow: hidden;">
-                            <span id="amaes-status-dot" style="width: 7px; height: 7px; border-radius: 50%; background: ${cachedQuestions ? '#10b981' : 'var(--text-muted)'}; flex-shrink: 0; box-shadow: 0 0 5px rgba(16,185,129,0.5);"></span>
-                            <span id="amaes-status" style="font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1;" title="Current Status">
-                                ${cachedQuestions ? `Ready. Cached ${cachedQuestions.length} verified Q&A.` : 'Ready. Select a tool above.'}
-                            </span>
-                        </div>
-                        <button id="amaes-btn-toggle-logs" type="button" style="background: var(--surface, #1e293b); border: 1px solid var(--border, #334155); color: var(--text-secondary); font-size: 9.5px; cursor: pointer; display: flex; align-items: center; gap: 3px; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; z-index: 2; box-shadow: 0 1px 3px rgba(0,0,0,0.25);" title="Toggle Activity History Log">
-                            ${ICONS.clock} <span id="amaes-log-count-badge">Log</span>
-                        </button>
-                    </div>
-
-                    <!-- Plan (Next Planned Step) -->
-                    <div id="amaes-status-plan" style="font-size: 10px; display: flex; align-items: center; gap: 5px;">
-                        <span style="font-weight: 700; color: var(--accent-blue, #3b82f6); opacity: 0.9;">Plan:</span>
-                        <span id="amaes-plan-text" style="color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            ${isQuiz ? 'Ready to highlight or solve questions' : 'Browse courses or review answers'}
-                        </span>
-                    </div>
-
-                    <!-- Done (Expandable Activity History Feed) -->
-                    <div id="amaes-activity-feed" style="
-                        display: none;
-                        flex-direction: column;
-                        gap: 3px;
-                        max-height: 120px;
-                        overflow-y: auto;
-                        border-top: 1px solid var(--border-subtle);
-                        padding-top: 5px;
-                        margin-top: 2px;
-                    ">
-                        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 9px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
-                            <span>Recent Activity ("Done"):</span>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <button id="amaes-btn-copy-logs" type="button" style="background: none; border: none; color: var(--accent-blue, #3b82f6); text-decoration: underline; font-size: 9px; cursor: pointer; padding: 0;" title="Copy all logged activities to clipboard">Copy Log</button>
-                                <button id="amaes-btn-clear-logs" type="button" style="background: none; border: none; color: var(--text-muted); text-decoration: underline; font-size: 9px; cursor: pointer; padding: 0;">Clear</button>
-                            </div>
-                        </div>
-                        <div id="amaes-logs-list" style="display: flex; flex-direction: column; gap: 2px; font-family: -apple-system, BlinkMacSystemFont, monospace; font-size: 9.5px;">
-                            <span style="color: var(--text-muted); font-style: italic;">No recorded events yet.</span>
-                        </div>
-                    </div>
-                </div>
             </div>
         `;
 
@@ -18391,7 +18328,7 @@ function setupAccountTransferUI() {
                 }
                 #amaes-nav-tabs {
                     display: grid;
-                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                    grid-template-columns: repeat(4, minmax(0, 1fr));
                     gap: 3px;
                     background: rgba(0,0,0,0.25);
                     padding: 3px;
@@ -19232,7 +19169,8 @@ function setupAccountTransferUI() {
         const tabPanes = {
             quiz: document.getElementById('tab-pane-quiz'),
             db: document.getElementById('tab-pane-db'),
-            course: document.getElementById('tab-pane-course')
+            course: document.getElementById('tab-pane-course'),
+            accounts: document.getElementById('tab-pane-accounts')
         };
 
         function switchTab(tabName) {
@@ -20391,6 +20329,33 @@ function setupAccountTransferUI() {
                 } else {
                     showToast("No missing quizzes found on this page! All completed.");
                     setLog("No missing quizzes found on this page. All activities completed!", "var(--accent-green)");
+                }
+            };
+        }
+
+        const btnTriggerHlAnswers = document.getElementById('btn-trigger-hl-answers');
+        if (btnTriggerHlAnswers) {
+            btnTriggerHlAnswers.onclick = () => {
+                const courseInfo = detectCourseInfo();
+                const subCode = courseInfo.subjectCode || 'CS6301';
+                const cached = getCachedAnswers(subCode);
+                if (cached && cached.length > 0) {
+                    const res = highlightQuizAnswers(cached, false, true);
+                    showToast(`Highlighted ${res.matched}/${res.total} questions!`);
+                    setLog(`Highlighted <b>${res.matched}/${res.total}</b> questions.`, "var(--accent-green)");
+                } else if (typeof autoFetchCloudAnswersIfMissing === 'function') {
+                    showToast("Checking cloud database for answers...");
+                    autoFetchCloudAnswersIfMissing(subCode).then(ok => {
+                        if (ok) {
+                            const fresh = getCachedAnswers(subCode);
+                            const res = highlightQuizAnswers(fresh, false, true);
+                            showToast(`Highlighted ${res.matched}/${res.total} questions from cloud!`);
+                        } else {
+                            showToast(`No answers found in database for ${subCode}`);
+                        }
+                    });
+                } else {
+                    showToast(`No answers cached for ${subCode}`);
                 }
             };
         }
