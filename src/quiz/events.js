@@ -149,6 +149,10 @@
 
         if (chkAutoPick) {
             chkAutoPick.onchange = () => {
+                if (autoQuizMode) {
+                    chkAutoPick.checked = true;
+                    return;
+                }
                 autoPickQuiz = chkAutoPick.checked;
                 localStorage.setItem('amaes_auto_pick_quiz', autoPickQuiz);
                 showToast(`Auto-Pick: ${autoPickQuiz ? 'Enabled' : 'Disabled'}`);
@@ -159,6 +163,10 @@
 
         if (chkAutoNextVerified) {
             chkAutoNextVerified.onchange = () => {
+                if (autoQuizMode) {
+                    chkAutoNextVerified.checked = true;
+                    return;
+                }
                 autoNextVerified = chkAutoNextVerified.checked;
                 localStorage.setItem('amaes_auto_next_verified', autoNextVerified);
                 showToast(`Auto-Next (Verified): ${autoNextVerified ? 'Enabled' : 'Disabled'}`);
@@ -169,6 +177,10 @@
 
         if (chkAutoPickStudyGuideFallback) {
             chkAutoPickStudyGuideFallback.onchange = () => {
+                if (autoQuizMode) {
+                    chkAutoPickStudyGuideFallback.checked = true;
+                    return;
+                }
                 autoPickStudyGuideFallback = chkAutoPickStudyGuideFallback.checked;
                 localStorage.setItem('amaes_auto_pick_study_guide_fallback', String(autoPickStudyGuideFallback));
                 showToast(`Study-guide fallback Auto-Pick: ${autoPickStudyGuideFallback ? 'Enabled in Auto-Quiz' : 'Disabled'}`);

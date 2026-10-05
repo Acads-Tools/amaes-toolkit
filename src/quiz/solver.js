@@ -2050,6 +2050,44 @@
         document.querySelectorAll('.amaes-card-btn-container .amaes-copy-ai-card-btn:not(.amaes-paste-ai-card-btn):not(.amaes-ask-ai-card-btn)').forEach(button => {
             button.style.display = autoQuizMode ? 'none' : '';
         });
+
+        // Synchronize Auto-Pilot controls (Locked ON and disabled while Auto-Quiz is actively driving)
+        const chkAutoPick = document.getElementById('chk-auto-pick');
+        const chkAutoNextVerified = document.getElementById('chk-auto-next-verified');
+        const chkAutoPickStudyGuide = document.getElementById('chk-auto-pick-study-guide-fallback');
+        if (autoQuizMode) {
+            if (chkAutoPick) {
+                chkAutoPick.checked = true;
+                chkAutoPick.disabled = true;
+                chkAutoPick.title = 'Active & locked while Auto-Quiz is running';
+            }
+            if (chkAutoNextVerified) {
+                chkAutoNextVerified.checked = true;
+                chkAutoNextVerified.disabled = true;
+                chkAutoNextVerified.title = 'Active & locked while Auto-Quiz is running';
+            }
+            if (chkAutoPickStudyGuide) {
+                chkAutoPickStudyGuide.checked = true;
+                chkAutoPickStudyGuide.disabled = true;
+                chkAutoPickStudyGuide.title = 'Active & locked while Auto-Quiz is running';
+            }
+        } else {
+            if (chkAutoPick) {
+                chkAutoPick.disabled = false;
+                chkAutoPick.checked = autoPickQuiz;
+                chkAutoPick.title = 'Automatically select choice inputs when verified answers are matched';
+            }
+            if (chkAutoNextVerified) {
+                chkAutoNextVerified.disabled = false;
+                chkAutoNextVerified.checked = autoNextVerified;
+                chkAutoNextVerified.title = 'Advances smoothly to next question when answered; pauses on unknown questions';
+            }
+            if (chkAutoPickStudyGuide) {
+                chkAutoPickStudyGuide.disabled = false;
+                chkAutoPickStudyGuide.checked = autoPickStudyGuideFallback;
+                chkAutoPickStudyGuide.title = "In Auto-Quiz, select Jenny's Online or AMAUOED study guide choices when no verified answer is available in the database.";
+            }
+        }
     }
 
     // Master Toggle Function for Starting / Pausing Autonomous Quiz
@@ -2062,6 +2100,9 @@
         localStorage.setItem('amaes_auto_quiz_mode', autoQuizMode ? 'true' : 'false');
 
         if (autoQuizMode) {
+            autoPickQuiz = true;
+            autoNextVerified = true;
+            autoPickStudyGuideFallback = true;
             isWaitingForUserAnswer = false;
             showToast("Auto-Quiz Started (Co-Pilot)");
             setLog("Auto-Quiz <b>started</b> in <b>Co-Pilot</b> mode!", "var(--accent-green)");

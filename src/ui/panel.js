@@ -175,15 +175,15 @@
                         <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 5px;">
                             <div style="font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Auto-Pilot Automation</div>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Automatically select choice inputs when verified answers are matched">
-                                <input id="chk-auto-pick" type="checkbox" ${autoPickQuiz ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <input id="chk-auto-pick" type="checkbox" ${autoQuizMode || autoPickQuiz ? 'checked' : ''} ${autoQuizMode ? 'disabled' : ''} style="cursor: pointer; margin: 0;" />
                                 <span>Auto-Pick Answers</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Advances smoothly to next question when answered; pauses on unknown questions">
-                                <input id="chk-auto-next-verified" type="checkbox" ${autoNextVerified ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <input id="chk-auto-next-verified" type="checkbox" ${autoQuizMode || autoNextVerified ? 'checked' : ''} ${autoQuizMode ? 'disabled' : ''} style="cursor: pointer; margin: 0;" />
                                 <span>Auto-Advance to Next Question</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="In Auto-Quiz, select Jenny's Online or AMAUOED study guide choices when no verified answer is available in the database.">
-                                <input id="chk-auto-pick-study-guide-fallback" type="checkbox" ${autoPickStudyGuideFallback ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
+                                <input id="chk-auto-pick-study-guide-fallback" type="checkbox" ${autoQuizMode || autoPickStudyGuideFallback ? 'checked' : ''} ${autoQuizMode ? 'disabled' : ''} style="cursor: pointer; margin: 0;" />
                                 <span>Online Study Guides (Jenny &amp; AMA)</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically click Submit all and finish after reaching the quiz summary. This submits without a final manual review.">
