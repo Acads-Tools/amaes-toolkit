@@ -52,10 +52,10 @@
                         return;
                     }
                 }
-                if (!checkIsQuizAttemptPage() && !autoQuizMode) {
-                    // Check if student is on the quiz view/start page (/mod/quiz/view.php)
+                if (!checkIsQuizAttemptPage()) {
+                    // Student is not on an active attempt page (e.g. view.php, dashboard, course)
                     const isQuizLanding = window.location.pathname.includes('/mod/quiz/view.php');
-                    if (isQuizLanding) {
+                    if (!autoQuizMode && isQuizLanding) {
                         const startBtn = document.querySelector('form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], .quizstartbutton button, .quizstartbutton input[type="submit"], #region-main button.btn-primary, #region-main input.btn-primary');
                         if (startBtn) {
                             toggleAutoQuizMode(true);
@@ -65,8 +65,7 @@
                             return;
                         }
                     }
-                    showToast("Open any quiz attempt to start auto-quiz!", 3000);
-                    setLog("Open any quiz attempt to start auto-quiz.", "var(--accent-blue)");
+                    toggleAutoQuizMode();
                     return;
                 }
                 if (checkIsQuizAttemptPage() && (isWaitingForUserAnswer || document.querySelector('.amaes-blockage-hud'))) {

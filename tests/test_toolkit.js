@@ -5729,7 +5729,56 @@ test("Automated Anomaly Detection & Reporting: detects verified answer failures,
     assert.strictEqual(dispatched.length, 1, "Duplicate anomaly in same session must be suppressed");
 });
 
+// --------------------------------------------------
+// 129. Matching Questions: Per-Row AI Resolution, Non-Corrupting Evidence Recording & Review Ground Truth Isolation
+// --------------------------------------------------
+test("Matching Questions: Per-Row AI Resolution, Non-Corrupting Evidence Recording & Review Ground Truth Isolation", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
+    // 1. Per-row AI solver function & button injection exists
+    assert.ok(script.includes("async function solveMatchingRowWithAi({ que, row, selectInput, subQText, autoApply = false })"), "solveMatchingRowWithAi must be defined");
+    assert.ok(script.includes("amaes-ai-match-row-btn"), "Must inject per-row AI button with class amaes-ai-match-row-btn");
+    assert.ok(script.includes("sessionStorage.setItem(sessionCacheKey, matchedOpt.text.trim())"), "Must cache matching row AI answers in sessionStorage");
+
+    // 2. Evidence recording splits matching rows into individual match_item entries
+    assert.ok(script.includes("questionType: 'match_item'"), "Must record matching items per-row with questionType: 'match_item'");
+    assert.ok(script.includes("subQuestionText: subQText"), "Must record each matching row prompt individually via subQuestionText");
+
+    // 3. Review ground truth isolation for partial marks
+    assert.ok(script.includes("Moodle does not provide row-by-row correctness indicators for this matching question"), "Must warn that partial marks without per-row checkmarks cannot verify individual answers");
+    assert.ok(script.includes("qNorm.includes('matching type')"), "Must detect generic Matching Type prompt");
+});
+
+// --------------------------------------------------
+// 130. Global Auto-Quiz Toggle: Operates outside quiz attempts, preserves state across navigation, and retains user choice
+// --------------------------------------------------
+test("Global Auto-Quiz Toggle: Operates outside quiz attempts, preserves state across navigation, and retains user choice", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Solver hotkey 'P' must trigger toggleAutoQuizMode before checkIsQuizAttemptPage check
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const keydownHandlerIdx = solverSrc.indexOf("window.addEventListener('keydown'");
+    assert.ok(keydownHandlerIdx > 0, "window.addEventListener('keydown') must be defined");
+    const keydownBlock = solverSrc.slice(keydownHandlerIdx);
+    const hotkeyPIdx = keydownBlock.indexOf("e.key === 'p' || e.key === 'P'");
+    const attemptGuardIdx = keydownBlock.indexOf("if (!checkIsQuizAttemptPage()) return;");
+    assert.ok(hotkeyPIdx > 0, "Hotkey P handler must be defined");
+    assert.ok(attemptGuardIdx > 0, "Attempt page guard must be defined");
+    assert.ok(hotkeyPIdx < attemptGuardIdx, "Hotkey P must be evaluated before attempt page guard in keydown handler so users can toggle Auto-Quiz anywhere");
+
+    // 2. Events btnMasterAutoQuiz must not abort outside quiz attempts
+    const eventsSrc = fs.readFileSync('src/quiz/events.js', 'utf8');
+    const masterBtnIdx = eventsSrc.indexOf("btnMasterAutoQuiz.onclick =");
+    assert.ok(masterBtnIdx > 0, "btnMasterAutoQuiz onclick listener must be defined");
+    const masterBtnBlock = eventsSrc.slice(masterBtnIdx, masterBtnIdx + 2000);
+    assert.ok(!masterBtnBlock.includes("Open any quiz attempt to start Auto-Quiz"), "btnMasterAutoQuiz must never lock or block user when outside a quiz attempt");
+    assert.ok(masterBtnBlock.includes("toggleAutoQuizMode();"), "btnMasterAutoQuiz must toggle autoQuizMode unconditionally");
+
+    // 3. State persistence
+    assert.ok(solverSrc.includes("localStorage.setItem('amaes_auto_quiz_mode', autoQuizMode ? 'true' : 'false')"), "Must persist autoQuizMode in localStorage");
+});
 
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
@@ -5740,3 +5789,4 @@ console.log("==================================================");
 if (failed > 0) {
     process.exit(1);
 }
+

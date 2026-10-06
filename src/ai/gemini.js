@@ -132,6 +132,109 @@
         return Array.from(byIndex.values()).sort((left, right) => left.rowIndex - right.rowIndex);
     }
 
+    function applyMatchingRowAiSuggestion(row, select, option, autoApply = false) {
+        if (!row || !select || !option) return;
+        row.querySelectorAll('.amaes-ai-matching-suggestion').forEach(el => el.remove());
+        const badge = document.createElement('div');
+        badge.className = 'amaes-ai-matching-suggestion';
+        badge.setAttribute('role', 'status');
+        badge.style.cssText = 'display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 4px 0; color: #7e22ce; font-size: 11px; font-weight: 700;';
+        const label = document.createElement('span');
+        label.textContent = `AI suggestion (unverified): ${option.text.trim()}`;
+        const useButton = document.createElement('button');
+        useButton.type = 'button';
+        useButton.textContent = autoApply ? 'Selected' : 'Use suggestion';
+        useButton.disabled = autoApply;
+        useButton.style.cssText = 'padding: 2px 7px; border: 1px solid #c084fc; border-radius: 4px; background: #faf5ff; color: #7e22ce; font-size: 10px; font-weight: 700; cursor: pointer;';
+
+        const applyOption = () => {
+            select.value = option.value;
+            select.dispatchEvent(new Event('input', { bubbles: true }));
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            select.dispatchEvent(new Event('blur', { bubbles: true }));
+            select.style.outline = '2px solid #a855f7';
+            select.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+            useButton.textContent = 'Selected';
+            useButton.disabled = true;
+        };
+
+        useButton.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            applyOption();
+        });
+
+        if (autoApply) {
+            applyOption();
+        }
+
+        badge.append(label, useButton);
+        select.insertAdjacentElement('afterend', badge);
+    }
+
+    async function solveMatchingRowWithAi({ que, row, selectInput, subQText, autoApply = false }) {
+        if (!selectInput || !subQText) return null;
+        const options = Array.from(selectInput.options || []).filter(option =>
+            option.value && option.value !== '0' && !option.text.toLowerCase().includes('choose')
+        );
+        if (options.length === 0) return null;
+
+        const sessionCacheKey = `amaes_ai_match_${normalizeText(subQText)}`;
+        const cachedAns = sessionStorage.getItem(sessionCacheKey);
+        if (cachedAns) {
+            const cachedOpt = options.find(o => normalizeChoice(o.text) === normalizeChoice(cachedAns));
+            if (cachedOpt) {
+                applyMatchingRowAiSuggestion(row, selectInput, cachedOpt, autoApply);
+                return cachedOpt;
+            }
+        }
+
+        const courseInfo = detectCourseInfo();
+        const courseCode = courseInfo.subjectCode || '';
+        const lines = [];
+        if (courseCode) lines.push(`[Course: ${courseCode}]`);
+        lines.push(`Question: ${subQText}`);
+        lines.push(`Options: ${options.map(o => o.text.trim()).join(' | ')}`);
+        lines.push(`Reply with ONLY the exact option text from the list above that best answers the question. No explanation.`);
+        const prompt = lines.join('\n');
+
+        const apiKey = getAvailableGeminiKey();
+        if (!apiKey && !isSharedAiFallbackEnabled()) {
+            showToast("Gemini AI is not configured. Please set your free Google AI Studio key.", 3500);
+            return null;
+        }
+
+        try {
+            let resText = null;
+            if (apiKey) {
+                const res = await callGeminiAPI(prompt, 64);
+                resText = res ? res.text : null;
+            } else {
+                resText = await requestSharedAiInference(prompt, { maxOutputTokens: 64 });
+            }
+            if (!resText) return null;
+
+            const cleanAns = resText.replace(/```(?:text|json)?/gi, '').replace(/^answer:\s*/i, '').replace(/^['"]|['"]$/g, '').trim();
+            const cleanNorm = normalizeChoice(cleanAns);
+            let matchedOpt = options.find(o => normalizeChoice(o.text) === cleanNorm);
+            if (!matchedOpt) {
+                matchedOpt = options.find(o => {
+                    const oNorm = normalizeChoice(o.text);
+                    return (oNorm.length > 2 && cleanNorm.includes(oNorm)) || (cleanNorm.length > 2 && oNorm.includes(cleanNorm));
+                });
+            }
+
+            if (matchedOpt) {
+                sessionStorage.setItem(sessionCacheKey, matchedOpt.text.trim());
+                applyMatchingRowAiSuggestion(row, selectInput, matchedOpt, autoApply);
+                return matchedOpt;
+            }
+        } catch (err) {
+            logDebug(`Single-row matching AI error: ${err.message}`);
+        }
+        return null;
+    }
+
     // Ultra-Compact Prompt Builder: 0 fluff, max token efficiency (~60-120 tokens total)
     function buildGeminiCompactPrompt(qData, courseCode = '', que = null) {
         const lines = [];
@@ -1342,6 +1445,35 @@
                     }
                     return;
                 }
+
+                // If bulk matching output was refused or unparseable, fall back to solving row-by-row
+                setLog(`[AI Matching Fallback] Bulk AI response unconfirmed; analyzing matching items row-by-row...`, "var(--accent-purple)");
+                let solvedCount = 0;
+                for (let i = 0; i < matchingRows.length; i++) {
+                    const mRow = matchingRows[i];
+                    const opt = await solveMatchingRowWithAi({
+                        que,
+                        row: mRow.row,
+                        selectInput: mRow.select,
+                        subQText: mRow.prompt,
+                        autoApply: false
+                    });
+                    if (opt) solvedCount++;
+                }
+                if (solvedCount > 0) {
+                    showToast(`Gemini suggested ${solvedCount} matching answers row-by-row; review before continuing.`, 3500);
+                    if (typeof onSuccess === 'function') {
+                        await onSuccess({ choiceText: `Solved ${solvedCount} rows`, matchingRows });
+                    }
+                    return;
+                }
+                const mismatchReason = "AI could not match these items. Use the inline ✨ AI button on each row to solve individually.";
+                showAiFallbackBar(que, qData, promptText, async () => {
+                    await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered });
+                }, { reason: mismatchReason, isAuthError: false });
+                showToast(mismatchReason, 4500);
+                if (typeof onFallback === 'function') onFallback();
+                return;
             }
 
             // Check for Dropdown / Select elements (gapselect)
@@ -1618,6 +1750,36 @@
 
         const courseInfo = detectCourseInfo();
         const courseCode = courseInfo.subjectCode || '';
+
+        if (qData.questionType === 'match') {
+            const matchingRows = getMatchingAiRows(que);
+            if (matchingRows.length > 0) {
+                if (cardAiBtn) cardAiBtn.innerHTML = `<span>AI solving rows...</span>`;
+                let solvedCount = 0;
+                for (let i = 0; i < matchingRows.length; i++) {
+                    const mRow = matchingRows[i];
+                    if (cardAiBtn) cardAiBtn.innerHTML = `<span>AI item ${i + 1}/${matchingRows.length}...</span>`;
+                    const opt = await solveMatchingRowWithAi({
+                        que,
+                        row: mRow.row,
+                        selectInput: mRow.select,
+                        subQText: mRow.prompt,
+                        autoApply: false
+                    });
+                    if (opt) solvedCount++;
+                }
+                que.querySelectorAll('.amaes-blockage-hud, .amaes-ai-fallback-bar, .amaes-unanswered-hint').forEach(el => el.remove());
+                que.style.outline = '2px solid rgba(139, 92, 246, 0.7)';
+                que.style.borderRadius = '8px';
+                setQuestionAiTag(que, true);
+                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+                showToast(`Gemini suggested ${solvedCount} of ${matchingRows.length} matching rows. Review suggestions!`, 3500);
+                setLog(`[AI Matching] Gemini suggested <b>${solvedCount} of ${matchingRows.length}</b> matching items.`, "var(--accent-purple)");
+                return;
+            }
+        }
+
         const promptText = buildGeminiCompactPrompt(qData, courseCode, que);
 
         await handleGeminiQuestionInference({

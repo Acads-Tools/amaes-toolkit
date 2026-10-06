@@ -3926,7 +3926,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     function recordAttemptAnswerEvidence(que, answer, source = 'manual_selection', metadata = {}) {
         if (!que || !answer) return;
         const qData = extractQuestionData(que);
-        if (!qData || !qData.qText) return;
+        const qText = metadata.subQuestionText || (qData && qData.qText);
+        if (!qText) return;
         try {
             const key = getAttemptEvidenceKey();
             const attemptId = new URLSearchParams(window.location.search).get('attempt');
@@ -3936,12 +3937,12 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             }
             const current = JSON.parse(sessionStorage.getItem(key) || '[]');
             const entry = {
-                qRaw: qData.qText,
-                qNorm: normalizeText(qData.qText),
+                qRaw: qText,
+                qNorm: normalizeText(qText),
                 ansRaw: String(answer).trim(),
                 ansNorm: normalizeChoice(answer),
-                choices: qData.choices || [],
-                questionType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : (Array.isArray(qData.choices) && qData.choices.length > 0 ? 'multichoice' : 'shortanswer')),
+                choices: metadata.subQuestionText ? [] : (qData.choices || []),
+                questionType: metadata.questionType || (metadata.subQuestionText ? 'match_item' : (qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : (Array.isArray(qData.choices) && qData.choices.length > 0 ? 'multichoice' : 'shortanswer')))),
                 answers: Array.isArray(metadata.answers) ? metadata.answers.map(value => String(value || '').trim()).filter(Boolean) : undefined,
                 source,
                 isAiSuggestion: source === 'ai_inference',
@@ -3988,6 +3989,23 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
                 const selectInputs = Array.from(que.querySelectorAll('select'));
                 if (selectInputs.length > 0) {
+                    const isMatch = typeof identifyQuestionType === 'function' && identifyQuestionType(que) === 'match';
+                    if (isMatch) {
+                        const matchRows = Array.from(que.querySelectorAll('.answer table tr, .answer tr')).filter(r => r.querySelector('select') && r.querySelector('td.text, td:first-child'));
+                        matchRows.forEach(row => {
+                            const promptCell = row.querySelector('td.text, td:first-child');
+                            const sel = row.querySelector('select');
+                            const subQText = promptCell ? cleanDOMToAI(promptCell).trim() : '';
+                            const opt = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+                            const text = (opt && opt.value && !opt.text.toLowerCase().includes('choose'))
+                                ? String(opt.text || opt.innerText || '').trim()
+                                : '';
+                            if (subQText && text) {
+                                recordAttemptAnswerEvidence(que, text, 'manual_match_select', { answers: [text], subQuestionText: subQText, questionType: 'match_item' });
+                            }
+                        });
+                        return;
+                    }
                     const selectAnswers = selectInputs.map(select => {
                         const option = select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
                         const text = (option && option.value && !option.text.toLowerCase().includes('choose'))
@@ -5516,9 +5534,10 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             autoNextVerified = true;
             autoPickStudyGuideFallback = true;
             isWaitingForUserAnswer = false;
-            showToast("Auto-Quiz Started (Co-Pilot)");
-            setLog("Auto-Quiz <b>started</b> in <b>Co-Pilot</b> mode!", "var(--accent-green)");
-            if (checkIsQuizAttemptPage()) runAutoQuizSolver(true);
+            const isAttempt = checkIsQuizAttemptPage();
+            showToast(isAttempt ? "Auto-Quiz Started (Co-Pilot)" : "Auto-Quiz Armed (Ready for Quiz)");
+            setLog(isAttempt ? "Auto-Quiz <b>started</b> in <b>Co-Pilot</b> mode!" : "Auto-Quiz <b>armed</b>! Will run hands-free upon opening any quiz attempt.", "var(--accent-green)");
+            if (isAttempt) runAutoQuizSolver(true);
             if (checkIsQuizSummaryPage()) handleQuizSummaryAutoSubmit();
         } else {
             isWaitingForUserAnswer = false;
@@ -6120,6 +6139,13 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 }
             }
 
+            // Pause / Start Auto-Quiz: 'P' (Allowed globally so student can arm/disarm anytime)
+            if (e.key === 'p' || e.key === 'P') {
+                e.preventDefault();
+                toggleAutoQuizMode();
+                return;
+            }
+
             if (!checkIsQuizAttemptPage()) return;
 
             const key = e.key ? e.key.toUpperCase() : '';
@@ -6196,12 +6222,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 return;
             }
 
-            // 4. Pause / Start Auto-Quiz: 'P'
-            if (key === 'P') {
-                e.preventDefault();
-                toggleAutoQuizMode();
-                return;
-            }
 
             // 5. Highlight Database Answers: 'H'
             if (key === 'H') {
@@ -7708,6 +7728,55 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                                 selectInput.dataset.amaesKnownWrongAnswers = JSON.stringify(rowWrongAnswers);
                             } else {
                                 delete selectInput.dataset.amaesKnownWrongAnswers;
+                            }
+                        }
+
+                        if (hasMatchingRows && !checkIsReviewPage()) {
+                            let aiRowBtn = row ? row.querySelector('.amaes-ai-row-btn, .amaes-ai-match-row-btn') : null;
+                            if (!aiRowBtn && row) {
+                                aiRowBtn = document.createElement('button');
+                                aiRowBtn.type = 'button';
+                                aiRowBtn.className = 'amaes-ai-row-btn amaes-ai-match-row-btn';
+                                aiRowBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>AI</span>`;
+                                aiRowBtn.title = 'Ask Gemini AI to solve this specific row';
+                                aiRowBtn.style.cssText = 'margin-left: 6px; padding: 2px 7px; font-size: 10px; font-weight: 700; border: 1px solid #c084fc; border-radius: 4px; background: #faf5ff; color: #7e22ce; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; vertical-align: middle;';
+                                aiRowBtn.onclick = async (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    aiRowBtn.disabled = true;
+                                    aiRowBtn.innerHTML = `<span>AI...</span>`;
+                                    try {
+                                        if (typeof solveMatchingRowWithAi === 'function') {
+                                            const opt = await solveMatchingRowWithAi({
+                                                que,
+                                                row,
+                                                selectInput,
+                                                subQText,
+                                                autoApply: false
+                                            });
+                                            if (opt) {
+                                                showToast(`AI suggested: "${opt.text.trim()}"`);
+                                            } else {
+                                                showToast("AI could not determine an answer for this row.");
+                                            }
+                                        }
+                                    } catch (err) {
+                                        showToast(`AI error: ${err.message}`);
+                                    } finally {
+                                        aiRowBtn.disabled = false;
+                                        aiRowBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>AI</span>`;
+                                    }
+                                };
+                                selectInput.insertAdjacentElement('afterend', aiRowBtn);
+                            }
+
+                            const sessionCacheKey = `amaes_ai_match_${normalizeText(subQText)}`;
+                            const cachedMatchAns = sessionStorage.getItem(sessionCacheKey);
+                            if (cachedMatchAns && !row.querySelector('.amaes-ai-matching-suggestion')) {
+                                const matchOpt = Array.from(selectInput.options).find(o => normalizeChoice(o.text) === normalizeChoice(cachedMatchAns));
+                                if (matchOpt && typeof applyMatchingRowAiSuggestion === 'function') {
+                                    applyMatchingRowAiSuggestion(row, selectInput, matchOpt, false);
+                                }
                             }
                         }
                         const effectiveCandidate = hasMatchingRows ? rowCandidate : bestCand;
@@ -12631,6 +12700,109 @@ function setupAccountTransferUI() {
         return Array.from(byIndex.values()).sort((left, right) => left.rowIndex - right.rowIndex);
     }
 
+    function applyMatchingRowAiSuggestion(row, select, option, autoApply = false) {
+        if (!row || !select || !option) return;
+        row.querySelectorAll('.amaes-ai-matching-suggestion').forEach(el => el.remove());
+        const badge = document.createElement('div');
+        badge.className = 'amaes-ai-matching-suggestion';
+        badge.setAttribute('role', 'status');
+        badge.style.cssText = 'display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 4px 0; color: #7e22ce; font-size: 11px; font-weight: 700;';
+        const label = document.createElement('span');
+        label.textContent = `AI suggestion (unverified): ${option.text.trim()}`;
+        const useButton = document.createElement('button');
+        useButton.type = 'button';
+        useButton.textContent = autoApply ? 'Selected' : 'Use suggestion';
+        useButton.disabled = autoApply;
+        useButton.style.cssText = 'padding: 2px 7px; border: 1px solid #c084fc; border-radius: 4px; background: #faf5ff; color: #7e22ce; font-size: 10px; font-weight: 700; cursor: pointer;';
+
+        const applyOption = () => {
+            select.value = option.value;
+            select.dispatchEvent(new Event('input', { bubbles: true }));
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            select.dispatchEvent(new Event('blur', { bubbles: true }));
+            select.style.outline = '2px solid #a855f7';
+            select.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+            useButton.textContent = 'Selected';
+            useButton.disabled = true;
+        };
+
+        useButton.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            applyOption();
+        });
+
+        if (autoApply) {
+            applyOption();
+        }
+
+        badge.append(label, useButton);
+        select.insertAdjacentElement('afterend', badge);
+    }
+
+    async function solveMatchingRowWithAi({ que, row, selectInput, subQText, autoApply = false }) {
+        if (!selectInput || !subQText) return null;
+        const options = Array.from(selectInput.options || []).filter(option =>
+            option.value && option.value !== '0' && !option.text.toLowerCase().includes('choose')
+        );
+        if (options.length === 0) return null;
+
+        const sessionCacheKey = `amaes_ai_match_${normalizeText(subQText)}`;
+        const cachedAns = sessionStorage.getItem(sessionCacheKey);
+        if (cachedAns) {
+            const cachedOpt = options.find(o => normalizeChoice(o.text) === normalizeChoice(cachedAns));
+            if (cachedOpt) {
+                applyMatchingRowAiSuggestion(row, selectInput, cachedOpt, autoApply);
+                return cachedOpt;
+            }
+        }
+
+        const courseInfo = detectCourseInfo();
+        const courseCode = courseInfo.subjectCode || '';
+        const lines = [];
+        if (courseCode) lines.push(`[Course: ${courseCode}]`);
+        lines.push(`Question: ${subQText}`);
+        lines.push(`Options: ${options.map(o => o.text.trim()).join(' | ')}`);
+        lines.push(`Reply with ONLY the exact option text from the list above that best answers the question. No explanation.`);
+        const prompt = lines.join('\n');
+
+        const apiKey = getAvailableGeminiKey();
+        if (!apiKey && !isSharedAiFallbackEnabled()) {
+            showToast("Gemini AI is not configured. Please set your free Google AI Studio key.", 3500);
+            return null;
+        }
+
+        try {
+            let resText = null;
+            if (apiKey) {
+                const res = await callGeminiAPI(prompt, 64);
+                resText = res ? res.text : null;
+            } else {
+                resText = await requestSharedAiInference(prompt, { maxOutputTokens: 64 });
+            }
+            if (!resText) return null;
+
+            const cleanAns = resText.replace(/```(?:text|json)?/gi, '').replace(/^answer:\s*/i, '').replace(/^['"]|['"]$/g, '').trim();
+            const cleanNorm = normalizeChoice(cleanAns);
+            let matchedOpt = options.find(o => normalizeChoice(o.text) === cleanNorm);
+            if (!matchedOpt) {
+                matchedOpt = options.find(o => {
+                    const oNorm = normalizeChoice(o.text);
+                    return (oNorm.length > 2 && cleanNorm.includes(oNorm)) || (cleanNorm.length > 2 && oNorm.includes(cleanNorm));
+                });
+            }
+
+            if (matchedOpt) {
+                sessionStorage.setItem(sessionCacheKey, matchedOpt.text.trim());
+                applyMatchingRowAiSuggestion(row, selectInput, matchedOpt, autoApply);
+                return matchedOpt;
+            }
+        } catch (err) {
+            logDebug(`Single-row matching AI error: ${err.message}`);
+        }
+        return null;
+    }
+
     // Ultra-Compact Prompt Builder: 0 fluff, max token efficiency (~60-120 tokens total)
     function buildGeminiCompactPrompt(qData, courseCode = '', que = null) {
         const lines = [];
@@ -13841,6 +14013,35 @@ function setupAccountTransferUI() {
                     }
                     return;
                 }
+
+                // If bulk matching output was refused or unparseable, fall back to solving row-by-row
+                setLog(`[AI Matching Fallback] Bulk AI response unconfirmed; analyzing matching items row-by-row...`, "var(--accent-purple)");
+                let solvedCount = 0;
+                for (let i = 0; i < matchingRows.length; i++) {
+                    const mRow = matchingRows[i];
+                    const opt = await solveMatchingRowWithAi({
+                        que,
+                        row: mRow.row,
+                        selectInput: mRow.select,
+                        subQText: mRow.prompt,
+                        autoApply: false
+                    });
+                    if (opt) solvedCount++;
+                }
+                if (solvedCount > 0) {
+                    showToast(`Gemini suggested ${solvedCount} matching answers row-by-row; review before continuing.`, 3500);
+                    if (typeof onSuccess === 'function') {
+                        await onSuccess({ choiceText: `Solved ${solvedCount} rows`, matchingRows });
+                    }
+                    return;
+                }
+                const mismatchReason = "AI could not match these items. Use the inline ✨ AI button on each row to solve individually.";
+                showAiFallbackBar(que, qData, promptText, async () => {
+                    await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered });
+                }, { reason: mismatchReason, isAuthError: false });
+                showToast(mismatchReason, 4500);
+                if (typeof onFallback === 'function') onFallback();
+                return;
             }
 
             // Check for Dropdown / Select elements (gapselect)
@@ -14117,6 +14318,36 @@ function setupAccountTransferUI() {
 
         const courseInfo = detectCourseInfo();
         const courseCode = courseInfo.subjectCode || '';
+
+        if (qData.questionType === 'match') {
+            const matchingRows = getMatchingAiRows(que);
+            if (matchingRows.length > 0) {
+                if (cardAiBtn) cardAiBtn.innerHTML = `<span>AI solving rows...</span>`;
+                let solvedCount = 0;
+                for (let i = 0; i < matchingRows.length; i++) {
+                    const mRow = matchingRows[i];
+                    if (cardAiBtn) cardAiBtn.innerHTML = `<span>AI item ${i + 1}/${matchingRows.length}...</span>`;
+                    const opt = await solveMatchingRowWithAi({
+                        que,
+                        row: mRow.row,
+                        selectInput: mRow.select,
+                        subQText: mRow.prompt,
+                        autoApply: false
+                    });
+                    if (opt) solvedCount++;
+                }
+                que.querySelectorAll('.amaes-blockage-hud, .amaes-ai-fallback-bar, .amaes-unanswered-hint').forEach(el => el.remove());
+                que.style.outline = '2px solid rgba(139, 92, 246, 0.7)';
+                que.style.borderRadius = '8px';
+                setQuestionAiTag(que, true);
+                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+                showToast(`Gemini suggested ${solvedCount} of ${matchingRows.length} matching rows. Review suggestions!`, 3500);
+                setLog(`[AI Matching] Gemini suggested <b>${solvedCount} of ${matchingRows.length}</b> matching items.`, "var(--accent-purple)");
+                return;
+            }
+        }
+
         const promptText = buildGeminiCompactPrompt(qData, courseCode, que);
 
         await handleGeminiQuestionInference({
@@ -16324,10 +16555,16 @@ function setupAccountTransferUI() {
             if (!qData || !qData.qText) return;
             const qNorm = normalizeText(qData.qText);
 
+            const isMatch = typeof identifyQuestionType === 'function' && identifyQuestionType(que) === 'match';
             // Find matching item in harvested list or cached DB
-            const harvestedItem = harvestedData && harvestedData.questions ?
-                harvestedData.questions.find(q => q.qNorm === qNorm || (qData.qText && qData.qText.includes(q.qRaw))) : null;
-            const dbEntry = cachedDb.find(q => q.qNorm === qNorm || (qData.qText && qData.qText.includes(q.qRaw)));
+            const isGenericMatchingHeader = isMatch && (qNorm.includes('matching type') || qNorm.includes('choose the correct answer'));
+            const harvestedItem = (isGenericMatchingHeader) ? null : (harvestedData && harvestedData.questions ?
+                harvestedData.questions.find(q => q.qNorm === qNorm || (qData.qText && qData.qText.includes(q.qRaw))) : null);
+            const dbEntry = (isGenericMatchingHeader) ? null : cachedDb.find(q => {
+                const normQ = normalizeText(q.qRaw || q.question || '');
+                if (normQ.includes('matching type') && (q.ansRaw || q.answer || '').includes(',')) return false;
+                return q.qNorm === qNorm || (qData.qText && qData.qText.includes(q.qRaw));
+            });
 
             const gradeInfo = parseMoodleQuestionGrade(que);
             const isFullMark = gradeInfo.isFullMark;
@@ -16553,6 +16790,47 @@ function setupAccountTransferUI() {
                 } else if (infoCol) {
                     infoCol.appendChild(pill);
                 }
+            }
+
+            if (isMatch && !isFullMark && checkmarkedTexts.length === 0 && !hasExplicitRightElem) {
+                pill.style.cssText = `
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 5px;
+                    padding: 4px 8px;
+                    margin-top: 6px;
+                    border-radius: 6px;
+                    font-size: 11px;
+                    font-weight: 700;
+                    line-height: 1.25;
+                    background: rgba(245, 158, 11, 0.14);
+                    color: #b45309;
+                    border: 1px solid rgba(245, 158, 11, 0.4);
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+                    cursor: default;
+                `;
+                const earnedStr = gradeInfo.earned !== null ? gradeInfo.earned : '';
+                const maxStr = gradeInfo.max !== null ? gradeInfo.max : '';
+                pill.title = `Partial score (${earnedStr}/${maxStr}): Moodle does not specify which individual rows were correct or incorrect, so this matching question is not auto-harvested.`;
+                pill.innerHTML = `${ICONS.alertTriangle || ICONS.help} <span>Unconfirmed (Not Harvested)</span>`;
+
+                let outcomeBox = que.querySelector('.outcome');
+                if (!outcomeBox) {
+                    const formulationBox = que.querySelector('.formulation, .content');
+                    if (formulationBox) {
+                        outcomeBox = document.createElement('div');
+                        outcomeBox.className = 'outcome clearfix';
+                        formulationBox.appendChild(outcomeBox);
+                    }
+                }
+                if (outcomeBox && !outcomeBox.querySelector('.amaes-review-matching-notice')) {
+                    const notice = document.createElement('div');
+                    notice.className = 'amaes-review-matching-notice';
+                    notice.style.cssText = 'margin-top: 8px; padding: 6px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); color: #92400e;';
+                    notice.textContent = `Partial Score (${earnedStr}/${maxStr}): Moodle does not provide row-by-row correctness indicators for this matching question. Rows remain unconfirmed and are not saved to the study bank.`;
+                    outcomeBox.appendChild(notice);
+                }
+                return;
             }
 
             if (isVerified && ansText) {
@@ -19769,10 +20047,10 @@ function setupAccountTransferUI() {
                         return;
                     }
                 }
-                if (!checkIsQuizAttemptPage() && !autoQuizMode) {
-                    // Check if student is on the quiz view/start page (/mod/quiz/view.php)
+                if (!checkIsQuizAttemptPage()) {
+                    // Student is not on an active attempt page (e.g. view.php, dashboard, course)
                     const isQuizLanding = window.location.pathname.includes('/mod/quiz/view.php');
-                    if (isQuizLanding) {
+                    if (!autoQuizMode && isQuizLanding) {
                         const startBtn = document.querySelector('form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], .quizstartbutton button, .quizstartbutton input[type="submit"], #region-main button.btn-primary, #region-main input.btn-primary');
                         if (startBtn) {
                             toggleAutoQuizMode(true);
@@ -19782,8 +20060,7 @@ function setupAccountTransferUI() {
                             return;
                         }
                     }
-                    showToast("Open any quiz attempt to start auto-quiz!", 3000);
-                    setLog("Open any quiz attempt to start auto-quiz.", "var(--accent-blue)");
+                    toggleAutoQuizMode();
                     return;
                 }
                 if (checkIsQuizAttemptPage() && (isWaitingForUserAnswer || document.querySelector('.amaes-blockage-hud'))) {

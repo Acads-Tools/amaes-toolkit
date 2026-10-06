@@ -1772,10 +1772,16 @@
             if (!qData || !qData.qText) return;
             const qNorm = normalizeText(qData.qText);
 
+            const isMatch = typeof identifyQuestionType === 'function' && identifyQuestionType(que) === 'match';
             // Find matching item in harvested list or cached DB
-            const harvestedItem = harvestedData && harvestedData.questions ?
-                harvestedData.questions.find(q => q.qNorm === qNorm || (qData.qText && qData.qText.includes(q.qRaw))) : null;
-            const dbEntry = cachedDb.find(q => q.qNorm === qNorm || (qData.qText && qData.qText.includes(q.qRaw)));
+            const isGenericMatchingHeader = isMatch && (qNorm.includes('matching type') || qNorm.includes('choose the correct answer'));
+            const harvestedItem = (isGenericMatchingHeader) ? null : (harvestedData && harvestedData.questions ?
+                harvestedData.questions.find(q => q.qNorm === qNorm || (qData.qText && qData.qText.includes(q.qRaw))) : null);
+            const dbEntry = (isGenericMatchingHeader) ? null : cachedDb.find(q => {
+                const normQ = normalizeText(q.qRaw || q.question || '');
+                if (normQ.includes('matching type') && (q.ansRaw || q.answer || '').includes(',')) return false;
+                return q.qNorm === qNorm || (qData.qText && qData.qText.includes(q.qRaw));
+            });
 
             const gradeInfo = parseMoodleQuestionGrade(que);
             const isFullMark = gradeInfo.isFullMark;
@@ -2001,6 +2007,47 @@
                 } else if (infoCol) {
                     infoCol.appendChild(pill);
                 }
+            }
+
+            if (isMatch && !isFullMark && checkmarkedTexts.length === 0 && !hasExplicitRightElem) {
+                pill.style.cssText = `
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 5px;
+                    padding: 4px 8px;
+                    margin-top: 6px;
+                    border-radius: 6px;
+                    font-size: 11px;
+                    font-weight: 700;
+                    line-height: 1.25;
+                    background: rgba(245, 158, 11, 0.14);
+                    color: #b45309;
+                    border: 1px solid rgba(245, 158, 11, 0.4);
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+                    cursor: default;
+                `;
+                const earnedStr = gradeInfo.earned !== null ? gradeInfo.earned : '';
+                const maxStr = gradeInfo.max !== null ? gradeInfo.max : '';
+                pill.title = `Partial score (${earnedStr}/${maxStr}): Moodle does not specify which individual rows were correct or incorrect, so this matching question is not auto-harvested.`;
+                pill.innerHTML = `${ICONS.alertTriangle || ICONS.help} <span>Unconfirmed (Not Harvested)</span>`;
+
+                let outcomeBox = que.querySelector('.outcome');
+                if (!outcomeBox) {
+                    const formulationBox = que.querySelector('.formulation, .content');
+                    if (formulationBox) {
+                        outcomeBox = document.createElement('div');
+                        outcomeBox.className = 'outcome clearfix';
+                        formulationBox.appendChild(outcomeBox);
+                    }
+                }
+                if (outcomeBox && !outcomeBox.querySelector('.amaes-review-matching-notice')) {
+                    const notice = document.createElement('div');
+                    notice.className = 'amaes-review-matching-notice';
+                    notice.style.cssText = 'margin-top: 8px; padding: 6px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); color: #92400e;';
+                    notice.textContent = `Partial Score (${earnedStr}/${maxStr}): Moodle does not provide row-by-row correctness indicators for this matching question. Rows remain unconfirmed and are not saved to the study bank.`;
+                    outcomeBox.appendChild(notice);
+                }
+                return;
             }
 
             if (isVerified && ansText) {

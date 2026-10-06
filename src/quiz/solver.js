@@ -516,7 +516,8 @@
     function recordAttemptAnswerEvidence(que, answer, source = 'manual_selection', metadata = {}) {
         if (!que || !answer) return;
         const qData = extractQuestionData(que);
-        if (!qData || !qData.qText) return;
+        const qText = metadata.subQuestionText || (qData && qData.qText);
+        if (!qText) return;
         try {
             const key = getAttemptEvidenceKey();
             const attemptId = new URLSearchParams(window.location.search).get('attempt');
@@ -526,12 +527,12 @@
             }
             const current = JSON.parse(sessionStorage.getItem(key) || '[]');
             const entry = {
-                qRaw: qData.qText,
-                qNorm: normalizeText(qData.qText),
+                qRaw: qText,
+                qNorm: normalizeText(qText),
                 ansRaw: String(answer).trim(),
                 ansNorm: normalizeChoice(answer),
-                choices: qData.choices || [],
-                questionType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : (Array.isArray(qData.choices) && qData.choices.length > 0 ? 'multichoice' : 'shortanswer')),
+                choices: metadata.subQuestionText ? [] : (qData.choices || []),
+                questionType: metadata.questionType || (metadata.subQuestionText ? 'match_item' : (qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : (Array.isArray(qData.choices) && qData.choices.length > 0 ? 'multichoice' : 'shortanswer')))),
                 answers: Array.isArray(metadata.answers) ? metadata.answers.map(value => String(value || '').trim()).filter(Boolean) : undefined,
                 source,
                 isAiSuggestion: source === 'ai_inference',
@@ -578,6 +579,23 @@
 
                 const selectInputs = Array.from(que.querySelectorAll('select'));
                 if (selectInputs.length > 0) {
+                    const isMatch = typeof identifyQuestionType === 'function' && identifyQuestionType(que) === 'match';
+                    if (isMatch) {
+                        const matchRows = Array.from(que.querySelectorAll('.answer table tr, .answer tr')).filter(r => r.querySelector('select') && r.querySelector('td.text, td:first-child'));
+                        matchRows.forEach(row => {
+                            const promptCell = row.querySelector('td.text, td:first-child');
+                            const sel = row.querySelector('select');
+                            const subQText = promptCell ? cleanDOMToAI(promptCell).trim() : '';
+                            const opt = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+                            const text = (opt && opt.value && !opt.text.toLowerCase().includes('choose'))
+                                ? String(opt.text || opt.innerText || '').trim()
+                                : '';
+                            if (subQText && text) {
+                                recordAttemptAnswerEvidence(que, text, 'manual_match_select', { answers: [text], subQuestionText: subQText, questionType: 'match_item' });
+                            }
+                        });
+                        return;
+                    }
                     const selectAnswers = selectInputs.map(select => {
                         const option = select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
                         const text = (option && option.value && !option.text.toLowerCase().includes('choose'))
@@ -2106,9 +2124,10 @@
             autoNextVerified = true;
             autoPickStudyGuideFallback = true;
             isWaitingForUserAnswer = false;
-            showToast("Auto-Quiz Started (Co-Pilot)");
-            setLog("Auto-Quiz <b>started</b> in <b>Co-Pilot</b> mode!", "var(--accent-green)");
-            if (checkIsQuizAttemptPage()) runAutoQuizSolver(true);
+            const isAttempt = checkIsQuizAttemptPage();
+            showToast(isAttempt ? "Auto-Quiz Started (Co-Pilot)" : "Auto-Quiz Armed (Ready for Quiz)");
+            setLog(isAttempt ? "Auto-Quiz <b>started</b> in <b>Co-Pilot</b> mode!" : "Auto-Quiz <b>armed</b>! Will run hands-free upon opening any quiz attempt.", "var(--accent-green)");
+            if (isAttempt) runAutoQuizSolver(true);
             if (checkIsQuizSummaryPage()) handleQuizSummaryAutoSubmit();
         } else {
             isWaitingForUserAnswer = false;
@@ -2710,6 +2729,13 @@
                 }
             }
 
+            // Pause / Start Auto-Quiz: 'P' (Allowed globally so student can arm/disarm anytime)
+            if (e.key === 'p' || e.key === 'P') {
+                e.preventDefault();
+                toggleAutoQuizMode();
+                return;
+            }
+
             if (!checkIsQuizAttemptPage()) return;
 
             const key = e.key ? e.key.toUpperCase() : '';
@@ -2786,12 +2812,6 @@
                 return;
             }
 
-            // 4. Pause / Start Auto-Quiz: 'P'
-            if (key === 'P') {
-                e.preventDefault();
-                toggleAutoQuizMode();
-                return;
-            }
 
             // 5. Highlight Database Answers: 'H'
             if (key === 'H') {
@@ -4298,6 +4318,55 @@
                                 selectInput.dataset.amaesKnownWrongAnswers = JSON.stringify(rowWrongAnswers);
                             } else {
                                 delete selectInput.dataset.amaesKnownWrongAnswers;
+                            }
+                        }
+
+                        if (hasMatchingRows && !checkIsReviewPage()) {
+                            let aiRowBtn = row ? row.querySelector('.amaes-ai-row-btn, .amaes-ai-match-row-btn') : null;
+                            if (!aiRowBtn && row) {
+                                aiRowBtn = document.createElement('button');
+                                aiRowBtn.type = 'button';
+                                aiRowBtn.className = 'amaes-ai-row-btn amaes-ai-match-row-btn';
+                                aiRowBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>AI</span>`;
+                                aiRowBtn.title = 'Ask Gemini AI to solve this specific row';
+                                aiRowBtn.style.cssText = 'margin-left: 6px; padding: 2px 7px; font-size: 10px; font-weight: 700; border: 1px solid #c084fc; border-radius: 4px; background: #faf5ff; color: #7e22ce; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; vertical-align: middle;';
+                                aiRowBtn.onclick = async (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    aiRowBtn.disabled = true;
+                                    aiRowBtn.innerHTML = `<span>AI...</span>`;
+                                    try {
+                                        if (typeof solveMatchingRowWithAi === 'function') {
+                                            const opt = await solveMatchingRowWithAi({
+                                                que,
+                                                row,
+                                                selectInput,
+                                                subQText,
+                                                autoApply: false
+                                            });
+                                            if (opt) {
+                                                showToast(`AI suggested: "${opt.text.trim()}"`);
+                                            } else {
+                                                showToast("AI could not determine an answer for this row.");
+                                            }
+                                        }
+                                    } catch (err) {
+                                        showToast(`AI error: ${err.message}`);
+                                    } finally {
+                                        aiRowBtn.disabled = false;
+                                        aiRowBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>AI</span>`;
+                                    }
+                                };
+                                selectInput.insertAdjacentElement('afterend', aiRowBtn);
+                            }
+
+                            const sessionCacheKey = `amaes_ai_match_${normalizeText(subQText)}`;
+                            const cachedMatchAns = sessionStorage.getItem(sessionCacheKey);
+                            if (cachedMatchAns && !row.querySelector('.amaes-ai-matching-suggestion')) {
+                                const matchOpt = Array.from(selectInput.options).find(o => normalizeChoice(o.text) === normalizeChoice(cachedMatchAns));
+                                if (matchOpt && typeof applyMatchingRowAiSuggestion === 'function') {
+                                    applyMatchingRowAiSuggestion(row, selectInput, matchOpt, false);
+                                }
                             }
                         }
                         const effectiveCandidate = hasMatchingRows ? rowCandidate : bestCand;
