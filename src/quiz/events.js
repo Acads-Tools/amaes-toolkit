@@ -1351,7 +1351,7 @@
             };
         }
 
-        // Panel Minimize State Persistence
+        // Panel Minimize State Persistence & Responsive Sync
         const panelEl = document.getElementById('amaes-toolkit-panel');
         const updateHudPauseBtnVisibility = () => {
             const hudPauseBtn = document.getElementById('btn-hud-toggle-quiz');
@@ -1360,7 +1360,32 @@
                 hudPauseBtn.style.display = isMin ? 'inline-flex' : 'none';
             }
         };
-        const savedMinimized = localStorage.getItem('amaes_pref_minimized') === 'true';
+
+        const updatePanelMinState = (isMin) => {
+            const backdropEl = document.getElementById('amaes-panel-backdrop');
+            const hudEl = document.getElementById('amaes-quiz-hud');
+            const root = document.documentElement;
+            if (root) {
+                root.classList.toggle('amaes-panel-is-minimized', isMin);
+            }
+            if (backdropEl) {
+                backdropEl.classList.toggle('active', !isMin);
+            }
+            if (hudEl) {
+                const isMobileScreen = (typeof window !== 'undefined' ? (window.innerWidth || 0) : 0) <= 640;
+                if (isMobileScreen) {
+                    hudEl.style.display = isMin ? 'flex' : 'none';
+                } else {
+                    hudEl.style.display = 'flex';
+                }
+            }
+            updateHudPauseBtnVisibility();
+        };
+
+        const deviceState = (typeof detectDeviceMode === 'function') ? detectDeviceMode() : { isMobile: false, isTablet: false };
+        const prefMinimized = localStorage.getItem('amaes_pref_minimized');
+        const savedMinimized = prefMinimized !== null ? (prefMinimized === 'true') : deviceState.isMobile;
+
         if (savedMinimized) {
             if (bodyEl) bodyEl.style.display = 'none';
             if (lockOverlay) lockOverlay.style.display = 'none';
@@ -1370,7 +1395,9 @@
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
                 </svg>
             `;
-            updateHudPauseBtnVisibility();
+            updatePanelMinState(true);
+        } else {
+            updatePanelMinState(false);
         }
 
         if (minBtn) minBtn.onclick = (e) => {
@@ -1382,7 +1409,7 @@
                 if (panelEl) panelEl.classList.remove('amaes-minimized');
                 minBtn.innerHTML = ICONS.minimize;
                 localStorage.setItem('amaes_pref_minimized', 'false');
-                updateHudPauseBtnVisibility();
+                updatePanelMinState(false);
             } else if (targetEl) {
                 targetEl.style.display = 'none';
                 if (panelEl) panelEl.classList.add('amaes-minimized');
@@ -1392,7 +1419,7 @@
                     </svg>
                 `;
                 localStorage.setItem('amaes_pref_minimized', 'true');
-                updateHudPauseBtnVisibility();
+                updatePanelMinState(true);
             }
         };
 
@@ -1407,10 +1434,57 @@
                         panelEl.classList.remove('amaes-minimized');
                         minBtn.innerHTML = ICONS.minimize;
                         localStorage.setItem('amaes_pref_minimized', 'false');
-                        updateHudPauseBtnVisibility();
+                        updatePanelMinState(false);
                     }
                 }
             });
+        }
+
+        // Backdrop click to minimize bottom sheet on mobile
+        const backdropEl = document.getElementById('amaes-panel-backdrop');
+        if (backdropEl) {
+            backdropEl.onclick = (e) => {
+                e.stopPropagation();
+                if (panelEl && !panelEl.classList.contains('amaes-minimized') && minBtn) {
+                    minBtn.click();
+                }
+            };
+        }
+
+        // Pull handle click & swipe-down touch gestures on mobile
+        const sheetHandle = panelEl ? panelEl.querySelector('.amaes-sheet-handle') : null;
+        if (sheetHandle) {
+            sheetHandle.onclick = (e) => {
+                e.stopPropagation();
+                if (panelEl && !panelEl.classList.contains('amaes-minimized') && minBtn) {
+                    minBtn.click();
+                }
+            };
+        }
+
+        let touchStartY = 0;
+        let touchDiffY = 0;
+        const panelDragZone = sheetHandle || (panelEl ? panelEl.querySelector('#amaes-header') : null);
+        if (panelDragZone) {
+            panelDragZone.addEventListener('touchstart', (e) => {
+                if (panelEl && panelEl.classList.contains('amaes-minimized')) return;
+                touchStartY = e.touches[0].clientY;
+                touchDiffY = 0;
+            }, { passive: true });
+
+            panelDragZone.addEventListener('touchmove', (e) => {
+                if (panelEl && panelEl.classList.contains('amaes-minimized')) return;
+                const currentY = e.touches[0].clientY;
+                touchDiffY = currentY - touchStartY;
+            }, { passive: true });
+
+            panelDragZone.addEventListener('touchend', () => {
+                if (panelEl && panelEl.classList.contains('amaes-minimized')) return;
+                if (touchDiffY > 45 && minBtn) {
+                    minBtn.click();
+                }
+                touchDiffY = 0;
+            }, { passive: true });
         }
 
         // Initialize lock state

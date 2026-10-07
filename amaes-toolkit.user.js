@@ -1718,6 +1718,31 @@
     let currentTheme = localStorage.getItem('amaes_toolkit_theme') || 'dark';
     if (!THEMES[currentTheme]) currentTheme = 'dark';
 
+    function detectDeviceMode() {
+        const w = (typeof window !== 'undefined') ? (window.innerWidth || document.documentElement.clientWidth || (screen && screen.width) || 1024) : 1024;
+        const isTouch = (typeof navigator !== 'undefined' && (navigator.maxTouchPoints > 0 || 'ontouchstart' in window));
+        const isMobile = w <= 640 || (w <= 768 && isTouch);
+        const isTablet = !isMobile && (w <= 1024 || (w <= 1280 && isTouch && w > 640));
+
+        const root = (typeof document !== 'undefined') ? document.documentElement : null;
+        if (root) {
+            root.classList.toggle('amaes-is-mobile', isMobile);
+            root.classList.toggle('amaes-is-tablet', isTablet);
+            root.classList.toggle('amaes-is-touch', isTouch);
+            root.classList.toggle('amaes-is-desktop', !isMobile && !isTablet);
+        }
+
+        return { isMobile, isTablet, isTouch, width: w };
+    }
+
+    if (typeof window !== 'undefined') {
+        detectDeviceMode();
+        window.addEventListener('resize', detectDeviceMode, { passive: true });
+        window.addEventListener('orientationchange', () => {
+            setTimeout(detectDeviceMode, 150);
+        }, { passive: true });
+    }
+
     function applyTheme(themeKey) {
         const t = THEMES[themeKey] || THEMES.dark;
         currentTheme = themeKey;
@@ -18431,6 +18456,7 @@ function setupAccountTransferUI() {
         panel.id = 'amaes-toolkit-panel';
 
         panel.innerHTML = `
+            <div class="amaes-sheet-handle" title="Drag down to minimize"></div>
             <!-- Top App Bar (Overflow-Proof) -->
             <div id="amaes-header">
                 <div id="amaes-brand">
@@ -18966,6 +18992,13 @@ function setupAccountTransferUI() {
                 </button>
             </div>
         `;
+
+        let backdrop = document.getElementById('amaes-panel-backdrop');
+        if (!backdrop) {
+            backdrop = document.createElement('div');
+            backdrop.id = 'amaes-panel-backdrop';
+            document.body.appendChild(backdrop);
+        }
 
         document.body.appendChild(panel);
         setupAccountSwitcherUI();
@@ -19916,6 +19949,278 @@ function setupAccountTransferUI() {
 
                 .amaes-ai-question-tag {
                     user-select: none;
+                }
+
+                /* ========================================================== */
+                /* RESPONSIVE DESIGN & MOBILE/TABLET OPTIMIZATIONS           */
+                /* ========================================================== */
+
+                /* Global Touch Optimizations */
+                .amaes-btn,
+                .amaes-icon-btn,
+                .amaes-tab-btn,
+                .amaes-copy-ai-card-btn,
+                .amaes-web-ai-item,
+                .amaes-que-stop-btn {
+                    touch-action: manipulation;
+                }
+
+                /* Mobile Bottom Sheet Backdrop */
+                #amaes-panel-backdrop {
+                    display: none;
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(15, 23, 42, 0.55);
+                    backdrop-filter: blur(3px);
+                    -webkit-backdrop-filter: blur(3px);
+                    z-index: 999998;
+                    opacity: 0;
+                    pointer-events: none;
+                    transition: opacity 0.25s ease;
+                }
+
+                .amaes-sheet-handle {
+                    display: none;
+                }
+
+                /* Mobile Viewports (Phones & Small Screens <= 640px) */
+                @media (max-width: 640px) {
+                    #amaes-panel-backdrop.active {
+                        display: block !important;
+                        opacity: 1 !important;
+                        pointer-events: auto !important;
+                    }
+
+                    .amaes-sheet-handle {
+                        display: block !important;
+                        width: 36px !important;
+                        height: 4px !important;
+                        border-radius: 2px !important;
+                        background: var(--border, #475569) !important;
+                        margin: 0 auto 8px auto !important;
+                        flex-shrink: 0 !important;
+                        cursor: pointer !important;
+                    }
+                    #amaes-toolkit-panel.amaes-minimized .amaes-sheet-handle {
+                        display: none !important;
+                    }
+
+                    /* Expanded Panel -> Full Mobile Bottom Sheet */
+                    #amaes-toolkit-panel:not(.amaes-minimized) {
+                        left: 0 !important;
+                        right: 0 !important;
+                        bottom: 0 !important;
+                        top: auto !important;
+                        width: 100% !important;
+                        max-width: 100vw !important;
+                        max-height: 80vh !important;
+                        max-height: calc(85dvh - env(safe-area-inset-bottom, 0px)) !important;
+                        border-radius: 16px 16px 0 0 !important;
+                        border-left: none !important;
+                        border-right: none !important;
+                        border-bottom: none !important;
+                        padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 12px)) 14px !important;
+                        box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5) !important;
+                        z-index: 999999 !important;
+                    }
+
+                    /* Minimized Panel -> Compact Touch FAB Pill */
+                    #amaes-toolkit-panel.amaes-minimized {
+                        bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+                        right: calc(14px + env(safe-area-inset-right, 0px)) !important;
+                        left: auto !important;
+                        top: auto !important;
+                        height: 34px !important;
+                        min-height: 34px !important;
+                        padding: 0 10px !important;
+                        border-radius: 22px !important;
+                        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+                        max-width: calc(100vw - 28px) !important;
+                    }
+
+                    /* Responsive Header & Action Buttons */
+                    #amaes-header {
+                        padding-bottom: 6px !important;
+                    }
+                    .amaes-icon-btn {
+                        width: 28px !important;
+                        height: 28px !important;
+                    }
+
+                    /* Tabs in Bottom Sheet */
+                    #amaes-nav-tabs {
+                        gap: 2px !important;
+                        padding: 2px !important;
+                        margin-bottom: 5px !important;
+                    }
+                    .amaes-tab-btn {
+                        padding: 6px 2px !important;
+                        font-size: 10px !important;
+                    }
+
+                    /* Quiz HUD Collision Prevention */
+                    #amaes-quiz-hud {
+                        bottom: calc(52px + env(safe-area-inset-bottom, 10px)) !important;
+                        left: 10px !important;
+                        right: auto !important;
+                        max-width: calc(100vw - 20px) !important;
+                        padding: 4px 10px !important;
+                        font-size: 10px !important;
+                        gap: 6px !important;
+                        border-radius: 20px !important;
+                    }
+                    #amaes-quiz-hud #hud-question-progress {
+                        display: none !important;
+                    }
+
+                    /* Top Navigation Update Item */
+                    #amaes-topnav-update-btn span,
+                    #amaes-topnav-update-item span {
+                        max-width: 130px !important;
+                        overflow: hidden !important;
+                        text-overflow: ellipsis !important;
+                        white-space: nowrap !important;
+                        font-size: 10px !important;
+                        padding: 2px 7px !important;
+                    }
+
+                    /* Toast Notification */
+                    #amaes-toast-notification {
+                        top: calc(10px + env(safe-area-inset-top, 0px)) !important;
+                        left: 12px !important;
+                        right: 12px !important;
+                        max-width: calc(100vw - 24px) !important;
+                        font-size: 11px !important;
+                        justify-content: center !important;
+                    }
+
+                    /* Modal Dialogs */
+                    #amaes-welcome-modal,
+                    #amaes-gemini-modal,
+                    #amaes-bug-modal,
+                    #amaes-contribute-modal,
+                    #amaes-full-qr-modal,
+                    #amaes-dev-modal {
+                        padding: 8px !important;
+                    }
+                    #amaes-welcome-card,
+                    #amaes-gemini-modal > div,
+                    #amaes-bug-modal > div,
+                    #amaes-contribute-modal > div,
+                    #amaes-full-qr-modal > div,
+                    #amaes-dev-modal > div {
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        max-height: 94dvh !important;
+                        border-radius: 12px !important;
+                    }
+                    #amaes-welcome-header {
+                        padding: 12px 14px 10px !important;
+                    }
+                    #amaes-welcome-title {
+                        font-size: 14px !important;
+                    }
+                    #amaes-welcome-scroll-container {
+                        padding: 12px 14px !important;
+                        gap: 12px !important;
+                    }
+                    #btn-welcome-close,
+                    #amaes-gemini-modal-close,
+                    #amaes-bug-modal-close {
+                        min-width: 36px !important;
+                        min-height: 36px !important;
+                        display: inline-flex !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                        font-size: 22px !important;
+                    }
+                }
+
+                /* Tablets & Medium Screens (641px to 1024px) */
+                @media (min-width: 641px) and (max-width: 1024px) {
+                    #amaes-toolkit-panel:not(.amaes-minimized) {
+                        width: 320px !important;
+                        max-height: calc(100vh - 60px) !important;
+                        bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !important;
+                        right: calc(18px + env(safe-area-inset-right, 0px)) !important;
+                    }
+                    #amaes-toolkit-panel.amaes-minimized {
+                        bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !important;
+                        right: calc(18px + env(safe-area-inset-right, 0px)) !important;
+                    }
+                }
+
+                /* In-Question Card Responsive Layout (All Mobile & Tablet Screens <= 768px) */
+                @media (max-width: 768px) {
+                    .que .info {
+                        padding-bottom: 2px !important;
+                        margin-bottom: 4px !important;
+                    }
+                    .amaes-card-btn-container {
+                        display: flex !important;
+                        flex-direction: row !important;
+                        flex-wrap: wrap !important;
+                        align-items: center !important;
+                        gap: 4px !important;
+                        margin-top: 3px !important;
+                        margin-bottom: 3px !important;
+                        width: 100% !important;
+                    }
+                    .amaes-card-ai-actions {
+                        display: flex !important;
+                        flex-direction: row !important;
+                        flex-wrap: wrap !important;
+                        align-items: center !important;
+                        gap: 4px !important;
+                        width: 100% !important;
+                    }
+                    .amaes-copy-ai-card-btn,
+                    .amaes-paste-ai-card-btn,
+                    .amaes-ask-ai-card-btn {
+                        flex: 1 1 auto !important;
+                        width: auto !important;
+                        min-width: 70px !important;
+                        padding: 4px 8px !important;
+                        font-size: 10px !important;
+                        height: 28px !important;
+                        box-sizing: border-box !important;
+                        border-radius: 6px !important;
+                    }
+                    .amaes-builtin-ai-section {
+                        display: flex !important;
+                        flex-direction: row !important;
+                        align-items: center !important;
+                        gap: 4px !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        border-top: none !important;
+                        flex: 1 1 auto !important;
+                        width: auto !important;
+                    }
+                    .amaes-builtin-ai-header {
+                        display: none !important;
+                    }
+                    .amaes-active-focus-badge {
+                        width: auto !important;
+                        padding: 2px 6px !important;
+                        font-size: 8.5px !important;
+                        margin-bottom: 0 !important;
+                        border-radius: 4px !important;
+                    }
+                    .amaes-web-ai-row {
+                        margin: 2px 0 4px 0 !important;
+                        padding: 2px 5px !important;
+                        gap: 3px !important;
+                        border-radius: 8px !important;
+                    }
+                    .amaes-web-ai-item {
+                        padding: 3px 6px !important;
+                        font-size: 9.5px !important;
+                        min-height: 24px !important;
+                    }
+                    .amaes-que-top-toolbar {
+                        margin-bottom: 4px !important;
+                    }
                 }
             `;
 
@@ -21346,7 +21651,7 @@ function setupAccountTransferUI() {
             };
         }
 
-        // Panel Minimize State Persistence
+        // Panel Minimize State Persistence & Responsive Sync
         const panelEl = document.getElementById('amaes-toolkit-panel');
         const updateHudPauseBtnVisibility = () => {
             const hudPauseBtn = document.getElementById('btn-hud-toggle-quiz');
@@ -21355,7 +21660,32 @@ function setupAccountTransferUI() {
                 hudPauseBtn.style.display = isMin ? 'inline-flex' : 'none';
             }
         };
-        const savedMinimized = localStorage.getItem('amaes_pref_minimized') === 'true';
+
+        const updatePanelMinState = (isMin) => {
+            const backdropEl = document.getElementById('amaes-panel-backdrop');
+            const hudEl = document.getElementById('amaes-quiz-hud');
+            const root = document.documentElement;
+            if (root) {
+                root.classList.toggle('amaes-panel-is-minimized', isMin);
+            }
+            if (backdropEl) {
+                backdropEl.classList.toggle('active', !isMin);
+            }
+            if (hudEl) {
+                const isMobileScreen = (typeof window !== 'undefined' ? (window.innerWidth || 0) : 0) <= 640;
+                if (isMobileScreen) {
+                    hudEl.style.display = isMin ? 'flex' : 'none';
+                } else {
+                    hudEl.style.display = 'flex';
+                }
+            }
+            updateHudPauseBtnVisibility();
+        };
+
+        const deviceState = (typeof detectDeviceMode === 'function') ? detectDeviceMode() : { isMobile: false, isTablet: false };
+        const prefMinimized = localStorage.getItem('amaes_pref_minimized');
+        const savedMinimized = prefMinimized !== null ? (prefMinimized === 'true') : deviceState.isMobile;
+
         if (savedMinimized) {
             if (bodyEl) bodyEl.style.display = 'none';
             if (lockOverlay) lockOverlay.style.display = 'none';
@@ -21365,7 +21695,9 @@ function setupAccountTransferUI() {
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
                 </svg>
             `;
-            updateHudPauseBtnVisibility();
+            updatePanelMinState(true);
+        } else {
+            updatePanelMinState(false);
         }
 
         if (minBtn) minBtn.onclick = (e) => {
@@ -21377,7 +21709,7 @@ function setupAccountTransferUI() {
                 if (panelEl) panelEl.classList.remove('amaes-minimized');
                 minBtn.innerHTML = ICONS.minimize;
                 localStorage.setItem('amaes_pref_minimized', 'false');
-                updateHudPauseBtnVisibility();
+                updatePanelMinState(false);
             } else if (targetEl) {
                 targetEl.style.display = 'none';
                 if (panelEl) panelEl.classList.add('amaes-minimized');
@@ -21387,7 +21719,7 @@ function setupAccountTransferUI() {
                     </svg>
                 `;
                 localStorage.setItem('amaes_pref_minimized', 'true');
-                updateHudPauseBtnVisibility();
+                updatePanelMinState(true);
             }
         };
 
@@ -21402,10 +21734,57 @@ function setupAccountTransferUI() {
                         panelEl.classList.remove('amaes-minimized');
                         minBtn.innerHTML = ICONS.minimize;
                         localStorage.setItem('amaes_pref_minimized', 'false');
-                        updateHudPauseBtnVisibility();
+                        updatePanelMinState(false);
                     }
                 }
             });
+        }
+
+        // Backdrop click to minimize bottom sheet on mobile
+        const backdropEl = document.getElementById('amaes-panel-backdrop');
+        if (backdropEl) {
+            backdropEl.onclick = (e) => {
+                e.stopPropagation();
+                if (panelEl && !panelEl.classList.contains('amaes-minimized') && minBtn) {
+                    minBtn.click();
+                }
+            };
+        }
+
+        // Pull handle click & swipe-down touch gestures on mobile
+        const sheetHandle = panelEl ? panelEl.querySelector('.amaes-sheet-handle') : null;
+        if (sheetHandle) {
+            sheetHandle.onclick = (e) => {
+                e.stopPropagation();
+                if (panelEl && !panelEl.classList.contains('amaes-minimized') && minBtn) {
+                    minBtn.click();
+                }
+            };
+        }
+
+        let touchStartY = 0;
+        let touchDiffY = 0;
+        const panelDragZone = sheetHandle || (panelEl ? panelEl.querySelector('#amaes-header') : null);
+        if (panelDragZone) {
+            panelDragZone.addEventListener('touchstart', (e) => {
+                if (panelEl && panelEl.classList.contains('amaes-minimized')) return;
+                touchStartY = e.touches[0].clientY;
+                touchDiffY = 0;
+            }, { passive: true });
+
+            panelDragZone.addEventListener('touchmove', (e) => {
+                if (panelEl && panelEl.classList.contains('amaes-minimized')) return;
+                const currentY = e.touches[0].clientY;
+                touchDiffY = currentY - touchStartY;
+            }, { passive: true });
+
+            panelDragZone.addEventListener('touchend', () => {
+                if (panelEl && panelEl.classList.contains('amaes-minimized')) return;
+                if (touchDiffY > 45 && minBtn) {
+                    minBtn.click();
+                }
+                touchDiffY = 0;
+            }, { passive: true });
         }
 
         // Initialize lock state

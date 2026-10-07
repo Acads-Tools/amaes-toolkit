@@ -52,6 +52,31 @@
     let currentTheme = localStorage.getItem('amaes_toolkit_theme') || 'dark';
     if (!THEMES[currentTheme]) currentTheme = 'dark';
 
+    function detectDeviceMode() {
+        const w = (typeof window !== 'undefined') ? (window.innerWidth || document.documentElement.clientWidth || (screen && screen.width) || 1024) : 1024;
+        const isTouch = (typeof navigator !== 'undefined' && (navigator.maxTouchPoints > 0 || 'ontouchstart' in window));
+        const isMobile = w <= 640 || (w <= 768 && isTouch);
+        const isTablet = !isMobile && (w <= 1024 || (w <= 1280 && isTouch && w > 640));
+
+        const root = (typeof document !== 'undefined') ? document.documentElement : null;
+        if (root) {
+            root.classList.toggle('amaes-is-mobile', isMobile);
+            root.classList.toggle('amaes-is-tablet', isTablet);
+            root.classList.toggle('amaes-is-touch', isTouch);
+            root.classList.toggle('amaes-is-desktop', !isMobile && !isTablet);
+        }
+
+        return { isMobile, isTablet, isTouch, width: w };
+    }
+
+    if (typeof window !== 'undefined') {
+        detectDeviceMode();
+        window.addEventListener('resize', detectDeviceMode, { passive: true });
+        window.addEventListener('orientationchange', () => {
+            setTimeout(detectDeviceMode, 150);
+        }, { passive: true });
+    }
+
     function applyTheme(themeKey) {
         const t = THEMES[themeKey] || THEMES.dark;
         currentTheme = themeKey;
