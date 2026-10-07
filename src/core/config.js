@@ -61,7 +61,7 @@
         banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999999;background:#0f172a;border-bottom:2px solid #ef4444;color:#f8fafc;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;font-size:14px;';
         banner.innerHTML = `
             <div style="display:flex;align-items:center;gap:10px">
-                <span style="font-size:16px">⚠️</span>
+                <span style="display:inline-flex;align-items:center;color:#f59e0b"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
                 <span>Update to v${required} to use the tool</span>
             </div>
             <a href="${SCRIPT_RAW_URL}" target="_blank" rel="noopener noreferrer"

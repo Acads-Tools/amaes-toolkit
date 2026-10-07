@@ -287,9 +287,9 @@
     // Multi-Web AI Launchers (ChatGPT, Perplexity, Gemini)
     // --------------------------------------------------
     const WEB_AI_PROVIDERS = {
-        chatgpt: { id: 'chatgpt', name: 'ChatGPT', icon: '💬', badge: '(Auto-fill)' },
-        perplexity: { id: 'perplexity', name: 'Perplexity', icon: '⚡', badge: '(Auto-search)' },
-        gemini: { id: 'gemini', name: 'Gemini', icon: '✦', badge: '(Copy & Go)' }
+        chatgpt: { id: 'chatgpt', name: 'ChatGPT', icon: ICONS.chatgpt, badge: '(Auto-fill)' },
+        perplexity: { id: 'perplexity', name: 'Perplexity', icon: ICONS.perplexity, badge: '(Auto-search)' },
+        gemini: { id: 'gemini', name: 'Gemini', icon: ICONS.gemini, badge: '(Copy & Go)' }
     };
 
     function getPreferredWebAi() {
@@ -369,10 +369,10 @@
         const askAiBtn = que.querySelector('.amaes-ask-ai-card-btn');
         if (askAiBtn) {
             if (que.dataset.amaesAiFailed === 'true' || que.querySelector('.amaes-ai-fallback-bar')) {
-                askAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+                askAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
                 askAiBtn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
             } else if (que.dataset.amaesAiAttempted === 'true') {
-                askAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+                askAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
             }
         }
     }
@@ -423,7 +423,7 @@
                 btnText.type = 'button';
                 btnText.className = 'amaes-copy-ai-card-btn';
                 btnText.title = 'Copy question and choices (copies visual snippet + text for images and drag & drop)';
-                btnText.innerHTML = `${ICONS.copy || ICONS.sparkles} <span>Copy AI</span>`;
+                btnText.innerHTML = `${ICONS.copy} <span>Copy AI</span>`;
                 btnText.style.display = autoQuizMode ? 'none' : '';
 
                 btnText.onclick = async (e) => {
@@ -444,7 +444,7 @@
                             setLog("Copied question with Course Context for AI.", "var(--accent-green)");
                         }
                         setTimeout(() => {
-                            btnText.innerHTML = `${ICONS.copy || ICONS.sparkles} <span>Copy AI</span>`;
+                            btnText.innerHTML = `${ICONS.copy} <span>Copy AI</span>`;
                             btnText.style.borderColor = '';
                             btnText.style.color = '';
                         }, 1800);

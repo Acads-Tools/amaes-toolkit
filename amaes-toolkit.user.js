@@ -91,7 +91,7 @@
         banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999999;background:#0f172a;border-bottom:2px solid #ef4444;color:#f8fafc;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;font-size:14px;';
         banner.innerHTML = `
             <div style="display:flex;align-items:center;gap:10px">
-                <span style="font-size:16px">⚠️</span>
+                <span style="display:inline-flex;align-items:center;color:#f59e0b"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
                 <span>Update to v${required} to use the tool</span>
             </div>
             <a href="${SCRIPT_RAW_URL}" target="_blank" rel="noopener noreferrer"
@@ -5021,7 +5021,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                                 gap: 4px;
                                 transition: all 0.15s ease;
                             " title="Ask Google Gemini AI to analyze and solve this question directly">
-                                ${ICONS.sparkles} <span>${firstBlockedQue.dataset.amaesAiAttempted ? 'Retry AI' : 'Ask AI'}</span>
+                                ${ICONS.gemini} <span>${firstBlockedQue.dataset.amaesAiAttempted ? 'Retry AI' : 'Ask AI'}</span>
                             </button>
                             ${retryCount >= 2 ? `
                             <button id="btn-blockage-config-ai" type="button" class="amaes-inline-btn" style="
@@ -5038,7 +5038,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                                 gap: 4px;
                                 transition: all 0.15s ease;
                             " title="Add another free Google Gemini API key for higher rate limits">
-                                ⚙ <span>Configure AI</span>
+                                ${ICONS.gear} <span>Configure AI</span>
                             </button>
                             ` : ''}
                             <button id="btn-blockage-stop" type="button" class="amaes-inline-btn" style="
@@ -5077,11 +5077,11 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                                 configBtn.className = 'amaes-inline-btn';
                                 configBtn.style.cssText = 'padding: 4px 10px; font-size: 11px; font-weight: 700; background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s ease;';
                                 configBtn.title = 'Add another free Google Gemini API key for higher rate limits';
-                                configBtn.innerHTML = `⚙ <span>Configure AI</span>`;
+                                configBtn.innerHTML = `${ICONS.gear} <span>Configure AI</span>`;
                                 configBtn.onclick = (ev) => {
                                     ev.preventDefault();
                                     ev.stopPropagation();
-                                    showGeminiSetupModal("💡 Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
+                                    showGeminiSetupModal("Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
                                 };
                                 blockageAskAi.parentNode.insertBefore(configBtn, blockageAskAi.nextSibling);
                             }
@@ -5094,7 +5094,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         blockageConfigAi.onclick = (e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            showGeminiSetupModal("💡 Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
+                            showGeminiSetupModal("Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
                         };
                     }
 
@@ -7762,7 +7762,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                                 aiRowBtn = document.createElement('button');
                                 aiRowBtn.type = 'button';
                                 aiRowBtn.className = 'amaes-ai-row-btn amaes-ai-match-row-btn';
-                                aiRowBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>AI</span>`;
+                                aiRowBtn.innerHTML = `${ICONS.gemini} <span>AI</span>`;
                                 aiRowBtn.title = 'Ask Gemini AI to solve this specific row';
                                 aiRowBtn.style.cssText = 'margin-left: 6px; padding: 2px 7px; font-size: 10px; font-weight: 700; border: 1px solid #c084fc; border-radius: 4px; background: #faf5ff; color: #7e22ce; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; vertical-align: middle;';
                                 aiRowBtn.onclick = async (e) => {
@@ -7789,7 +7789,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                                         showToast(`AI error: ${err.message}`);
                                     } finally {
                                         aiRowBtn.disabled = false;
-                                        aiRowBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>AI</span>`;
+                                        aiRowBtn.innerHTML = `${ICONS.gemini} <span>AI</span>`;
                                     }
                                 };
                                 selectInput.insertAdjacentElement('afterend', aiRowBtn);
@@ -11987,9 +11987,9 @@ function setupAccountTransferUI() {
     // Multi-Web AI Launchers (ChatGPT, Perplexity, Gemini)
     // --------------------------------------------------
     const WEB_AI_PROVIDERS = {
-        chatgpt: { id: 'chatgpt', name: 'ChatGPT', icon: '💬', badge: '(Auto-fill)' },
-        perplexity: { id: 'perplexity', name: 'Perplexity', icon: '⚡', badge: '(Auto-search)' },
-        gemini: { id: 'gemini', name: 'Gemini', icon: '✦', badge: '(Copy & Go)' }
+        chatgpt: { id: 'chatgpt', name: 'ChatGPT', icon: ICONS.chatgpt, badge: '(Auto-fill)' },
+        perplexity: { id: 'perplexity', name: 'Perplexity', icon: ICONS.perplexity, badge: '(Auto-search)' },
+        gemini: { id: 'gemini', name: 'Gemini', icon: ICONS.gemini, badge: '(Copy & Go)' }
     };
 
     function getPreferredWebAi() {
@@ -12069,10 +12069,10 @@ function setupAccountTransferUI() {
         const askAiBtn = que.querySelector('.amaes-ask-ai-card-btn');
         if (askAiBtn) {
             if (que.dataset.amaesAiFailed === 'true' || que.querySelector('.amaes-ai-fallback-bar')) {
-                askAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+                askAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
                 askAiBtn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
             } else if (que.dataset.amaesAiAttempted === 'true') {
-                askAiBtn.innerHTML = `${ICONS.sparkles} <span>Retry AI</span>`;
+                askAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
             }
         }
     }
@@ -12123,7 +12123,7 @@ function setupAccountTransferUI() {
                 btnText.type = 'button';
                 btnText.className = 'amaes-copy-ai-card-btn';
                 btnText.title = 'Copy question and choices (copies visual snippet + text for images and drag & drop)';
-                btnText.innerHTML = `${ICONS.copy || ICONS.sparkles} <span>Copy AI</span>`;
+                btnText.innerHTML = `${ICONS.copy} <span>Copy AI</span>`;
                 btnText.style.display = autoQuizMode ? 'none' : '';
 
                 btnText.onclick = async (e) => {
@@ -12144,7 +12144,7 @@ function setupAccountTransferUI() {
                             setLog("Copied question with Course Context for AI.", "var(--accent-green)");
                         }
                         setTimeout(() => {
-                            btnText.innerHTML = `${ICONS.copy || ICONS.sparkles} <span>Copy AI</span>`;
+                            btnText.innerHTML = `${ICONS.copy} <span>Copy AI</span>`;
                             btnText.style.borderColor = '';
                             btnText.style.color = '';
                         }, 1800);
@@ -12661,7 +12661,7 @@ function setupAccountTransferUI() {
 
         const quizConfigBtn = document.getElementById('btn-quiz-config-ai');
         if (quizConfigBtn) {
-            quizConfigBtn.innerHTML = `${ICONS.sparkles} <span>${isConfigured ? (keys.length > 1 ? `Configure AI Keys (${keys.length})` : 'Configure AI Key') : 'Setup Free AI Key'}</span>`;
+            quizConfigBtn.innerHTML = `${ICONS.gear} <span>${isConfigured ? (keys.length > 1 ? `Configure AI Keys (${keys.length})` : 'Configure AI Key') : 'Setup Free AI Key'}</span>`;
         }
     }
 
@@ -13474,7 +13474,7 @@ function setupAccountTransferUI() {
                         display: inline-flex;
                         align-items: center;
                         gap: 3px;
-                    " title="Add another free Google Gemini API key for higher rate limits">⚙ Configure AI</button>
+                    " title="Add another free Google Gemini API key for higher rate limits">${ICONS.gear} Configure AI</button>
                     ` : ''}
                     <button type="button" class="amaes-ai-retry-btn" style="
                         background: #ea580c;
@@ -13513,7 +13513,7 @@ function setupAccountTransferUI() {
                 configBtn.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    showGeminiSetupModal("💡 Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
+                    showGeminiSetupModal("Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
                 };
             }
 
@@ -13599,7 +13599,7 @@ function setupAccountTransferUI() {
                     display: inline-flex;
                     align-items: center;
                     gap: 3px;
-                " title="Add another free Google Gemini API key for higher rate limits">⚙ Configure AI</button>
+                " title="Add another free Google Gemini API key for higher rate limits">${ICONS.gear} Configure AI</button>
                 ` : ''}
                 <button type="button" class="amaes-ai-copy-btn" style="
                     background: #fae8ff;
@@ -13624,7 +13624,7 @@ function setupAccountTransferUI() {
             configBtn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                showGeminiSetupModal("💡 Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
+                showGeminiSetupModal("Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
             };
         }
 
@@ -14060,7 +14060,7 @@ function setupAccountTransferUI() {
                     }
                     return;
                 }
-                const mismatchReason = "AI could not match these items. Use the inline ✨ AI button on each row to solve individually.";
+                const mismatchReason = "AI could not match these items. Use the inline AI button on each row to solve individually.";
                 showAiFallbackBar(que, qData, promptText, async () => {
                     await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered });
                 }, { reason: mismatchReason, isAuthError: false });
@@ -14297,7 +14297,7 @@ function setupAccountTransferUI() {
             color: #7c3aed;
             border: 1px solid rgba(139, 92, 246, 0.3);
         `;
-        badge.innerHTML = `${ICONS.sparkles} <span>AI Suggestion: <strong>${escapeHtml(answerText)}</strong></span>`;
+        badge.innerHTML = `${ICONS.gemini} <span>AI Suggestion: <strong>${escapeHtml(answerText)}</strong></span>`;
 
         const parent = textInput.parentElement || textInput;
         if (parent.nextSibling) {
@@ -14365,8 +14365,8 @@ function setupAccountTransferUI() {
                 que.style.outline = '2px solid rgba(139, 92, 246, 0.7)';
                 que.style.borderRadius = '8px';
                 setQuestionAiTag(que, true);
-                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
-                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
+                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
                 showToast(`Gemini suggested ${solvedCount} of ${matchingRows.length} matching rows. Review suggestions!`, 3500);
                 setLog(`[AI Matching] Gemini suggested <b>${solvedCount} of ${matchingRows.length}</b> matching items.`, "var(--accent-purple)");
                 return;
@@ -14401,21 +14401,21 @@ function setupAccountTransferUI() {
                     }
                 }
 
-                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
-                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
+                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
                 showToast(`Gemini resolved Question #${qData ? qData.qNum : ''}!`, 3000);
             },
             onFallback: () => {
-                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
-                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
+                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
             }
         });
 
         if (cardAiBtn && cardAiBtn.innerHTML.includes('Asking AI...')) {
-            cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+            cardAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
         }
         if (blockageAiBtn && blockageAiBtn.innerHTML.includes('Asking AI...')) {
-            blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+            blockageAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
         }
     }
 
@@ -14538,7 +14538,7 @@ function setupAccountTransferUI() {
                                 <span style="font-weight: 600; color: #f8fafc;">Paste your key(s) here:</span>
                                 <!-- Speed explanation box -->
                                 <div id="amaes-multikey-explain" style="margin: 6px 0; padding: 8px 12px; background: rgba(124,58,237,0.12); border: 1px solid rgba(168,85,247,0.4); border-radius: 8px; font-size: 11px; color: #e9d5ff; line-height: 1.5;">
-                                    <b style="color: #ffffff; font-size: 11.5px;">💡 Higher Limits with Multiple Keys</b><br>
+                                    <b style="color: #ffffff; font-size: 11.5px;">Higher Limits with Multiple Keys</b><br>
                                     Hit a rate limit or busy error? Google provides 15 free AI requests per minute per account. You can create an extra free API key using a secondary Google account and add it here. The toolkit will automatically rotate between your keys to double your capacity and eliminate wait times!
                                 </div>
                                 <!-- Dynamic key rows rendered by JS -->
@@ -18124,7 +18124,7 @@ function setupAccountTransferUI() {
                 <!-- Footer Action -->
                 <div style="padding: 14px 24px; border-top: 1px solid ${isLight ? '#f4f4f5' : '#27272a'}; background: ${isLight ? '#ffffff' : '#18181b'}; display: flex; justify-content: space-between; align-items: center;">
                     <a href="https://github.com/Acads-Tools/amaes-toolkit#frequently-asked-questions-faqs" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11px; text-decoration: none; display: flex; align-items: center; gap: 4px;" title="View FAQs & Guide">
-                        📖 <span>FAQs & Guide</span>
+                        ${ICONS.book} <span>FAQs & Guide</span>
                     </a>
                     <button id="btn-got-it-welcome" class="amaes-btn amaes-btn-green" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '' : 'disabled'} style="padding: 8px 22px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; background: #10b981; color: #fff; border: none; opacity: ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '1' : '0.5'};">
                         ${ICONS.zap} Get Started
@@ -18638,7 +18638,7 @@ function setupAccountTransferUI() {
                             <details id="amaes-ai-quiz-settings-block" style="border: 1px solid var(--border-subtle); border-radius: 6px; background: rgba(0,0,0,0.12); overflow: hidden;">
                                 <summary style="cursor: pointer; padding: 5px 8px; font-size: 10px; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; user-select: none;">
                                     <span style="display: flex; align-items: center; gap: 5px;">
-                                        ${ICONS.sparkles}
+                                        ${ICONS.gemini}
                                         <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
                                         <span style="text-transform: uppercase; letter-spacing: 0.5px; font-size: 9.5px;">Built-in AI</span>
                                     </span>
@@ -18646,7 +18646,7 @@ function setupAccountTransferUI() {
                                 </summary>
                                 <div style="display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--border-subtle); background: rgba(0, 0, 0, 0.15);">
                                     <button id="btn-quiz-config-ai" type="button" class="amaes-btn" style="justify-content: center; padding: 5px 8px; font-size: 10px; background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; font-weight: 600; cursor: pointer;">
-                                        ${ICONS.sparkles} <span>${geminiApiKey ? 'Configure AI Key' : 'Setup Free AI Key'}</span>
+                                        ${ICONS.gear} <span>${geminiApiKey ? 'Configure AI Key' : 'Setup Free AI Key'}</span>
                                     </button>
                                     <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="When question is not in DB, automatically ask AI for the answer">
                                         <input id="chk-ai-quiz-enabled" type="checkbox" ${aiQuizEnabled ? 'checked' : ''} style="cursor: pointer; margin: 0;" />

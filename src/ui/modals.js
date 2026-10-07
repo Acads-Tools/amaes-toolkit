@@ -242,7 +242,7 @@
                 <!-- Footer Action -->
                 <div style="padding: 14px 24px; border-top: 1px solid ${isLight ? '#f4f4f5' : '#27272a'}; background: ${isLight ? '#ffffff' : '#18181b'}; display: flex; justify-content: space-between; align-items: center;">
                     <a href="https://github.com/Acads-Tools/amaes-toolkit#frequently-asked-questions-faqs" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11px; text-decoration: none; display: flex; align-items: center; gap: 4px;" title="View FAQs & Guide">
-                        📖 <span>FAQs & Guide</span>
+                        ${ICONS.book} <span>FAQs & Guide</span>
                     </a>
                     <button id="btn-got-it-welcome" class="amaes-btn amaes-btn-green" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '' : 'disabled'} style="padding: 8px 22px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; background: #10b981; color: #fff; border: none; opacity: ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '1' : '0.5'};">
                         ${ICONS.zap} Get Started

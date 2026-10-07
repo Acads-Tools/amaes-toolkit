@@ -68,7 +68,7 @@
 
         const quizConfigBtn = document.getElementById('btn-quiz-config-ai');
         if (quizConfigBtn) {
-            quizConfigBtn.innerHTML = `${ICONS.sparkles} <span>${isConfigured ? (keys.length > 1 ? `Configure AI Keys (${keys.length})` : 'Configure AI Key') : 'Setup Free AI Key'}</span>`;
+            quizConfigBtn.innerHTML = `${ICONS.gear} <span>${isConfigured ? (keys.length > 1 ? `Configure AI Keys (${keys.length})` : 'Configure AI Key') : 'Setup Free AI Key'}</span>`;
         }
     }
 
@@ -881,7 +881,7 @@
                         display: inline-flex;
                         align-items: center;
                         gap: 3px;
-                    " title="Add another free Google Gemini API key for higher rate limits">⚙ Configure AI</button>
+                    " title="Add another free Google Gemini API key for higher rate limits">${ICONS.gear} Configure AI</button>
                     ` : ''}
                     <button type="button" class="amaes-ai-retry-btn" style="
                         background: #ea580c;
@@ -920,7 +920,7 @@
                 configBtn.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    showGeminiSetupModal("💡 Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
+                    showGeminiSetupModal("Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
                 };
             }
 
@@ -1006,7 +1006,7 @@
                     display: inline-flex;
                     align-items: center;
                     gap: 3px;
-                " title="Add another free Google Gemini API key for higher rate limits">⚙ Configure AI</button>
+                " title="Add another free Google Gemini API key for higher rate limits">${ICONS.gear} Configure AI</button>
                 ` : ''}
                 <button type="button" class="amaes-ai-copy-btn" style="
                     background: #fae8ff;
@@ -1031,7 +1031,7 @@
             configBtn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                showGeminiSetupModal("💡 Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
+                showGeminiSetupModal("Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
             };
         }
 
@@ -1467,7 +1467,7 @@
                     }
                     return;
                 }
-                const mismatchReason = "AI could not match these items. Use the inline ✨ AI button on each row to solve individually.";
+                const mismatchReason = "AI could not match these items. Use the inline AI button on each row to solve individually.";
                 showAiFallbackBar(que, qData, promptText, async () => {
                     await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered });
                 }, { reason: mismatchReason, isAuthError: false });
@@ -1704,7 +1704,7 @@
             color: #7c3aed;
             border: 1px solid rgba(139, 92, 246, 0.3);
         `;
-        badge.innerHTML = `${ICONS.sparkles} <span>AI Suggestion: <strong>${escapeHtml(answerText)}</strong></span>`;
+        badge.innerHTML = `${ICONS.gemini} <span>AI Suggestion: <strong>${escapeHtml(answerText)}</strong></span>`;
 
         const parent = textInput.parentElement || textInput;
         if (parent.nextSibling) {
@@ -1772,8 +1772,8 @@
                 que.style.outline = '2px solid rgba(139, 92, 246, 0.7)';
                 que.style.borderRadius = '8px';
                 setQuestionAiTag(que, true);
-                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
-                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
+                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
                 showToast(`Gemini suggested ${solvedCount} of ${matchingRows.length} matching rows. Review suggestions!`, 3500);
                 setLog(`[AI Matching] Gemini suggested <b>${solvedCount} of ${matchingRows.length}</b> matching items.`, "var(--accent-purple)");
                 return;
@@ -1808,21 +1808,21 @@
                     }
                 }
 
-                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
-                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
+                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
                 showToast(`Gemini resolved Question #${qData ? qData.qNum : ''}!`, 3000);
             },
             onFallback: () => {
-                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
-                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
+                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
             }
         });
 
         if (cardAiBtn && cardAiBtn.innerHTML.includes('Asking AI...')) {
-            cardAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+            cardAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
         }
         if (blockageAiBtn && blockageAiBtn.innerHTML.includes('Asking AI...')) {
-            blockageAiBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>Retry AI</span>`;
+            blockageAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
         }
     }
 
@@ -1945,7 +1945,7 @@
                                 <span style="font-weight: 600; color: #f8fafc;">Paste your key(s) here:</span>
                                 <!-- Speed explanation box -->
                                 <div id="amaes-multikey-explain" style="margin: 6px 0; padding: 8px 12px; background: rgba(124,58,237,0.12); border: 1px solid rgba(168,85,247,0.4); border-radius: 8px; font-size: 11px; color: #e9d5ff; line-height: 1.5;">
-                                    <b style="color: #ffffff; font-size: 11.5px;">💡 Higher Limits with Multiple Keys</b><br>
+                                    <b style="color: #ffffff; font-size: 11.5px;">Higher Limits with Multiple Keys</b><br>
                                     Hit a rate limit or busy error? Google provides 15 free AI requests per minute per account. You can create an extra free API key using a secondary Google account and add it here. The toolkit will automatically rotate between your keys to double your capacity and eliminate wait times!
                                 </div>
                                 <!-- Dynamic key rows rendered by JS -->

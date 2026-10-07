@@ -1586,7 +1586,7 @@
                                 gap: 4px;
                                 transition: all 0.15s ease;
                             " title="Ask Google Gemini AI to analyze and solve this question directly">
-                                ${ICONS.sparkles} <span>${firstBlockedQue.dataset.amaesAiAttempted ? 'Retry AI' : 'Ask AI'}</span>
+                                ${ICONS.gemini} <span>${firstBlockedQue.dataset.amaesAiAttempted ? 'Retry AI' : 'Ask AI'}</span>
                             </button>
                             ${retryCount >= 2 ? `
                             <button id="btn-blockage-config-ai" type="button" class="amaes-inline-btn" style="
@@ -1603,7 +1603,7 @@
                                 gap: 4px;
                                 transition: all 0.15s ease;
                             " title="Add another free Google Gemini API key for higher rate limits">
-                                ⚙ <span>Configure AI</span>
+                                ${ICONS.gear} <span>Configure AI</span>
                             </button>
                             ` : ''}
                             <button id="btn-blockage-stop" type="button" class="amaes-inline-btn" style="
@@ -1642,11 +1642,11 @@
                                 configBtn.className = 'amaes-inline-btn';
                                 configBtn.style.cssText = 'padding: 4px 10px; font-size: 11px; font-weight: 700; background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s ease;';
                                 configBtn.title = 'Add another free Google Gemini API key for higher rate limits';
-                                configBtn.innerHTML = `⚙ <span>Configure AI</span>`;
+                                configBtn.innerHTML = `${ICONS.gear} <span>Configure AI</span>`;
                                 configBtn.onclick = (ev) => {
                                     ev.preventDefault();
                                     ev.stopPropagation();
-                                    showGeminiSetupModal("💡 Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
+                                    showGeminiSetupModal("Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
                                 };
                                 blockageAskAi.parentNode.insertBefore(configBtn, blockageAskAi.nextSibling);
                             }
@@ -1659,7 +1659,7 @@
                         blockageConfigAi.onclick = (e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            showGeminiSetupModal("💡 Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
+                            showGeminiSetupModal("Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
                         };
                     }
 
@@ -4327,7 +4327,7 @@
                                 aiRowBtn = document.createElement('button');
                                 aiRowBtn.type = 'button';
                                 aiRowBtn.className = 'amaes-ai-row-btn amaes-ai-match-row-btn';
-                                aiRowBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>AI</span>`;
+                                aiRowBtn.innerHTML = `${ICONS.gemini} <span>AI</span>`;
                                 aiRowBtn.title = 'Ask Gemini AI to solve this specific row';
                                 aiRowBtn.style.cssText = 'margin-left: 6px; padding: 2px 7px; font-size: 10px; font-weight: 700; border: 1px solid #c084fc; border-radius: 4px; background: #faf5ff; color: #7e22ce; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; vertical-align: middle;';
                                 aiRowBtn.onclick = async (e) => {
@@ -4354,7 +4354,7 @@
                                         showToast(`AI error: ${err.message}`);
                                     } finally {
                                         aiRowBtn.disabled = false;
-                                        aiRowBtn.innerHTML = `${ICONS.gemini || ICONS.sparkles} <span>AI</span>`;
+                                        aiRowBtn.innerHTML = `${ICONS.gemini} <span>AI</span>`;
                                     }
                                 };
                                 selectInput.insertAdjacentElement('afterend', aiRowBtn);

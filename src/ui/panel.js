@@ -235,7 +235,7 @@
                             <details id="amaes-ai-quiz-settings-block" style="border: 1px solid var(--border-subtle); border-radius: 6px; background: rgba(0,0,0,0.12); overflow: hidden;">
                                 <summary style="cursor: pointer; padding: 5px 8px; font-size: 10px; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; user-select: none;">
                                     <span style="display: flex; align-items: center; gap: 5px;">
-                                        ${ICONS.sparkles}
+                                        ${ICONS.gemini}
                                         <span class="amaes-summary-chevron">${ICONS.chevronRight}</span>
                                         <span style="text-transform: uppercase; letter-spacing: 0.5px; font-size: 9.5px;">Built-in AI</span>
                                     </span>
@@ -243,7 +243,7 @@
                                 </summary>
                                 <div style="display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--border-subtle); background: rgba(0, 0, 0, 0.15);">
                                     <button id="btn-quiz-config-ai" type="button" class="amaes-btn" style="justify-content: center; padding: 5px 8px; font-size: 10px; background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; font-weight: 600; cursor: pointer;">
-                                        ${ICONS.sparkles} <span>${geminiApiKey ? 'Configure AI Key' : 'Setup Free AI Key'}</span>
+                                        ${ICONS.gear} <span>${geminiApiKey ? 'Configure AI Key' : 'Setup Free AI Key'}</span>
                                     </button>
                                     <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="When question is not in DB, automatically ask AI for the answer">
                                         <input id="chk-ai-quiz-enabled" type="checkbox" ${aiQuizEnabled ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
