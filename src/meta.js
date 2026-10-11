@@ -23,6 +23,7 @@
 // @connect      docs.google.com
 // @connect      amaes-community-relay.acads-tools.workers.dev
 // @connect      generativelanguage.googleapis.com
+// @connect      api.typesafe.ai
 // @run-at       document-end
 // @license      MIT
 // @homepageURL  https://github.com/Acads-Tools/amaes-toolkit

@@ -35,6 +35,7 @@ const BUILD_MANIFEST = [
     'moodle/account-transfer.js',
     'dev/diagnostics.js',
     'ai/prompts.js',
+    'ai/jev.js',
     'ai/gemini.js',
     'sync/harvester.js',
     'dev/console.js',

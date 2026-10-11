@@ -38,13 +38,19 @@
 
     function updateAiAssistantUI() {
         const keys = getGeminiApiKeys();
-        const isConfigured = keys.length > 0;
+        const isGeminiSet = keys.length > 0;
+        const isJevSet = typeof isJevConfigured === 'function' && isJevConfigured() && isJevEnabled();
+        const isConfigured = isGeminiSet || isJevSet;
 
         const badge = document.getElementById('gemini-status-badge');
         if (badge) {
             const activeModel = cachedWorkingEndpoint ? cachedWorkingEndpoint.model : 'Gemini Flash';
             badge.style.color = isConfigured ? 'var(--accent-green)' : 'var(--text-muted)';
-            if (isConfigured) {
+            if (isGeminiSet && isJevSet) {
+                badge.innerHTML = `Ready (${activeModel} + Jev)`;
+            } else if (isJevSet) {
+                badge.innerHTML = `Ready (TypeSafe Jev)`;
+            } else if (isGeminiSet) {
                 badge.innerHTML = keys.length > 1
                     ? `Ready (${keys.length} keys)`
                     : `Ready (${activeModel})`;
@@ -55,7 +61,7 @@
 
         const setupBtn = document.getElementById('btn-open-gemini-setup');
         if (setupBtn) {
-            setupBtn.innerHTML = `<span>            ${isConfigured ? (keys.length > 1 ? `Configure AI keys (${keys.length})` : 'Configure AI key') : 'Setup Free AI Assistant'}</span>`;
+            setupBtn.innerHTML = `<span>${isConfigured ? 'Configure AI keys' : 'Setup Free AI Assistant'}</span>`;
         }
 
         const quizAiPill = document.getElementById('amaes-ai-quiz-status-pill');
@@ -1146,6 +1152,28 @@
             }
         }
 
+        // Jev Decision Provider: If configured and enabled, evaluate with Jev System One first
+        if (typeof isJevConfigured === 'function' && typeof isJevEnabled === 'function' && isJevConfigured() && isJevEnabled()) {
+            try {
+                const courseInfo = detectCourseInfo();
+                const courseCode = courseInfo.subjectCode || '';
+                const jevResult = await evaluateQuestionWithJev({ que, qData, courseCode });
+                if (jevResult && jevResult.row && jevResult.choiceText) {
+                    applyAiChoiceHighlight(jevResult.row);
+                    saveAiAnswerToCache(qData, jevResult);
+                    const probPct = Math.round((jevResult.probability || jevResult.confidence || 0.5) * 100);
+                    setLog(`[Jev AI] Suggested <b>${escapeHtml(jevResult.choiceText)}</b> (${probPct}% probability) for #${qData ? qData.qNum : ''}.`, "var(--accent-purple)");
+                    showToast(`Jev suggested: "${jevResult.choiceText}" (${probPct}%)`, 3000);
+                    if (typeof onSuccess === 'function') {
+                        await onSuccess(jevResult);
+                    }
+                    return;
+                }
+            } catch (jevErr) {
+                logDebug(`Jev evaluation fallback: ${jevErr.message}`);
+            }
+        }
+
         // 0.1 Rate Limit Guard: If user is on Free Tier and 15 RPM cap is reached or cooling down from 429:
         const rateLimitStatus = getAiRateLimitStatus();
         if (rateLimitStatus.isLimited) {
@@ -1889,115 +1917,103 @@
 
                 <!-- Modal Content -->
                 <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px; max-height: 75vh; overflow-y: auto;">
-                    ${initialNotice ? `
+                        ${initialNotice ? `
                     <div id="amaes-gemini-modal-notice" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; padding: 10px 12px; border-radius: 8px; font-size: 11.5px; line-height: 1.45; display: flex; align-items: flex-start; gap: 8px;">
                         <span style="display: inline-flex; align-items: center; color: #f87171; flex-shrink: 0; margin-top: 1px;">${ICONS.alertTriangle}</span>
                         <div>${escapeHtml(initialNotice)}</div>
                     </div>
                     ` : ''}
-                    <div style="font-size: 11.5px; color: var(--text-secondary, #cbd5e1); line-height: 1.45;">
-                        Get instant answers on uncertain questions directly in your quiz.
-                        <span style="color: #34d399; font-weight: 600;">100% Free</span> with your personal Google account. 
-                        <span style="color: #a78bfa; font-weight: 600;">0 tokens used</span> on questions already in the verified database.
+
+                    <!-- 1. Google Gemini Section -->
+                    <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg, #0f172a); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="font-weight: 700; color: #f8fafc; font-size: 12px;">Google Gemini API Key</span>
+                                <span style="font-size: 9.5px; background: rgba(124, 58, 237, 0.25); color: #c084fc; padding: 1px 6px; border-radius: 4px; font-weight: 600;">Primary AI</span>
+                            </div>
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 4px;
+                                color: #a78bfa;
+                                font-size: 11px;
+                                text-decoration: none;
+                                font-weight: 600;
+                            ">
+                                ${ICONS.external} <span>Get Free Key ↗</span>
+                            </a>
+                        </div>
+
+                        <!-- Dynamic Gemini key rows -->
+                        <div id="amaes-gemini-key-rows" style="display: flex; flex-direction: column; gap: 5px;"></div>
+                        
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 2px;">
+                            <button id="amaes-gemini-btn-add-key" type="button" style="
+                                background: transparent;
+                                border: 1px dashed rgba(168,85,247,0.4);
+                                color: #a78bfa;
+                                border-radius: 5px;
+                                font-size: 10px;
+                                font-weight: 600;
+                                padding: 4px 10px;
+                                cursor: pointer;
+                            ">+ Add Backup Key</button>
+
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <span style="font-size: 10px; color: var(--text-muted, #94a3b8);">Plan:</span>
+                                <select id="amaes-gemini-plan-select" style="
+                                    background: var(--surface, #1e293b);
+                                    color: #f8fafc;
+                                    border: 1px solid var(--border, #334155);
+                                    padding: 2px 6px;
+                                    border-radius: 4px;
+                                    font-size: 10px;
+                                    cursor: pointer;
+                                ">
+                                    <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
+                                    <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Multi-key rotation note -->
+                        <div id="amaes-multikey-explain" style="padding: 6px 10px; background: rgba(124,58,237,0.1); border: 1px solid rgba(168,85,247,0.25); border-radius: 6px; font-size: 10.5px; color: #d8b4fe; line-height: 1.4;">
+                            <b style="color: #ffffff;">Higher Limits with Multiple Keys:</b> Add backup keys to automatically rotate between your keys and bypass rate limits.
+                        </div>
                     </div>
 
-                    <!-- 4 Steps -->
-                    <div style="display: flex; flex-direction: column; gap: 10px; background: var(--bg, #0f172a); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
-                        <div style="display: flex; align-items: flex-start; gap: 8px;">
-                            <span style="background: #7c3aed; color: #fff; font-weight: 800; font-size: 10px; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;">1</span>
-                            <div>
-                                <span style="font-weight: 600; color: #f8fafc;">Open Google AI Studio</span>
-                                <div style="margin-top: 4px;">
-                                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="
-                                        display: inline-flex;
-                                        align-items: center;
-                                        gap: 5px;
-                                        background: #4f46e5;
-                                        color: #fff;
-                                        text-decoration: none;
-                                        padding: 5px 10px;
-                                        border-radius: 5px;
-                                        font-size: 11px;
-                                        font-weight: 700;
-                                    ">
-                                        ${ICONS.external} <span>Open Google AI Studio (Free)</span>
-                                    </a>
-                                </div>
+                    <!-- 2. TypeSafe Jev Decision Engine Card -->
+                    <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg, #0f172a); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="font-weight: 700; color: #60a5fa; font-size: 12px;">TypeSafe Jev</span>
+                                <span style="font-size: 9.5px; background: rgba(59, 130, 246, 0.25); color: #bfdbfe; padding: 1px 6px; border-radius: 4px; font-weight: 600;">Fast Classifier</span>
                             </div>
+                            <a href="https://console.typesafe.ai" target="_blank" rel="noopener noreferrer" style="color: #93c5fd; font-size: 11px; text-decoration: none; font-weight: 600;">Get Key ↗</a>
                         </div>
 
-                        <div style="display: flex; align-items: flex-start; gap: 8px;">
-                            <span style="background: #7c3aed; color: #fff; font-weight: 800; font-size: 10px; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">2</span>
-                            <div style="color: var(--text-secondary, #cbd5e1); font-size: 11.5px;">Sign in with any standard Google or Gmail account.</div>
-                        </div>
-
-                        <div style="display: flex; align-items: flex-start; gap: 8px;">
-                            <span style="background: #7c3aed; color: #fff; font-weight: 800; font-size: 10px; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">3</span>
-                            <div style="color: var(--text-secondary, #cbd5e1); font-size: 11.5px;">
-                                Click <b>"Create API Key"</b> and copy your key.<br>
-                                <span style="font-size: 10.5px; color: #a78bfa;">(Tip: If prompted, select "Create API key in new project" for automatic free setup)</span>
-                            </div>
-                        </div>
-
-                        <div style="display: flex; align-items: flex-start; gap: 8px;">
-                            <span style="background: #7c3aed; color: #fff; font-weight: 800; font-size: 10px; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;">4</span>
-                            <div style="flex: 1;">
-                                <span style="font-weight: 600; color: #f8fafc;">Paste your key(s) here:</span>
-                                <!-- Speed explanation box -->
-                                <div id="amaes-multikey-explain" style="margin: 6px 0; padding: 8px 12px; background: rgba(124,58,237,0.12); border: 1px solid rgba(168,85,247,0.4); border-radius: 8px; font-size: 11px; color: #e9d5ff; line-height: 1.5;">
-                                    <b style="color: #ffffff; font-size: 11.5px;">Higher Limits with Multiple Keys</b><br>
-                                    Hit a rate limit or busy error? Google provides 15 free AI requests per minute per account. You can create an extra free API key using a secondary Google account and add it here. The toolkit will automatically rotate between your keys to double your capacity and eliminate wait times!
-                                </div>
-                                <!-- Dynamic key rows rendered by JS -->
-                                <div id="amaes-gemini-key-rows" style="display: flex; flex-direction: column; gap: 5px; margin-top: 4px;"></div>
-                                <button id="amaes-gemini-btn-add-key" type="button" style="
-                                    margin-top: 6px;
-                                    background: transparent;
-                                    border: 1px dashed rgba(168,85,247,0.5);
-                                    color: #a78bfa;
-                                    border-radius: 5px;
-                                    font-size: 10px;
-                                    font-weight: 700;
-                                    padding: 4px 10px;
-                                    cursor: pointer;
-                                    width: 100%;
-                                ">+ Add Optional Backup Key</button>
-                            </div>
-                        </div>
-
-                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: rgba(0,0,0,0.2); border-radius: 6px; border: 1px solid var(--border-subtle, #334155);">
-                            <div>
-                                <span style="font-weight: 600; color: #f8fafc; font-size: 11px;">Google AI plan:</span>
-                                <div style="font-size: 9.5px; color: var(--text-muted, #94a3b8);">Choose the plan that matches your Google AI Studio account. The toolkit handles waiting automatically.</div>
-                            </div>
-                            <select id="amaes-gemini-plan-select" style="
-                                background: var(--surface, #1e293b);
-                                color: #f8fafc;
-                                border: 1px solid var(--border, #334155);
-                                padding: 4px 8px;
-                                border-radius: 5px;
-                                font-size: 10.5px;
-                                cursor: pointer;
-                            ">
-                                <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
-                                <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
-                            </select>
-                        </div>
-
-                        <label style="display:flex; gap:9px; align-items:flex-start; padding:9px 10px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:6px; cursor:pointer;">
-                            <input id="amaes-shared-ai-fallback" type="checkbox" ${isSharedAiFallbackEnabled() ? 'checked' : ''} style="margin-top:2px; accent-color:#10b981;">
-                            <span style="font-size:10.5px; color:#d1fae5; line-height:1.5;">
-                                <b style="color:#6ee7b7;">Use shared AI help if my key is temporarily busy</b><br>
-                                This is turned on by default. If Google temporarily limits your personal key, the toolkit may try a small, project-managed shared pool so you do not have to wait. This does <b>not</b> upload or share your personal key. Shared capacity is limited, so it may still be unavailable. Your personal key is always tried first. Turn this off if you do not want shared AI fallback.
-                            </span>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #f8fafc; cursor: pointer;">
+                            <input id="amaes-jev-enable-checkbox" type="checkbox" ${typeof isJevEnabled === 'function' && isJevEnabled() ? 'checked' : ''} style="cursor: pointer; accent-color: #3b82f6;" />
+                            <span>Enable for Multiple Choice & True/False questions</span>
                         </label>
-                        <label style="display:flex; gap:9px; align-items:flex-start; padding:9px 10px; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.35); border-radius:6px; cursor:pointer;">
-                            <input id="amaes-contributor-sharing" type="checkbox" ${isContributorSharingEnabled() ? 'checked' : ''} style="margin-top:2px; accent-color:#f59e0b;">
-                            <span style="font-size:10.5px; color:#fef3c7; line-height:1.5;">
-                                <b style="color:#fbbf24;">Share my key when I am inactive (optional)</b><br>
-                                If checked, saving this key is your consent to encrypted contributor sharing. It stays reserved for you while you are using AMAES, may help another user only after your short inactive grace period, and is automatically deleted after 30 days without activity. You can turn this off and delete it anytime.
-                                <a href="https://github.com/Acads-Tools/database/blob/main/relay/README.md#contributor-key-sharing" target="_blank" rel="noopener noreferrer" style="color:#fcd34d; text-decoration:underline; margin-left:3px;">Read sharing details</a>
-                            </span>
+
+                        <div style="display: flex; gap: 5px; align-items: center;">
+                            <input id="amaes-jev-input-key" type="password" placeholder="TypeSafe API key (or leave empty if using relay)..." value="${escapeHtml(typeof getJevApiKey === 'function' ? getJevApiKey() : '')}" style="flex:1; background:var(--surface,#1e293b); color:#f8fafc; border:1px solid var(--border,#334155); padding:5px 8px; border-radius:5px; font-size:11px; outline:none; font-family:monospace;" />
+                            <button id="amaes-jev-btn-paste" type="button" style="background:var(--surface,#1e293b); border:1px solid var(--border,#334155); color:#60a5fa; border-radius:5px; padding:4px 8px; font-size:10px; cursor:pointer;">Paste</button>
+                            <button id="amaes-jev-btn-test" type="button" style="background:rgba(59,130,246,0.2); border:1px solid rgba(59,130,246,0.4); color:#93c5fd; border-radius:5px; padding:4px 9px; font-size:10px; font-weight:600; cursor:pointer;">Test Jev</button>
+                        </div>
+                        <div id="amaes-jev-status-feedback" style="display: none; padding: 5px 8px; border-radius: 4px; font-size: 10.5px; font-weight: 600;"></div>
+                    </div>
+
+                    <!-- 3. Community Options -->
+                    <div style="display: flex; flex-direction: column; gap: 7px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
+                        <label style="display: flex; gap: 7px; align-items: center; cursor: pointer;">
+                            <input id="amaes-shared-ai-fallback" type="checkbox" ${isSharedAiFallbackEnabled() ? 'checked' : ''} style="accent-color: #10b981;" />
+                            <span style="font-size: 10.5px; color: #d1fae5;">Use shared community AI if personal key is busy</span>
+                        </label>
+                        <label style="display: flex; gap: 7px; align-items: center; cursor: pointer;">
+                            <input id="amaes-contributor-sharing" type="checkbox" ${isContributorSharingEnabled() ? 'checked' : ''} style="accent-color: #f59e0b;" />
+                            <span style="font-size: 10.5px; color: #fef3c7;">Share key with community when idle (If checked, saving this key is your consent. <a href="https://github.com/Acads-Tools/database/blob/main/relay/README.md#contributor-key-sharing" target="_blank" rel="noopener noreferrer" style="color: #fcd34d; text-decoration: underline;">Details</a>)</span>
                         </label>
                     </div>
 
@@ -2106,11 +2122,60 @@
             };
         }
 
+        // Jev Decision Engine elements
+        const jevInput = modal.querySelector('#amaes-jev-input-key');
+        const jevPasteBtn = modal.querySelector('#amaes-jev-btn-paste');
+        const jevTestBtn = modal.querySelector('#amaes-jev-btn-test');
+        const jevCheckbox = modal.querySelector('#amaes-jev-enable-checkbox');
+        const jevFeedback = modal.querySelector('#amaes-jev-status-feedback');
+
+        if (jevPasteBtn && jevInput) {
+            jevPasteBtn.onclick = async () => {
+                try {
+                    if (navigator.clipboard && navigator.clipboard.readText) {
+                        const t = await navigator.clipboard.readText();
+                        if (t) jevInput.value = t.trim();
+                    } else { jevInput.focus(); jevInput.select(); }
+                } catch (_) { jevInput.focus(); }
+            };
+        }
+
+        if (jevTestBtn && jevInput && jevFeedback) {
+            jevTestBtn.onclick = async () => {
+                const testKey = jevInput.value.trim();
+                jevTestBtn.disabled = true;
+                jevTestBtn.textContent = 'Testing...';
+                jevFeedback.style.display = 'block';
+                jevFeedback.style.background = 'rgba(59, 130, 246, 0.15)';
+                jevFeedback.style.color = '#60a5fa';
+                jevFeedback.style.border = '1px solid rgba(59, 130, 246, 0.3)';
+                jevFeedback.textContent = 'Testing TypeSafe Jev System One endpoint...';
+
+                try {
+                    const testRes = await testJevConnection(testKey || null);
+                    jevFeedback.style.background = 'rgba(16, 185, 129, 0.15)';
+                    jevFeedback.style.color = '#34d399';
+                    jevFeedback.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+                    jevFeedback.textContent = `✓ Jev Connected! Decision: "${testRes.decision}" (${Math.round((testRes.confidence || 0.9) * 100)}% conf in ${testRes.durationMs}ms)`;
+                } catch (e) {
+                    jevFeedback.style.background = 'rgba(239, 68, 68, 0.15)';
+                    jevFeedback.style.color = '#f87171';
+                    jevFeedback.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+                    jevFeedback.textContent = `Jev Error: ${e.message.slice(0, 100)}`;
+                } finally {
+                    jevTestBtn.disabled = false;
+                    jevTestBtn.textContent = 'Test Jev';
+                }
+            };
+        }
+
         if (removeBtn) {
             removeBtn.onclick = () => {
                 deleteContributorKey().catch(() => {});
                 setGeminiApiKeys([]);
-                showToast('Gemini API key removed.');
+                if (typeof setJevApiKey === 'function') setJevApiKey('');
+                if (typeof setJevEnabled === 'function') setJevEnabled(false);
+                showToast('AI API keys removed.');
                 closeModal();
             };
         }
@@ -2121,12 +2186,32 @@
                     .map(inp => inp.value.trim())
                     .filter(Boolean);
                 const rawKey = allKeyVals[0] || '';
+                const jevKeyVal = jevInput ? jevInput.value.trim() : '';
+
+                if (jevInput && typeof setJevApiKey === 'function') {
+                    setJevApiKey(jevKeyVal);
+                }
+                if (jevCheckbox && typeof setJevEnabled === 'function') {
+                    setJevEnabled(jevCheckbox.checked);
+                }
+
                 if (!rawKey) {
+                    if (jevKeyVal || (jevCheckbox && jevCheckbox.checked)) {
+                        feedback.style.display = 'block';
+                        feedback.style.background = 'rgba(16, 185, 129, 0.15)';
+                        feedback.style.color = '#34d399';
+                        feedback.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+                        feedback.innerText = 'TypeSafe Jev settings saved successfully!';
+                        showToast('TypeSafe Jev settings saved.');
+                        updateAiAssistantUI();
+                        setTimeout(closeModal, 1000);
+                        return;
+                    }
                     feedback.style.display = 'block';
                     feedback.style.background = 'rgba(239, 68, 68, 0.15)';
                     feedback.style.color = '#f87171';
                     feedback.style.border = '1px solid rgba(239, 68, 68, 0.3)';
-                    feedback.innerText = 'Please paste or type your Gemini API key first.';
+                    feedback.innerText = 'Please paste or type your Gemini API key or TypeSafe Jev key.';
                     return;
                 }
 

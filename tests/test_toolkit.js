@@ -5780,6 +5780,106 @@ test("Global Auto-Quiz Toggle: Operates outside quiz attempts, preserves state a
     assert.ok(solverSrc.includes("localStorage.setItem('amaes_auto_quiz_mode', autoQuizMode ? 'true' : 'false')"), "Must persist autoQuizMode in localStorage");
 });
 
+// --------------------------------------------------
+// 131. Jev Decision Provider (System One AI Integration)
+// --------------------------------------------------
+test("Jev Decision Provider: formats System One payloads, parses choice/boolean responses with calibrated confidence, and connects to TypeSafe API", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Check metadata and connect directive
+    assert.ok(script.includes("// @connect      api.typesafe.ai"), "Must grant network connect permission to api.typesafe.ai in userscript header");
+
+    // 2. Check Jev module constants and exports
+    assert.ok(script.includes("const JEV_DIRECT_ENDPOINT = 'https://api.typesafe.ai/v1/systemone';"), "Must declare Jev Direct System One endpoint");
+    assert.ok(script.includes("const JEV_DEFAULT_MODEL = 'jev-latest';"), "Must use jev-latest default model");
+    assert.ok(script.includes("function formatJevPayload("), "Must export formatJevPayload");
+    assert.ok(script.includes("function parseJevResponse("), "Must export parseJevResponse");
+    assert.ok(script.includes("function executeJevRequest("), "Must export executeJevRequest");
+    assert.ok(script.includes("function evaluateQuestionWithJev("), "Must export evaluateQuestionWithJev");
+
+    // 3. Functional test of formatJevPayload and parseJevResponse via eval context
+    const jevSrc = fs.readFileSync('src/ai/jev.js', 'utf8');
+    const sandbox = {
+        localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+        normalizeChoice: str => String(str || '').toLowerCase().trim(),
+        cleanDOMToAI: str => String(str || '').trim()
+    };
+    const runner = new Function('ctx', `
+        with(ctx) {
+            ${jevSrc}
+            return { formatJevPayload, parseJevResponse };
+        }
+    `);
+    const { formatJevPayload, parseJevResponse } = runner(sandbox);
+
+    // Test Choice Payload
+    const choicePayload = formatJevPayload({
+        state: 'Context: CPU Components',
+        questionType: 'choice',
+        instructions: 'Which component performs arithmetic operations?',
+        choices: ['ALU', 'CU', 'Register', 'RAM']
+    });
+    assert.strictEqual(choicePayload.model, 'jev-latest');
+    assert.strictEqual(choicePayload.state, 'Context: CPU Components');
+    assert.strictEqual(choicePayload.questions.decision.type, 'choice');
+    assert.deepStrictEqual(choicePayload.questions.decision.criteria, {
+        opt_0: 'ALU',
+        opt_1: 'CU',
+        opt_2: 'Register',
+        opt_3: 'RAM'
+    });
+
+    // Test Boolean Payload
+    const boolPayload = formatJevPayload({
+        state: 'Context: Networking',
+        questionType: 'boolean',
+        instructions: 'Is HTTP a stateless protocol?'
+    });
+    assert.strictEqual(boolPayload.questions.decision.type, 'noul');
+
+    // Test Choice Response Parsing
+    const parsedChoice = parseJevResponse({
+        model: 'jev-1.13.0',
+        answers: {
+            decision: {
+                type: 'choice',
+                choice: 'opt_0',
+                probabilities: { opt_0: 0.96, opt_1: 0.02, opt_2: 0.01, opt_3: 0.01 },
+                confidence: 0.94
+            }
+        }
+    }, {
+        questionType: 'choice',
+        choices: ['ALU', 'CU', 'Register', 'RAM'],
+        criteria: { opt_0: 'ALU', opt_1: 'CU', opt_2: 'Register', opt_3: 'RAM' }
+    });
+    assert.strictEqual(parsedChoice.ok, true);
+    assert.strictEqual(parsedChoice.choiceText, 'ALU');
+    assert.strictEqual(parsedChoice.choiceIndex, 0);
+    assert.strictEqual(parsedChoice.probability, 0.96);
+    assert.strictEqual(parsedChoice.confidence, 0.94);
+
+    // Test Boolean Response Parsing
+    const parsedBool = parseJevResponse({
+        answers: {
+            decision: {
+                type: 'noul',
+                noul: 0.92
+            }
+        }
+    }, { questionType: 'boolean' });
+    assert.strictEqual(parsedBool.ok, true);
+    assert.strictEqual(parsedBool.isTrue, true);
+    assert.strictEqual(parsedBool.choiceText, 'True');
+    assert.strictEqual(parsedBool.probability, 0.92);
+
+    // 4. Check UI integration in setup modal
+    assert.ok(script.includes('id="amaes-jev-input-key"'), "Must include Jev input key field in setup modal");
+    assert.ok(script.includes('id="amaes-jev-enable-checkbox"'), "Must include Jev enable checkbox in setup modal");
+    assert.ok(script.includes('id="amaes-jev-btn-test"'), "Must include Test Jev button in setup modal");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);
