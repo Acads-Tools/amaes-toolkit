@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.11.21
+// @version      1.12.0
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.21";
+    const SCRIPT_VERSION = "v1.12.0";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -46,6 +46,120 @@
     function isSupportedMoodleHost(host = (window.location && window.location.hostname)) {
         return SUPPORTED_AMAES_HOSTS.includes(host);
     }
+
+    // ==========================================
+    // Cross-Domain Persistent Storage Bridge (GM_storage <-> localStorage)
+    // Ensures credentials, API keys, terms acceptance, and settings
+    // seamlessly transfer between semestral.amaes.com and semestralexam.amaes.com
+    // ==========================================
+    const SHARED_STORAGE_KEYS = [
+        'amaes_terms_acknowledged',
+        'amaes_welcome_dismissed',
+        'amaes_gemini_api_key',
+        'amaes_gemini_api_keys',
+        'amaes_jev_api_key',
+        'amaes_jev_endpoint',
+        'amaes_jev_enabled',
+        'amaes_shared_ai_fallback_enabled',
+        'amaes_ai_quiz_enabled',
+        'amaes_ai_auto_select',
+        'amaes_ai_retry_count',
+        'amaes_ai_auto_copy_on_fail',
+        'amaes_ai_auto_next_on_ai',
+        'amaes_ai_plan_tier',
+        'amaes_auto_quiz_mode',
+        'amaes_quiz_personality',
+        'amaes_auto_pick_quiz',
+        'amaes_auto_next_quiz',
+        'amaes_auto_next_verified',
+        'amaes_auto_pick_study_guide_fallback',
+        'amaes_auto_submit_quiz',
+        'amaes_auto_push_github',
+        'amaes_auto_copy_search',
+        'amaes_auto_cloud_sync',
+        'amaes_auto_scrape_amauoed',
+        'amaes_auto_harvest_grades',
+        'amaes_enable_hotkeys',
+        'amaes_auto_highlight_quiz',
+        'amaes_copy_include_confidence',
+        'amaes_auto_copy_ai',
+        'amaes_smart_skip_quiz',
+        'amaes_show_in_question_ai_btns',
+        'amaes_ai_prompt_hint',
+        'amaes_auto_community_share',
+        'amaes_auto_min_quiz',
+        'amaes_theme',
+        'amaes_active_tab',
+        'amaes_anonymous_contributor_id'
+    ];
+
+    const toolkitStorage = {
+        get(key, defaultValue = null) {
+            try {
+                if (typeof GM_getValue === 'function') {
+                    const gmVal = GM_getValue(key, undefined);
+                    if (gmVal !== undefined && gmVal !== null) {
+                        try {
+                            localStorage.setItem(key, typeof gmVal === 'string' ? gmVal : JSON.stringify(gmVal));
+                        } catch (_) {}
+                        return gmVal;
+                    }
+                }
+            } catch (_) {}
+            try {
+                const localVal = localStorage.getItem(key);
+                if (localVal !== null && localVal !== undefined) {
+                    try {
+                        if (typeof GM_setValue === 'function') {
+                            GM_setValue(key, localVal);
+                        }
+                    } catch (_) {}
+                    return localVal;
+                }
+            } catch (_) {}
+            return defaultValue;
+        },
+
+        set(key, value) {
+            try {
+                if (typeof GM_setValue === 'function') {
+                    GM_setValue(key, value);
+                }
+            } catch (_) {}
+            try {
+                localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+            } catch (_) {}
+        },
+
+        remove(key) {
+            try {
+                if (typeof GM_deleteValue === 'function') {
+                    GM_deleteValue(key);
+                }
+            } catch (_) {}
+            try {
+                localStorage.removeItem(key);
+            } catch (_) {}
+        },
+
+        syncAll() {
+            try {
+                SHARED_STORAGE_KEYS.forEach(k => {
+                    const gmVal = (typeof GM_getValue === 'function') ? GM_getValue(k, undefined) : undefined;
+                    const localVal = localStorage.getItem(k);
+                    if ((gmVal === undefined || gmVal === null) && (localVal !== null && localVal !== undefined)) {
+                        if (typeof GM_setValue === 'function') {
+                            GM_setValue(k, localVal);
+                        }
+                    } else if (gmVal !== undefined && gmVal !== null && (localVal === null || localVal === undefined)) {
+                        localStorage.setItem(k, typeof gmVal === 'string' ? gmVal : JSON.stringify(gmVal));
+                    }
+                });
+            } catch (_) {}
+        }
+    };
+
+    toolkitStorage.syncAll();
 
     // The installer page uses a same-page event as a privacy-safe installation check.
     if (window.location.hostname === 'acads-tools.github.io' &&
@@ -2016,25 +2130,25 @@
     }
 
     function isSharedAiFallbackEnabled() {
-        return localStorage.getItem(SHARED_AI_FALLBACK_STORAGE_KEY) !== 'false';
+        return toolkitStorage.get(SHARED_AI_FALLBACK_STORAGE_KEY) !== 'false';
     }
 
     function setSharedAiFallbackEnabled(enabled) {
-        localStorage.setItem(SHARED_AI_FALLBACK_STORAGE_KEY, enabled ? 'true' : 'false');
+        toolkitStorage.set(SHARED_AI_FALLBACK_STORAGE_KEY, enabled ? 'true' : 'false');
     }
 
     function getGeminiApiKeys() {
         try {
-            const raw = localStorage.getItem(GEMINI_API_KEYS_STORAGE_KEY);
+            const raw = toolkitStorage.get(GEMINI_API_KEYS_STORAGE_KEY);
             if (raw) {
-                const parsed = JSON.parse(raw);
+                const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
                 if (Array.isArray(parsed)) {
                     const clean = parsed.map(k => (k || '').trim()).filter(Boolean);
                     if (clean.length > 0) return clean;
                 }
             }
         } catch (_) {}
-        const single = (localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY) || '').trim();
+        const single = String(toolkitStorage.get(GEMINI_API_KEY_STORAGE_KEY) || '').trim();
         return single ? [single] : [];
     }
 
@@ -2042,52 +2156,52 @@
         const clean = Array.isArray(keys) ? keys.map(k => (k || '').trim()).filter(Boolean) : [];
         if (clean.length > 0) {
             try {
-                localStorage.setItem(GEMINI_API_KEYS_STORAGE_KEY, JSON.stringify(clean));
+                toolkitStorage.set(GEMINI_API_KEYS_STORAGE_KEY, JSON.stringify(clean));
             } catch (_) {}
-            localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, clean[0]);
+            toolkitStorage.set(GEMINI_API_KEY_STORAGE_KEY, clean[0]);
             geminiApiKey = clean[0];
         } else {
-            localStorage.removeItem(GEMINI_API_KEYS_STORAGE_KEY);
-            localStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
+            toolkitStorage.remove(GEMINI_API_KEYS_STORAGE_KEY);
+            toolkitStorage.remove(GEMINI_API_KEY_STORAGE_KEY);
             geminiApiKey = '';
         }
         updateAiAssistantUI();
     }
 
     let geminiApiKey = (getGeminiApiKeys()[0] || '');
-    let aiQuizEnabled = localStorage.getItem('amaes_ai_quiz_enabled') !== 'false'; // default true
-    let aiAutoSelect = localStorage.getItem('amaes_ai_auto_select') !== 'false'; // default true: auto-select AI suggestion
-    let aiRetryCount = parseInt(localStorage.getItem('amaes_ai_retry_count') || '2', 10);
+    let aiQuizEnabled = toolkitStorage.get('amaes_ai_quiz_enabled') !== 'false'; // default true
+    let aiAutoSelect = toolkitStorage.get('amaes_ai_auto_select') !== 'false'; // default true: auto-select AI suggestion
+    let aiRetryCount = parseInt(toolkitStorage.get('amaes_ai_retry_count') || '2', 10);
     if (isNaN(aiRetryCount) || aiRetryCount < 1) aiRetryCount = 2;
-    let aiAutoCopyOnFail = localStorage.getItem('amaes_ai_auto_copy_on_fail') !== 'false'; // default true: auto-copy on fail
+    let aiAutoCopyOnFail = toolkitStorage.get('amaes_ai_auto_copy_on_fail') !== 'false'; // default true: auto-copy on fail
     const aiAnswerSessionCache = new Map(); // In-memory session cache for instant reuse
     let activeAiAbortController = null;
 
     function getAiRetryCount() {
-        const val = parseInt(localStorage.getItem('amaes_ai_retry_count') || '2', 10);
+        const val = parseInt(toolkitStorage.get('amaes_ai_retry_count') || '2', 10);
         return (isNaN(val) || val < 1) ? 2 : Math.min(5, val);
     }
 
     function setAiRetryCount(val) {
         aiRetryCount = Math.max(1, Math.min(5, parseInt(val, 10) || 2));
-        localStorage.setItem('amaes_ai_retry_count', String(aiRetryCount));
+        toolkitStorage.set('amaes_ai_retry_count', String(aiRetryCount));
     }
 
     function getAiAutoCopyOnFail() {
-        return localStorage.getItem('amaes_ai_auto_copy_on_fail') !== 'false';
+        return toolkitStorage.get('amaes_ai_auto_copy_on_fail') !== 'false';
     }
 
     function setAiAutoCopyOnFail(val) {
         aiAutoCopyOnFail = Boolean(val);
-        localStorage.setItem('amaes_ai_auto_copy_on_fail', aiAutoCopyOnFail ? 'true' : 'false');
+        toolkitStorage.set('amaes_ai_auto_copy_on_fail', aiAutoCopyOnFail ? 'true' : 'false');
     }
 
-    let aiAutoNextOnAiAnswer = localStorage.getItem('amaes_ai_auto_next_on_ai') !== 'false'; // default true
-    function getAiAutoNextOnAiAnswer() { return localStorage.getItem('amaes_ai_auto_next_on_ai') !== 'false'; }
-    function setAiAutoNextOnAiAnswer(val) { aiAutoNextOnAiAnswer = Boolean(val); localStorage.setItem('amaes_ai_auto_next_on_ai', aiAutoNextOnAiAnswer ? 'true' : 'false'); }
+    let aiAutoNextOnAiAnswer = toolkitStorage.get('amaes_ai_auto_next_on_ai') !== 'false'; // default true
+    function getAiAutoNextOnAiAnswer() { return toolkitStorage.get('amaes_ai_auto_next_on_ai') !== 'false'; }
+    function setAiAutoNextOnAiAnswer(val) { aiAutoNextOnAiAnswer = Boolean(val); toolkitStorage.set('amaes_ai_auto_next_on_ai', aiAutoNextOnAiAnswer ? 'true' : 'false'); }
 
     const GEMINI_FREE_RPM = 15; // 15 requests per minute limit on Google AI Studio Free Tier
-    let aiPlanTier = localStorage.getItem('amaes_ai_plan_tier') || 'free'; // 'free' or 'paid'
+    let aiPlanTier = toolkitStorage.get('amaes_ai_plan_tier') || 'free'; // 'free' or 'paid'
     let aiRateLimitCooldownUntil = 0;
     try {
         const storedCooldown = parseInt(sessionStorage.getItem('amaes_ai_cooldown_until') || '0', 10);
@@ -2096,12 +2210,12 @@
     let activeRateLimitTimerInterval = null;
 
     function getAiPlanTier() {
-        return localStorage.getItem('amaes_ai_plan_tier') || 'free';
+        return toolkitStorage.get('amaes_ai_plan_tier') || 'free';
     }
 
     function setAiPlanTier(tier) {
         aiPlanTier = tier === 'paid' ? 'paid' : 'free';
-        localStorage.setItem('amaes_ai_plan_tier', aiPlanTier);
+        toolkitStorage.set('amaes_ai_plan_tier', aiPlanTier);
     }
 
     function getAiKeyId(key) {
@@ -3916,6 +4030,153 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         }
     }
 
+    // Contextual in-question action chip guiding students when unsure or stuck
+    function renderUnsureActionChip(que) {
+        if (!que || que.querySelector('.amaes-unsure-help-chip') || checkIsReviewPage()) return;
+        const formulation = que.querySelector('.formulation, .content') || que;
+        const chip = document.createElement('div');
+        chip.className = 'amaes-unsure-help-chip';
+        chip.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            margin-bottom: 6px;
+            padding: 6px 12px;
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--accent-blue, #3b82f6);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+        `;
+        chip.title = 'Click to skip to the next question or page';
+        chip.innerHTML = `
+            <span style="font-size: 13px;">💡</span>
+            <span>Unsure? Pick an answer or press <kbd style="background: rgba(59, 130, 246, 0.2); color: #3b82f6; font-weight: 800; padding: 1px 5px; border-radius: 3px; font-size: 10px; border: 1px solid rgba(59, 130, 246, 0.35); font-family: monospace;">N</kbd> to skip to next question</span>
+            <span style="margin-left: auto; font-weight: 700; font-size: 10.5px; opacity: 0.85;">Skip ➔</span>
+        `;
+        chip.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof triggerNextQuizPage === 'function') {
+                triggerNextQuizPage();
+            } else {
+                const nextBtn = document.querySelector('.submitbtns input[value*="Next"], input[value*="Next page"], button[value*="Next"]');
+                if (nextBtn) nextBtn.click();
+            }
+        };
+        formulation.appendChild(chip);
+    }
+
+    // Connects keyboard shortcut [N] directly to the Moodle Next Page button on screen
+    function updateNextButtonIndicator() {
+        if (!checkIsQuizAttemptPage()) return;
+        const nextBtn = document.querySelector('.submitbtns input[type="submit"], .submitbtns button[type="submit"], input[value*="Next page"], input[value*="Next"], button[value*="Next"]');
+        if (!nextBtn) return;
+        let beacon = document.getElementById('amaes-next-btn-beacon');
+        if (!beacon) {
+            beacon = document.createElement('span');
+            beacon.id = 'amaes-next-btn-beacon';
+            beacon.style.cssText = `
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                margin-left: 8px;
+                padding: 3px 8px;
+                background: rgba(16, 185, 129, 0.15);
+                border: 1px solid rgba(16, 185, 129, 0.35);
+                border-radius: 4px;
+                font-size: 10px;
+                font-weight: 700;
+                color: #10b981;
+                vertical-align: middle;
+                user-select: none;
+                letter-spacing: 0.3px;
+            `;
+            beacon.innerHTML = `<kbd style="background: rgba(16, 185, 129, 0.25); color: #047857; padding: 1px 5px; border-radius: 3px; font-size: 9.5px; font-family: monospace;">N</kbd> <span>Next</span>`;
+            if (nextBtn.nextSibling) {
+                nextBtn.parentNode.insertBefore(beacon, nextBtn.nextSibling);
+            } else {
+                nextBtn.parentNode.appendChild(beacon);
+            }
+        }
+    }
+
+    // High-visibility focused banner explaining prompt copy & AI paste shortcuts for new questions
+    function renderNewQuestionFocusBanner(que, qNum) {
+        if (!que || que.querySelector('.amaes-new-question-focus-banner') || checkIsReviewPage()) return;
+        const formulation = que.querySelector('.formulation, .content') || que;
+        const banner = document.createElement('div');
+        banner.className = 'amaes-new-question-focus-banner';
+        banner.style.cssText = `
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            background: #fffbeb;
+            border: 1.5px solid #f59e0b;
+            border-radius: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.12);
+            box-sizing: border-box;
+        `;
+        banner.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="background: #f59e0b; color: #ffffff; padding: 2px 7px; border-radius: 4px; font-weight: 800; font-size: 10px; letter-spacing: 0.5px;">NEW QUESTION</span>
+                    <span style="font-weight: 700; color: #92400e; font-size: 12px;">Question #${qNum || ''} Copied to Clipboard!</span>
+                </div>
+                <span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Not in database yet</span>
+            </div>
+            <div style="font-size: 11.5px; color: #78350f; line-height: 1.45; margin-bottom: 8px;">
+                📋 <b>Question is ready to paste!</b> Press <kbd style="background: rgba(0,0,0,0.08); padding: 1px 4px; border-radius: 3px; font-weight: 700; font-family: monospace;">Ctrl+V</kbd> in Google Gemini or ChatGPT to get the answer.<br>
+                💡 Unsure? Pick a choice or press <kbd style="background: rgba(0,0,0,0.08); padding: 1px 4px; border-radius: 3px; font-weight: 700; font-family: monospace;">N</kbd> (or click Next) to skip.
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" style="
+                    display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; border-radius: 5px; font-size: 11px; font-weight: 700; text-decoration: none; cursor: pointer;
+                ">${ICONS.gemini} <span>Open Google Gemini ↗</span></a>
+                <button type="button" class="amaes-btn-recopy-q" style="
+                    display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #ffffff; color: #78350f; border: 1px solid #d97706; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer;
+                ">${ICONS.copy} <span>Copy Again</span></button>
+                <button type="button" class="amaes-btn-skip-q" style="
+                    display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: auto;
+                "><span>Next Question (N) ➔</span></button>
+            </div>
+        `;
+
+        const recopyBtn = banner.querySelector('.amaes-btn-recopy-q');
+        if (recopyBtn) {
+            recopyBtn.onclick = (e) => {
+                e.preventDefault();
+                const qText = cleanDOMToAI(que.querySelector('.qtext, .formulation') || que);
+                if (typeof GM_setClipboard === 'function') {
+                    GM_setClipboard(qText);
+                } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(qText);
+                }
+                showToast("Question re-copied to clipboard! Press Ctrl+V in AI.", 2500);
+            };
+        }
+
+        const skipBtn = banner.querySelector('.amaes-btn-skip-q');
+        if (skipBtn) {
+            skipBtn.onclick = (e) => {
+                e.preventDefault();
+                if (typeof triggerNextQuizPage === 'function') {
+                    triggerNextQuizPage();
+                } else {
+                    const nextBtn = document.querySelector('.submitbtns input[value*="Next"], input[value*="Next page"], button[value*="Next"]');
+                    if (nextBtn) nextBtn.click();
+                }
+            };
+        }
+
+        formulation.insertBefore(banner, formulation.firstChild);
+    }
+
     function saveQuizAttemptSummary(subCode, data) {
         if (!data || typeof data.percentage !== 'number') return;
         const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
@@ -5159,6 +5420,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             toggleAutoQuizMode();
                         };
                     }
+                    renderUnsureActionChip(firstBlockedQue);
+                    updateNextButtonIndicator();
                 }
 
                 // Listen for user selecting or typing a choice: show visual confirmation, DO NOT auto-next by default
@@ -5312,21 +5575,140 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     let summaryAutoSubmitTimer = null;
     let summaryAutoSubmitAttempted = false;
 
+    // Evaluates attempt completeness on Quiz Summary Page (/mod/quiz/summary.php)
+    function evaluateQuizSummaryPage() {
+        if (!checkIsQuizSummaryPage()) return null;
+        const table = document.querySelector('table.quizsummaryofattempt, .generaltable.quizsummaryofattempt, #region-main table.generaltable, table.generaltable');
+        if (!table) return null;
+        const rows = Array.from(table.querySelectorAll('tbody tr'));
+        const unanswered = [];
+        let total = 0;
+        let answered = 0;
+
+        rows.forEach(row => {
+            const cells = Array.from(row.querySelectorAll('th, td'));
+            if (cells.length < 2) return;
+            const qCell = cells[0];
+            const statusCell = cells[1];
+            const qNum = (qCell.textContent || '').trim();
+            const statusText = (statusCell.textContent || '').trim();
+            if (!qNum || isNaN(parseInt(qNum, 10))) return;
+
+            total += 1;
+            const link = row.querySelector('a[href*="/mod/quiz/attempt.php"]') || qCell.querySelector('a') || null;
+            const isSaved = /answer saved|completed|complete/i.test(statusText);
+            const isNotAnswered = /not yet answered|not answered|incomplete|no answer/i.test(statusText);
+
+            if (isNotAnswered || (!isSaved && statusText.length > 0)) {
+                unanswered.push({ qNum, rowElement: row, statusCell, link, statusText });
+            } else {
+                answered += 1;
+            }
+        });
+
+        return {
+            totalQuestions: total,
+            answeredQuestions: answered,
+            unansweredQuestions: unanswered,
+            isAllAnswered: total > 0 && unanswered.length === 0
+        };
+    }
+
     // Auto-Mark as Done / Submit Handler for Quiz Summary Page (/mod/quiz/summary.php)
     function handleQuizSummaryAutoSubmit() {
         if (!checkIsQuizSummaryPage()) return;
         promoteAttemptEvidenceFromScore();
 
+        const evalRes = evaluateQuizSummaryPage();
+
+        // INCOMPLETE ATTEMPT SAFETY GUARD: If some questions are NOT answered, highlight them and pause auto-submit!
+        if (evalRes && evalRes.unansweredQuestions.length > 0) {
+            if (summaryAutoSubmitTimer) {
+                clearTimeout(summaryAutoSubmitTimer);
+                summaryAutoSubmitTimer = null;
+            }
+
+            // Highlight incomplete rows
+            evalRes.unansweredQuestions.forEach(item => {
+                item.rowElement.style.background = 'rgba(245, 158, 11, 0.15)';
+                item.rowElement.style.outline = '2px solid #f59e0b';
+                item.rowElement.style.borderRadius = '4px';
+                if (!item.statusCell.querySelector('.amaes-unanswered-badge')) {
+                    const badge = document.createElement('span');
+                    badge.className = 'amaes-unanswered-badge';
+                    badge.style.cssText = 'background:#f59e0b; color:#ffffff; padding:2px 7px; border-radius:4px; font-weight:800; font-size:10px; margin-left:8px; display:inline-block;';
+                    badge.textContent = '⚠️ Not Answered';
+                    item.statusCell.appendChild(badge);
+                }
+            });
+
+            // Top Warning Banner
+            let banner = document.getElementById('amaes-summary-incomplete-banner');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'amaes-summary-incomplete-banner';
+                banner.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0; padding:12px 16px; border:2px solid #f59e0b; border-radius:10px; background:#fffbeb; color:#78350f; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; box-shadow:0 4px 12px rgba(245,158,11,0.15);';
+                banner.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="font-size:22px;">⚠️</span>
+                        <div>
+                            <div style="font-weight:800; font-size:13px; color:#92400e;">Incomplete Quiz: ${evalRes.unansweredQuestions.length} Question${evalRes.unansweredQuestions.length > 1 ? 's' : ''} Not Answered!</div>
+                            <div style="font-size:11.5px; color:#b45309; margin-top:2px;">Auto-submit paused to protect your grade. Questions needing answers: <b>${evalRes.unansweredQuestions.map(u => '#' + u.qNum).join(', ')}</b>.</div>
+                        </div>
+                    </div>
+                    ${evalRes.unansweredQuestions[0].link ? `
+                    <a id="amaes-btn-jump-first-unanswered" href="${evalRes.unansweredQuestions[0].link.href}" style="padding:7px 14px; background:#f59e0b; color:#ffffff; border:none; border-radius:6px; font-weight:700; font-size:11.5px; cursor:pointer; white-space:nowrap; text-decoration:none;">Answer Question #${evalRes.unansweredQuestions[0].qNum} ➔</a>
+                    ` : ''}
+                `;
+                const mainArea = document.querySelector('#region-main, main, [role="main"]') || document.body;
+                mainArea.prepend(banner);
+            }
+
+            syncAutoQuizUI();
+            setLog(`<b>Incomplete Quiz:</b> ${evalRes.unansweredQuestions.length} questions not answered (${evalRes.unansweredQuestions.map(u => '#' + u.qNum).join(', ')}). Auto-submit paused.`, "var(--accent-amber)");
+            showToast(`⚠️ Incomplete quiz: ${evalRes.unansweredQuestions.length} questions not answered!`, 4500);
+            return;
+        }
+
+        // ALL QUESTIONS ANSWERED: Ready for submission!
+        document.getElementById('amaes-summary-incomplete-banner')?.remove();
+
+        const shouldAutoSubmit = autoSubmitQuiz;
+
+        // Render Ready Banner
+        let readyBanner = document.getElementById('amaes-summary-ready-banner');
+        if (!readyBanner) {
+            readyBanner = document.createElement('div');
+            readyBanner.id = 'amaes-summary-ready-banner';
+            readyBanner.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0; padding:12px 16px; border:2px solid #10b981; border-radius:10px; background:#ecfdf5; color:#065f46; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; box-shadow:0 4px 12px rgba(16,185,129,0.15);';
+            readyBanner.innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:22px; color:#10b981;">✓</span>
+                    <div>
+                        <div style="font-weight:800; font-size:13px; color:#065f46;">All ${evalRes ? evalRes.totalQuestions : ''} Questions Answered & Saved!</div>
+                        <div style="font-size:11.5px; color:#047857; margin-top:2px;">${shouldAutoSubmit ? 'Auto-submitting attempt...' : 'Review your saved answers below and click Submit all and finish.'}</div>
+                    </div>
+                </div>
+                <button id="amaes-btn-quick-submit" type="button" style="padding:7px 16px; background:#10b981; color:#ffffff; border:none; border-radius:6px; font-weight:800; font-size:12px; cursor:pointer; white-space:nowrap; box-shadow:0 2px 6px rgba(16,185,129,0.3);">Submit All & Finish ➔</button>
+            `;
+            readyBanner.querySelector('#amaes-btn-quick-submit').onclick = () => {
+                const sBtn = findQuizSummarySubmitButton();
+                if (sBtn) sBtn.click();
+            };
+            const mainArea = document.querySelector('#region-main, main, [role="main"]') || document.body;
+            mainArea.prepend(readyBanner);
+        }
+
         // Update UI immediately to indicate completion and waiting for confirmation
         syncAutoQuizUI();
         setLog(
-            autoSubmitQuiz
-                ? "<b>Quiz Completed:</b> All questions answered and saved. Auto-submit is enabled."
+            shouldAutoSubmit
+                ? "<b>Quiz Completed:</b> All questions answered and saved. Auto-submit is active."
                 : "<b>Quiz Completed:</b> All questions answered and saved. Waiting for your confirmation to submit.",
             "var(--accent-green)",
-            autoSubmitQuiz ? "Moodle submission will be confirmed automatically" : "Review your saved answers below and click Submit all and finish"
+            shouldAutoSubmit ? "Moodle submission will be confirmed automatically" : "Review your saved answers below and click Submit all and finish"
         );
-        showToast(autoSubmitQuiz ? "✓ All questions answered! Auto-submit is enabled." : "✓ All questions answered! Waiting for confirmation...", 4000);
+        showToast(shouldAutoSubmit ? "✓ All questions answered! Auto-submitting..." : "✓ All questions answered! Waiting for confirmation...", 4000);
 
         // Update document title so students multitasking in background tabs know it's ready
         if (typeof document !== 'undefined' && document.title && !document.title.includes('(✓ Ready to Submit)')) {
@@ -5349,7 +5731,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         }
 
         if (autoSubmitQuiz && !summaryAutoSubmitAttempted && !summaryAutoSubmitTimer) {
-            if (!autoQuizMode) return;
             if (!submitBtn) {
                 showQuizSubmitFallback(
                     'Auto-submit could not find Moodle’s “Submit all and finish” button. Locate Moodle’s submission control on this page and click it to finish.',
@@ -6794,6 +7175,11 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         <span>No answer known to the system yet — <b>be the first to answer and share it!</b></span>
                     `;
                     formulation.insertBefore(hint, formulation.firstChild);
+                    const numElem = que.querySelector('.info .no, .qno');
+                    const qNum = numElem ? numElem.innerText.replace(/[^0-9]/g, '') : '';
+                    renderNewQuestionFocusBanner(que, qNum);
+                    renderUnsureActionChip(que);
+                    updateNextButtonIndicator();
                 }
                 return;
             }
@@ -7353,6 +7739,15 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         targetRow.style.boxSizing = 'border-box';
                         targetRow.style.transition = 'all 0.2s ease';
 
+                        // Differentiate unconfirmed study-guide choice text from default white
+                        if (isStudyGuide) {
+                            targetRow.querySelectorAll('label, .answernumber, p, span').forEach(el => {
+                                if (!el.classList.contains('amaes-unverified-badge') && !el.closest('.amaes-unverified-badge')) {
+                                    el.style.color = 'var(--accent-sky, #0284c7)';
+                                }
+                            });
+                        }
+
                         // Reset inner label so it doesn't constrain width or wrap oddly
                         if (label !== targetRow) {
                             label.style.outline = 'none';
@@ -7389,8 +7784,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                                 badge.onclick = (e) => { e.stopPropagation(); };
                             }
                             badge.style.cssText = `
-                                background: ${sourceColor};
-                                color: #ffffff !important;
+                                background: ${isStudyGuide ? 'rgba(2, 132, 199, 0.15)' : sourceColor};
+                                color: ${isStudyGuide ? '#0284c7 !important' : '#ffffff !important'};
+                                border: ${isStudyGuide ? '1px solid rgba(2, 132, 199, 0.4)' : 'none'};
                                 font-size: 10px;
                                 font-weight: 700;
                                 padding: 2px 7px;
@@ -7399,7 +7795,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                                 display: inline-flex;
                                 align-items: center;
                                 gap: 4px;
-                                box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+                                box-shadow: ${isStudyGuide ? 'none' : '0 1px 3px rgba(0,0,0,0.18)'};
                                 white-space: nowrap;
                                 flex-shrink: 0;
                                 text-decoration: none;
@@ -8263,6 +8659,11 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         <span>No answer known to the system yet — <b>be the first to answer and share it!</b></span>
                     `;
                     formulation.insertBefore(hint, formulation.firstChild);
+                    const numElem = que.querySelector('.info .no, .qno');
+                    const qNum = numElem ? numElem.innerText.replace(/[^0-9]/g, '') : '';
+                    renderNewQuestionFocusBanner(que, qNum);
+                    renderUnsureActionChip(que);
+                    updateNextButtonIndicator();
                 }
             } else {
                 matchedCount++;
@@ -13071,7 +13472,7 @@ function setupAccountTransferUI() {
 
     function getGeminiApiKey() {
         const keys = getGeminiApiKeys();
-        return keys.length > 0 ? keys[0] : (localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY) || geminiApiKey || '');
+        return keys.length > 0 ? keys[0] : (toolkitStorage.get(GEMINI_API_KEY_STORAGE_KEY) || geminiApiKey || '');
     }
 
     function setGeminiApiKey(key) {
@@ -14953,7 +15354,7 @@ function setupAccountTransferUI() {
                 ">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="font-weight: 700; color: #c084fc;">AI</span>
-                        <span style="font-weight: 800; font-size: 13.5px; color: #f8fafc;">Setup Free Google Gemini AI</span>
+                        <span style="font-weight: 800; font-size: 13.5px; color: var(--text-primary, #f8fafc);">Setup Free Google Gemini AI</span>
                     </div>
                     <button id="amaes-gemini-modal-close" type="button" style="
                         background: transparent;
@@ -14968,19 +15369,19 @@ function setupAccountTransferUI() {
 
                 <!-- Modal Content -->
                 <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px; max-height: 75vh; overflow-y: auto;">
-                        ${initialNotice ? `
+                    ${initialNotice ? `
                     <div id="amaes-gemini-modal-notice" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; padding: 10px 12px; border-radius: 8px; font-size: 11.5px; line-height: 1.45; display: flex; align-items: flex-start; gap: 8px;">
                         <span style="display: inline-flex; align-items: center; color: #f87171; flex-shrink: 0; margin-top: 1px;">${ICONS.alertTriangle}</span>
                         <div>${escapeHtml(initialNotice)}</div>
                     </div>
                     ` : ''}
 
-                    <!-- 1. Google Gemini Section -->
-                    <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg, #0f172a); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
+                    <!-- 1. Quick 3-Step Setup Card for Students -->
+                    <div style="display: flex; flex-direction: column; gap: 10px; background: var(--bg, #0f172a); padding: 14px; border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
                         <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="font-weight: 700; color: #f8fafc; font-size: 12px;">Google Gemini API Key</span>
-                                <span style="font-size: 9.5px; background: rgba(124, 58, 237, 0.25); color: #c084fc; padding: 1px 6px; border-radius: 4px; font-weight: 600;">Primary AI</span>
+                            <div>
+                                <div style="font-weight: 700; color: var(--text-primary, #f8fafc); font-size: 12px;">Google Gemini API Key</div>
+                                <div style="font-size: 10.5px; color: var(--text-muted, #94a3b8); margin-top: 1px;">Solves unknown quiz questions instantly for free.</div>
                             </div>
                             <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="
                                 display: inline-flex;
@@ -14989,84 +15390,97 @@ function setupAccountTransferUI() {
                                 color: #a78bfa;
                                 font-size: 11px;
                                 text-decoration: none;
-                                font-weight: 600;
+                                font-weight: 700;
+                                background: rgba(168, 85, 247, 0.12);
+                                border: 1px solid rgba(168, 85, 247, 0.3);
+                                padding: 3px 8px;
+                                border-radius: 5px;
                             ">
                                 ${ICONS.external} <span>Get Free Key ↗</span>
                             </a>
                         </div>
 
                         <!-- Dynamic Gemini key rows -->
-                        <div id="amaes-gemini-key-rows" style="display: flex; flex-direction: column; gap: 5px;"></div>
-                        
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 2px;">
-                            <button id="amaes-gemini-btn-add-key" type="button" style="
-                                background: transparent;
-                                border: 1px dashed rgba(168,85,247,0.4);
-                                color: #a78bfa;
-                                border-radius: 5px;
-                                font-size: 10px;
-                                font-weight: 600;
-                                padding: 4px 10px;
-                                cursor: pointer;
-                            ">+ Add Backup Key</button>
+                        <div id="amaes-gemini-key-rows" style="display: flex; flex-direction: column; gap: 6px;"></div>
+                    </div>
 
-                            <div style="display: flex; align-items: center; gap: 5px;">
-                                <span style="font-size: 10px; color: var(--text-muted, #94a3b8);">Plan:</span>
-                                <select id="amaes-gemini-plan-select" style="
-                                    background: var(--surface, #1e293b);
-                                    color: #f8fafc;
-                                    border: 1px solid var(--border, #334155);
-                                    padding: 2px 6px;
-                                    border-radius: 4px;
-                                    font-size: 10px;
-                                    cursor: pointer;
-                                ">
-                                    <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
-                                    <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
-                                </select>
+                    <!-- Collapsible Advanced Settings (Non-Tech Friendly) -->
+                    <details style="padding: 0; margin: 0;">
+                        <summary style="font-size: 11px; font-weight: 600; color: var(--text-muted, #94a3b8); cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
+                            <span>⚙️ Advanced Settings (Backup Keys, Jev Classifier & Sharing)</span>
+                        </summary>
+                        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px; padding-left: 4px;">
+                            <!-- Backup Keys & Tier -->
+                            <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg, #0f172a); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                                    <button id="amaes-gemini-btn-add-key" type="button" style="
+                                        background: transparent;
+                                        border: 1px dashed rgba(168,85,247,0.4);
+                                        color: #a78bfa;
+                                        border-radius: 5px;
+                                        font-size: 10px;
+                                        font-weight: 600;
+                                        padding: 4px 10px;
+                                        cursor: pointer;
+                                    ">+ Add Backup Key</button>
+
+                                    <div style="display: flex; align-items: center; gap: 5px;">
+                                        <span style="font-size: 10px; color: var(--text-muted, #94a3b8);">Plan:</span>
+                                        <select id="amaes-gemini-plan-select" style="
+                                            background: var(--surface, #1e293b);
+                                            color: var(--text-primary, #f8fafc);
+                                            border: 1px solid var(--border, #334155);
+                                            padding: 2px 6px;
+                                            border-radius: 4px;
+                                            font-size: 10px;
+                                            cursor: pointer;
+                                        ">
+                                            <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
+                                            <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div id="amaes-multikey-explain" style="padding: 6px 10px; background: rgba(124,58,237,0.1); border: 1px solid rgba(168,85,247,0.25); border-radius: 6px; font-size: 10px; color: #d8b4fe; line-height: 1.4;">
+                                    <b style="color: #ffffff;">Higher Limits with Multiple Keys:</b> Add backup keys to automatically rotate between your keys and bypass rate limits.
+                                </div>
+                            </div>
+
+                            <!-- 2. TypeSafe Jev Decision Engine Card -->
+                            <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg, #0f172a); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-weight: 700; color: #60a5fa; font-size: 11.5px;">TypeSafe Jev</span>
+                                        <span style="font-size: 9px; background: rgba(59, 130, 246, 0.25); color: #bfdbfe; padding: 1px 5px; border-radius: 4px; font-weight: 600;">Fast Classifier</span>
+                                    </div>
+                                    <a href="https://console.typesafe.ai" target="_blank" rel="noopener noreferrer" style="color: #93c5fd; font-size: 10.5px; text-decoration: none; font-weight: 600;">Get Key ↗</a>
+                                </div>
+
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary, #f8fafc); cursor: pointer;">
+                                    <input id="amaes-jev-enable-checkbox" type="checkbox" ${typeof isJevEnabled === 'function' && isJevEnabled() ? 'checked' : ''} style="cursor: pointer; accent-color: #3b82f6;" />
+                                    <span>Enable for Multiple Choice & True/False questions</span>
+                                </label>
+
+                                <div style="display: flex; gap: 5px; align-items: center;">
+                                    <input id="amaes-jev-input-key" type="password" placeholder="TypeSafe API key (or leave empty if using relay)..." value="${escapeHtml(typeof getJevApiKey === 'function' ? getJevApiKey() : '')}" style="flex:1; background:var(--surface,#1e293b); color:var(--text-primary,#f8fafc); border:1px solid var(--border,#334155); padding:5px 8px; border-radius:5px; font-size:11px; outline:none; font-family:monospace;" />
+                                    <button id="amaes-jev-btn-paste" type="button" style="background:var(--surface,#1e293b); border:1px solid var(--border,#334155); color:#60a5fa; border-radius:5px; padding:4px 8px; font-size:10px; cursor:pointer;">Paste</button>
+                                    <button id="amaes-jev-btn-test" type="button" style="background:rgba(59,130,246,0.2); border:1px solid rgba(59,130,246,0.4); color:#93c5fd; border-radius:5px; padding:4px 9px; font-size:10px; font-weight:600; cursor:pointer;">Test Jev</button>
+                                </div>
+                                <div id="amaes-jev-status-feedback" style="display: none; padding: 5px 8px; border-radius: 4px; font-size: 10.5px; font-weight: 600;"></div>
+                            </div>
+
+                            <!-- 3. Community Options -->
+                            <div style="display: flex; flex-direction: column; gap: 7px; padding: 10px; background: var(--bg, #0f172a); border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
+                                <label style="display: flex; gap: 7px; align-items: center; cursor: pointer;">
+                                    <input id="amaes-shared-ai-fallback" type="checkbox" ${isSharedAiFallbackEnabled() ? 'checked' : ''} style="accent-color: #10b981;" />
+                                    <span style="font-size: 10.5px; color: var(--text-primary, #f8fafc);">Use shared community AI if personal key is busy</span>
+                                </label>
+                                <label style="display: flex; gap: 7px; align-items: center; cursor: pointer;">
+                                    <input id="amaes-contributor-sharing" type="checkbox" ${isContributorSharingEnabled() ? 'checked' : ''} style="accent-color: #f59e0b;" />
+                                    <span style="font-size: 10.5px; color: var(--text-muted, #94a3b8);">Share key with community when idle (If checked, saving this key is your consent. <a href="https://github.com/Acads-Tools/database/blob/main/relay/README.md#contributor-key-sharing" target="_blank" rel="noopener noreferrer" style="color: #fcd34d; text-decoration: underline;">Details</a>)</span>
+                                </label>
                             </div>
                         </div>
-
-                        <!-- Multi-key rotation note -->
-                        <div id="amaes-multikey-explain" style="padding: 6px 10px; background: rgba(124,58,237,0.1); border: 1px solid rgba(168,85,247,0.25); border-radius: 6px; font-size: 10.5px; color: #d8b4fe; line-height: 1.4;">
-                            <b style="color: #ffffff;">Higher Limits with Multiple Keys:</b> Add backup keys to automatically rotate between your keys and bypass rate limits.
-                        </div>
-                    </div>
-
-                    <!-- 2. TypeSafe Jev Decision Engine Card -->
-                    <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg, #0f172a); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <span style="font-weight: 700; color: #60a5fa; font-size: 12px;">TypeSafe Jev</span>
-                                <span style="font-size: 9.5px; background: rgba(59, 130, 246, 0.25); color: #bfdbfe; padding: 1px 6px; border-radius: 4px; font-weight: 600;">Fast Classifier</span>
-                            </div>
-                            <a href="https://console.typesafe.ai" target="_blank" rel="noopener noreferrer" style="color: #93c5fd; font-size: 11px; text-decoration: none; font-weight: 600;">Get Key ↗</a>
-                        </div>
-
-                        <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: #f8fafc; cursor: pointer;">
-                            <input id="amaes-jev-enable-checkbox" type="checkbox" ${typeof isJevEnabled === 'function' && isJevEnabled() ? 'checked' : ''} style="cursor: pointer; accent-color: #3b82f6;" />
-                            <span>Enable for Multiple Choice & True/False questions</span>
-                        </label>
-
-                        <div style="display: flex; gap: 5px; align-items: center;">
-                            <input id="amaes-jev-input-key" type="password" placeholder="TypeSafe API key (or leave empty if using relay)..." value="${escapeHtml(typeof getJevApiKey === 'function' ? getJevApiKey() : '')}" style="flex:1; background:var(--surface,#1e293b); color:#f8fafc; border:1px solid var(--border,#334155); padding:5px 8px; border-radius:5px; font-size:11px; outline:none; font-family:monospace;" />
-                            <button id="amaes-jev-btn-paste" type="button" style="background:var(--surface,#1e293b); border:1px solid var(--border,#334155); color:#60a5fa; border-radius:5px; padding:4px 8px; font-size:10px; cursor:pointer;">Paste</button>
-                            <button id="amaes-jev-btn-test" type="button" style="background:rgba(59,130,246,0.2); border:1px solid rgba(59,130,246,0.4); color:#93c5fd; border-radius:5px; padding:4px 9px; font-size:10px; font-weight:600; cursor:pointer;">Test Jev</button>
-                        </div>
-                        <div id="amaes-jev-status-feedback" style="display: none; padding: 5px 8px; border-radius: 4px; font-size: 10.5px; font-weight: 600;"></div>
-                    </div>
-
-                    <!-- 3. Community Options -->
-                    <div style="display: flex; flex-direction: column; gap: 7px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
-                        <label style="display: flex; gap: 7px; align-items: center; cursor: pointer;">
-                            <input id="amaes-shared-ai-fallback" type="checkbox" ${isSharedAiFallbackEnabled() ? 'checked' : ''} style="accent-color: #10b981;" />
-                            <span style="font-size: 10.5px; color: #d1fae5;">Use shared community AI if personal key is busy</span>
-                        </label>
-                        <label style="display: flex; gap: 7px; align-items: center; cursor: pointer;">
-                            <input id="amaes-contributor-sharing" type="checkbox" ${isContributorSharingEnabled() ? 'checked' : ''} style="accent-color: #f59e0b;" />
-                            <span style="font-size: 10.5px; color: #fef3c7;">Share key with community when idle (If checked, saving this key is your consent. <a href="https://github.com/Acads-Tools/database/blob/main/relay/README.md#contributor-key-sharing" target="_blank" rel="noopener noreferrer" style="color: #fcd34d; text-decoration: underline;">Details</a>)</span>
-                        </label>
-                    </div>
+                    </details>
 
                     <!-- Status Feedback -->
                     <div id="amaes-gemini-status-feedback" style="display: none; padding: 8px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;"></div>
@@ -15090,7 +15504,7 @@ function setupAccountTransferUI() {
                                 background: linear-gradient(135deg, #7c3aed, #4f46e5);
                                 padding: 6px 16px;
                                 font-weight: 700;
-                            ">Test & Save Key</button>
+                            ">Save & Activate AI</button>
                         </div>
                     </div>
                 </div>
@@ -18435,7 +18849,7 @@ function setupAccountTransferUI() {
     // ==========================================
 
     function showWelcomeOnboardingModal(force = false, focusDev = false) {
-        if (!force && localStorage.getItem('amaes_welcome_dismissed') === 'true') {
+        if (!force && toolkitStorage.get('amaes_welcome_dismissed') === 'true') {
             return;
         }
 
@@ -18665,7 +19079,7 @@ function setupAccountTransferUI() {
 
                     <!-- Agreement Disclaimer (Unboxed & Clean) -->
                     <label style="display: flex; align-items: flex-start; gap: 10px; padding: 2px 0; cursor: pointer; user-select: none;" id="welcome-terms-container">
-                        <input id="welcome-chk-terms" type="checkbox" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 16px; height: 16px; margin-top: 1px; cursor: pointer; flex-shrink: 0; accent-color: #10b981;" />
+                        <input id="welcome-chk-terms" type="checkbox" ${toolkitStorage.get('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 16px; height: 16px; margin-top: 1px; cursor: pointer; flex-shrink: 0; accent-color: #10b981;" />
                         <span style="color: ${isLight ? '#52525b' : '#a1a1aa'}; font-size: 11px; line-height: 1.45;">I understand this is an independent study aid provided "AS IS". I agree to the <a id="welcome-terms-link" href="https://github.com/Acads-Tools/amaes-toolkit/blob/main/docs/TERMS.md" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#2563eb' : '#60a5fa'}; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;">Terms of Use &amp; Disclaimer</a>, acknowledge that I am solely responsible for my own coursework and academic integrity, and agree to share verified answers anonymously to help classmates.</span>
                     </label>
                 </div>
@@ -18675,7 +19089,7 @@ function setupAccountTransferUI() {
                     <a href="https://github.com/Acads-Tools/amaes-toolkit#frequently-asked-questions-faqs" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11px; text-decoration: none; display: flex; align-items: center; gap: 4px;" title="View FAQs & Guide">
                         ${ICONS.book} <span>FAQs & Guide</span>
                     </a>
-                    <button id="btn-got-it-welcome" class="amaes-btn amaes-btn-green" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '' : 'disabled'} style="padding: 8px 22px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; background: #10b981; color: #fff; border: none; opacity: ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '1' : '0.5'};">
+                    <button id="btn-got-it-welcome" class="amaes-btn amaes-btn-green" ${toolkitStorage.get('amaes_terms_acknowledged') === 'true' ? '' : 'disabled'} style="padding: 8px 22px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; background: #10b981; color: #fff; border: none; opacity: ${toolkitStorage.get('amaes_terms_acknowledged') === 'true' ? '1' : '0.5'};">
                         ${ICONS.zap} Get Started
                     </button>
                 </div>
@@ -18688,7 +19102,7 @@ function setupAccountTransferUI() {
             const el = document.getElementById(id);
             if (el) {
                 el.onchange = (e) => {
-                    localStorage.setItem(storageKey, e.target.checked);
+                    toolkitStorage.set(storageKey, e.target.checked);
                     if (onToggle) onToggle(e.target.checked);
                 };
             }
@@ -18770,14 +19184,14 @@ function setupAccountTransferUI() {
         if (termsCheck && gotItButton && termsContainer) {
             termsCheck.onchange = () => {
                 const checked = termsCheck.checked;
-                localStorage.setItem('amaes_terms_acknowledged', checked ? 'true' : 'false');
+                toolkitStorage.set('amaes_terms_acknowledged', checked ? 'true' : 'false');
                 gotItButton.disabled = !checked;
                 gotItButton.style.opacity = checked ? '1' : '0.5';
                 termsContainer.style.borderColor = checked ? 'rgba(16, 185, 129, 0.5)' : 'rgba(16, 185, 129, 0.2)';
                 if (typeof window._amaesUpdatePanelLockState === 'function') window._amaesUpdatePanelLockState();
                 if (!checked) {
                     autoQuizMode = false;
-                    localStorage.setItem('amaes_auto_quiz_mode', 'false');
+                    toolkitStorage.set('amaes_auto_quiz_mode', 'false');
                     showToast("Agreement unaccepted. Pausing tools and refreshing page...", 2500);
                     setTimeout(() => window.location.reload(), 500);
                 }
@@ -18932,12 +19346,12 @@ function setupAccountTransferUI() {
         };
 
         const dismiss = () => {
-            if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') {
+            if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') {
                 showToast("Please acknowledge the terms before proceeding.");
                 return;
             }
             closeModalClean();
-            localStorage.setItem('amaes_welcome_dismissed', 'true');
+            toolkitStorage.set('amaes_welcome_dismissed', 'true');
             if (typeof window._amaesUpdatePanelLockState === 'function') window._amaesUpdatePanelLockState();
             showToast("Terms accepted! Toolkit unlocked. Refreshing to activate...", 2500);
             setTimeout(() => window.location.reload(), 500);
@@ -22570,10 +22984,10 @@ function setupAccountTransferUI() {
         checkForScriptUpdates(false);
 
         // Strict Terms Acceptance Guard: if not acknowledged, pause all tools except update checking
-        const isTermsAccepted = localStorage.getItem('amaes_terms_acknowledged') === 'true';
+        const isTermsAccepted = toolkitStorage.get('amaes_terms_acknowledged') === 'true';
         if (!isTermsAccepted) {
             autoQuizMode = false;
-            localStorage.setItem('amaes_auto_quiz_mode', 'false');
+            toolkitStorage.set('amaes_auto_quiz_mode', 'false');
             showWelcomeOnboardingModal(false);
             logDebug("Terms not acknowledged. Toolkit paused in locked state.");
             return;

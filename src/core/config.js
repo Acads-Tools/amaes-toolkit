@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.21";
+    const SCRIPT_VERSION = "v1.12.0";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -12,6 +12,120 @@
     function isSupportedMoodleHost(host = (window.location && window.location.hostname)) {
         return SUPPORTED_AMAES_HOSTS.includes(host);
     }
+
+    // ==========================================
+    // Cross-Domain Persistent Storage Bridge (GM_storage <-> localStorage)
+    // Ensures credentials, API keys, terms acceptance, and settings
+    // seamlessly transfer between semestral.amaes.com and semestralexam.amaes.com
+    // ==========================================
+    const SHARED_STORAGE_KEYS = [
+        'amaes_terms_acknowledged',
+        'amaes_welcome_dismissed',
+        'amaes_gemini_api_key',
+        'amaes_gemini_api_keys',
+        'amaes_jev_api_key',
+        'amaes_jev_endpoint',
+        'amaes_jev_enabled',
+        'amaes_shared_ai_fallback_enabled',
+        'amaes_ai_quiz_enabled',
+        'amaes_ai_auto_select',
+        'amaes_ai_retry_count',
+        'amaes_ai_auto_copy_on_fail',
+        'amaes_ai_auto_next_on_ai',
+        'amaes_ai_plan_tier',
+        'amaes_auto_quiz_mode',
+        'amaes_quiz_personality',
+        'amaes_auto_pick_quiz',
+        'amaes_auto_next_quiz',
+        'amaes_auto_next_verified',
+        'amaes_auto_pick_study_guide_fallback',
+        'amaes_auto_submit_quiz',
+        'amaes_auto_push_github',
+        'amaes_auto_copy_search',
+        'amaes_auto_cloud_sync',
+        'amaes_auto_scrape_amauoed',
+        'amaes_auto_harvest_grades',
+        'amaes_enable_hotkeys',
+        'amaes_auto_highlight_quiz',
+        'amaes_copy_include_confidence',
+        'amaes_auto_copy_ai',
+        'amaes_smart_skip_quiz',
+        'amaes_show_in_question_ai_btns',
+        'amaes_ai_prompt_hint',
+        'amaes_auto_community_share',
+        'amaes_auto_min_quiz',
+        'amaes_theme',
+        'amaes_active_tab',
+        'amaes_anonymous_contributor_id'
+    ];
+
+    const toolkitStorage = {
+        get(key, defaultValue = null) {
+            try {
+                if (typeof GM_getValue === 'function') {
+                    const gmVal = GM_getValue(key, undefined);
+                    if (gmVal !== undefined && gmVal !== null) {
+                        try {
+                            localStorage.setItem(key, typeof gmVal === 'string' ? gmVal : JSON.stringify(gmVal));
+                        } catch (_) {}
+                        return gmVal;
+                    }
+                }
+            } catch (_) {}
+            try {
+                const localVal = localStorage.getItem(key);
+                if (localVal !== null && localVal !== undefined) {
+                    try {
+                        if (typeof GM_setValue === 'function') {
+                            GM_setValue(key, localVal);
+                        }
+                    } catch (_) {}
+                    return localVal;
+                }
+            } catch (_) {}
+            return defaultValue;
+        },
+
+        set(key, value) {
+            try {
+                if (typeof GM_setValue === 'function') {
+                    GM_setValue(key, value);
+                }
+            } catch (_) {}
+            try {
+                localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+            } catch (_) {}
+        },
+
+        remove(key) {
+            try {
+                if (typeof GM_deleteValue === 'function') {
+                    GM_deleteValue(key);
+                }
+            } catch (_) {}
+            try {
+                localStorage.removeItem(key);
+            } catch (_) {}
+        },
+
+        syncAll() {
+            try {
+                SHARED_STORAGE_KEYS.forEach(k => {
+                    const gmVal = (typeof GM_getValue === 'function') ? GM_getValue(k, undefined) : undefined;
+                    const localVal = localStorage.getItem(k);
+                    if ((gmVal === undefined || gmVal === null) && (localVal !== null && localVal !== undefined)) {
+                        if (typeof GM_setValue === 'function') {
+                            GM_setValue(k, localVal);
+                        }
+                    } else if (gmVal !== undefined && gmVal !== null && (localVal === null || localVal === undefined)) {
+                        localStorage.setItem(k, typeof gmVal === 'string' ? gmVal : JSON.stringify(gmVal));
+                    }
+                });
+            } catch (_) {}
+        }
+    };
+
+    toolkitStorage.syncAll();
 
     // The installer page uses a same-page event as a privacy-safe installation check.
     if (window.location.hostname === 'acads-tools.github.io' &&

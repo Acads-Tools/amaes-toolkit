@@ -341,25 +341,25 @@
     }
 
     function isSharedAiFallbackEnabled() {
-        return localStorage.getItem(SHARED_AI_FALLBACK_STORAGE_KEY) !== 'false';
+        return toolkitStorage.get(SHARED_AI_FALLBACK_STORAGE_KEY) !== 'false';
     }
 
     function setSharedAiFallbackEnabled(enabled) {
-        localStorage.setItem(SHARED_AI_FALLBACK_STORAGE_KEY, enabled ? 'true' : 'false');
+        toolkitStorage.set(SHARED_AI_FALLBACK_STORAGE_KEY, enabled ? 'true' : 'false');
     }
 
     function getGeminiApiKeys() {
         try {
-            const raw = localStorage.getItem(GEMINI_API_KEYS_STORAGE_KEY);
+            const raw = toolkitStorage.get(GEMINI_API_KEYS_STORAGE_KEY);
             if (raw) {
-                const parsed = JSON.parse(raw);
+                const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
                 if (Array.isArray(parsed)) {
                     const clean = parsed.map(k => (k || '').trim()).filter(Boolean);
                     if (clean.length > 0) return clean;
                 }
             }
         } catch (_) {}
-        const single = (localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY) || '').trim();
+        const single = String(toolkitStorage.get(GEMINI_API_KEY_STORAGE_KEY) || '').trim();
         return single ? [single] : [];
     }
 
@@ -367,52 +367,52 @@
         const clean = Array.isArray(keys) ? keys.map(k => (k || '').trim()).filter(Boolean) : [];
         if (clean.length > 0) {
             try {
-                localStorage.setItem(GEMINI_API_KEYS_STORAGE_KEY, JSON.stringify(clean));
+                toolkitStorage.set(GEMINI_API_KEYS_STORAGE_KEY, JSON.stringify(clean));
             } catch (_) {}
-            localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, clean[0]);
+            toolkitStorage.set(GEMINI_API_KEY_STORAGE_KEY, clean[0]);
             geminiApiKey = clean[0];
         } else {
-            localStorage.removeItem(GEMINI_API_KEYS_STORAGE_KEY);
-            localStorage.removeItem(GEMINI_API_KEY_STORAGE_KEY);
+            toolkitStorage.remove(GEMINI_API_KEYS_STORAGE_KEY);
+            toolkitStorage.remove(GEMINI_API_KEY_STORAGE_KEY);
             geminiApiKey = '';
         }
         updateAiAssistantUI();
     }
 
     let geminiApiKey = (getGeminiApiKeys()[0] || '');
-    let aiQuizEnabled = localStorage.getItem('amaes_ai_quiz_enabled') !== 'false'; // default true
-    let aiAutoSelect = localStorage.getItem('amaes_ai_auto_select') !== 'false'; // default true: auto-select AI suggestion
-    let aiRetryCount = parseInt(localStorage.getItem('amaes_ai_retry_count') || '2', 10);
+    let aiQuizEnabled = toolkitStorage.get('amaes_ai_quiz_enabled') !== 'false'; // default true
+    let aiAutoSelect = toolkitStorage.get('amaes_ai_auto_select') !== 'false'; // default true: auto-select AI suggestion
+    let aiRetryCount = parseInt(toolkitStorage.get('amaes_ai_retry_count') || '2', 10);
     if (isNaN(aiRetryCount) || aiRetryCount < 1) aiRetryCount = 2;
-    let aiAutoCopyOnFail = localStorage.getItem('amaes_ai_auto_copy_on_fail') !== 'false'; // default true: auto-copy on fail
+    let aiAutoCopyOnFail = toolkitStorage.get('amaes_ai_auto_copy_on_fail') !== 'false'; // default true: auto-copy on fail
     const aiAnswerSessionCache = new Map(); // In-memory session cache for instant reuse
     let activeAiAbortController = null;
 
     function getAiRetryCount() {
-        const val = parseInt(localStorage.getItem('amaes_ai_retry_count') || '2', 10);
+        const val = parseInt(toolkitStorage.get('amaes_ai_retry_count') || '2', 10);
         return (isNaN(val) || val < 1) ? 2 : Math.min(5, val);
     }
 
     function setAiRetryCount(val) {
         aiRetryCount = Math.max(1, Math.min(5, parseInt(val, 10) || 2));
-        localStorage.setItem('amaes_ai_retry_count', String(aiRetryCount));
+        toolkitStorage.set('amaes_ai_retry_count', String(aiRetryCount));
     }
 
     function getAiAutoCopyOnFail() {
-        return localStorage.getItem('amaes_ai_auto_copy_on_fail') !== 'false';
+        return toolkitStorage.get('amaes_ai_auto_copy_on_fail') !== 'false';
     }
 
     function setAiAutoCopyOnFail(val) {
         aiAutoCopyOnFail = Boolean(val);
-        localStorage.setItem('amaes_ai_auto_copy_on_fail', aiAutoCopyOnFail ? 'true' : 'false');
+        toolkitStorage.set('amaes_ai_auto_copy_on_fail', aiAutoCopyOnFail ? 'true' : 'false');
     }
 
-    let aiAutoNextOnAiAnswer = localStorage.getItem('amaes_ai_auto_next_on_ai') !== 'false'; // default true
-    function getAiAutoNextOnAiAnswer() { return localStorage.getItem('amaes_ai_auto_next_on_ai') !== 'false'; }
-    function setAiAutoNextOnAiAnswer(val) { aiAutoNextOnAiAnswer = Boolean(val); localStorage.setItem('amaes_ai_auto_next_on_ai', aiAutoNextOnAiAnswer ? 'true' : 'false'); }
+    let aiAutoNextOnAiAnswer = toolkitStorage.get('amaes_ai_auto_next_on_ai') !== 'false'; // default true
+    function getAiAutoNextOnAiAnswer() { return toolkitStorage.get('amaes_ai_auto_next_on_ai') !== 'false'; }
+    function setAiAutoNextOnAiAnswer(val) { aiAutoNextOnAiAnswer = Boolean(val); toolkitStorage.set('amaes_ai_auto_next_on_ai', aiAutoNextOnAiAnswer ? 'true' : 'false'); }
 
     const GEMINI_FREE_RPM = 15; // 15 requests per minute limit on Google AI Studio Free Tier
-    let aiPlanTier = localStorage.getItem('amaes_ai_plan_tier') || 'free'; // 'free' or 'paid'
+    let aiPlanTier = toolkitStorage.get('amaes_ai_plan_tier') || 'free'; // 'free' or 'paid'
     let aiRateLimitCooldownUntil = 0;
     try {
         const storedCooldown = parseInt(sessionStorage.getItem('amaes_ai_cooldown_until') || '0', 10);
@@ -421,12 +421,12 @@
     let activeRateLimitTimerInterval = null;
 
     function getAiPlanTier() {
-        return localStorage.getItem('amaes_ai_plan_tier') || 'free';
+        return toolkitStorage.get('amaes_ai_plan_tier') || 'free';
     }
 
     function setAiPlanTier(tier) {
         aiPlanTier = tier === 'paid' ? 'paid' : 'free';
-        localStorage.setItem('amaes_ai_plan_tier', aiPlanTier);
+        toolkitStorage.set('amaes_ai_plan_tier', aiPlanTier);
     }
 
     function getAiKeyId(key) {

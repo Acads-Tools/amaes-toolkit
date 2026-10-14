@@ -2924,8 +2924,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.11.21'), "Userscript header must specify v1.11.21");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.11.21";'), "Constant SCRIPT_VERSION must be v1.11.21");
+    assert.ok(script.includes('@version      1.12.0'), "Userscript header must specify v1.12.0");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.12.0";'), "Constant SCRIPT_VERSION must be v1.12.0");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4136,11 +4136,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.11.21-blue.svg"), "README badge must show v1.11.21");
+    assert.ok(readme.includes("version-1.12.0-blue.svg"), "README badge must show v1.12.0");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.11.21<"), "Website must display v1.11.21 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.12.0<"), "Website must display v1.12.0 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -5895,6 +5895,50 @@ test("Exam Portal Domain Matching & Assessment Origin Attribution (v1.11.21)", (
     // 3. Solver badge origin attribution
     assert.ok(script.includes('originSuffix'), "Must format origin suffix for verified badges");
     assert.ok(script.includes('• From'), "Badge must include origin label when present");
+});
+
+test("Cross-Domain Storage Bridge, Quiz Summary Smart Evaluator, Calm Study Guides & Student Guidance (v1.12.0)", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Cross-Domain Storage Bridge (toolkitStorage)
+    assert.ok(script.includes("const SHARED_STORAGE_KEYS = ["), "Must declare shared storage keys array for cross-domain sync");
+    assert.ok(script.includes("'amaes_terms_acknowledged'"), "Shared keys must synchronize terms agreement");
+    assert.ok(script.includes("'amaes_welcome_dismissed'"), "Shared keys must synchronize welcome modal status");
+    assert.ok(script.includes("'amaes_gemini_api_keys'"), "Shared keys must synchronize Gemini API keys");
+    assert.ok(script.includes("'amaes_auto_submit_quiz'"), "Shared keys must synchronize auto-submit quiz setting");
+    assert.ok(script.includes("const toolkitStorage = {"), "Must define toolkitStorage cross-domain bridge");
+    assert.ok(script.includes("syncAll()"), "toolkitStorage must provide syncAll method to migrate across domains");
+    assert.ok(script.includes("toolkitStorage.get('amaes_terms_acknowledged'"), "Init must check terms agreement via toolkitStorage");
+
+    // 2. Quiz Summary Page Smart Evaluator
+    assert.ok(script.includes("function evaluateQuizSummaryPage()"), "Must define evaluateQuizSummaryPage evaluator");
+    assert.ok(script.includes("unanswered.push({"), "Summary evaluator must collect unanswered questions");
+    assert.ok(script.includes("⚠️ Not Answered"), "Summary evaluator must attach ⚠️ Not Answered badge to incomplete rows");
+    assert.ok(script.includes("amaes-summary-incomplete-banner"), "Summary handler must render incomplete warning banner");
+    assert.ok(script.includes("amaes-btn-jump-first-unanswered"), "Summary incomplete banner must provide 1-click jump button");
+    assert.ok(script.includes("amaes-summary-ready-banner"), "Summary handler must render ready-to-submit banner when all questions are answered");
+    assert.ok(script.includes("amaes-btn-quick-submit"), "Summary ready banner must provide quick submit button");
+    assert.ok(script.includes("if (evalRes && evalRes.unansweredQuestions.length > 0)"), "Must pause auto-submit if any question is not answered");
+
+    // 3. Student In-Quiz Guidance & Next Indicator
+    assert.ok(script.includes("function renderUnsureActionChip("), "Must define renderUnsureActionChip helper");
+    assert.ok(script.includes("Unsure? Pick an answer or press") && script.includes("to skip to next question"), "Action chip must guide unsure students clearly");
+    assert.ok(script.includes("function updateNextButtonIndicator()"), "Must define updateNextButtonIndicator helper");
+    assert.ok(script.includes("amaes-next-btn-beacon"), "Next button indicator must display beacon");
+    assert.ok(script.includes("function renderNewQuestionFocusBanner("), "Must define renderNewQuestionFocusBanner helper");
+    assert.ok(script.includes("Question is ready to paste!"), "Floating focus banner must announce copied state");
+    assert.ok(script.includes("Ctrl+V"), "Focus banner must mention Ctrl+V shortcut for pasting into AI chatbots");
+
+    // 4. Calm Study Guide & Jenny Highlighting
+    assert.ok(script.includes("var(--accent-sky, #0284c7)"), "Study guide choices must use calm sky-cyan differentiation");
+    assert.ok(script.includes("function setQuestionStudyGuideTag("), "Must tag question with study guide source attribution");
+
+    // 5. Redesigned Unified AI Setup Modal
+    assert.ok(script.includes("Get Free Key ↗"), "AI setup modal must provide 1-click link to get free API key");
+    assert.ok(script.includes("amaes-gemini-key-rows"), "AI setup modal must render key inputs");
+    assert.ok(script.includes("Save & Activate AI") && script.includes("amaes-gemini-btn-test-save"), "AI setup modal must provide test and save action");
+    assert.ok(script.includes("<details") && script.includes("Advanced Settings (Backup Keys, Jev Classifier & Sharing)"), "AI setup modal must collapse advanced settings in <details>");
 });
 
 console.log("\n==================================================");

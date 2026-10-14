@@ -428,6 +428,153 @@
         }
     }
 
+    // Contextual in-question action chip guiding students when unsure or stuck
+    function renderUnsureActionChip(que) {
+        if (!que || que.querySelector('.amaes-unsure-help-chip') || checkIsReviewPage()) return;
+        const formulation = que.querySelector('.formulation, .content') || que;
+        const chip = document.createElement('div');
+        chip.className = 'amaes-unsure-help-chip';
+        chip.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            margin-bottom: 6px;
+            padding: 6px 12px;
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--accent-blue, #3b82f6);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+        `;
+        chip.title = 'Click to skip to the next question or page';
+        chip.innerHTML = `
+            <span style="font-size: 13px;">💡</span>
+            <span>Unsure? Pick an answer or press <kbd style="background: rgba(59, 130, 246, 0.2); color: #3b82f6; font-weight: 800; padding: 1px 5px; border-radius: 3px; font-size: 10px; border: 1px solid rgba(59, 130, 246, 0.35); font-family: monospace;">N</kbd> to skip to next question</span>
+            <span style="margin-left: auto; font-weight: 700; font-size: 10.5px; opacity: 0.85;">Skip ➔</span>
+        `;
+        chip.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof triggerNextQuizPage === 'function') {
+                triggerNextQuizPage();
+            } else {
+                const nextBtn = document.querySelector('.submitbtns input[value*="Next"], input[value*="Next page"], button[value*="Next"]');
+                if (nextBtn) nextBtn.click();
+            }
+        };
+        formulation.appendChild(chip);
+    }
+
+    // Connects keyboard shortcut [N] directly to the Moodle Next Page button on screen
+    function updateNextButtonIndicator() {
+        if (!checkIsQuizAttemptPage()) return;
+        const nextBtn = document.querySelector('.submitbtns input[type="submit"], .submitbtns button[type="submit"], input[value*="Next page"], input[value*="Next"], button[value*="Next"]');
+        if (!nextBtn) return;
+        let beacon = document.getElementById('amaes-next-btn-beacon');
+        if (!beacon) {
+            beacon = document.createElement('span');
+            beacon.id = 'amaes-next-btn-beacon';
+            beacon.style.cssText = `
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                margin-left: 8px;
+                padding: 3px 8px;
+                background: rgba(16, 185, 129, 0.15);
+                border: 1px solid rgba(16, 185, 129, 0.35);
+                border-radius: 4px;
+                font-size: 10px;
+                font-weight: 700;
+                color: #10b981;
+                vertical-align: middle;
+                user-select: none;
+                letter-spacing: 0.3px;
+            `;
+            beacon.innerHTML = `<kbd style="background: rgba(16, 185, 129, 0.25); color: #047857; padding: 1px 5px; border-radius: 3px; font-size: 9.5px; font-family: monospace;">N</kbd> <span>Next</span>`;
+            if (nextBtn.nextSibling) {
+                nextBtn.parentNode.insertBefore(beacon, nextBtn.nextSibling);
+            } else {
+                nextBtn.parentNode.appendChild(beacon);
+            }
+        }
+    }
+
+    // High-visibility focused banner explaining prompt copy & AI paste shortcuts for new questions
+    function renderNewQuestionFocusBanner(que, qNum) {
+        if (!que || que.querySelector('.amaes-new-question-focus-banner') || checkIsReviewPage()) return;
+        const formulation = que.querySelector('.formulation, .content') || que;
+        const banner = document.createElement('div');
+        banner.className = 'amaes-new-question-focus-banner';
+        banner.style.cssText = `
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            background: #fffbeb;
+            border: 1.5px solid #f59e0b;
+            border-radius: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.12);
+            box-sizing: border-box;
+        `;
+        banner.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="background: #f59e0b; color: #ffffff; padding: 2px 7px; border-radius: 4px; font-weight: 800; font-size: 10px; letter-spacing: 0.5px;">NEW QUESTION</span>
+                    <span style="font-weight: 700; color: #92400e; font-size: 12px;">Question #${qNum || ''} Copied to Clipboard!</span>
+                </div>
+                <span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Not in database yet</span>
+            </div>
+            <div style="font-size: 11.5px; color: #78350f; line-height: 1.45; margin-bottom: 8px;">
+                📋 <b>Question is ready to paste!</b> Press <kbd style="background: rgba(0,0,0,0.08); padding: 1px 4px; border-radius: 3px; font-weight: 700; font-family: monospace;">Ctrl+V</kbd> in Google Gemini or ChatGPT to get the answer.<br>
+                💡 Unsure? Pick a choice or press <kbd style="background: rgba(0,0,0,0.08); padding: 1px 4px; border-radius: 3px; font-weight: 700; font-family: monospace;">N</kbd> (or click Next) to skip.
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" style="
+                    display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; border-radius: 5px; font-size: 11px; font-weight: 700; text-decoration: none; cursor: pointer;
+                ">${ICONS.gemini} <span>Open Google Gemini ↗</span></a>
+                <button type="button" class="amaes-btn-recopy-q" style="
+                    display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #ffffff; color: #78350f; border: 1px solid #d97706; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer;
+                ">${ICONS.copy} <span>Copy Again</span></button>
+                <button type="button" class="amaes-btn-skip-q" style="
+                    display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: auto;
+                "><span>Next Question (N) ➔</span></button>
+            </div>
+        `;
+
+        const recopyBtn = banner.querySelector('.amaes-btn-recopy-q');
+        if (recopyBtn) {
+            recopyBtn.onclick = (e) => {
+                e.preventDefault();
+                const qText = cleanDOMToAI(que.querySelector('.qtext, .formulation') || que);
+                if (typeof GM_setClipboard === 'function') {
+                    GM_setClipboard(qText);
+                } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(qText);
+                }
+                showToast("Question re-copied to clipboard! Press Ctrl+V in AI.", 2500);
+            };
+        }
+
+        const skipBtn = banner.querySelector('.amaes-btn-skip-q');
+        if (skipBtn) {
+            skipBtn.onclick = (e) => {
+                e.preventDefault();
+                if (typeof triggerNextQuizPage === 'function') {
+                    triggerNextQuizPage();
+                } else {
+                    const nextBtn = document.querySelector('.submitbtns input[value*="Next"], input[value*="Next page"], button[value*="Next"]');
+                    if (nextBtn) nextBtn.click();
+                }
+            };
+        }
+
+        formulation.insertBefore(banner, formulation.firstChild);
+    }
+
     function saveQuizAttemptSummary(subCode, data) {
         if (!data || typeof data.percentage !== 'number') return;
         const sCode = subCode || (detectCourseInfo().subjectCode) || 'GENERAL';
@@ -1671,6 +1818,8 @@
                             toggleAutoQuizMode();
                         };
                     }
+                    renderUnsureActionChip(firstBlockedQue);
+                    updateNextButtonIndicator();
                 }
 
                 // Listen for user selecting or typing a choice: show visual confirmation, DO NOT auto-next by default
@@ -1824,21 +1973,140 @@
     let summaryAutoSubmitTimer = null;
     let summaryAutoSubmitAttempted = false;
 
+    // Evaluates attempt completeness on Quiz Summary Page (/mod/quiz/summary.php)
+    function evaluateQuizSummaryPage() {
+        if (!checkIsQuizSummaryPage()) return null;
+        const table = document.querySelector('table.quizsummaryofattempt, .generaltable.quizsummaryofattempt, #region-main table.generaltable, table.generaltable');
+        if (!table) return null;
+        const rows = Array.from(table.querySelectorAll('tbody tr'));
+        const unanswered = [];
+        let total = 0;
+        let answered = 0;
+
+        rows.forEach(row => {
+            const cells = Array.from(row.querySelectorAll('th, td'));
+            if (cells.length < 2) return;
+            const qCell = cells[0];
+            const statusCell = cells[1];
+            const qNum = (qCell.textContent || '').trim();
+            const statusText = (statusCell.textContent || '').trim();
+            if (!qNum || isNaN(parseInt(qNum, 10))) return;
+
+            total += 1;
+            const link = row.querySelector('a[href*="/mod/quiz/attempt.php"]') || qCell.querySelector('a') || null;
+            const isSaved = /answer saved|completed|complete/i.test(statusText);
+            const isNotAnswered = /not yet answered|not answered|incomplete|no answer/i.test(statusText);
+
+            if (isNotAnswered || (!isSaved && statusText.length > 0)) {
+                unanswered.push({ qNum, rowElement: row, statusCell, link, statusText });
+            } else {
+                answered += 1;
+            }
+        });
+
+        return {
+            totalQuestions: total,
+            answeredQuestions: answered,
+            unansweredQuestions: unanswered,
+            isAllAnswered: total > 0 && unanswered.length === 0
+        };
+    }
+
     // Auto-Mark as Done / Submit Handler for Quiz Summary Page (/mod/quiz/summary.php)
     function handleQuizSummaryAutoSubmit() {
         if (!checkIsQuizSummaryPage()) return;
         promoteAttemptEvidenceFromScore();
 
+        const evalRes = evaluateQuizSummaryPage();
+
+        // INCOMPLETE ATTEMPT SAFETY GUARD: If some questions are NOT answered, highlight them and pause auto-submit!
+        if (evalRes && evalRes.unansweredQuestions.length > 0) {
+            if (summaryAutoSubmitTimer) {
+                clearTimeout(summaryAutoSubmitTimer);
+                summaryAutoSubmitTimer = null;
+            }
+
+            // Highlight incomplete rows
+            evalRes.unansweredQuestions.forEach(item => {
+                item.rowElement.style.background = 'rgba(245, 158, 11, 0.15)';
+                item.rowElement.style.outline = '2px solid #f59e0b';
+                item.rowElement.style.borderRadius = '4px';
+                if (!item.statusCell.querySelector('.amaes-unanswered-badge')) {
+                    const badge = document.createElement('span');
+                    badge.className = 'amaes-unanswered-badge';
+                    badge.style.cssText = 'background:#f59e0b; color:#ffffff; padding:2px 7px; border-radius:4px; font-weight:800; font-size:10px; margin-left:8px; display:inline-block;';
+                    badge.textContent = '⚠️ Not Answered';
+                    item.statusCell.appendChild(badge);
+                }
+            });
+
+            // Top Warning Banner
+            let banner = document.getElementById('amaes-summary-incomplete-banner');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'amaes-summary-incomplete-banner';
+                banner.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0; padding:12px 16px; border:2px solid #f59e0b; border-radius:10px; background:#fffbeb; color:#78350f; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; box-shadow:0 4px 12px rgba(245,158,11,0.15);';
+                banner.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="font-size:22px;">⚠️</span>
+                        <div>
+                            <div style="font-weight:800; font-size:13px; color:#92400e;">Incomplete Quiz: ${evalRes.unansweredQuestions.length} Question${evalRes.unansweredQuestions.length > 1 ? 's' : ''} Not Answered!</div>
+                            <div style="font-size:11.5px; color:#b45309; margin-top:2px;">Auto-submit paused to protect your grade. Questions needing answers: <b>${evalRes.unansweredQuestions.map(u => '#' + u.qNum).join(', ')}</b>.</div>
+                        </div>
+                    </div>
+                    ${evalRes.unansweredQuestions[0].link ? `
+                    <a id="amaes-btn-jump-first-unanswered" href="${evalRes.unansweredQuestions[0].link.href}" style="padding:7px 14px; background:#f59e0b; color:#ffffff; border:none; border-radius:6px; font-weight:700; font-size:11.5px; cursor:pointer; white-space:nowrap; text-decoration:none;">Answer Question #${evalRes.unansweredQuestions[0].qNum} ➔</a>
+                    ` : ''}
+                `;
+                const mainArea = document.querySelector('#region-main, main, [role="main"]') || document.body;
+                mainArea.prepend(banner);
+            }
+
+            syncAutoQuizUI();
+            setLog(`<b>Incomplete Quiz:</b> ${evalRes.unansweredQuestions.length} questions not answered (${evalRes.unansweredQuestions.map(u => '#' + u.qNum).join(', ')}). Auto-submit paused.`, "var(--accent-amber)");
+            showToast(`⚠️ Incomplete quiz: ${evalRes.unansweredQuestions.length} questions not answered!`, 4500);
+            return;
+        }
+
+        // ALL QUESTIONS ANSWERED: Ready for submission!
+        document.getElementById('amaes-summary-incomplete-banner')?.remove();
+
+        const shouldAutoSubmit = autoSubmitQuiz;
+
+        // Render Ready Banner
+        let readyBanner = document.getElementById('amaes-summary-ready-banner');
+        if (!readyBanner) {
+            readyBanner = document.createElement('div');
+            readyBanner.id = 'amaes-summary-ready-banner';
+            readyBanner.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0; padding:12px 16px; border:2px solid #10b981; border-radius:10px; background:#ecfdf5; color:#065f46; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; box-shadow:0 4px 12px rgba(16,185,129,0.15);';
+            readyBanner.innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:22px; color:#10b981;">✓</span>
+                    <div>
+                        <div style="font-weight:800; font-size:13px; color:#065f46;">All ${evalRes ? evalRes.totalQuestions : ''} Questions Answered & Saved!</div>
+                        <div style="font-size:11.5px; color:#047857; margin-top:2px;">${shouldAutoSubmit ? 'Auto-submitting attempt...' : 'Review your saved answers below and click Submit all and finish.'}</div>
+                    </div>
+                </div>
+                <button id="amaes-btn-quick-submit" type="button" style="padding:7px 16px; background:#10b981; color:#ffffff; border:none; border-radius:6px; font-weight:800; font-size:12px; cursor:pointer; white-space:nowrap; box-shadow:0 2px 6px rgba(16,185,129,0.3);">Submit All & Finish ➔</button>
+            `;
+            readyBanner.querySelector('#amaes-btn-quick-submit').onclick = () => {
+                const sBtn = findQuizSummarySubmitButton();
+                if (sBtn) sBtn.click();
+            };
+            const mainArea = document.querySelector('#region-main, main, [role="main"]') || document.body;
+            mainArea.prepend(readyBanner);
+        }
+
         // Update UI immediately to indicate completion and waiting for confirmation
         syncAutoQuizUI();
         setLog(
-            autoSubmitQuiz
-                ? "<b>Quiz Completed:</b> All questions answered and saved. Auto-submit is enabled."
+            shouldAutoSubmit
+                ? "<b>Quiz Completed:</b> All questions answered and saved. Auto-submit is active."
                 : "<b>Quiz Completed:</b> All questions answered and saved. Waiting for your confirmation to submit.",
             "var(--accent-green)",
-            autoSubmitQuiz ? "Moodle submission will be confirmed automatically" : "Review your saved answers below and click Submit all and finish"
+            shouldAutoSubmit ? "Moodle submission will be confirmed automatically" : "Review your saved answers below and click Submit all and finish"
         );
-        showToast(autoSubmitQuiz ? "✓ All questions answered! Auto-submit is enabled." : "✓ All questions answered! Waiting for confirmation...", 4000);
+        showToast(shouldAutoSubmit ? "✓ All questions answered! Auto-submitting..." : "✓ All questions answered! Waiting for confirmation...", 4000);
 
         // Update document title so students multitasking in background tabs know it's ready
         if (typeof document !== 'undefined' && document.title && !document.title.includes('(✓ Ready to Submit)')) {
@@ -1861,7 +2129,6 @@
         }
 
         if (autoSubmitQuiz && !summaryAutoSubmitAttempted && !summaryAutoSubmitTimer) {
-            if (!autoQuizMode) return;
             if (!submitBtn) {
                 showQuizSubmitFallback(
                     'Auto-submit could not find Moodle’s “Submit all and finish” button. Locate Moodle’s submission control on this page and click it to finish.',
@@ -3306,6 +3573,11 @@
                         <span>No answer known to the system yet — <b>be the first to answer and share it!</b></span>
                     `;
                     formulation.insertBefore(hint, formulation.firstChild);
+                    const numElem = que.querySelector('.info .no, .qno');
+                    const qNum = numElem ? numElem.innerText.replace(/[^0-9]/g, '') : '';
+                    renderNewQuestionFocusBanner(que, qNum);
+                    renderUnsureActionChip(que);
+                    updateNextButtonIndicator();
                 }
                 return;
             }
@@ -3865,6 +4137,15 @@
                         targetRow.style.boxSizing = 'border-box';
                         targetRow.style.transition = 'all 0.2s ease';
 
+                        // Differentiate unconfirmed study-guide choice text from default white
+                        if (isStudyGuide) {
+                            targetRow.querySelectorAll('label, .answernumber, p, span').forEach(el => {
+                                if (!el.classList.contains('amaes-unverified-badge') && !el.closest('.amaes-unverified-badge')) {
+                                    el.style.color = 'var(--accent-sky, #0284c7)';
+                                }
+                            });
+                        }
+
                         // Reset inner label so it doesn't constrain width or wrap oddly
                         if (label !== targetRow) {
                             label.style.outline = 'none';
@@ -3901,8 +4182,9 @@
                                 badge.onclick = (e) => { e.stopPropagation(); };
                             }
                             badge.style.cssText = `
-                                background: ${sourceColor};
-                                color: #ffffff !important;
+                                background: ${isStudyGuide ? 'rgba(2, 132, 199, 0.15)' : sourceColor};
+                                color: ${isStudyGuide ? '#0284c7 !important' : '#ffffff !important'};
+                                border: ${isStudyGuide ? '1px solid rgba(2, 132, 199, 0.4)' : 'none'};
                                 font-size: 10px;
                                 font-weight: 700;
                                 padding: 2px 7px;
@@ -3911,7 +4193,7 @@
                                 display: inline-flex;
                                 align-items: center;
                                 gap: 4px;
-                                box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+                                box-shadow: ${isStudyGuide ? 'none' : '0 1px 3px rgba(0,0,0,0.18)'};
                                 white-space: nowrap;
                                 flex-shrink: 0;
                                 text-decoration: none;
@@ -4775,6 +5057,11 @@
                         <span>No answer known to the system yet — <b>be the first to answer and share it!</b></span>
                     `;
                     formulation.insertBefore(hint, formulation.firstChild);
+                    const numElem = que.querySelector('.info .no, .qno');
+                    const qNum = numElem ? numElem.innerText.replace(/[^0-9]/g, '') : '';
+                    renderNewQuestionFocusBanner(que, qNum);
+                    renderUnsureActionChip(que);
+                    updateNextButtonIndicator();
                 }
             } else {
                 matchedCount++;

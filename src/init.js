@@ -26,10 +26,10 @@
         checkForScriptUpdates(false);
 
         // Strict Terms Acceptance Guard: if not acknowledged, pause all tools except update checking
-        const isTermsAccepted = localStorage.getItem('amaes_terms_acknowledged') === 'true';
+        const isTermsAccepted = toolkitStorage.get('amaes_terms_acknowledged') === 'true';
         if (!isTermsAccepted) {
             autoQuizMode = false;
-            localStorage.setItem('amaes_auto_quiz_mode', 'false');
+            toolkitStorage.set('amaes_auto_quiz_mode', 'false');
             showWelcomeOnboardingModal(false);
             logDebug("Terms not acknowledged. Toolkit paused in locked state.");
             return;

@@ -4,7 +4,7 @@
     // ==========================================
 
     function showWelcomeOnboardingModal(force = false, focusDev = false) {
-        if (!force && localStorage.getItem('amaes_welcome_dismissed') === 'true') {
+        if (!force && toolkitStorage.get('amaes_welcome_dismissed') === 'true') {
             return;
         }
 
@@ -234,7 +234,7 @@
 
                     <!-- Agreement Disclaimer (Unboxed & Clean) -->
                     <label style="display: flex; align-items: flex-start; gap: 10px; padding: 2px 0; cursor: pointer; user-select: none;" id="welcome-terms-container">
-                        <input id="welcome-chk-terms" type="checkbox" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 16px; height: 16px; margin-top: 1px; cursor: pointer; flex-shrink: 0; accent-color: #10b981;" />
+                        <input id="welcome-chk-terms" type="checkbox" ${toolkitStorage.get('amaes_terms_acknowledged') === 'true' ? 'checked' : ''} style="width: 16px; height: 16px; margin-top: 1px; cursor: pointer; flex-shrink: 0; accent-color: #10b981;" />
                         <span style="color: ${isLight ? '#52525b' : '#a1a1aa'}; font-size: 11px; line-height: 1.45;">I understand this is an independent study aid provided "AS IS". I agree to the <a id="welcome-terms-link" href="https://github.com/Acads-Tools/amaes-toolkit/blob/main/docs/TERMS.md" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#2563eb' : '#60a5fa'}; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;">Terms of Use &amp; Disclaimer</a>, acknowledge that I am solely responsible for my own coursework and academic integrity, and agree to share verified answers anonymously to help classmates.</span>
                     </label>
                 </div>
@@ -244,7 +244,7 @@
                     <a href="https://github.com/Acads-Tools/amaes-toolkit#frequently-asked-questions-faqs" target="_blank" rel="noopener noreferrer" style="color: ${isLight ? '#71717a' : '#a1a1aa'}; font-size: 11px; text-decoration: none; display: flex; align-items: center; gap: 4px;" title="View FAQs & Guide">
                         ${ICONS.book} <span>FAQs & Guide</span>
                     </a>
-                    <button id="btn-got-it-welcome" class="amaes-btn amaes-btn-green" ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '' : 'disabled'} style="padding: 8px 22px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; background: #10b981; color: #fff; border: none; opacity: ${localStorage.getItem('amaes_terms_acknowledged') === 'true' ? '1' : '0.5'};">
+                    <button id="btn-got-it-welcome" class="amaes-btn amaes-btn-green" ${toolkitStorage.get('amaes_terms_acknowledged') === 'true' ? '' : 'disabled'} style="padding: 8px 22px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; background: #10b981; color: #fff; border: none; opacity: ${toolkitStorage.get('amaes_terms_acknowledged') === 'true' ? '1' : '0.5'};">
                         ${ICONS.zap} Get Started
                     </button>
                 </div>
@@ -257,7 +257,7 @@
             const el = document.getElementById(id);
             if (el) {
                 el.onchange = (e) => {
-                    localStorage.setItem(storageKey, e.target.checked);
+                    toolkitStorage.set(storageKey, e.target.checked);
                     if (onToggle) onToggle(e.target.checked);
                 };
             }
@@ -339,14 +339,14 @@
         if (termsCheck && gotItButton && termsContainer) {
             termsCheck.onchange = () => {
                 const checked = termsCheck.checked;
-                localStorage.setItem('amaes_terms_acknowledged', checked ? 'true' : 'false');
+                toolkitStorage.set('amaes_terms_acknowledged', checked ? 'true' : 'false');
                 gotItButton.disabled = !checked;
                 gotItButton.style.opacity = checked ? '1' : '0.5';
                 termsContainer.style.borderColor = checked ? 'rgba(16, 185, 129, 0.5)' : 'rgba(16, 185, 129, 0.2)';
                 if (typeof window._amaesUpdatePanelLockState === 'function') window._amaesUpdatePanelLockState();
                 if (!checked) {
                     autoQuizMode = false;
-                    localStorage.setItem('amaes_auto_quiz_mode', 'false');
+                    toolkitStorage.set('amaes_auto_quiz_mode', 'false');
                     showToast("Agreement unaccepted. Pausing tools and refreshing page...", 2500);
                     setTimeout(() => window.location.reload(), 500);
                 }
@@ -501,12 +501,12 @@
         };
 
         const dismiss = () => {
-            if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') {
+            if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') {
                 showToast("Please acknowledge the terms before proceeding.");
                 return;
             }
             closeModalClean();
-            localStorage.setItem('amaes_welcome_dismissed', 'true');
+            toolkitStorage.set('amaes_welcome_dismissed', 'true');
             if (typeof window._amaesUpdatePanelLockState === 'function') window._amaesUpdatePanelLockState();
             showToast("Terms accepted! Toolkit unlocked. Refreshing to activate...", 2500);
             setTimeout(() => window.location.reload(), 500);
