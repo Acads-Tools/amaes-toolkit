@@ -3829,7 +3829,11 @@
                         }
                         const sourceLabels = [];
                         if (hasVerifiedSource) {
-                            sourceLabels.push(isDeduced ? 'Deduced Answer' : 'Verified Answer');
+                            const verifiedItem = sourceCandidates.find(candidate => isConfirmedCandidate(candidate));
+                            const originSuffix = (verifiedItem && verifiedItem.originLabel && verifiedItem.originLabel !== 'General')
+                                ? ` • From ${verifiedItem.originLabel}`
+                                : '';
+                            sourceLabels.push(isDeduced ? `Deduced Answer${originSuffix}` : `Verified Answer${originSuffix}`);
                         }
                         if (hasCommunitySource) sourceLabels.push('Community Candidate (Unconfirmed)');
                         if (hasStudyGuideSource && studyGuide) {

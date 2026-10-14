@@ -85,6 +85,45 @@
         return clean;
     }
 
+    function detectAssessmentOrigin() {
+        const host = (window.location && window.location.hostname) ? window.location.hostname.toLowerCase() : '';
+        const isExamHost = host.includes('exam');
+        const breadcrumbItems = Array.from(document.querySelectorAll('.breadcrumb-item, .breadcrumb a, nav.breadcrumb a, .breadcrumb span'))
+            .map(el => (el.innerText || '').trim())
+            .filter(Boolean);
+        const breadcrumbText = breadcrumbItems.join(' ').toLowerCase();
+        const heading = (document.querySelector('.page-header-headings h1, #page-header h1, #region-main h2, #region-main h3')?.innerText || '').trim().toLowerCase();
+        const title = (document.title || '').toLowerCase();
+        const combined = `${breadcrumbText} ${heading} ${title}`;
+
+        const isExam = isExamHost || /\b(?:exam|examination|prelim\s+exam|midterm\s+exam|prefinal\s+exam|final\s+exam)\b/i.test(combined);
+
+        let examPhase = 'Quiz';
+        if (isExam) {
+            if (/\bprelim(?:\s+lab)?\s+exam\b/i.test(combined) || /\bprelim\b/i.test(combined)) {
+                examPhase = combined.includes('lab') ? 'Prelim Lab Exam' : 'Prelim Exam';
+            } else if (/\bmidterm(?:\s+lab)?\s+exam\b/i.test(combined) || /\bmidterm\b/i.test(combined)) {
+                examPhase = combined.includes('lab') ? 'Midterm Lab Exam' : 'Midterm Exam';
+            } else if (/\bprefinal\b/i.test(combined)) {
+                examPhase = 'Prefinal Exam';
+            } else if (/\bfinal\b/i.test(combined)) {
+                examPhase = 'Final Exam';
+            } else {
+                examPhase = 'Exam';
+            }
+        } else if (/\bquiz\b/i.test(combined)) {
+            const quizMatch = combined.match(/\bquiz\s*\d+\b/i) || heading.match(/\bquiz\s*\d+\b/i);
+            examPhase = quizMatch ? quizMatch[0].replace(/\bquiz\s*/i, 'Quiz ') : 'Quiz';
+        }
+
+        return {
+            originType: isExam ? 'exam' : 'quiz',
+            originLabel: examPhase,
+            isExam,
+            isExamHost
+        };
+    }
+
     function detectCourseInfo() {
         let fullTitle = '';
         const codeRegex = /\b([A-Za-z]{2,6}\d{3,4}[A-Za-z]*)\b/;
@@ -173,12 +212,17 @@
             }
         }
 
+        const assessmentOrigin = detectAssessmentOrigin();
+
         return {
             fullTitle,
             subjectCode,
             subjectName,
             courseId,
-            currentActivityTitle
+            currentActivityTitle,
+            assessmentOrigin,
+            originType: assessmentOrigin.originType,
+            originLabel: assessmentOrigin.originLabel
         };
     }
 

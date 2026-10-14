@@ -135,7 +135,7 @@
     }
 
     async function setupAccountSwitcherLoginCapture() {
-        if (window.location.hostname !== 'semestral.amaes.com') return;
+        if (typeof isSupportedMoodleHost === 'function' ? !isSupportedMoodleHost(window.location.hostname) : (window.location.hostname !== 'semestral.amaes.com' && window.location.hostname !== 'semestralexam.amaes.com')) return;
         const loginFields = findAccountSwitcherLoginFields();
         if (!loginFields || loginFields.form.querySelector('#amaes-login-save-account')) return;
         try {
@@ -352,7 +352,7 @@
     }
 
     async function handleAccountSwitcherNavigation() {
-        if (window.location.hostname !== 'semestral.amaes.com') return;
+        if (typeof isSupportedMoodleHost === 'function' ? !isSupportedMoodleHost(window.location.hostname) : (window.location.hostname !== 'semestral.amaes.com' && window.location.hostname !== 'semestralexam.amaes.com')) return;
 
         let pending;
         try {

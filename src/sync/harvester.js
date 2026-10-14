@@ -1008,7 +1008,9 @@
                         evidenceType: rowIsWrong ? 'moodle_review_elimination' : 'moodle_review',
                         wrongAnswerEvidence: rowIsWrong,
                         period: detectTermFromText(quizTitle) || 'General',
-                        quizTitle
+                        quizTitle,
+                        originType: (typeof detectAssessmentOrigin === 'function') ? detectAssessmentOrigin().originType : 'quiz',
+                        originLabel: (typeof detectAssessmentOrigin === 'function') ? detectAssessmentOrigin().originLabel : (quizTitle || 'Quiz')
                     });
                 });
                 matchingEvidence.forEach(item => {
@@ -1214,7 +1216,9 @@
                         (wrongAnswers.length > 0 ? 'moodle_review_elimination' : 'community_report'),
                     wrongAnswerEvidence: wrongAnswers.length > 0,
                     period: detectedPeriod,
-                    quizTitle: quizTitle
+                    quizTitle: quizTitle,
+                    originType: (typeof detectAssessmentOrigin === 'function') ? detectAssessmentOrigin().originType : 'quiz',
+                    originLabel: (typeof detectAssessmentOrigin === 'function') ? detectAssessmentOrigin().originLabel : (quizTitle || 'Quiz')
                 });
             }
         });
@@ -1356,7 +1360,9 @@
                 verified: Boolean(q.verified),
                 isAiSuggestion: Boolean(q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini'))),
                 source: q.source || options.source || "auto_harvester",
-                evidenceType: q.evidenceType || (q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini')) ? 'ai_inference' : evidenceType)
+                evidenceType: q.evidenceType || (q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini')) ? 'ai_inference' : evidenceType),
+                originType: q.originType || (typeof detectAssessmentOrigin === 'function' ? detectAssessmentOrigin().originType : 'quiz'),
+                originLabel: q.originLabel || q.quizTitle || (typeof detectAssessmentOrigin === 'function' ? detectAssessmentOrigin().originLabel : 'Quiz')
             }))
         };
 

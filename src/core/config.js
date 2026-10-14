@@ -1,12 +1,17 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.20";
+    const SCRIPT_VERSION = "v1.11.21";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
     const ANSWER_SHARING_DISABLED_COURSES = new Set(['GE6301']);
     const CONTRIBUTOR_ID_STORAGE_KEY = 'amaes_anonymous_contributor_id';
+    const SUPPORTED_AMAES_HOSTS = ['semestral.amaes.com', 'semestralexam.amaes.com'];
+
+    function isSupportedMoodleHost(host = (window.location && window.location.hostname)) {
+        return SUPPORTED_AMAES_HOSTS.includes(host);
+    }
 
     // The installer page uses a same-page event as a privacy-safe installation check.
     if (window.location.hostname === 'acads-tools.github.io' &&
@@ -21,8 +26,8 @@
         return;
     }
 
-    // STRICT DOMAIN LOCK: Ensure execution ONLY on semestral.amaes.com
-    if (window.location.hostname !== 'semestral.amaes.com') {
+    // STRICT DOMAIN LOCK: Ensure execution ONLY on supported AMAES Moodle portals
+    if (!isSupportedMoodleHost(window.location.hostname)) {
         return;
     }
 

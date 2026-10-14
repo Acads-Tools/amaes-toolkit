@@ -1,12 +1,15 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.11.20
+// @version      1.11.21
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
 // @match        http://semestral.amaes.com/*
 // @match        *://semestral.amaes.com/*
+// @match        https://semestralexam.amaes.com/*
+// @match        http://semestralexam.amaes.com/*
+// @match        *://semestralexam.amaes.com/*
 // @match        https://acads-tools.github.io/amaes-toolkit/*
 // @updateURL    https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js
 // @downloadURL  https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js
@@ -32,12 +35,17 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.11.20";
+    const SCRIPT_VERSION = "v1.11.21";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
     const ANSWER_SHARING_DISABLED_COURSES = new Set(['GE6301']);
     const CONTRIBUTOR_ID_STORAGE_KEY = 'amaes_anonymous_contributor_id';
+    const SUPPORTED_AMAES_HOSTS = ['semestral.amaes.com', 'semestralexam.amaes.com'];
+
+    function isSupportedMoodleHost(host = (window.location && window.location.hostname)) {
+        return SUPPORTED_AMAES_HOSTS.includes(host);
+    }
 
     // The installer page uses a same-page event as a privacy-safe installation check.
     if (window.location.hostname === 'acads-tools.github.io' &&
@@ -52,8 +60,8 @@
         return;
     }
 
-    // STRICT DOMAIN LOCK: Ensure execution ONLY on semestral.amaes.com
-    if (window.location.hostname !== 'semestral.amaes.com') {
+    // STRICT DOMAIN LOCK: Ensure execution ONLY on supported AMAES Moodle portals
+    if (!isSupportedMoodleHost(window.location.hostname)) {
         return;
     }
 
@@ -2424,6 +2432,45 @@
         return clean;
     }
 
+    function detectAssessmentOrigin() {
+        const host = (window.location && window.location.hostname) ? window.location.hostname.toLowerCase() : '';
+        const isExamHost = host.includes('exam');
+        const breadcrumbItems = Array.from(document.querySelectorAll('.breadcrumb-item, .breadcrumb a, nav.breadcrumb a, .breadcrumb span'))
+            .map(el => (el.innerText || '').trim())
+            .filter(Boolean);
+        const breadcrumbText = breadcrumbItems.join(' ').toLowerCase();
+        const heading = (document.querySelector('.page-header-headings h1, #page-header h1, #region-main h2, #region-main h3')?.innerText || '').trim().toLowerCase();
+        const title = (document.title || '').toLowerCase();
+        const combined = `${breadcrumbText} ${heading} ${title}`;
+
+        const isExam = isExamHost || /\b(?:exam|examination|prelim\s+exam|midterm\s+exam|prefinal\s+exam|final\s+exam)\b/i.test(combined);
+
+        let examPhase = 'Quiz';
+        if (isExam) {
+            if (/\bprelim(?:\s+lab)?\s+exam\b/i.test(combined) || /\bprelim\b/i.test(combined)) {
+                examPhase = combined.includes('lab') ? 'Prelim Lab Exam' : 'Prelim Exam';
+            } else if (/\bmidterm(?:\s+lab)?\s+exam\b/i.test(combined) || /\bmidterm\b/i.test(combined)) {
+                examPhase = combined.includes('lab') ? 'Midterm Lab Exam' : 'Midterm Exam';
+            } else if (/\bprefinal\b/i.test(combined)) {
+                examPhase = 'Prefinal Exam';
+            } else if (/\bfinal\b/i.test(combined)) {
+                examPhase = 'Final Exam';
+            } else {
+                examPhase = 'Exam';
+            }
+        } else if (/\bquiz\b/i.test(combined)) {
+            const quizMatch = combined.match(/\bquiz\s*\d+\b/i) || heading.match(/\bquiz\s*\d+\b/i);
+            examPhase = quizMatch ? quizMatch[0].replace(/\bquiz\s*/i, 'Quiz ') : 'Quiz';
+        }
+
+        return {
+            originType: isExam ? 'exam' : 'quiz',
+            originLabel: examPhase,
+            isExam,
+            isExamHost
+        };
+    }
+
     function detectCourseInfo() {
         let fullTitle = '';
         const codeRegex = /\b([A-Za-z]{2,6}\d{3,4}[A-Za-z]*)\b/;
@@ -2512,12 +2559,17 @@
             }
         }
 
+        const assessmentOrigin = detectAssessmentOrigin();
+
         return {
             fullTitle,
             subjectCode,
             subjectName,
             courseId,
-            currentActivityTitle
+            currentActivityTitle,
+            assessmentOrigin,
+            originType: assessmentOrigin.originType,
+            originLabel: assessmentOrigin.originLabel
         };
     }
 
@@ -7265,7 +7317,11 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         }
                         const sourceLabels = [];
                         if (hasVerifiedSource) {
-                            sourceLabels.push(isDeduced ? 'Deduced Answer' : 'Verified Answer');
+                            const verifiedItem = sourceCandidates.find(candidate => isConfirmedCandidate(candidate));
+                            const originSuffix = (verifiedItem && verifiedItem.originLabel && verifiedItem.originLabel !== 'General')
+                                ? ` • From ${verifiedItem.originLabel}`
+                                : '';
+                            sourceLabels.push(isDeduced ? `Deduced Answer${originSuffix}` : `Verified Answer${originSuffix}`);
                         }
                         if (hasCommunitySource) sourceLabels.push('Community Candidate (Unconfirmed)');
                         if (hasStudyGuideSource && studyGuide) {
@@ -9429,7 +9485,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     }
 
     async function setupAccountSwitcherLoginCapture() {
-        if (window.location.hostname !== 'semestral.amaes.com') return;
+        if (typeof isSupportedMoodleHost === 'function' ? !isSupportedMoodleHost(window.location.hostname) : (window.location.hostname !== 'semestral.amaes.com' && window.location.hostname !== 'semestralexam.amaes.com')) return;
         const loginFields = findAccountSwitcherLoginFields();
         if (!loginFields || loginFields.form.querySelector('#amaes-login-save-account')) return;
         try {
@@ -9646,7 +9702,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     }
 
     async function handleAccountSwitcherNavigation() {
-        if (window.location.hostname !== 'semestral.amaes.com') return;
+        if (typeof isSupportedMoodleHost === 'function' ? !isSupportedMoodleHost(window.location.hostname) : (window.location.hostname !== 'semestral.amaes.com' && window.location.hostname !== 'semestralexam.amaes.com')) return;
 
         let pending;
         try {
@@ -16303,7 +16359,9 @@ function setupAccountTransferUI() {
                         evidenceType: rowIsWrong ? 'moodle_review_elimination' : 'moodle_review',
                         wrongAnswerEvidence: rowIsWrong,
                         period: detectTermFromText(quizTitle) || 'General',
-                        quizTitle
+                        quizTitle,
+                        originType: (typeof detectAssessmentOrigin === 'function') ? detectAssessmentOrigin().originType : 'quiz',
+                        originLabel: (typeof detectAssessmentOrigin === 'function') ? detectAssessmentOrigin().originLabel : (quizTitle || 'Quiz')
                     });
                 });
                 matchingEvidence.forEach(item => {
@@ -16509,7 +16567,9 @@ function setupAccountTransferUI() {
                         (wrongAnswers.length > 0 ? 'moodle_review_elimination' : 'community_report'),
                     wrongAnswerEvidence: wrongAnswers.length > 0,
                     period: detectedPeriod,
-                    quizTitle: quizTitle
+                    quizTitle: quizTitle,
+                    originType: (typeof detectAssessmentOrigin === 'function') ? detectAssessmentOrigin().originType : 'quiz',
+                    originLabel: (typeof detectAssessmentOrigin === 'function') ? detectAssessmentOrigin().originLabel : (quizTitle || 'Quiz')
                 });
             }
         });
@@ -16651,7 +16711,9 @@ function setupAccountTransferUI() {
                 verified: Boolean(q.verified),
                 isAiSuggestion: Boolean(q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini'))),
                 source: q.source || options.source || "auto_harvester",
-                evidenceType: q.evidenceType || (q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini')) ? 'ai_inference' : evidenceType)
+                evidenceType: q.evidenceType || (q.isAiSuggestion || (q.source && String(q.source).toLowerCase().includes('gemini')) ? 'ai_inference' : evidenceType),
+                originType: q.originType || (typeof detectAssessmentOrigin === 'function' ? detectAssessmentOrigin().originType : 'quiz'),
+                originLabel: q.originLabel || q.quizTitle || (typeof detectAssessmentOrigin === 'function' ? detectAssessmentOrigin().originLabel : 'Quiz')
             }))
         };
 
