@@ -886,9 +886,58 @@
         return /fa-remove|fa-times|alt="Incorrect"|title="Incorrect"|incorrect\.svg/i.test(html);
     }
 
+    function evaluateReviewPageReviewability(rootDoc = document) {
+        if (!rootDoc) return { isReviewable: false, reason: 'no_document' };
+        const bodyText = (rootDoc.body ? rootDoc.body.innerText : (rootDoc.innerText || '')).toLowerCase();
+        if (bodyText.includes('you cannot review this attempt') ||
+            bodyText.includes('review is not permitted') ||
+            bodyText.includes('review of this attempt is not allowed')) {
+            return { isReviewable: false, reason: 'moodle_explicit_restriction' };
+        }
+
+        const queList = rootDoc.querySelectorAll('.que');
+        if (queList.length === 0) {
+            return { isReviewable: false, reason: 'no_questions' };
+        }
+
+        let hasGroundTruth = false;
+        for (const que of queList) {
+            if (que.querySelector('.rightanswer, .outcome .rightanswer')) {
+                hasGroundTruth = true;
+                break;
+            }
+            if (hasChoiceCheckmark(que) || hasChoiceCross(que)) {
+                hasGroundTruth = true;
+                break;
+            }
+            const gradeInfo = parseMoodleQuestionGrade(que);
+            if (gradeInfo.earned !== null && gradeInfo.max !== null && (gradeInfo.isFullMark || gradeInfo.isZeroMark || gradeInfo.isPartialMark)) {
+                hasGroundTruth = true;
+                break;
+            }
+        }
+
+        return {
+            isReviewable: hasGroundTruth,
+            reason: hasGroundTruth ? 'ground_truth_present' : 'feedback_hidden'
+        };
+    }
+
     function harvestFromReviewDOM(rootDoc, subCode, quizTitle, courseTitle = '') {
         const queList = rootDoc.querySelectorAll('.que');
         if (queList.length === 0) return { success: false, error: 'No questions found on review page', questions: [] };
+
+        // Reviewability Safety Guard: If feedback and marks are hidden, disable scraping!
+        const reviewability = evaluateReviewPageReviewability(rootDoc);
+        if (!reviewability.isReviewable) {
+            return {
+                success: false,
+                unreviewable: true,
+                reason: reviewability.reason,
+                error: 'Moodle has hidden answer feedback and marks for this assessment. Answer scraping is safely paused.',
+                questions: []
+            };
+        }
 
         let gradeText = '';
         const gradeRow = rootDoc.querySelector('.quizreviewsummary tr:last-child, .quizreviewsummary .grade');
@@ -2336,6 +2385,29 @@
         }
 
         const harvested = harvestReviewAnswers();
+
+        // Non-Reviewable Assessment Guard: If feedback and marks are hidden, pause auto-harvesting
+        if (harvested && harvested.unreviewable) {
+            let banner = document.getElementById('amaes-unreviewable-page-banner');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'amaes-unreviewable-page-banner';
+                banner.style.cssText = 'display:flex; align-items:center; gap:10px; margin:14px 0; padding:12px 16px; border:2px solid #f59e0b; border-radius:10px; background:#fffbeb; color:#78350f; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; box-shadow:0 4px 12px rgba(245,158,11,0.15);';
+                banner.innerHTML = `
+                    <span style="font-size:22px;">🔒</span>
+                    <div>
+                        <div style="font-weight:800; font-size:13px; color:#92400e;">Non-Reviewable Assessment — Auto-Harvesting Paused</div>
+                        <div style="font-size:11.5px; color:#b45309; margin-top:2px;">Moodle has hidden answer feedback and marks for this assessment. Answer scraping is safely disabled to prevent unverified data pollution.</div>
+                    </div>
+                `;
+                const mainArea = document.querySelector('#region-main, main, [role="main"]') || document.body;
+                mainArea.prepend(banner);
+            }
+            setLog("<b>Non-Reviewable Assessment:</b> Answer feedback and marks are hidden by Moodle for this attempt. Answer scraping safely paused.", "var(--accent-amber)");
+            showToast("🔒 Non-reviewable assessment: answer scraping safely paused.", 4000);
+            return;
+        }
+
         // MutationObserver may see the review page before Moodle finishes
         // inserting all questions. Include the question signature in the guard
         // so a later multi-question DOM is harvested too.
@@ -2366,6 +2438,19 @@
 
         if (lastProcessedReviewAttempt === processingKey) return;
         lastProcessedReviewAttempt = processingKey;
+
+        // Inject Reviewable Assessment Status Badge
+        let reviewBadge = document.getElementById('amaes-reviewable-page-badge');
+        if (!reviewBadge) {
+            const summaryTable = document.querySelector('.quizreviewsummary, table.quizreviewsummary, #region-main, main') || document.body;
+            reviewBadge = document.createElement('div');
+            reviewBadge.id = 'amaes-reviewable-page-badge';
+            reviewBadge.style.cssText = 'display:inline-flex; align-items:center; gap:6px; margin:8px 0; padding:5px 12px; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); border-radius:6px; color:#059669; font-size:11.5px; font-weight:700; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
+            reviewBadge.innerHTML = `<span>✓</span> <span>Reviewable Assessment: Ground truth available (${harvested.harvestedCount} verified answers, ${harvested.eliminatedCount || 0} wrong choices harvested)</span>`;
+            if (summaryTable.parentNode) {
+                summaryTable.parentNode.insertBefore(reviewBadge, summaryTable);
+            }
+        }
 
         // Auto-save verified answers and eliminated wrong choices to local subject cache
         const cacheRes = mergeAnswersIntoCache(harvested.subjectCode, harvested.questions, 'Review');

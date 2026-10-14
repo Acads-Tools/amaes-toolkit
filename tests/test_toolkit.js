@@ -2924,8 +2924,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.12.0'), "Userscript header must specify v1.12.0");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.12.0";'), "Constant SCRIPT_VERSION must be v1.12.0");
+    assert.ok(script.includes('@version      1.12.1'), "Userscript header must specify v1.12.1");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.12.1";'), "Constant SCRIPT_VERSION must be v1.12.1");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4136,11 +4136,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.12.0-blue.svg"), "README badge must show v1.12.0");
+    assert.ok(readme.includes("version-1.12.1-blue.svg"), "README badge must show v1.12.1");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.12.0<"), "Website must display v1.12.0 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.12.1<"), "Website must display v1.12.1 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -5940,6 +5940,38 @@ test("Cross-Domain Storage Bridge, Quiz Summary Smart Evaluator, Calm Study Guid
     assert.ok(script.includes("Save & Activate AI") && script.includes("amaes-gemini-btn-test-save"), "AI setup modal must provide test and save action");
     assert.ok(script.includes("<details") && script.includes("Advanced Settings (Backup Keys, Jev Classifier & Sharing)"), "AI setup modal must collapse advanced settings in <details>");
 });
+
+test("Auto-Harvest Reviewability Detection, Locked Exam Skip Protection & Exam Portal Tools Adaptation (v1.12.1)", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Auto-Harvest Reviewability Detection & Safety Guard
+    assert.ok(script.includes("function evaluateReviewPageReviewability("), "Must define evaluateReviewPageReviewability evaluator");
+    assert.ok(script.includes("reason: 'moodle_explicit_restriction'"), "Must detect explicit Moodle review restrictions");
+    assert.ok(script.includes("reason: hasGroundTruth ? 'ground_truth_present' : 'feedback_hidden'"), "Must distinguish present ground truth from hidden feedback");
+    assert.ok(script.includes("harvested.unreviewable"), "Harvest handler must detect unreviewable review attempts");
+    assert.ok(script.includes("amaes-unreviewable-page-banner"), "Must inject warning banner on unreviewable attempts");
+    assert.ok(script.includes("Non-Reviewable Assessment — Auto-Harvesting Paused"), "Banner must announce auto-harvesting paused");
+    assert.ok(script.includes("amaes-reviewable-page-badge"), "Must inject verified status badge on reviewable attempts");
+    assert.ok(script.includes("Reviewable Assessment: Ground truth available"), "Badge must announce ground truth availability");
+
+    // 2. Locked & Restricted Exam Skip Protection
+    assert.ok(script.includes("function isActivityLockedOrRestricted("), "Must define isActivityLockedOrRestricted validator");
+    assert.ok(script.includes("takeexamcode"), "Locked check must catch TakeExamCode conditional access restrictions");
+    assert.ok(script.includes(".fa-lock, .icon-lock"), "Locked check must catch lock icon indicators");
+    assert.ok(script.includes("isActivityLockedOrRestricted(container)") && script.includes("scanBlock"), "findButtons must skip locked/restricted activities");
+    assert.ok(script.includes("if (isActivityLockedOrRestricted(container)) return;"), "setupAutoViewBadges must skip locked/restricted activities");
+    assert.ok(script.includes("🔒 ${classification.badge} (Locked)"), "highlightItems must display locked badge on restricted activities");
+
+    // 3. Exam Portal Course Tools Adaptation & Guard
+    assert.ok(script.includes("amaes-exam-portal-banner"), "Course tools tab must render exam portal mode banner when on exam site");
+    assert.ok(script.includes("Only exam assessments are hosted here"), "Banner must explain exam portal scope");
+    assert.ok(script.includes("Auto-Mark Passed Exams (≥80%)"), "Auto-mark button must adapt text for exam portal");
+    assert.ok(script.includes("Exams (≥80%)"), "Single auto-mark button must adapt text for exams");
+    assert.ok(script.includes("Highlight All Exams"), "Highlighter must adapt text for exams on exam portal");
+    assert.ok(script.includes("Lectures are not hosted on the Exam Portal"), "runBatch must block lecture batching on exam portals");
+});
+
 
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);

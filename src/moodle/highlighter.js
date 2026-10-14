@@ -55,11 +55,14 @@
 
         const quizRegex = getQuizRegex();
         if (isQuizMod || hasPinkIcon || quizRegex.test(text)) {
+            const isExam = /exam|examination|prelim|prelims|midterm|midterms|prefinal|prefinals|final\b|finals/i.test(text) ||
+                           (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam);
             return {
                 type: 'quiz',
+                isExam: isExam,
                 reason: isQuizMod ? 'quiz-module' : hasPinkIcon ? 'pink-icon' : 'keyword',
-                color: 'var(--accent-pink)',
-                badge: 'Quiz'
+                color: isExam ? 'var(--accent-blue, #2563eb)' : 'var(--accent-pink)',
+                badge: isExam ? 'Exam' : 'Quiz'
             };
         }
 
@@ -335,6 +338,47 @@
         return false;
     }
 
+    function isActivityLockedOrRestricted(container) {
+        if (!container) return false;
+
+        // 1. Direct class checks indicating Moodle restriction or dimmed state
+        if (container.classList.contains('dimmed') ||
+            container.classList.contains('dimmed_text') ||
+            container.classList.contains('conditionalhidden') ||
+            container.classList.contains('isrestricted') ||
+            container.classList.contains('restricted') ||
+            container.classList.contains('locked')) {
+            return true;
+        }
+
+        // 2. Specific restriction / availability / lock indicators in children
+        if (container.querySelector('.dimmed, .dimmed_text, .conditionalhidden, .restrictions, .availabilityinfo, [data-region="activity-information"], .fa-lock, .icon-lock, [data-region="locked"], [aria-label*="locked" i], [aria-label*="restricted" i]')) {
+            const restrictElem = container.querySelector('.restrictions, .availabilityinfo, [data-region="activity-information"], .badge-info, .badge, .fa-lock, .icon-lock');
+            if (restrictElem) {
+                const rText = (restrictElem.innerText || restrictElem.textContent || '').trim();
+                if (/not available unless|restricted|not available until|hidden from students|takeexamcode|locked/i.test(rText) || restrictElem.matches('.fa-lock, .icon-lock')) {
+                    return true;
+                }
+            }
+        }
+
+        // 3. Text content scan for Moodle conditional access strings (e.g. "TakeExamCode contains 4", "Restricted Not available unless:")
+        const fullText = (container.innerText || container.textContent || '').trim();
+        if (/restricted:?\s+not available|not available unless|not available until|takeexamcode|prerequisite|must be completed first|activity.*is marked complete/i.test(fullText)) {
+            return true;
+        }
+
+        // 4. Missing, disabled, or dimmed link on activity container (locked exams have no active clickable link)
+        const link = container.querySelector('a.aal_link, a[href*="/mod/"]');
+        if (!link || link.getAttribute('aria-disabled') === 'true' || link.classList.contains('dimmed') || link.getAttribute('tabindex') === '-1' || link.hasAttribute('disabled')) {
+            if (container.matches('.activity, .activity-item, li.activity, div[data-region="activity-card"]')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     function findButtons(goal = 'mark_done', category = 'lecture', gradesMap = null) {
         const results = [];
         const activityElements = document.querySelectorAll(
@@ -349,6 +393,11 @@
 
             // Smart Skip: If goal is to mark done, completely skip activities that are already done
             if (goal === 'mark_done' && isActivityAlreadyComplete(container)) {
+                return;
+            }
+
+            // Locked / Restricted Skip: If activity or exam is restricted/locked, cannot be clicked or auto-marked done!
+            if (isActivityLockedOrRestricted(container)) {
                 return;
             }
 
@@ -549,6 +598,9 @@
             // Smart Skip: If activity is already done/completed, do not bind or view
             if (isActivityAlreadyComplete(container)) return;
 
+            // Locked / Restricted Skip: If activity or exam is restricted/locked, cannot be clicked or auto-viewed
+            if (isActivityLockedOrRestricted(container)) return;
+
             const completionArea = container.querySelector(
                 '.activity-completion, [data-region="completion-info"], .automatic-completion-conditions, .completion-info'
             ) || container;
@@ -653,18 +705,20 @@
                 count++;
                 el.classList.add('amaes-highlighted-item');
                 el.style.position = 'relative';
-                el.style.outline = `2px solid ${classification.color}`;
+                const isLocked = isActivityLockedOrRestricted(el);
+                const borderColor = isLocked ? 'var(--accent-amber, #f59e0b)' : classification.color;
+                el.style.outline = isLocked ? `2px dashed ${borderColor}` : `2px solid ${borderColor}`;
                 el.style.borderRadius = '8px';
-                el.style.boxShadow = `0 0 10px ${classification.color}33`;
+                el.style.boxShadow = `0 0 10px ${borderColor}33`;
 
                 const badge = document.createElement('span');
                 badge.className = 'amaes-type-badge';
-                badge.innerText = classification.badge;
+                badge.innerText = isLocked ? `🔒 ${classification.badge} (Locked)` : classification.badge;
                 badge.style.cssText = `
                     position: absolute;
                     top: 6px;
                     right: 6px;
-                    background: ${classification.color};
+                    background: ${isLocked ? '#d97706' : classification.color};
                     color: #ffffff;
                     font-size: 9px;
                     font-weight: 700;

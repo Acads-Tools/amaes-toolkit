@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.12.0
+// @version      1.12.1
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.12.0";
+    const SCRIPT_VERSION = "v1.12.1";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -8733,11 +8733,14 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
         const quizRegex = getQuizRegex();
         if (isQuizMod || hasPinkIcon || quizRegex.test(text)) {
+            const isExam = /exam|examination|prelim|prelims|midterm|midterms|prefinal|prefinals|final\b|finals/i.test(text) ||
+                           (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam);
             return {
                 type: 'quiz',
+                isExam: isExam,
                 reason: isQuizMod ? 'quiz-module' : hasPinkIcon ? 'pink-icon' : 'keyword',
-                color: 'var(--accent-pink)',
-                badge: 'Quiz'
+                color: isExam ? 'var(--accent-blue, #2563eb)' : 'var(--accent-pink)',
+                badge: isExam ? 'Exam' : 'Quiz'
             };
         }
 
@@ -9013,6 +9016,47 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         return false;
     }
 
+    function isActivityLockedOrRestricted(container) {
+        if (!container) return false;
+
+        // 1. Direct class checks indicating Moodle restriction or dimmed state
+        if (container.classList.contains('dimmed') ||
+            container.classList.contains('dimmed_text') ||
+            container.classList.contains('conditionalhidden') ||
+            container.classList.contains('isrestricted') ||
+            container.classList.contains('restricted') ||
+            container.classList.contains('locked')) {
+            return true;
+        }
+
+        // 2. Specific restriction / availability / lock indicators in children
+        if (container.querySelector('.dimmed, .dimmed_text, .conditionalhidden, .restrictions, .availabilityinfo, [data-region="activity-information"], .fa-lock, .icon-lock, [data-region="locked"], [aria-label*="locked" i], [aria-label*="restricted" i]')) {
+            const restrictElem = container.querySelector('.restrictions, .availabilityinfo, [data-region="activity-information"], .badge-info, .badge, .fa-lock, .icon-lock');
+            if (restrictElem) {
+                const rText = (restrictElem.innerText || restrictElem.textContent || '').trim();
+                if (/not available unless|restricted|not available until|hidden from students|takeexamcode|locked/i.test(rText) || restrictElem.matches('.fa-lock, .icon-lock')) {
+                    return true;
+                }
+            }
+        }
+
+        // 3. Text content scan for Moodle conditional access strings (e.g. "TakeExamCode contains 4", "Restricted Not available unless:")
+        const fullText = (container.innerText || container.textContent || '').trim();
+        if (/restricted:?\s+not available|not available unless|not available until|takeexamcode|prerequisite|must be completed first|activity.*is marked complete/i.test(fullText)) {
+            return true;
+        }
+
+        // 4. Missing, disabled, or dimmed link on activity container (locked exams have no active clickable link)
+        const link = container.querySelector('a.aal_link, a[href*="/mod/"]');
+        if (!link || link.getAttribute('aria-disabled') === 'true' || link.classList.contains('dimmed') || link.getAttribute('tabindex') === '-1' || link.hasAttribute('disabled')) {
+            if (container.matches('.activity, .activity-item, li.activity, div[data-region="activity-card"]')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     function findButtons(goal = 'mark_done', category = 'lecture', gradesMap = null) {
         const results = [];
         const activityElements = document.querySelectorAll(
@@ -9027,6 +9071,11 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
             // Smart Skip: If goal is to mark done, completely skip activities that are already done
             if (goal === 'mark_done' && isActivityAlreadyComplete(container)) {
+                return;
+            }
+
+            // Locked / Restricted Skip: If activity or exam is restricted/locked, cannot be clicked or auto-marked done!
+            if (isActivityLockedOrRestricted(container)) {
                 return;
             }
 
@@ -9227,6 +9276,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             // Smart Skip: If activity is already done/completed, do not bind or view
             if (isActivityAlreadyComplete(container)) return;
 
+            // Locked / Restricted Skip: If activity or exam is restricted/locked, cannot be clicked or auto-viewed
+            if (isActivityLockedOrRestricted(container)) return;
+
             const completionArea = container.querySelector(
                 '.activity-completion, [data-region="completion-info"], .automatic-completion-conditions, .completion-info'
             ) || container;
@@ -9331,18 +9383,20 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 count++;
                 el.classList.add('amaes-highlighted-item');
                 el.style.position = 'relative';
-                el.style.outline = `2px solid ${classification.color}`;
+                const isLocked = isActivityLockedOrRestricted(el);
+                const borderColor = isLocked ? 'var(--accent-amber, #f59e0b)' : classification.color;
+                el.style.outline = isLocked ? `2px dashed ${borderColor}` : `2px solid ${borderColor}`;
                 el.style.borderRadius = '8px';
-                el.style.boxShadow = `0 0 10px ${classification.color}33`;
+                el.style.boxShadow = `0 0 10px ${borderColor}33`;
 
                 const badge = document.createElement('span');
                 badge.className = 'amaes-type-badge';
-                badge.innerText = classification.badge;
+                badge.innerText = isLocked ? `🔒 ${classification.badge} (Locked)` : classification.badge;
                 badge.style.cssText = `
                     position: absolute;
                     top: 6px;
                     right: 6px;
-                    background: ${classification.color};
+                    background: ${isLocked ? '#d97706' : classification.color};
                     color: #ffffff;
                     font-size: 9px;
                     font-weight: 700;
@@ -16651,9 +16705,58 @@ function setupAccountTransferUI() {
         return /fa-remove|fa-times|alt="Incorrect"|title="Incorrect"|incorrect\.svg/i.test(html);
     }
 
+    function evaluateReviewPageReviewability(rootDoc = document) {
+        if (!rootDoc) return { isReviewable: false, reason: 'no_document' };
+        const bodyText = (rootDoc.body ? rootDoc.body.innerText : (rootDoc.innerText || '')).toLowerCase();
+        if (bodyText.includes('you cannot review this attempt') ||
+            bodyText.includes('review is not permitted') ||
+            bodyText.includes('review of this attempt is not allowed')) {
+            return { isReviewable: false, reason: 'moodle_explicit_restriction' };
+        }
+
+        const queList = rootDoc.querySelectorAll('.que');
+        if (queList.length === 0) {
+            return { isReviewable: false, reason: 'no_questions' };
+        }
+
+        let hasGroundTruth = false;
+        for (const que of queList) {
+            if (que.querySelector('.rightanswer, .outcome .rightanswer')) {
+                hasGroundTruth = true;
+                break;
+            }
+            if (hasChoiceCheckmark(que) || hasChoiceCross(que)) {
+                hasGroundTruth = true;
+                break;
+            }
+            const gradeInfo = parseMoodleQuestionGrade(que);
+            if (gradeInfo.earned !== null && gradeInfo.max !== null && (gradeInfo.isFullMark || gradeInfo.isZeroMark || gradeInfo.isPartialMark)) {
+                hasGroundTruth = true;
+                break;
+            }
+        }
+
+        return {
+            isReviewable: hasGroundTruth,
+            reason: hasGroundTruth ? 'ground_truth_present' : 'feedback_hidden'
+        };
+    }
+
     function harvestFromReviewDOM(rootDoc, subCode, quizTitle, courseTitle = '') {
         const queList = rootDoc.querySelectorAll('.que');
         if (queList.length === 0) return { success: false, error: 'No questions found on review page', questions: [] };
+
+        // Reviewability Safety Guard: If feedback and marks are hidden, disable scraping!
+        const reviewability = evaluateReviewPageReviewability(rootDoc);
+        if (!reviewability.isReviewable) {
+            return {
+                success: false,
+                unreviewable: true,
+                reason: reviewability.reason,
+                error: 'Moodle has hidden answer feedback and marks for this assessment. Answer scraping is safely paused.',
+                questions: []
+            };
+        }
 
         let gradeText = '';
         const gradeRow = rootDoc.querySelector('.quizreviewsummary tr:last-child, .quizreviewsummary .grade');
@@ -18101,6 +18204,29 @@ function setupAccountTransferUI() {
         }
 
         const harvested = harvestReviewAnswers();
+
+        // Non-Reviewable Assessment Guard: If feedback and marks are hidden, pause auto-harvesting
+        if (harvested && harvested.unreviewable) {
+            let banner = document.getElementById('amaes-unreviewable-page-banner');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'amaes-unreviewable-page-banner';
+                banner.style.cssText = 'display:flex; align-items:center; gap:10px; margin:14px 0; padding:12px 16px; border:2px solid #f59e0b; border-radius:10px; background:#fffbeb; color:#78350f; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; box-shadow:0 4px 12px rgba(245,158,11,0.15);';
+                banner.innerHTML = `
+                    <span style="font-size:22px;">🔒</span>
+                    <div>
+                        <div style="font-weight:800; font-size:13px; color:#92400e;">Non-Reviewable Assessment — Auto-Harvesting Paused</div>
+                        <div style="font-size:11.5px; color:#b45309; margin-top:2px;">Moodle has hidden answer feedback and marks for this assessment. Answer scraping is safely disabled to prevent unverified data pollution.</div>
+                    </div>
+                `;
+                const mainArea = document.querySelector('#region-main, main, [role="main"]') || document.body;
+                mainArea.prepend(banner);
+            }
+            setLog("<b>Non-Reviewable Assessment:</b> Answer feedback and marks are hidden by Moodle for this attempt. Answer scraping safely paused.", "var(--accent-amber)");
+            showToast("🔒 Non-reviewable assessment: answer scraping safely paused.", 4000);
+            return;
+        }
+
         // MutationObserver may see the review page before Moodle finishes
         // inserting all questions. Include the question signature in the guard
         // so a later multi-question DOM is harvested too.
@@ -18131,6 +18257,19 @@ function setupAccountTransferUI() {
 
         if (lastProcessedReviewAttempt === processingKey) return;
         lastProcessedReviewAttempt = processingKey;
+
+        // Inject Reviewable Assessment Status Badge
+        let reviewBadge = document.getElementById('amaes-reviewable-page-badge');
+        if (!reviewBadge) {
+            const summaryTable = document.querySelector('.quizreviewsummary, table.quizreviewsummary, #region-main, main') || document.body;
+            reviewBadge = document.createElement('div');
+            reviewBadge.id = 'amaes-reviewable-page-badge';
+            reviewBadge.style.cssText = 'display:inline-flex; align-items:center; gap:6px; margin:8px 0; padding:5px 12px; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); border-radius:6px; color:#059669; font-size:11.5px; font-weight:700; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
+            reviewBadge.innerHTML = `<span>✓</span> <span>Reviewable Assessment: Ground truth available (${harvested.harvestedCount} verified answers, ${harvested.eliminatedCount || 0} wrong choices harvested)</span>`;
+            if (summaryTable.parentNode) {
+                summaryTable.parentNode.insertBefore(reviewBadge, summaryTable);
+            }
+        }
 
         // Auto-save verified answers and eliminated wrong choices to local subject cache
         const cacheRes = mergeAnswersIntoCache(harvested.subjectCode, harvested.questions, 'Review');
@@ -19384,8 +19523,8 @@ function setupAccountTransferUI() {
         const hasActiveCourse = !!courseInfo.subjectCode;
         let subCode = courseInfo.subjectCode || detectedCodes[0] || '';
         const defaultAmauoedUrl = subCode ? getStoredAmauoedUrl(subCode) : '';
-        const cachedQuestions = subCode ? getCachedAnswers(subCode) : null;
         const isQuiz = checkIsQuizPage();
+        const isExamPortal = (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam) || (typeof window !== 'undefined' && window.location.hostname.includes('exam'));
 
         let initialKeyword = "";
         if (courseInfo.subjectCode) {
@@ -19795,14 +19934,20 @@ function setupAccountTransferUI() {
 
                 <!-- TAB PANE 3: Course Automation Tools -->
                 <div id="tab-pane-course" class="amaes-tab-pane" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
+                    ${isExamPortal ? `
+                        <div id="amaes-exam-portal-banner" style="display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 6px; font-size: 11px; color: var(--accent-blue, #2563eb);">
+                            <span style="font-size: 14px;">🎯</span>
+                            <span><b>Exam Portal Mode:</b> Only exam assessments are hosted here. Non-exam tools (lectures/videos) are disabled.</span>
+                        </div>
+                    ` : ''}
                     <div id="mod-marker-card" class="amaes-card">
                         ${renderCardContent('mod-marker', ICONS.check, 'Activity Auto-Marker', '', `
                             <div style="display: flex; flex-direction: column; gap: 5px;">
-                                ${renderToolBtn({ id: 'btn-mark-all', icon: ICONS.zap, text: 'Auto-Mark All Eligible as Done', title: 'Mark all lectures and passed quizzes (≥80%) as done', style: 'width: 100%; padding: 6px; font-weight: 700; background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(5,150,105,0.2)); border: 1px solid rgba(16,185,129,0.4); color: var(--accent-green, #10b981);' })}
+                                ${renderToolBtn({ id: 'btn-mark-all', icon: ICONS.zap, text: isExamPortal ? 'Auto-Mark Passed Exams (≥80%)' : 'Auto-Mark All Eligible as Done', title: isExamPortal ? 'Mark passed exams (≥80%) as done' : 'Mark all lectures and passed quizzes (≥80%) as done', style: 'width: 100%; padding: 6px; font-weight: 700; background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(5,150,105,0.2)); border: 1px solid rgba(16,185,129,0.4); color: var(--accent-green, #10b981);' })}
                                 <div style="display: flex; gap: 4px;">
-                                    ${renderToolBtn({ id: 'btn-mark-lec', icon: ICONS.book, text: 'Lectures', title: 'Mark lectures as done', style: 'flex: 1;' })}
-                                    ${renderToolBtn({ id: 'btn-mark-quiz', icon: ICONS.edit, text: 'Quizzes (≥80%)', title: 'Mark quizzes with passable grade as done', style: 'flex: 1;' })}
-                                    ${renderToolBtn({ id: 'btn-undo-all', icon: ICONS.undo, text: 'Undo', title: 'Undo all completions', style: 'width: auto; padding: 5px 8px;' })}
+                                    ${!isExamPortal ? renderToolBtn({ id: 'btn-mark-lec', icon: ICONS.book, text: 'Lectures', title: 'Mark lectures as done', style: 'flex: 1;' }) : ''}
+                                    ${renderToolBtn({ id: 'btn-mark-quiz', icon: ICONS.edit, text: isExamPortal ? 'Exams (≥80%)' : 'Quizzes (≥80%)', title: isExamPortal ? 'Mark exams with passable grade as done' : 'Mark quizzes with passable grade as done', style: 'flex: 1;' })}
+                                    ${!isExamPortal ? renderToolBtn({ id: 'btn-undo-all', icon: ICONS.undo, text: 'Undo', title: 'Undo all completions', style: 'width: auto; padding: 5px 8px;' }) : ''}
                                 </div>
                             </div>
                         `)}
@@ -19811,13 +19956,15 @@ function setupAccountTransferUI() {
                     <div id="mod-highlighter-card" class="amaes-card">
                         ${renderCardContent('mod-highlighter', ICONS.preview, 'Activity Highlighter', '', `
                             <div style="display: flex; gap: 4px;">
-                                ${renderToolBtn({ id: 'btn-hl-all', icon: '', text: 'Highlight All', style: 'flex: 2; font-weight: 600;' })}
+                                ${renderToolBtn({ id: 'btn-hl-all', icon: '', text: isExamPortal ? 'Highlight All Exams' : 'Highlight All', style: 'flex: 2; font-weight: 600;' })}
                                 ${renderToolBtn({ id: 'btn-hl-clear', icon: ICONS.clear, text: 'Clear', style: 'flex: 1;' })}
                             </div>
+                            ${!isExamPortal ? `
                             <div style="display: flex; gap: 4px; margin-top: 4px;">
                                 ${renderToolBtn({ id: 'btn-hl-lec', icon: ICONS.book, text: 'Lectures', title: 'Highlight Lectures & Lessons', style: 'flex: 1;' })}
                                 ${renderToolBtn({ id: 'btn-hl-vid', icon: ICONS.video, text: 'Videos', title: 'Highlight Video Lectures', style: 'flex: 1;' })}
                             </div>
+                            ` : ''}
                         `)}
                     </div>
 
@@ -22853,13 +23000,20 @@ function setupAccountTransferUI() {
                 return;
             }
 
+            const isExamPortal = (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam) || (typeof window !== 'undefined' && window.location.hostname.includes('exam'));
+            if (isExamPortal && category === 'lecture') {
+                showToast("Lectures are not hosted on the Exam Portal.");
+                setLog("<b>Exam Portal Mode:</b> Lectures and reading materials are not hosted on the Exam Portal. Use Exam Auto-Marker instead.", "var(--accent-amber)");
+                return;
+            }
+
             isRunning = true;
             shouldStop = false;
             stopBtn.style.display = 'flex';
 
             let gradesMap = null;
             if (goal === 'mark_done' && (category === 'quiz' || category === 'all')) {
-                setLog("Verifying course grades: Only quizzes with a passable grade (≥80%) will be marked...", "var(--accent-blue)");
+                setLog(isExamPortal ? "Verifying course grades: Only exams with a passable grade (≥80%) will be marked..." : "Verifying course grades: Only quizzes with a passable grade (≥80%) will be marked...", "var(--accent-blue)");
                 if (typeof fetchCourseGradesMap === 'function') {
                     gradesMap = await fetchCourseGradesMap();
                 }
@@ -22870,9 +23024,9 @@ function setupAccountTransferUI() {
 
             const items = findButtons(goal, category, gradesMap);
             if (items.length === 0) {
-                if (goal === 'mark_done' && category === 'quiz') {
-                    showToast("No quizzes with passable grade (≥80%) found to mark.");
-                    setLog("<b>Zero Matching Quizzes:</b> Only quizzes with a passing grade (≥80%) are marked. Incomplete or failing quizzes were left untouched.", "var(--accent-amber)");
+                if (goal === 'mark_done' && (category === 'quiz' || (isExamPortal && category === 'all'))) {
+                    showToast(isExamPortal ? "No exams with passable grade (≥80%) found to mark." : "No quizzes with passable grade (≥80%) found to mark.");
+                    setLog(isExamPortal ? "<b>Zero Matching Exams:</b> Only exams with a passing grade (≥80%) are marked. Incomplete, locked, or failing exams were left untouched." : "<b>Zero Matching Quizzes:</b> Only quizzes with a passing grade (≥80%) are marked. Incomplete, locked, or failing quizzes were left untouched.", "var(--accent-amber)");
                 } else {
                     showToast(`No uncompleted ${category} items found to ${goal === 'mark_done' ? 'mark' : 'undo'}!`);
                     setLog(`No matching items found for: <b>${category}</b> (${goal})!`, "var(--accent-green)");
@@ -22919,7 +23073,7 @@ function setupAccountTransferUI() {
                 }
                 showToast(`Finished ${actionLabel.toLowerCase()} ${processedCount} items!`);
                 if (goal === 'mark_done' && (category === 'quiz' || category === 'all')) {
-                    setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items! Any quizzes without a passable grade (≥80%) remained untouched.`, "var(--accent-green)");
+                    setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items! Any ${isExamPortal ? 'exams' : 'quizzes'} without a passable grade (≥80%) remained untouched.`, "var(--accent-green)");
                 } else {
                     setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items!`, "var(--accent-green)");
                 }

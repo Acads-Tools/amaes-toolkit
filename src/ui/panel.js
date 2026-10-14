@@ -18,8 +18,8 @@
         const hasActiveCourse = !!courseInfo.subjectCode;
         let subCode = courseInfo.subjectCode || detectedCodes[0] || '';
         const defaultAmauoedUrl = subCode ? getStoredAmauoedUrl(subCode) : '';
-        const cachedQuestions = subCode ? getCachedAnswers(subCode) : null;
         const isQuiz = checkIsQuizPage();
+        const isExamPortal = (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam) || (typeof window !== 'undefined' && window.location.hostname.includes('exam'));
 
         let initialKeyword = "";
         if (courseInfo.subjectCode) {
@@ -429,14 +429,20 @@
 
                 <!-- TAB PANE 3: Course Automation Tools -->
                 <div id="tab-pane-course" class="amaes-tab-pane" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
+                    ${isExamPortal ? `
+                        <div id="amaes-exam-portal-banner" style="display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 6px; font-size: 11px; color: var(--accent-blue, #2563eb);">
+                            <span style="font-size: 14px;">🎯</span>
+                            <span><b>Exam Portal Mode:</b> Only exam assessments are hosted here. Non-exam tools (lectures/videos) are disabled.</span>
+                        </div>
+                    ` : ''}
                     <div id="mod-marker-card" class="amaes-card">
                         ${renderCardContent('mod-marker', ICONS.check, 'Activity Auto-Marker', '', `
                             <div style="display: flex; flex-direction: column; gap: 5px;">
-                                ${renderToolBtn({ id: 'btn-mark-all', icon: ICONS.zap, text: 'Auto-Mark All Eligible as Done', title: 'Mark all lectures and passed quizzes (≥80%) as done', style: 'width: 100%; padding: 6px; font-weight: 700; background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(5,150,105,0.2)); border: 1px solid rgba(16,185,129,0.4); color: var(--accent-green, #10b981);' })}
+                                ${renderToolBtn({ id: 'btn-mark-all', icon: ICONS.zap, text: isExamPortal ? 'Auto-Mark Passed Exams (≥80%)' : 'Auto-Mark All Eligible as Done', title: isExamPortal ? 'Mark passed exams (≥80%) as done' : 'Mark all lectures and passed quizzes (≥80%) as done', style: 'width: 100%; padding: 6px; font-weight: 700; background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(5,150,105,0.2)); border: 1px solid rgba(16,185,129,0.4); color: var(--accent-green, #10b981);' })}
                                 <div style="display: flex; gap: 4px;">
-                                    ${renderToolBtn({ id: 'btn-mark-lec', icon: ICONS.book, text: 'Lectures', title: 'Mark lectures as done', style: 'flex: 1;' })}
-                                    ${renderToolBtn({ id: 'btn-mark-quiz', icon: ICONS.edit, text: 'Quizzes (≥80%)', title: 'Mark quizzes with passable grade as done', style: 'flex: 1;' })}
-                                    ${renderToolBtn({ id: 'btn-undo-all', icon: ICONS.undo, text: 'Undo', title: 'Undo all completions', style: 'width: auto; padding: 5px 8px;' })}
+                                    ${!isExamPortal ? renderToolBtn({ id: 'btn-mark-lec', icon: ICONS.book, text: 'Lectures', title: 'Mark lectures as done', style: 'flex: 1;' }) : ''}
+                                    ${renderToolBtn({ id: 'btn-mark-quiz', icon: ICONS.edit, text: isExamPortal ? 'Exams (≥80%)' : 'Quizzes (≥80%)', title: isExamPortal ? 'Mark exams with passable grade as done' : 'Mark quizzes with passable grade as done', style: 'flex: 1;' })}
+                                    ${!isExamPortal ? renderToolBtn({ id: 'btn-undo-all', icon: ICONS.undo, text: 'Undo', title: 'Undo all completions', style: 'width: auto; padding: 5px 8px;' }) : ''}
                                 </div>
                             </div>
                         `)}
@@ -445,13 +451,15 @@
                     <div id="mod-highlighter-card" class="amaes-card">
                         ${renderCardContent('mod-highlighter', ICONS.preview, 'Activity Highlighter', '', `
                             <div style="display: flex; gap: 4px;">
-                                ${renderToolBtn({ id: 'btn-hl-all', icon: '', text: 'Highlight All', style: 'flex: 2; font-weight: 600;' })}
+                                ${renderToolBtn({ id: 'btn-hl-all', icon: '', text: isExamPortal ? 'Highlight All Exams' : 'Highlight All', style: 'flex: 2; font-weight: 600;' })}
                                 ${renderToolBtn({ id: 'btn-hl-clear', icon: ICONS.clear, text: 'Clear', style: 'flex: 1;' })}
                             </div>
+                            ${!isExamPortal ? `
                             <div style="display: flex; gap: 4px; margin-top: 4px;">
                                 ${renderToolBtn({ id: 'btn-hl-lec', icon: ICONS.book, text: 'Lectures', title: 'Highlight Lectures & Lessons', style: 'flex: 1;' })}
                                 ${renderToolBtn({ id: 'btn-hl-vid', icon: ICONS.video, text: 'Videos', title: 'Highlight Video Lectures', style: 'flex: 1;' })}
                             </div>
+                            ` : ''}
                         `)}
                     </div>
 

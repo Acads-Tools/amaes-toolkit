@@ -1590,13 +1590,20 @@
                 return;
             }
 
+            const isExamPortal = (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam) || (typeof window !== 'undefined' && window.location.hostname.includes('exam'));
+            if (isExamPortal && category === 'lecture') {
+                showToast("Lectures are not hosted on the Exam Portal.");
+                setLog("<b>Exam Portal Mode:</b> Lectures and reading materials are not hosted on the Exam Portal. Use Exam Auto-Marker instead.", "var(--accent-amber)");
+                return;
+            }
+
             isRunning = true;
             shouldStop = false;
             stopBtn.style.display = 'flex';
 
             let gradesMap = null;
             if (goal === 'mark_done' && (category === 'quiz' || category === 'all')) {
-                setLog("Verifying course grades: Only quizzes with a passable grade (≥80%) will be marked...", "var(--accent-blue)");
+                setLog(isExamPortal ? "Verifying course grades: Only exams with a passable grade (≥80%) will be marked..." : "Verifying course grades: Only quizzes with a passable grade (≥80%) will be marked...", "var(--accent-blue)");
                 if (typeof fetchCourseGradesMap === 'function') {
                     gradesMap = await fetchCourseGradesMap();
                 }
@@ -1607,9 +1614,9 @@
 
             const items = findButtons(goal, category, gradesMap);
             if (items.length === 0) {
-                if (goal === 'mark_done' && category === 'quiz') {
-                    showToast("No quizzes with passable grade (≥80%) found to mark.");
-                    setLog("<b>Zero Matching Quizzes:</b> Only quizzes with a passing grade (≥80%) are marked. Incomplete or failing quizzes were left untouched.", "var(--accent-amber)");
+                if (goal === 'mark_done' && (category === 'quiz' || (isExamPortal && category === 'all'))) {
+                    showToast(isExamPortal ? "No exams with passable grade (≥80%) found to mark." : "No quizzes with passable grade (≥80%) found to mark.");
+                    setLog(isExamPortal ? "<b>Zero Matching Exams:</b> Only exams with a passing grade (≥80%) are marked. Incomplete, locked, or failing exams were left untouched." : "<b>Zero Matching Quizzes:</b> Only quizzes with a passing grade (≥80%) are marked. Incomplete, locked, or failing quizzes were left untouched.", "var(--accent-amber)");
                 } else {
                     showToast(`No uncompleted ${category} items found to ${goal === 'mark_done' ? 'mark' : 'undo'}!`);
                     setLog(`No matching items found for: <b>${category}</b> (${goal})!`, "var(--accent-green)");
@@ -1656,7 +1663,7 @@
                 }
                 showToast(`Finished ${actionLabel.toLowerCase()} ${processedCount} items!`);
                 if (goal === 'mark_done' && (category === 'quiz' || category === 'all')) {
-                    setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items! Any quizzes without a passable grade (≥80%) remained untouched.`, "var(--accent-green)");
+                    setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items! Any ${isExamPortal ? 'exams' : 'quizzes'} without a passable grade (≥80%) remained untouched.`, "var(--accent-green)");
                 } else {
                     setLog(`Successfully finished ${actionLabel.toLowerCase()} ${processedCount} items!`, "var(--accent-green)");
                 }
