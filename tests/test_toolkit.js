@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.5'), "Userscript header must specify v1.13.5");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.5";'), "Constant SCRIPT_VERSION must be v1.13.5");
+    assert.ok(script.includes('@version      1.13.6'), "Userscript header must specify v1.13.6");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.6";'), "Constant SCRIPT_VERSION must be v1.13.6");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4138,11 +4138,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.13.5-blue.svg"), "README badge must show v1.13.5");
+    assert.ok(readme.includes("version-1.13.6-blue.svg"), "README badge must show v1.13.6");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.13.5<"), "Website must display v1.13.5 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.13.6<"), "Website must display v1.13.6 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -6361,6 +6361,41 @@ test("Declutter Matching Questions, Suppress Sidebar & Prevent AI Rate Limit Loo
     // 5. Blockage banner text sanitization
     assert.ok(solverSrc.includes("isMatchBanner"), "solver.js banner 1 must sanitize question-copied text for matching questions");
     assert.ok(solverSrc.includes("isMatchBlocked"), "solver.js blockage HUD must sanitize question-copied text for matching questions");
+});
+
+// --------------------------------------------------
+// 192. Strict Answer Hierarchy, Sequential AI Queue & Native Moodle Navigation (v1.13.6)
+// --------------------------------------------------
+test("Strict Answer Hierarchy, Sequential AI Queue & Native Moodle Navigation (v1.13.6)", () => {
+    const fs = require('fs');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const geminiSrc = fs.readFileSync('src/ai/gemini.js', 'utf8');
+    const panelSrc = fs.readFileSync('src/ui/panel.js', 'utf8');
+
+    // 1. Strict answer hierarchy guard before AI inference in solver
+    assert.ok(solverSrc.includes("[Answer Hierarchy] Selected community/study-guide candidate for Question"), "Auto-quiz solver must pick available candidate and skip AI");
+    assert.ok(solverSrc.includes("isQuestionAnswered(firstBlockedQue)"), "Solver must check if question was already answered before running AI");
+    assert.ok(solverSrc.includes("firstBlockedQue.querySelectorAll('.amaes-blockage-hud, .amaes-ai-fallback-bar').forEach(el => el.remove());"), "Solver must clean HUD when hierarchy picks candidate");
+
+    // 2. Sequential 1-by-1 AI queue in gemini.js
+    assert.ok(geminiSrc.includes("let activeAiInferenceQueue = Promise.resolve();"), "gemini.js must maintain a sequential queue promise");
+    assert.ok(geminiSrc.includes("activeAiInferenceQueue = new Promise"), "handleGeminiQuestionInference must chain execution through activeAiInferenceQueue");
+    assert.ok(geminiSrc.includes("already has an answer; no request sent"), "Queue worker must skip request if question was answered while waiting in queue");
+
+    // 3. Native Moodle Next button integration (Press N)
+    assert.ok(solverSrc.includes("const unifiedText = `${orig.trim()} (Press N)`;"), "updateNextButtonIndicator must decorate Moodle native submit buttons directly");
+    assert.ok(solverSrc.includes("document.getElementById('amaes-next-btn-beacon')?.remove();"), "updateNextButtonIndicator must eliminate detached next-button beacon");
+
+    // 4. Card decluttering on answered questions
+    assert.ok(panelSrc.includes('.que[data-answered="true"] .amaes-card-btn-container'), "CSS must hide sidebar action buttons on answered questions");
+    assert.ok(panelSrc.includes('.que[data-answered="true"] .amaes-web-ai-row'), "CSS must hide web AI launcher row on answered questions");
+    assert.ok(panelSrc.includes(".amaes-active-focus-badge"), "CSS must hide noisy active focus badge");
+    assert.ok(solverSrc.includes("que.dataset.answered = answered ? 'true' : 'false';"), "isQuestionAnswered must synchronize que.dataset.answered attribute");
+
+    // 5. Minimalist 1-line quiz summary auto-submit strip
+    assert.ok(solverSrc.includes("readyBanner.id = 'amaes-summary-ready-banner';"), "Quiz summary must render ready banner");
+    assert.ok(solverSrc.includes('id="amaes-btn-quick-submit"'), "Quiz summary banner must retain quick submit button");
+    assert.ok(solverSrc.includes('id="amaes-btn-cancel-auto-submit"'), "Quiz summary banner must retain cancel button");
 });
 
 console.log("\n==================================================");

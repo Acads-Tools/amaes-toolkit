@@ -844,11 +844,11 @@
         const bar = document.createElement('div');
         bar.className = 'amaes-ai-fallback-bar';
         bar.style.cssText = `
-            margin-bottom: 12px;
-            padding: 8px 12px;
+            margin-bottom: 8px;
+            padding: 5px 10px;
             background: ${isRateLimit ? '#fff7ed' : '#fdf4ff'};
-            border: 1.5px solid ${isRateLimit ? '#f97316' : '#d946ef'};
-            border-radius: 8px;
+            border: 1px solid ${isRateLimit ? '#fdba74' : '#e879f9'};
+            border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -866,13 +866,8 @@
         if (isRateLimit && waitSeconds > 0) {
             bar.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px;">
-                    <span style="font-weight: 700;">Status</span>
-                    <div>
-                        <div style="font-weight: 700; color: #9a3412;">Google AI is temporarily busy</div>
-                        <div style="font-size: 10.5px; color: #c2410c;">
-                            Next request available in <strong id="amaes-ratelimit-countdown">${waitSeconds}s</strong>... (Prompt copied)
-                        </div>
-                    </div>
+                    <span style="font-weight: 700; background: #ea580c; color: #fff; padding: 1px 5px; border-radius: 3px; font-size: 9.5px;">BUSY</span>
+                    <span style="font-size: 11px; color: #9a3412;">Google AI is temporarily busy: available in <strong id="amaes-ratelimit-countdown">${waitSeconds}s</strong> (Prompt copied)</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
                     ${showConfig ? `
@@ -1065,8 +1060,25 @@
         }
     }
 
-    // Handles thinking indicator, watchdog timeout, configurable retries, wrong choice elimination guard, session caching, and auto-copy on fail
+    let activeAiInferenceQueue = Promise.resolve();
+
     async function handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered = false }) {
+        const prevQueue = activeAiInferenceQueue;
+        let releaseLock = () => {};
+        activeAiInferenceQueue = new Promise(resolve => { releaseLock = resolve; });
+        try {
+            await prevQueue;
+        } catch (_) {}
+
+        try {
+            return await _executeGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered });
+        } finally {
+            releaseLock();
+        }
+    }
+
+    // Handles thinking indicator, watchdog timeout, configurable retries, wrong choice elimination guard, session caching, and auto-copy on fail
+    async function _executeGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered = false }) {
         que.querySelectorAll('.amaes-ai-thinking-indicator, .amaes-ai-fallback-bar').forEach(el => el.remove());
 
         if (typeof isFeatureDisabledByAdmin === 'function' && isFeatureDisabledByAdmin('aiSolver')) {

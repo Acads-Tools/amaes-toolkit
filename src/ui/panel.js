@@ -1040,13 +1040,15 @@
                     box-sizing: border-box;
                 }
 
-                /* Completely hide side buttons and redundant whole-card AI on matching/composite questions */
+                /* Completely hide side buttons and redundant whole-card AI on matching/composite or answered questions */
                 .que.match .amaes-card-btn-container,
                 .que.qtype_match .amaes-card-btn-container,
                 .que[data-composite="true"] .amaes-card-btn-container,
                 .que.match .amaes-ai-matching-run-btn,
                 .que.qtype_match .amaes-ai-matching-run-btn,
-                .que[data-composite="true"] .amaes-ai-matching-run-btn {
+                .que[data-composite="true"] .amaes-ai-matching-run-btn,
+                .que[data-answered="true"] .amaes-card-btn-container,
+                .que[data-answered="true"] .amaes-web-ai-row {
                     display: none !important;
                 }
 
@@ -1248,7 +1250,7 @@
                     height: 10px !important;
                 }
                 .que.amaes-active-focus-que .amaes-active-focus-badge {
-                    display: inline-flex !important;
+                    display: none !important;
                 }
 
                 .que.amaes-no-answer-que {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.13.5
+// @version      1.13.6
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.13.5";
+    const SCRIPT_VERSION = "v1.13.6";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -3902,45 +3902,49 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
     function isQuestionAnswered(que) {
         if (!que) return false;
+        let answered = false;
         const radios = que.querySelectorAll('.answer input[type="radio"]');
-        if (radios.length > 0) return Array.from(radios).some(input => input.checked);
-
-        const checkboxes = que.querySelectorAll('.answer input[type="checkbox"]');
-        if (checkboxes.length > 0) {
-            const highlighted = que.querySelectorAll('.amaes-highlighted-choice input[type="checkbox"]');
-            return highlighted.length > 0
-                ? Array.from(highlighted).every(input => input.checked)
-                : Array.from(checkboxes).some(input => input.checked);
+        if (radios.length > 0) {
+            answered = Array.from(radios).some(input => input.checked);
+        } else {
+            const checkboxes = que.querySelectorAll('.answer input[type="checkbox"]');
+            if (checkboxes.length > 0) {
+                const highlighted = que.querySelectorAll('.amaes-highlighted-choice input[type="checkbox"]');
+                answered = highlighted.length > 0
+                    ? Array.from(highlighted).every(input => input.checked)
+                    : Array.from(checkboxes).some(input => input.checked);
+            } else {
+                const selects = que.querySelectorAll('select');
+                if (selects.length > 0) {
+                    answered = Array.from(selects).every(select => select.value && select.value !== '0');
+                } else {
+                    const textInputs = que.querySelectorAll(
+                        'input[type="text"].form-control, input.form-control, textarea'
+                    );
+                    if (textInputs.length > 0) {
+                        answered = Array.from(textInputs).every(input => input.value && input.value.trim());
+                    } else {
+                        const placeInputs = que.querySelectorAll('input.placeinput, input[type="hidden"][name*="_p"]');
+                        const dropZones = que.querySelectorAll('.drop, .dropzone, span.droptarget, .droppable');
+                        if (placeInputs.length > 0 || dropZones.length > 0) {
+                            answered = placeInputs.length > 0 &&
+                                Array.from(placeInputs).every(input => input.value && input.value !== '0' && input.value.trim());
+                        } else {
+                            const anyInputs = que.querySelectorAll('input:not([type="hidden"]), select, textarea');
+                            if (anyInputs.length > 0) {
+                                const hasChecked = Array.from(anyInputs).some(i => (i.type === 'radio' || i.type === 'checkbox') && i.checked);
+                                const hasValue = Array.from(anyInputs).some(i => i.type !== 'radio' && i.type !== 'checkbox' && i.value && i.value.trim() && i.value !== '0');
+                                answered = Boolean(hasChecked || hasValue);
+                            } else {
+                                answered = que.classList.contains('answered') || que.classList.contains('complete');
+                            }
+                        }
+                    }
+                }
+            }
         }
-
-        const selects = que.querySelectorAll('select');
-        if (selects.length > 0) {
-            return Array.from(selects).every(select => select.value && select.value !== '0');
-        }
-
-        const textInputs = que.querySelectorAll(
-            'input[type="text"].form-control, input.form-control, textarea'
-        );
-        if (textInputs.length > 0) {
-            return Array.from(textInputs).every(input => input.value && input.value.trim());
-        }
-
-        const placeInputs = que.querySelectorAll('input.placeinput, input[type="hidden"][name*="_p"]');
-        const dropZones = que.querySelectorAll('.drop, .dropzone, span.droptarget, .droppable');
-        if (placeInputs.length > 0 || dropZones.length > 0) {
-            return placeInputs.length > 0 &&
-                Array.from(placeInputs).every(input => input.value && input.value !== '0' && input.value.trim());
-        }
-
-        // Generalized fallback for unknown question input structures
-        const anyInputs = que.querySelectorAll('input:not([type="hidden"]), select, textarea');
-        if (anyInputs.length > 0) {
-            const hasChecked = Array.from(anyInputs).some(i => (i.type === 'radio' || i.type === 'checkbox') && i.checked);
-            const hasValue = Array.from(anyInputs).some(i => i.type !== 'radio' && i.type !== 'checkbox' && i.value && i.value.trim() && i.value !== '0');
-            if (hasChecked || hasValue) return true;
-        }
-
-        return que.classList.contains('answered') || que.classList.contains('complete');
+        que.dataset.answered = answered ? 'true' : 'false';
+        return answered;
     }
 
     function findNextUnansweredOnCurrentPage(sourceQue) {
@@ -4079,37 +4083,28 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     }
 
     // Connects keyboard shortcut [N] directly to the Moodle Next Page button on screen
+    // Connects keyboard shortcut [N] directly inside Moodle's native Next Page button on screen
     function updateNextButtonIndicator() {
         if (!checkIsQuizAttemptPage()) return;
-        const nextBtn = document.querySelector('.submitbtns input[type="submit"], .submitbtns button[type="submit"], input[value*="Next page"], input[value*="Next"], button[value*="Next"]');
+        const nextBtn = findQuizNextButton() || document.querySelector('.submitbtns input[type="submit"], .submitbtns button[type="submit"], input[value*="Next page"], input[value*="Next"], button[value*="Next"]');
         if (!nextBtn) return;
-        let beacon = document.getElementById('amaes-next-btn-beacon');
-        if (!beacon) {
-            beacon = document.createElement('span');
-            beacon.id = 'amaes-next-btn-beacon';
-            beacon.style.cssText = `
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
-                margin-left: 8px;
-                padding: 3px 8px;
-                background: rgba(16, 185, 129, 0.15);
-                border: 1px solid rgba(16, 185, 129, 0.35);
-                border-radius: 4px;
-                font-size: 10px;
-                font-weight: 700;
-                color: #10b981;
-                vertical-align: middle;
-                user-select: none;
-                letter-spacing: 0.3px;
-            `;
-            beacon.innerHTML = `<kbd style="background: rgba(16, 185, 129, 0.25); color: #047857; padding: 1px 5px; border-radius: 3px; font-size: 9.5px; font-family: monospace;">N</kbd> <span>Next</span>`;
-            if (nextBtn.nextSibling) {
-                nextBtn.parentNode.insertBefore(beacon, nextBtn.nextSibling);
+
+        // Unify text directly into Moodle's native button HTML / label
+        if (!nextBtn.dataset.amaesOriginalText) {
+            nextBtn.dataset.amaesOriginalText = nextBtn.tagName === 'INPUT' ? nextBtn.value : nextBtn.textContent;
+        }
+        const orig = nextBtn.dataset.amaesOriginalText || 'Next page';
+        if (!orig.includes('(Press N)')) {
+            const unifiedText = `${orig.trim()} (Press N)`;
+            if (nextBtn.tagName === 'INPUT') {
+                nextBtn.value = unifiedText;
             } else {
-                nextBtn.parentNode.appendChild(beacon);
+                nextBtn.textContent = unifiedText;
             }
         }
+
+        // Clean up standalone beacon to unify directly into Moodle button
+        document.getElementById('amaes-next-btn-beacon')?.remove();
     }
 
     // High-visibility focused banner for unanswered questions: clear, non-technical guidance and 1-click actions
@@ -5092,6 +5087,28 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
                 const navState = getQuizNavQuestionStates();
 
+                // STRICT ANSWER HIERARCHY GUARD:
+                // 1. If question is already answered (by student or prior pick), DO NOT run AI!
+                if (isQuestionAnswered(firstBlockedQue)) {
+                    firstBlockedQue.querySelectorAll('.amaes-blockage-hud, .amaes-ai-fallback-bar').forEach(el => el.remove());
+                    isSolverRunning = false;
+                    return;
+                }
+                // 2. If question already has an unconfirmed community or study-guide candidate,
+                // and study guide fallback is enabled, pick it now and skip AI inference!
+                const unconfirmedChoice = firstBlockedQue.querySelector('.amaes-highlighted-choice input[type="radio"], .amaes-highlighted-choice input[type="checkbox"]');
+                if (unconfirmedChoice && (autoPickStudyGuideFallback || autoPickQuiz)) {
+                    if (!unconfirmedChoice.checked) {
+                        unconfirmedChoice.checked = true;
+                        unconfirmedChoice.click();
+                        unconfirmedChoice.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    firstBlockedQue.querySelectorAll('.amaes-blockage-hud, .amaes-ai-fallback-bar').forEach(el => el.remove());
+                    setLog(`[Answer Hierarchy] Selected community/study-guide candidate for Question #${qData ? qData.qNum : ''}; skipped AI.`, "var(--accent-blue)");
+                    isSolverRunning = false;
+                    return;
+                }
+
                 // GOOGLE GEMINI AI ASSISTANT: Handle uncertain Multiple Choice, True/False, and row-mapped Matching questions.
                 // Other complex types (drag & drop, gapselect, text inputs) fall back to manual copy.
                 const isEligibleChoice = isEligibleForAiSolver(firstBlockedQue, qData);
@@ -5784,23 +5801,22 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         if (!readyBanner) {
             readyBanner = document.createElement('div');
             readyBanner.id = 'amaes-summary-ready-banner';
-            readyBanner.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0; padding:12px 16px; border:2px solid #10b981; border-radius:10px; background:#ecfdf5; color:#065f46; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; box-shadow:0 4px 12px rgba(16,185,129,0.15);';
+            readyBanner.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:10px; margin:10px 0; padding:8px 14px; border:1px solid #10b981; border-radius:8px; background:#ecfdf5; color:#065f46; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; box-sizing:border-box; box-shadow:0 1px 4px rgba(16,185,129,0.1);';
             const autoSubmitDesc = delaySec > 0
                 ? `Auto-submitting attempt in <b id="amaes-summary-countdown-sec">${delaySec}s</b>...`
                 : 'Auto-submitting attempt...';
             readyBanner.innerHTML = `
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="display:inline-flex; align-items:center; color:#10b981;">${ICONS.checkCircle}</span>
-                    <div>
-                        <div style="font-weight:800; font-size:13px; color:#065f46;">All ${evalRes ? evalRes.totalQuestions : ''} Questions Answered & Saved!</div>
-                        <div id="amaes-summary-banner-desc" style="font-size:11.5px; color:#047857; margin-top:2px;">${shouldAutoSubmit ? autoSubmitDesc : 'Review your saved answers below and click Submit all and finish.'}</div>
-                    </div>
-                </div>
                 <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="display:inline-flex; align-items:center; color:#10b981;">${ICONS.checkCircle}</span>
+                    <span style="font-weight:700; font-size:12px; color:#065f46;">All ${evalRes ? evalRes.totalQuestions : ''} questions answered</span>
+                    <span style="color:#047857; font-size:10px; opacity:0.6;">•</span>
+                    <span id="amaes-summary-banner-desc" style="font-size:11.5px; color:#047857;">${shouldAutoSubmit ? autoSubmitDesc : 'Review your saved answers below and click Submit all and finish.'}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
                     ${shouldAutoSubmit ? `
-                    <button id="amaes-btn-cancel-auto-submit" type="button" style="padding:6px 12px; background:rgba(239,68,68,0.1); color:#dc2626; border:1px solid rgba(239,68,68,0.3); border-radius:6px; font-weight:700; font-size:11.5px; cursor:pointer; white-space:nowrap;">Cancel Auto-Submit</button>
+                    <button id="amaes-btn-cancel-auto-submit" type="button" style="padding:4px 10px; background:rgba(239,68,68,0.1); color:#dc2626; border:1px solid rgba(239,68,68,0.25); border-radius:5px; font-weight:700; font-size:11px; cursor:pointer; white-space:nowrap;">Cancel Auto-Submit</button>
                     ` : ''}
-                    <button id="amaes-btn-quick-submit" type="button" style="padding:7px 16px; background:#10b981; color:#ffffff; border:none; border-radius:6px; font-weight:800; font-size:12px; cursor:pointer; white-space:nowrap; box-shadow:0 2px 6px rgba(16,185,129,0.3);">Submit All & Finish &rarr;</button>
+                    <button id="amaes-btn-quick-submit" type="button" style="padding:5px 14px; background:#10b981; color:#ffffff; border:none; border-radius:5px; font-weight:700; font-size:11.5px; cursor:pointer; white-space:nowrap;">Submit All & Finish &rarr;</button>
                 </div>
             `;
             readyBanner.querySelector('#amaes-btn-quick-submit').onclick = () => {
@@ -7688,7 +7704,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             Boolean(candidate.isAiSuggestion || (candidate.source || '').toLowerCase().includes('gemini') ||
                             (Array.isArray(candidate.sources) && candidate.sources.some(source => String(source).toLowerCase().includes('gemini'))))
                         );
-                        const studyGuide = hasStudyGuideSource ? getStudyGuideInfo(sourceCandidates.find(candidate => getStudyGuideInfo(candidate))) : null;
+                        const studyGuide = hasStudyGuideSource
+                            ? getStudyGuideInfo(sourceCandidates.find(candidate => getStudyGuideInfo(candidate)))
+                            : (hasCommunitySource ? { label: 'Community', url: null } : null);
                         const isStudyGuide = Boolean(studyGuide);
                         const isDeduced = cand.deduced === true;
                         let sourceColor = '#0284c7';
@@ -8048,7 +8066,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     }
                     const bestCand = shortAnsCandidates[0];
                     const bestAnswer = bestCand ? (bestCand.ansRaw || bestCand.answer || '') : '';
-                    const studyGuide = isConfirmedCandidate(bestCand) ? null : getStudyGuideInfo(bestCand);
+                    const studyGuide = isConfirmedCandidate(bestCand)
+                        ? null
+                        : (getStudyGuideInfo(bestCand) || (bestCand && Boolean(bestCand.source || '').toLowerCase().includes('community') ? { label: 'Community', url: null } : null));
                     const isStudyGuide = Boolean(studyGuide);
                     const courseInfo = detectCourseInfo();
                     const subCode = courseInfo.subjectCode || 'CS6301';
@@ -8181,7 +8201,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     const bestCand = validCandidates[0] || null;
                     if (!bestCand && !hasMatchingRows) return;
                     const bestAnswer = bestCand ? (bestCand.ansRaw || bestCand.answer || '') : '';
-                    const studyGuide = bestCand && !isConfirmedCandidate(bestCand) ? getStudyGuideInfo(bestCand) : null;
+                    const studyGuide = bestCand && !isConfirmedCandidate(bestCand)
+                        ? (getStudyGuideInfo(bestCand) || (bestCand && Boolean(bestCand.source || '').toLowerCase().includes('community') ? { label: 'Community', url: null } : null))
+                        : null;
                     const isStudyGuide = Boolean(studyGuide);
                     const courseInfo = detectCourseInfo();
                     const subCode = courseInfo.subjectCode || 'CS6301';
@@ -8295,7 +8317,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             return;
                         }
                         const effectiveStudyGuide = effectiveCandidate && !isConfirmedCandidate(effectiveCandidate)
-                            ? getStudyGuideInfo(effectiveCandidate)
+                            ? (getStudyGuideInfo(effectiveCandidate) || (Boolean(effectiveCandidate.source || '').toLowerCase().includes('community') ? { label: 'Community', url: null } : null))
                             : null;
                         const effectiveIsStudyGuide = Boolean(effectiveStudyGuide);
                         const effectiveSourceColor = effectiveIsStudyGuide ? '#0284c7' :
@@ -14568,11 +14590,11 @@ function setupAccountTransferUI() {
         const bar = document.createElement('div');
         bar.className = 'amaes-ai-fallback-bar';
         bar.style.cssText = `
-            margin-bottom: 12px;
-            padding: 8px 12px;
+            margin-bottom: 8px;
+            padding: 5px 10px;
             background: ${isRateLimit ? '#fff7ed' : '#fdf4ff'};
-            border: 1.5px solid ${isRateLimit ? '#f97316' : '#d946ef'};
-            border-radius: 8px;
+            border: 1px solid ${isRateLimit ? '#fdba74' : '#e879f9'};
+            border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -14590,13 +14612,8 @@ function setupAccountTransferUI() {
         if (isRateLimit && waitSeconds > 0) {
             bar.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px;">
-                    <span style="font-weight: 700;">Status</span>
-                    <div>
-                        <div style="font-weight: 700; color: #9a3412;">Google AI is temporarily busy</div>
-                        <div style="font-size: 10.5px; color: #c2410c;">
-                            Next request available in <strong id="amaes-ratelimit-countdown">${waitSeconds}s</strong>... (Prompt copied)
-                        </div>
-                    </div>
+                    <span style="font-weight: 700; background: #ea580c; color: #fff; padding: 1px 5px; border-radius: 3px; font-size: 9.5px;">BUSY</span>
+                    <span style="font-size: 11px; color: #9a3412;">Google AI is temporarily busy: available in <strong id="amaes-ratelimit-countdown">${waitSeconds}s</strong> (Prompt copied)</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
                     ${showConfig ? `
@@ -14789,8 +14806,25 @@ function setupAccountTransferUI() {
         }
     }
 
-    // Handles thinking indicator, watchdog timeout, configurable retries, wrong choice elimination guard, session caching, and auto-copy on fail
+    let activeAiInferenceQueue = Promise.resolve();
+
     async function handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered = false }) {
+        const prevQueue = activeAiInferenceQueue;
+        let releaseLock = () => {};
+        activeAiInferenceQueue = new Promise(resolve => { releaseLock = resolve; });
+        try {
+            await prevQueue;
+        } catch (_) {}
+
+        try {
+            return await _executeGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered });
+        } finally {
+            releaseLock();
+        }
+    }
+
+    // Handles thinking indicator, watchdog timeout, configurable retries, wrong choice elimination guard, session caching, and auto-copy on fail
+    async function _executeGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered = false }) {
         que.querySelectorAll('.amaes-ai-thinking-indicator, .amaes-ai-fallback-bar').forEach(el => el.remove());
 
         if (typeof isFeatureDisabledByAdmin === 'function' && isFeatureDisabledByAdmin('aiSolver')) {
@@ -20769,13 +20803,15 @@ function setupAccountTransferUI() {
                     box-sizing: border-box;
                 }
 
-                /* Completely hide side buttons and redundant whole-card AI on matching/composite questions */
+                /* Completely hide side buttons and redundant whole-card AI on matching/composite or answered questions */
                 .que.match .amaes-card-btn-container,
                 .que.qtype_match .amaes-card-btn-container,
                 .que[data-composite="true"] .amaes-card-btn-container,
                 .que.match .amaes-ai-matching-run-btn,
                 .que.qtype_match .amaes-ai-matching-run-btn,
-                .que[data-composite="true"] .amaes-ai-matching-run-btn {
+                .que[data-composite="true"] .amaes-ai-matching-run-btn,
+                .que[data-answered="true"] .amaes-card-btn-container,
+                .que[data-answered="true"] .amaes-web-ai-row {
                     display: none !important;
                 }
 
@@ -20977,7 +21013,7 @@ function setupAccountTransferUI() {
                     height: 10px !important;
                 }
                 .que.amaes-active-focus-que .amaes-active-focus-badge {
-                    display: inline-flex !important;
+                    display: none !important;
                 }
 
                 .que.amaes-no-answer-que {
