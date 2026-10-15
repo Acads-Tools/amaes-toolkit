@@ -28,6 +28,10 @@
         if (btnMasterAutoQuiz) {
             btnMasterAutoQuiz.onclick = () => {
                 if (checkIsQuizSummaryPage()) {
+                    if (typeof hastenQuizSummaryAutoSubmit === 'function') {
+                        hastenQuizSummaryAutoSubmit();
+                        return;
+                    }
                     const submitBtn = findQuizSummarySubmitButton();
                     if (submitBtn) {
                         submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });

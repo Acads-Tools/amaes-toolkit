@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.6'), "Userscript header must specify v1.13.6");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.6";'), "Constant SCRIPT_VERSION must be v1.13.6");
+    assert.ok(script.includes('@version      1.13.7'), "Userscript header must specify v1.13.7");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.7";'), "Constant SCRIPT_VERSION must be v1.13.7");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4138,11 +4138,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.13.6-blue.svg"), "README badge must show v1.13.6");
+    assert.ok(readme.includes("version-1.13.7-blue.svg"), "README badge must show v1.13.7");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.13.6<"), "Website must display v1.13.6 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.13.7<"), "Website must display v1.13.7 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -6396,6 +6396,40 @@ test("Strict Answer Hierarchy, Sequential AI Queue & Native Moodle Navigation (v
     assert.ok(solverSrc.includes("readyBanner.id = 'amaes-summary-ready-banner';"), "Quiz summary must render ready banner");
     assert.ok(solverSrc.includes('id="amaes-btn-quick-submit"'), "Quiz summary banner must retain quick submit button");
     assert.ok(solverSrc.includes('id="amaes-btn-cancel-auto-submit"'), "Quiz summary banner must retain cancel button");
+});
+
+// --------------------------------------------------
+// 193. Summary Auto-Submit Hasten Key [N], Speed Multiplier & Native Right-Side Integration (v1.13.7)
+// --------------------------------------------------
+test("Summary Auto-Submit Hasten Key [N], Speed Multiplier & Native Right-Side Integration (v1.13.7)", () => {
+    const fs = require('fs');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const eventsSrc = fs.readFileSync('src/quiz/events.js', 'utf8');
+
+    // 1. Hasten function and multiplier logic
+    assert.ok(solverSrc.includes("function hastenQuizSummaryAutoSubmit()"), "solver.js must define hastenQuizSummaryAutoSubmit");
+    assert.ok(solverSrc.includes("summaryAutoSubmitHastenMultiplier < 2"), "Hasten logic must advance multiplier from 1x to 2x");
+    assert.ok(solverSrc.includes("summaryAutoSubmitHastenMultiplier < 4"), "Hasten logic must advance multiplier from 2x to 4x");
+    assert.ok(solverSrc.includes("summaryAutoSubmitHastenMultiplier < 8"), "Hasten logic must advance multiplier from 4x to 8x");
+    assert.ok(solverSrc.includes("targetDeadline = Math.max(Date.now(), targetDeadline - 2000);"), "Hasten logic must subtract 2000ms (2s) per tap");
+
+    // 2. Keyboard shortcut 'N', 'Space', 'Enter' on summary.php
+    assert.ok(solverSrc.includes("if (checkIsQuizSummaryPage())"), "Keydown listener must handle quiz summary page");
+    assert.ok(solverSrc.includes("hastenQuizSummaryAutoSubmit();"), "Keydown listener must call hastenQuizSummaryAutoSubmit on N key");
+
+    // 3. Right-side Quiz Navigation block indicator
+    assert.ok(solverSrc.includes("id = 'amaes-navblock-submit-indicator'"), "Must mount submit indicator in right-side Quiz Navigation block");
+    assert.ok(solverSrc.includes("Press <b>N</b> to hasten (-2s)"), "Nav block indicator must clearly guide pressing N to hasten");
+
+    // 4. Native Moodle button text decoration with live countdown
+    assert.ok(solverSrc.includes("function updateQuizSummarySubmitButtons("), "solver.js must define updateQuizSummarySubmitButtons");
+    assert.ok(solverSrc.includes("Press N to hasten"), "Native Moodle submit button must announce Press N to hasten during countdown");
+
+    // 5. Clean DOM insertion above native submit buttons
+    assert.ok(solverSrc.includes("submitContainer.parentNode.insertBefore(readyBanner, submitContainer);"), "readyBanner must mount directly above native submitbtns container");
+
+    // 6. Panel Master Auto-Quiz button triggers hasten on summary page
+    assert.ok(eventsSrc.includes("if (checkIsQuizSummaryPage()) {\n                    if (typeof hastenQuizSummaryAutoSubmit === 'function') {\n                        hastenQuizSummaryAutoSubmit();"), "Panel auto-quiz button must trigger hasten on summary page");
 });
 
 console.log("\n==================================================");
