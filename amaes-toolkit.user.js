@@ -13739,9 +13739,9 @@ function setupAccountTransferUI() {
 
     function getMatchingAiRows(que) {
         if (!que) return [];
-        return Array.from(que.querySelectorAll('.answer table tr, .answer tr'))
+        return Array.from(que.querySelectorAll('.answer table tr, .answer tr, .answer .r0, .answer .r1, .answer [class*="r"], .answer > div, .answer li'))
             .map(row => {
-                const promptCell = row.querySelector('td.text, td:first-child');
+                const promptCell = row.querySelector('td.text, td:first-child, .text, [class*="text"]');
                 const select = row.querySelector('td.control select, select');
                 const prompt = promptCell ? cleanDOMToAI(promptCell).trim() : '';
                 return prompt && select ? { row, select, prompt } : null;
@@ -13875,7 +13875,8 @@ function setupAccountTransferUI() {
                 const res = await callGeminiAPI(prompt, 64);
                 resText = res ? res.text : null;
             } else {
-                resText = await requestSharedAiInference(prompt, { maxOutputTokens: 64 });
+                const sharedResult = await callSharedAiFallback({ prompt, maxOutputTokens: 64 });
+                resText = sharedResult ? (sharedResult.text || sharedResult.answer) : null;
             }
             if (!resText) return null;
 
