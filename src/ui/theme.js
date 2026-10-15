@@ -143,7 +143,7 @@
     let autoHighlightQuiz = localStorage.getItem('amaes_auto_highlight_quiz') !== 'false'; // default true
     let autoCopyQuizForAI = localStorage.getItem('amaes_auto_copy_ai') !== 'false'; // default true
     let autoQuizMode = localStorage.getItem('amaes_auto_quiz_mode') === 'true'; // default false (Master autonomous switch)
-    let fastQuizMode = localStorage.getItem('amaes_fast_quiz_mode') === 'true'; // default false (⚡ Speed Mode)
+    let fastQuizMode = localStorage.getItem('amaes_fast_quiz_mode') !== 'false'; // default true (built-in fast answers & accelerated transitions)
     let autoPickQuiz = localStorage.getItem('amaes_auto_pick_quiz') !== 'false'; // default true: auto-select verified answers
     let autoNextVerified = localStorage.getItem('amaes_auto_next_verified') !== 'false'; // default true: auto-advance when solver answers verified question
     let autoPickStudyGuideFallback = localStorage.getItem('amaes_auto_pick_study_guide_fallback') !== 'false'; // default true: automatically use online study guides (Jenny & AMA)

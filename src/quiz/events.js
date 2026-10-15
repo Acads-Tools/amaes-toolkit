@@ -2,24 +2,10 @@
         const btnCopyCurrQ = document.getElementById('btn-copy-curr-q');
         const btnCopyAllQ = document.getElementById('btn-copy-all-q');
         const btnFillAllPage = document.getElementById('btn-fill-all-page');
-        const chkFastQuizMode = document.getElementById('chk-fast-quiz-mode');
         const chkAutoPick = document.getElementById('chk-auto-pick');
         const chkAutoNextVerified = document.getElementById('chk-auto-next-verified');
         const chkAutoPickStudyGuideFallback = document.getElementById('chk-auto-pick-study-guide-fallback');
         const chkAutoHlQuiz = document.getElementById('chk-auto-hl-quiz');
-
-        if (chkFastQuizMode) {
-            chkFastQuizMode.onchange = () => {
-                fastQuizMode = chkFastQuizMode.checked;
-                localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
-                if (typeof syncFastQuizUI === 'function') syncFastQuizUI();
-                showToast(`Speed Mode: ${fastQuizMode ? 'ON' : 'OFF'}`);
-                setLog(`Speed Mode: <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)", fastQuizMode ? "Answers visible questions instantly & accelerates transitions" : "Paced mode");
-                if (fastQuizMode && checkIsQuizAttemptPage()) {
-                    runAutoQuizSolver(true);
-                }
-            };
-        }
 
         if (btnFillAllPage) {
             btnFillAllPage.onclick = () => {

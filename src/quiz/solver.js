@@ -1048,8 +1048,8 @@
         const nextOnPage = findNextUnansweredOnCurrentPage(sourceQue);
         if (nextOnPage) {
             clearTimeout(autoNextTimer);
-            const secText = (effectiveDelay / 1000).toFixed(1) + 's' + (fastQuizMode ? ' (Fast Mode)' : '');
-            setLog(`<b>Question Answered:</b> Moving to the next unanswered question in <b>${secText}</b>...`, fastQuizMode ? "var(--accent-amber)" : "var(--accent-blue)");
+            const secText = (effectiveDelay / 1000).toFixed(1) + 's';
+            setLog(`<b>Question Answered:</b> Moving to the next unanswered question in <b>${secText}</b>...`, "var(--accent-blue)");
             showToast("Answer recorded! Moving to next...", 1000);
             autoNextTimer = setTimeout(() => {
                 if (!autoQuizMode) return;
@@ -1081,7 +1081,7 @@
             }, finishDelay);
         } else {
             const pageDelay = effectiveDelay;
-            setLog(`<b>Question Answered:</b> Advancing to next page in <b>${(pageDelay / 1000).toFixed(1)}s${fastQuizMode ? ' (Fast Mode)' : ''}</b>...`, fastQuizMode ? "var(--accent-amber)" : "var(--accent-blue)");
+            setLog(`<b>Question Answered:</b> Advancing to next page in <b>${(pageDelay / 1000).toFixed(1)}s</b>...`, "var(--accent-blue)");
             showToast("Answer selected! Advancing to next page...", 1000);
             autoNextTimer = setTimeout(() => {
                 if (!autoQuizMode) return;
@@ -1394,7 +1394,7 @@
                             return;
                         }
 
-                        setLog(`[Auto-Next] <b>Auto-Next:</b> Advancing to next question in <b>${(navDelay / 1000).toFixed(1)}s${fastQuizMode ? ' (Fast Mode)' : ''}</b>...`, fastQuizMode ? "var(--accent-amber)" : "var(--accent-blue)");
+                        setLog(`[Auto-Next] <b>Auto-Next:</b> Advancing to next question in <b>${(navDelay / 1000).toFixed(1)}s</b>...`, "var(--accent-blue)");
                         autoNextTimer = setTimeout(() => {
                             if (!autoQuizMode) return;
                             clickQuizNextButton(nextBtn);
@@ -1579,7 +1579,7 @@
                         }
                     });
 
-                    // In Fast Mode on multi-question pages: concurrently solve other visible unknown questions
+                    // Built-in acceleration on multi-question pages: concurrently solve other visible unknown questions
                     if (fastQuizMode && queContainers.length > 1 && unverifiedQuestions.length > 1) {
                         const otherQue = unverifiedQuestions.slice(1);
                         otherQue.forEach(oQue => {
@@ -1622,7 +1622,7 @@
                         showToast(res && res.withImage ? `Visual snippet & Question #${qData ? qData.qNum : ''} copied to clipboard!` : `Question #${qData ? qData.qNum : ''} copied to clipboard — ready to paste!`, 3000);
                     }).catch(() => {});
 
-                    // In Fast Mode: even if first question requires manual intervention, background-solve remaining eligible questions
+                    // Built-in acceleration: even if first question requires manual intervention, background-solve remaining eligible questions
                     if (fastQuizMode && queContainers.length > 1 && unverifiedQuestions.length > 1) {
                         const activeKey = getAvailableGeminiKey();
                         if (activeKey && aiQuizEnabled) {
@@ -2200,41 +2200,10 @@
     }
 
     function syncFastQuizUI() {
-        const chk = document.getElementById('chk-fast-quiz-mode');
-        if (chk) chk.checked = fastQuizMode;
-        const card = document.getElementById('amaes-fast-answer-card');
-        if (card && card.tagName === 'DIV') {
-            card.style.background = fastQuizMode
-                ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(217, 119, 6, 0.08) 100%)'
-                : 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%)';
-            card.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.25)';
-            card.style.boxShadow = fastQuizMode ? '0 0 10px rgba(245, 158, 11, 0.15)' : 'none';
-        }
-        const title = document.getElementById('amaes-fast-quiz-title');
-        if (title) {
-            title.style.color = fastQuizMode ? '#f59e0b' : 'var(--text-secondary)';
-        }
-        const iconBadge = document.getElementById('amaes-fast-quiz-icon');
-        if (iconBadge) {
-            iconBadge.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.12)';
-        }
-        const pill = document.getElementById('amaes-fast-quiz-pill');
-        if (pill) {
-            pill.style.background = fastQuizMode ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(245, 158, 11, 0.12)';
-            pill.style.color = fastQuizMode ? '#000' : '#f59e0b';
-            pill.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.3)';
-        }
-        const hudFastBtn = document.getElementById('btn-hud-fast-quiz');
-        if (hudFastBtn) {
-            hudFastBtn.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255,255,255,0.08)';
-            hudFastBtn.style.color = fastQuizMode ? '#f59e0b' : '#94a3b8';
-            hudFastBtn.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(255,255,255,0.15)';
-            hudFastBtn.innerHTML = `${ICONS.zap} <span>${fastQuizMode ? 'Speed ON' : 'Speed'}</span>`;
-        }
         const hudModeText = document.getElementById('hud-mode-text');
         if (hudModeText && autoQuizMode && !isWaitingForUserAnswer) {
-            hudModeText.textContent = fastQuizMode ? 'Speed Co-Pilot ⚡' : 'Co-Pilot';
-            hudModeText.style.color = fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--accent-blue, #3b82f6)';
+            hudModeText.textContent = 'Co-Pilot';
+            hudModeText.style.color = 'var(--accent-blue, #3b82f6)';
         }
     }
 
@@ -2268,24 +2237,6 @@
                 subtext.textContent = 'Auto-answering & advancing in background. Click to pause.';
             } else {
                 subtext.textContent = 'Auto-answers & advances. Pauses & copies on unknown questions.';
-            }
-        }
-
-        const bgNoticeDot = document.getElementById('amaes-autoquiz-bg-dot');
-        const bgNoticeText = document.getElementById('amaes-autoquiz-bg-text');
-        if (bgNoticeDot && bgNoticeText) {
-            if (checkIsQuizSummaryPage()) {
-                bgNoticeDot.style.background = 'var(--accent-green, #10b981)';
-                bgNoticeDot.style.boxShadow = '0 0 6px #10b981';
-                bgNoticeText.textContent = 'Completed · Waiting for your confirmation';
-            } else if (autoQuizMode) {
-                bgNoticeDot.style.background = 'var(--accent-green, #10b981)';
-                bgNoticeDot.style.boxShadow = '0 0 6px #10b981';
-                bgNoticeText.textContent = 'Active in background (safe to switch tabs/apps)';
-            } else {
-                bgNoticeDot.style.background = 'var(--text-muted, #94a3b8)';
-                bgNoticeDot.style.boxShadow = 'none';
-                bgNoticeText.textContent = 'Runs while multitasking in other windows';
             }
         }
 
@@ -2564,8 +2515,8 @@
             <div style="display: flex; align-items: center; gap: 6px;">
                 <span id="hud-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: ${!autoQuizMode ? '#64748b' : (isWaitingForUserAnswer ? '#f59e0b' : '#3b82f6')}; box-shadow: 0 0 8px ${!autoQuizMode ? 'transparent' : (isWaitingForUserAnswer ? '#f59e0b' : '#3b82f6')};"></span>
                 <span style="font-weight: 700;">Auto-Quiz:</span>
-                <span id="hud-mode-text" style="color: ${!autoQuizMode ? '#94a3b8' : (isWaitingForUserAnswer ? 'var(--accent-amber, #f59e0b)' : (fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--accent-blue, #3b82f6)'))}; font-weight: 700;">
-                    ${!autoQuizMode ? 'Paused' : (isWaitingForUserAnswer ? 'Waiting on Q' : (fastQuizMode ? 'Fast Co-Pilot ⚡' : 'Co-Pilot'))}
+                <span id="hud-mode-text" style="color: ${!autoQuizMode ? '#94a3b8' : (isWaitingForUserAnswer ? 'var(--accent-amber, #f59e0b)' : 'var(--accent-blue, #3b82f6)')}; font-weight: 700;">
+                    ${!autoQuizMode ? 'Paused' : (isWaitingForUserAnswer ? 'Waiting on Q' : 'Co-Pilot')}
                 </span>
             </div>
 
@@ -2575,11 +2526,6 @@
             <!-- Pause / Resume Button (Adaptive: only shown when main panel is minimized) -->
             <button id="btn-hud-toggle-quiz" class="amaes-inline-btn" style="display: ${isPanelMinimized ? 'inline-flex' : 'none'}; padding: 3px 10px; font-size: 10px; background: ${autoQuizMode ? 'rgba(239,68,68,0.25); color:#ef4444; border:1px solid #ef4444' : 'rgba(16,185,129,0.25); color:#10b981; border:1px solid #10b981'}; border-radius: 12px; cursor: pointer; font-weight: 600;">
                 ${autoQuizMode ? 'Pause' : 'Resume'}
-            </button>
-
-            <!-- Fast Mode HUD Toggle -->
-            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Fast Answer Mode">
-                ${ICONS.zap} <span>${fastQuizMode ? 'Speed ON' : 'Speed'}</span>
             </button>
 
             <!-- Persistent Update Indicator -->
@@ -2608,20 +2554,6 @@
         if (_el__btn_hud_toggle_quiz_) _el__btn_hud_toggle_quiz_.onclick = () => {
             toggleAutoQuizMode();
         };
-
-        const hudFastBtn = document.getElementById('btn-hud-fast-quiz');
-        if (hudFastBtn) {
-            hudFastBtn.onclick = () => {
-                fastQuizMode = !fastQuizMode;
-                localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
-                syncFastQuizUI();
-                showToast(`Speed Mode: ${fastQuizMode ? 'ON' : 'OFF'}`);
-                setLog(`Speed Mode: <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
-                if (fastQuizMode && checkIsQuizAttemptPage()) {
-                    runAutoQuizSolver(true);
-                }
-            };
-        }
     }
 
     // Auto-select choice based on AI answer from clipboard (Shortcut: V or Button)
@@ -3039,19 +2971,6 @@
                 return;
             }
 
-            // Speed Mode Toggle: 'F'
-            if (key === 'F') {
-                e.preventDefault();
-                fastQuizMode = !fastQuizMode;
-                localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
-                syncFastQuizUI();
-                showToast(`Speed Mode: ${fastQuizMode ? 'ON' : 'OFF'}`);
-                setLog(`Speed Mode: <b>${fastQuizMode ? 'ON' : 'OFF'}</b> via <b>F</b> key.`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
-                if (fastQuizMode && checkIsQuizAttemptPage()) {
-                    runAutoQuizSolver(true);
-                }
-                return;
-            }
 
             // 2. Copy Current Question for AI: 'C'
             if (key === 'C') {

@@ -2924,8 +2924,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.12.6'), "Userscript header must specify v1.12.6");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.12.6";'), "Constant SCRIPT_VERSION must be v1.12.6");
+    assert.ok(script.includes('@version      1.12.7'), "Userscript header must specify v1.12.7");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.12.7";'), "Constant SCRIPT_VERSION must be v1.12.7");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -3679,11 +3679,11 @@ test("Background Execution: notifies users that Auto-Quiz runs hands-free in bac
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
     const dashHtml = fs.readFileSync('dashboard.html', 'utf8');
 
-    // 1. Quiz panel background execution badge & indicator
-    assert.ok(script.includes('id="amaes-autoquiz-bg-notice"'), "Must include background multitasking notice in Quiz tab");
-    assert.ok(script.includes('id="amaes-autoquiz-bg-dot"'), "Must include status indicator dot for background execution");
-    assert.ok(script.includes('id="amaes-autoquiz-bg-text"'), "Must include descriptive text for background execution status");
-    assert.ok(script.includes('syncAutoQuizUI'), "Must dynamically update background notice in syncAutoQuizUI");
+    // 1. Quiz panel background execution badge & indicator removed for streamlined UI
+    assert.strictEqual(script.includes('id="amaes-autoquiz-bg-notice"'), false, "Must remove background multitasking notice in Quiz tab");
+    assert.strictEqual(script.includes('id="amaes-autoquiz-bg-dot"'), false, "Must remove status indicator dot for background execution");
+    assert.strictEqual(script.includes('id="amaes-autoquiz-bg-text"'), false, "Must remove descriptive text for background execution status");
+    assert.ok(script.includes('syncAutoQuizUI'), "Must include syncAutoQuizUI");
 
     // 2. Quick Start Guide onboarding notice
     assert.ok(script.includes('Background Capable'), "Quick Start Guide must reassure users about background execution");
@@ -4136,11 +4136,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.12.6-blue.svg"), "README badge must show v1.12.6");
+    assert.ok(readme.includes("version-1.12.7-blue.svg"), "README badge must show v1.12.7");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.12.6<"), "Website must display v1.12.6 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.12.7<"), "Website must display v1.12.7 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -4935,19 +4935,18 @@ test("Fast Answer (Turbo) Mode: accelerates next-page transitions, batch-fills v
     const fs = require('fs');
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
-    // 1. Settings card & HUD controls
-    assert.ok(script.includes('id="chk-fast-quiz-mode"'), "Panel must include Fast Answer Mode checkbox");
-    assert.ok(script.includes('Fast Answer Mode'), "Must display non-techy friendly label 'Fast Answer Mode'");
-    assert.ok(script.includes('id="amaes-fast-quiz-icon"'), "Must display SVG icon badge for Fast Mode");
-    assert.ok(script.includes('id="btn-hud-fast-quiz"'), "HUD must include Fast Mode toggle button");
-    assert.ok(script.includes('Fast Co-Pilot ⚡'), "HUD status badge must indicate Fast Co-Pilot when active");
+    // 1. Settings card & HUD controls removed (fast acceleration is built-in default)
+    assert.strictEqual(script.includes('id="chk-fast-quiz-mode"'), false, "Panel must not include Fast Answer Mode checkbox (built-in default)");
+    assert.strictEqual(script.includes('id="btn-hud-fast-quiz"'), false, "HUD must not include Fast Mode toggle button");
+    assert.strictEqual(script.includes('Fast Co-Pilot ⚡'), false, "HUD status badge must display clean Co-Pilot");
+    assert.ok(script.includes("let fastQuizMode = localStorage.getItem('amaes_fast_quiz_mode') !== 'false';"), "fastQuizMode must be enabled by default");
 
     // 2. 1-Click Fill Verified Answers
     assert.ok(script.includes('id="btn-fill-all-page"'), "Must provide 1-click 'Fill Verified Answers' button on multi-question pages");
 
-    // 3. Fast transitions timing & F shortcut
+    // 3. Fast transitions timing & indexing
     assert.ok(script.includes("effectiveDelay = fastQuizMode ? Math.min(delayMs, 200) : delayMs;"), "Must accelerate auto-advance delay in Fast Mode");
-    assert.ok(script.includes("key === 'F'"), "Must support 'F' hotkey to toggle Fast Answer Mode");
+    assert.strictEqual(script.includes("key === 'F'"), false, "F shortcut must be removed since speed mode is now standard default");
     assert.ok(script.includes("const questionCandidateIndex = new Map();"), "Must index cached questions once per lookup pass");
     assert.ok(script.includes("questionCandidateIndex.get(currentQuestionKey) || []"), "Must query exact local question keys before fuzzy matching");
     assert.ok(script.includes("const externalStudyGuideAnswers = typeof readJennysonlinePersistentCache === 'function'"), "Quiz lookup must use locally cached guide suggestions immediately");
@@ -5082,7 +5081,7 @@ test("Quiz Summary Attempt Completion: verifies immediate quest_done audio chime
 
     // 4. UI synchronizer state on summary page
     assert.ok(script.includes("Review & Submit"), "btnMasterAutoQuiz must display 'Review & Submit' on summary page");
-    assert.ok(script.includes("Completed · Waiting for your confirmation"), "bgNoticeText must display completed confirmation on summary page");
+    assert.ok(script.includes("All questions answered and saved. Review your answers and submit when ready."), "subtext must display completed confirmation on summary page");
 
     // 5. Removed premature audio chime right before finish navigation on attempt page
     const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
@@ -5972,7 +5971,7 @@ test("Auto-Harvest Reviewability Detection, Locked Exam Skip Protection & Exam P
     assert.ok(script.includes("Lectures are not hosted on the Exam Portal"), "runBatch must block lecture batching on exam portals");
 });
 
-test("Panel Initialization & Quiz Attempt Safe Runtime Execution (v1.12.6)", () => {
+test("Panel Initialization & Quiz Attempt Safe Runtime Execution (v1.12.7)", () => {
     const fs = require('fs');
     const vm = require('vm');
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');

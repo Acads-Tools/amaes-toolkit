@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.12.6
+// @version      1.12.7
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.12.6";
+    const SCRIPT_VERSION = "v1.12.7";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -1935,7 +1935,7 @@
     let autoHighlightQuiz = localStorage.getItem('amaes_auto_highlight_quiz') !== 'false'; // default true
     let autoCopyQuizForAI = localStorage.getItem('amaes_auto_copy_ai') !== 'false'; // default true
     let autoQuizMode = localStorage.getItem('amaes_auto_quiz_mode') === 'true'; // default false (Master autonomous switch)
-    let fastQuizMode = localStorage.getItem('amaes_fast_quiz_mode') === 'true'; // default false (⚡ Speed Mode)
+    let fastQuizMode = localStorage.getItem('amaes_fast_quiz_mode') !== 'false'; // default true (built-in fast answers & accelerated transitions)
     let autoPickQuiz = localStorage.getItem('amaes_auto_pick_quiz') !== 'false'; // default true: auto-select verified answers
     let autoNextVerified = localStorage.getItem('amaes_auto_next_verified') !== 'false'; // default true: auto-advance when solver answers verified question
     let autoPickStudyGuideFallback = localStorage.getItem('amaes_auto_pick_study_guide_fallback') !== 'false'; // default true: automatically use online study guides (Jenny & AMA)
@@ -4653,8 +4653,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         const nextOnPage = findNextUnansweredOnCurrentPage(sourceQue);
         if (nextOnPage) {
             clearTimeout(autoNextTimer);
-            const secText = (effectiveDelay / 1000).toFixed(1) + 's' + (fastQuizMode ? ' (Fast Mode)' : '');
-            setLog(`<b>Question Answered:</b> Moving to the next unanswered question in <b>${secText}</b>...`, fastQuizMode ? "var(--accent-amber)" : "var(--accent-blue)");
+            const secText = (effectiveDelay / 1000).toFixed(1) + 's';
+            setLog(`<b>Question Answered:</b> Moving to the next unanswered question in <b>${secText}</b>...`, "var(--accent-blue)");
             showToast("Answer recorded! Moving to next...", 1000);
             autoNextTimer = setTimeout(() => {
                 if (!autoQuizMode) return;
@@ -4686,7 +4686,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             }, finishDelay);
         } else {
             const pageDelay = effectiveDelay;
-            setLog(`<b>Question Answered:</b> Advancing to next page in <b>${(pageDelay / 1000).toFixed(1)}s${fastQuizMode ? ' (Fast Mode)' : ''}</b>...`, fastQuizMode ? "var(--accent-amber)" : "var(--accent-blue)");
+            setLog(`<b>Question Answered:</b> Advancing to next page in <b>${(pageDelay / 1000).toFixed(1)}s</b>...`, "var(--accent-blue)");
             showToast("Answer selected! Advancing to next page...", 1000);
             autoNextTimer = setTimeout(() => {
                 if (!autoQuizMode) return;
@@ -4999,7 +4999,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             return;
                         }
 
-                        setLog(`[Auto-Next] <b>Auto-Next:</b> Advancing to next question in <b>${(navDelay / 1000).toFixed(1)}s${fastQuizMode ? ' (Fast Mode)' : ''}</b>...`, fastQuizMode ? "var(--accent-amber)" : "var(--accent-blue)");
+                        setLog(`[Auto-Next] <b>Auto-Next:</b> Advancing to next question in <b>${(navDelay / 1000).toFixed(1)}s</b>...`, "var(--accent-blue)");
                         autoNextTimer = setTimeout(() => {
                             if (!autoQuizMode) return;
                             clickQuizNextButton(nextBtn);
@@ -5184,7 +5184,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         }
                     });
 
-                    // In Fast Mode on multi-question pages: concurrently solve other visible unknown questions
+                    // Built-in acceleration on multi-question pages: concurrently solve other visible unknown questions
                     if (fastQuizMode && queContainers.length > 1 && unverifiedQuestions.length > 1) {
                         const otherQue = unverifiedQuestions.slice(1);
                         otherQue.forEach(oQue => {
@@ -5227,7 +5227,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         showToast(res && res.withImage ? `Visual snippet & Question #${qData ? qData.qNum : ''} copied to clipboard!` : `Question #${qData ? qData.qNum : ''} copied to clipboard — ready to paste!`, 3000);
                     }).catch(() => {});
 
-                    // In Fast Mode: even if first question requires manual intervention, background-solve remaining eligible questions
+                    // Built-in acceleration: even if first question requires manual intervention, background-solve remaining eligible questions
                     if (fastQuizMode && queContainers.length > 1 && unverifiedQuestions.length > 1) {
                         const activeKey = getAvailableGeminiKey();
                         if (activeKey && aiQuizEnabled) {
@@ -5805,41 +5805,10 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     }
 
     function syncFastQuizUI() {
-        const chk = document.getElementById('chk-fast-quiz-mode');
-        if (chk) chk.checked = fastQuizMode;
-        const card = document.getElementById('amaes-fast-answer-card');
-        if (card && card.tagName === 'DIV') {
-            card.style.background = fastQuizMode
-                ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(217, 119, 6, 0.08) 100%)'
-                : 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%)';
-            card.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.25)';
-            card.style.boxShadow = fastQuizMode ? '0 0 10px rgba(245, 158, 11, 0.15)' : 'none';
-        }
-        const title = document.getElementById('amaes-fast-quiz-title');
-        if (title) {
-            title.style.color = fastQuizMode ? '#f59e0b' : 'var(--text-secondary)';
-        }
-        const iconBadge = document.getElementById('amaes-fast-quiz-icon');
-        if (iconBadge) {
-            iconBadge.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.12)';
-        }
-        const pill = document.getElementById('amaes-fast-quiz-pill');
-        if (pill) {
-            pill.style.background = fastQuizMode ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(245, 158, 11, 0.12)';
-            pill.style.color = fastQuizMode ? '#000' : '#f59e0b';
-            pill.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(245, 158, 11, 0.3)';
-        }
-        const hudFastBtn = document.getElementById('btn-hud-fast-quiz');
-        if (hudFastBtn) {
-            hudFastBtn.style.background = fastQuizMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255,255,255,0.08)';
-            hudFastBtn.style.color = fastQuizMode ? '#f59e0b' : '#94a3b8';
-            hudFastBtn.style.borderColor = fastQuizMode ? '#f59e0b' : 'rgba(255,255,255,0.15)';
-            hudFastBtn.innerHTML = `${ICONS.zap} <span>${fastQuizMode ? 'Speed ON' : 'Speed'}</span>`;
-        }
         const hudModeText = document.getElementById('hud-mode-text');
         if (hudModeText && autoQuizMode && !isWaitingForUserAnswer) {
-            hudModeText.textContent = fastQuizMode ? 'Speed Co-Pilot ⚡' : 'Co-Pilot';
-            hudModeText.style.color = fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--accent-blue, #3b82f6)';
+            hudModeText.textContent = 'Co-Pilot';
+            hudModeText.style.color = 'var(--accent-blue, #3b82f6)';
         }
     }
 
@@ -5873,24 +5842,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 subtext.textContent = 'Auto-answering & advancing in background. Click to pause.';
             } else {
                 subtext.textContent = 'Auto-answers & advances. Pauses & copies on unknown questions.';
-            }
-        }
-
-        const bgNoticeDot = document.getElementById('amaes-autoquiz-bg-dot');
-        const bgNoticeText = document.getElementById('amaes-autoquiz-bg-text');
-        if (bgNoticeDot && bgNoticeText) {
-            if (checkIsQuizSummaryPage()) {
-                bgNoticeDot.style.background = 'var(--accent-green, #10b981)';
-                bgNoticeDot.style.boxShadow = '0 0 6px #10b981';
-                bgNoticeText.textContent = 'Completed · Waiting for your confirmation';
-            } else if (autoQuizMode) {
-                bgNoticeDot.style.background = 'var(--accent-green, #10b981)';
-                bgNoticeDot.style.boxShadow = '0 0 6px #10b981';
-                bgNoticeText.textContent = 'Active in background (safe to switch tabs/apps)';
-            } else {
-                bgNoticeDot.style.background = 'var(--text-muted, #94a3b8)';
-                bgNoticeDot.style.boxShadow = 'none';
-                bgNoticeText.textContent = 'Runs while multitasking in other windows';
             }
         }
 
@@ -6169,8 +6120,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             <div style="display: flex; align-items: center; gap: 6px;">
                 <span id="hud-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: ${!autoQuizMode ? '#64748b' : (isWaitingForUserAnswer ? '#f59e0b' : '#3b82f6')}; box-shadow: 0 0 8px ${!autoQuizMode ? 'transparent' : (isWaitingForUserAnswer ? '#f59e0b' : '#3b82f6')};"></span>
                 <span style="font-weight: 700;">Auto-Quiz:</span>
-                <span id="hud-mode-text" style="color: ${!autoQuizMode ? '#94a3b8' : (isWaitingForUserAnswer ? 'var(--accent-amber, #f59e0b)' : (fastQuizMode ? 'var(--accent-amber, #f59e0b)' : 'var(--accent-blue, #3b82f6)'))}; font-weight: 700;">
-                    ${!autoQuizMode ? 'Paused' : (isWaitingForUserAnswer ? 'Waiting on Q' : (fastQuizMode ? 'Fast Co-Pilot ⚡' : 'Co-Pilot'))}
+                <span id="hud-mode-text" style="color: ${!autoQuizMode ? '#94a3b8' : (isWaitingForUserAnswer ? 'var(--accent-amber, #f59e0b)' : 'var(--accent-blue, #3b82f6)')}; font-weight: 700;">
+                    ${!autoQuizMode ? 'Paused' : (isWaitingForUserAnswer ? 'Waiting on Q' : 'Co-Pilot')}
                 </span>
             </div>
 
@@ -6180,11 +6131,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             <!-- Pause / Resume Button (Adaptive: only shown when main panel is minimized) -->
             <button id="btn-hud-toggle-quiz" class="amaes-inline-btn" style="display: ${isPanelMinimized ? 'inline-flex' : 'none'}; padding: 3px 10px; font-size: 10px; background: ${autoQuizMode ? 'rgba(239,68,68,0.25); color:#ef4444; border:1px solid #ef4444' : 'rgba(16,185,129,0.25); color:#10b981; border:1px solid #10b981'}; border-radius: 12px; cursor: pointer; font-weight: 600;">
                 ${autoQuizMode ? 'Pause' : 'Resume'}
-            </button>
-
-            <!-- Fast Mode HUD Toggle -->
-            <button id="btn-hud-fast-quiz" class="amaes-inline-btn" style="padding: 3px 8px; font-size: 10px; background: ${fastQuizMode ? 'rgba(245, 158, 11, 0.25); color: #f59e0b; border: 1px solid #f59e0b' : 'rgba(255,255,255,0.08); color: #94a3b8; border: 1px solid rgba(255,255,255,0.15)'}; border-radius: 12px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Fast Answer Mode">
-                ${ICONS.zap} <span>${fastQuizMode ? 'Speed ON' : 'Speed'}</span>
             </button>
 
             <!-- Persistent Update Indicator -->
@@ -6213,20 +6159,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         if (_el__btn_hud_toggle_quiz_) _el__btn_hud_toggle_quiz_.onclick = () => {
             toggleAutoQuizMode();
         };
-
-        const hudFastBtn = document.getElementById('btn-hud-fast-quiz');
-        if (hudFastBtn) {
-            hudFastBtn.onclick = () => {
-                fastQuizMode = !fastQuizMode;
-                localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
-                syncFastQuizUI();
-                showToast(`Speed Mode: ${fastQuizMode ? 'ON' : 'OFF'}`);
-                setLog(`Speed Mode: <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
-                if (fastQuizMode && checkIsQuizAttemptPage()) {
-                    runAutoQuizSolver(true);
-                }
-            };
-        }
     }
 
     // Auto-select choice based on AI answer from clipboard (Shortcut: V or Button)
@@ -6644,19 +6576,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 return;
             }
 
-            // Speed Mode Toggle: 'F'
-            if (key === 'F') {
-                e.preventDefault();
-                fastQuizMode = !fastQuizMode;
-                localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
-                syncFastQuizUI();
-                showToast(`Speed Mode: ${fastQuizMode ? 'ON' : 'OFF'}`);
-                setLog(`Speed Mode: <b>${fastQuizMode ? 'ON' : 'OFF'}</b> via <b>F</b> key.`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)");
-                if (fastQuizMode && checkIsQuizAttemptPage()) {
-                    runAutoQuizSolver(true);
-                }
-                return;
-            }
 
             // 2. Copy Current Question for AI: 'C'
             if (key === 'C') {
@@ -18840,7 +18759,6 @@ function setupAccountTransferUI() {
                         addLine(`Anonymous Active Users (${label}):`, 'var(--accent-purple)');
                         addLine(`• Unique Active Devices: ${count}`, 'var(--accent-green)');
                         addLine(`• Total Quizzes Solved: ${data.total_session_quizzes_reported || 0}`, 'var(--accent-blue)');
-                        addLine(`• Speed Mode Users: ${data.fast_mode_active_count || 0} (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
                     } else {
                         addLine(`Unable to retrieve metrics for '${tf}'.`, 'var(--accent-pink)');
                     }
@@ -18860,15 +18778,13 @@ function setupAccountTransferUI() {
                         const count = typeof data.active_users !== 'undefined' ? data.active_users : data.active_users_24h;
                         const label = data.timeframe || tf;
                         addLine(`Feature Adoption Summary (${label}):`, 'var(--accent-purple)');
-                        addLine(`• ⚡ Speed Mode: ${data.fast_mode_active_count || 0} of ${count} users (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
                         addLine(`• Auto-Quiz Completions: ${data.total_session_quizzes_reported || 0} quizzes solved`, 'var(--accent-green)');
                         if (data.events && Object.keys(data.events).length > 0) {
                             const evts = Object.entries(data.events).map(([k, v]) => `${k}: ${v}`).join(' | ');
                             addLine(`• Action Events: ${evts}`, 'var(--accent-blue)');
                         }
                         const vList = Object.entries(data.versions || {}).map(([v, cnt]) => `v${v}: ${cnt}`).join(', ');
-                        addLine(`• Active Script Versions: ${vList || 'None'}`, 'var(--text-secondary)');
-                        addLine(`• Local Client Status: Fast Mode: ${fastQuizMode ? 'ON' : 'OFF'} | Auto-Quiz: ${autoQuizMode ? 'ON' : 'OFF'}`, 'var(--text-muted)');
+                        addLine(`• Local Client Status: Auto-Quiz: ${autoQuizMode ? 'ON' : 'OFF'}`, 'var(--text-muted)');
                     } else {
                         addLine(`Feature breakdown currently unavailable from relay.`, 'var(--accent-pink)');
                     }
@@ -18892,7 +18808,6 @@ function setupAccountTransferUI() {
                         addLine(`• Active Unique Users: ${count}`, 'var(--accent-green)');
                         addLine(`• Total Telemetry Events: ${eventsCount}`, 'var(--text-secondary)');
                         addLine(`• Session Quizzes Solved Reported: ${data.total_session_quizzes_reported || 0}`, 'var(--accent-blue)');
-                        addLine(`• Speed Mode Users: ${data.fast_mode_active_count || 0} (${data.fast_mode_adoption_percent || 0}% adoption)`, 'var(--accent-amber)');
                         if (data.events && Object.keys(data.events).length > 0) {
                             const eList = Object.entries(data.events).map(([ev, num]) => `${ev}: ${num}`).join(', ');
                             addLine(`• Activity Breakdown: ${eList}`, 'var(--text-secondary)');
@@ -18972,7 +18887,7 @@ function setupAccountTransferUI() {
             addLine('• status                   - System health, active course context & relay status', 'var(--text-secondary)');
             addLine('• stats [1h|6h|24h|7d|all] - Live user counts, quizzes solved & adoption rates', 'var(--text-secondary)');
             addLine('• users [1h|6h|24h|7d|all] - Aggregate unique active user counts by timeframe', 'var(--text-secondary)');
-            addLine('• features [timeframe]     - Feature adoption breakdown (Fast mode, auto-quiz, etc.)', 'var(--text-secondary)');
+            addLine('• features [timeframe]     - Feature adoption breakdown (auto-quiz, events, etc.)', 'var(--text-secondary)');
             addLine('• ping                     - Real roundtrip network latency to Cloudflare relay', 'var(--text-secondary)');
             addLine('• cache                    - Question bank statistics and stored course codes', 'var(--text-secondary)');
             addLine('• logs                     - Dumps recent audit events directly in console', 'var(--text-secondary)');
@@ -19654,16 +19569,7 @@ function setupAccountTransferUI() {
                         </div>
                     </div>
 
-                    <!-- Background Multitasking Status (only during active quiz) -->
-                    ${isQuiz ? `
-                    <div id="amaes-autoquiz-bg-notice" style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px; padding: 4px 8px; font-size: 9.5px; display: flex; align-items: center; justify-content: space-between; gap: 6px;" title="Auto-Quiz operates autonomously across questions and pages even when you minimize or switch to other windows">
-                        <div style="display: flex; align-items: center; gap: 5px;">
-                            <span id="amaes-autoquiz-bg-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${autoQuizMode ? 'var(--accent-green, #10b981)' : 'var(--text-muted, #94a3b8)'}; ${autoQuizMode ? 'box-shadow: 0 0 6px #10b981;' : ''}"></span>
-                            <span style="font-weight: 600; color: var(--text-primary);">${autoQuizMode ? 'Running in background' : 'Runs in background'}:</span>
-                            <span id="amaes-autoquiz-bg-text" style="color: var(--text-secondary);">${autoQuizMode ? 'Safe to switch tabs or apps' : 'Works even when minimized'}</span>
-                        </div>
-                    </div>
-                    ` : ''}
+
 
                     <!-- Batch actions on multi-question pages -->
                     <div id="amaes-batch-copy-container" style="display: ${isQuiz && Boolean(document.querySelector('.que')) && !autoQuizMode ? 'flex' : 'none'}; gap: 4px; margin-top: 2px;">
@@ -19719,14 +19625,7 @@ function setupAccountTransferUI() {
                             </label>
                         </div>
 
-                        <!-- Speed Mode Card -->
-                        <label id="amaes-fast-answer-card" style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Speed Mode: Answers visible questions instantly and moves quickly to the next page">
-                            <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span id="amaes-fast-quiz-title" style="display: inline-flex; align-items: center; gap: 4px;">
-                                <span id="amaes-fast-quiz-icon" style="display: inline-flex; align-items: center; color: var(--text-muted);">${ICONS.zap}</span>
-                                <span>Speed Mode</span>
-                            </span>
-                        </label>
+
                     </div>
 
                     <!-- Collapsible Advanced Settings (Collapsed by default for clean UX) -->
@@ -21415,24 +21314,10 @@ function setupAccountTransferUI() {
         const btnCopyCurrQ = document.getElementById('btn-copy-curr-q');
         const btnCopyAllQ = document.getElementById('btn-copy-all-q');
         const btnFillAllPage = document.getElementById('btn-fill-all-page');
-        const chkFastQuizMode = document.getElementById('chk-fast-quiz-mode');
         const chkAutoPick = document.getElementById('chk-auto-pick');
         const chkAutoNextVerified = document.getElementById('chk-auto-next-verified');
         const chkAutoPickStudyGuideFallback = document.getElementById('chk-auto-pick-study-guide-fallback');
         const chkAutoHlQuiz = document.getElementById('chk-auto-hl-quiz');
-
-        if (chkFastQuizMode) {
-            chkFastQuizMode.onchange = () => {
-                fastQuizMode = chkFastQuizMode.checked;
-                localStorage.setItem('amaes_fast_quiz_mode', fastQuizMode ? 'true' : 'false');
-                if (typeof syncFastQuizUI === 'function') syncFastQuizUI();
-                showToast(`Speed Mode: ${fastQuizMode ? 'ON' : 'OFF'}`);
-                setLog(`Speed Mode: <b>${fastQuizMode ? 'ON' : 'OFF'}</b>`, fastQuizMode ? "var(--accent-amber)" : "var(--text-secondary)", fastQuizMode ? "Answers visible questions instantly & accelerates transitions" : "Paced mode");
-                if (fastQuizMode && checkIsQuizAttemptPage()) {
-                    runAutoQuizSolver(true);
-                }
-            };
-        }
 
         if (btnFillAllPage) {
             btnFillAllPage.onclick = () => {

@@ -146,16 +146,7 @@
                         </div>
                     </div>
 
-                    <!-- Background Multitasking Status (only during active quiz) -->
-                    ${isQuiz ? `
-                    <div id="amaes-autoquiz-bg-notice" style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px; padding: 4px 8px; font-size: 9.5px; display: flex; align-items: center; justify-content: space-between; gap: 6px;" title="Auto-Quiz operates autonomously across questions and pages even when you minimize or switch to other windows">
-                        <div style="display: flex; align-items: center; gap: 5px;">
-                            <span id="amaes-autoquiz-bg-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${autoQuizMode ? 'var(--accent-green, #10b981)' : 'var(--text-muted, #94a3b8)'}; ${autoQuizMode ? 'box-shadow: 0 0 6px #10b981;' : ''}"></span>
-                            <span style="font-weight: 600; color: var(--text-primary);">${autoQuizMode ? 'Running in background' : 'Runs in background'}:</span>
-                            <span id="amaes-autoquiz-bg-text" style="color: var(--text-secondary);">${autoQuizMode ? 'Safe to switch tabs or apps' : 'Works even when minimized'}</span>
-                        </div>
-                    </div>
-                    ` : ''}
+
 
                     <!-- Batch actions on multi-question pages -->
                     <div id="amaes-batch-copy-container" style="display: ${isQuiz && Boolean(document.querySelector('.que')) && !autoQuizMode ? 'flex' : 'none'}; gap: 4px; margin-top: 2px;">
@@ -211,14 +202,7 @@
                             </label>
                         </div>
 
-                        <!-- Speed Mode Card -->
-                        <label id="amaes-fast-answer-card" style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Speed Mode: Answers visible questions instantly and moves quickly to the next page">
-                            <input id="chk-fast-quiz-mode" type="checkbox" ${fastQuizMode ? 'checked' : ''} style="cursor: pointer; margin: 0;" />
-                            <span id="amaes-fast-quiz-title" style="display: inline-flex; align-items: center; gap: 4px;">
-                                <span id="amaes-fast-quiz-icon" style="display: inline-flex; align-items: center; color: var(--text-muted);">${ICONS.zap}</span>
-                                <span>Speed Mode</span>
-                            </span>
-                        </label>
+
                     </div>
 
                     <!-- Collapsible Advanced Settings (Collapsed by default for clean UX) -->
