@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.13.1
+// @version      1.13.2
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.13.1";
+    const SCRIPT_VERSION = "v1.13.2";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -8892,6 +8892,25 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     function isActivityAlreadyComplete(container) {
         if (!container) return false;
 
+        // 0. Immediate short-circuit: If container has an uncompleted manual completion button, it is NOT complete!
+        const manualUncompletedBtn = container.querySelector(
+            'button[data-toggletype="manual:mark-done"], button[data-action="toggle-manual-completion"]:not([data-toggletype="manual:undo"])'
+        );
+        if (manualUncompletedBtn) {
+            const btnText = (manualUncompletedBtn.innerText || manualUncompletedBtn.getAttribute('aria-label') || manualUncompletedBtn.textContent || '').trim().toLowerCase();
+            if (btnText.includes('mark as done') || btnText.includes('to do') || manualUncompletedBtn.getAttribute('data-toggletype') === 'manual:mark-done') {
+                return false;
+            }
+        }
+
+        const anyBtns = container.querySelectorAll('button, input[type="submit"], input[type="button"]');
+        for (const b of anyBtns) {
+            const bText = (b.innerText || b.getAttribute('aria-label') || b.value || '').trim().toLowerCase();
+            if (bText.includes('mark as done') || b.getAttribute('data-toggletype') === 'manual:mark-done') {
+                return false;
+            }
+        }
+
         // 1. Direct class checks on container
         if (container.classList.contains('completed')) return true;
 
@@ -8907,21 +8926,25 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
         if (completionArea.querySelector('.badge-success, .text-success, [data-region="completion-info"] .badge-success')) return true;
 
-        // 4. Check entire completionArea text content for "Done" or "Completed"
+        // 4. Check completionArea text content for "Done" or "Completed" (strictly excluding "mark as done" and "to do")
         const fullText = (completionArea.innerText || completionArea.textContent || '').trim().toLowerCase();
-        if (fullText.includes('done:') || fullText.includes('done :') || /\bdone\b/i.test(fullText) || fullText.includes('completed')) {
-            return true;
+        if (!fullText.includes('mark as done') && !fullText.includes('to do')) {
+            if (fullText.includes('done:') || fullText.includes('done :') || /\bdone\b/i.test(fullText) || fullText.includes('completed')) {
+                return true;
+            }
         }
 
-        // 5. Scan all buttons inside container for manual undo or done text
-        const btns = container.querySelectorAll(
-            'button[data-action="toggle-manual-completion"], button[data-toggletype], button.btn-outline-success, button.btn-success, button'
-        );
-        for (const b of btns) {
-            const bText = (b.innerText || b.getAttribute('aria-label') || b.textContent || '').trim().toLowerCase();
+        // 5. Scan all buttons inside container for manual undo or done text (strictly excluding "mark as done")
+        for (const b of anyBtns) {
+            const bText = (b.innerText || b.getAttribute('aria-label') || b.value || '').trim().toLowerCase();
             const bToggle = (b.getAttribute('data-toggletype') || '').toLowerCase();
-            if (bToggle === 'manual:undo' || /\bdone\b/i.test(bText) || bText.includes('✓') || bText.includes('✔') || b.classList.contains('btn-outline-success') || b.classList.contains('btn-success')) {
+            if (bToggle === 'manual:undo' || (b.classList && (b.classList.contains('btn-outline-success') || b.classList.contains('btn-success')))) {
                 return true;
+            }
+            if (!bText.includes('mark as done') && !bText.includes('to do')) {
+                if (bText === 'done' || bText.startsWith('done') || bText.includes('✓') || bText.includes('✔') || bText.includes('completed')) {
+                    return true;
+                }
             }
         }
 
@@ -8959,10 +8982,17 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         }
 
         // 4. Missing, disabled, or dimmed link on activity container (locked exams have no active clickable link)
-        const link = container.querySelector('a.aal_link, a[href*="/mod/"]');
-        if (!link || link.getAttribute('aria-disabled') === 'true' || link.classList.contains('dimmed') || link.getAttribute('tabindex') === '-1' || link.hasAttribute('disabled')) {
-            if (container.matches('.activity, .activity-item, li.activity, div[data-region="activity-card"]')) {
-                return true;
+        // If an item has an interactive manual completion button, it is never an inaccessible locked exam!
+        const hasManualBtn = Boolean(container.querySelector('button[data-action="toggle-manual-completion"], button[data-toggletype], form.togglecompletion'));
+        if (!hasManualBtn) {
+            const isQuizOrExam = container.classList.contains('modtype_quiz') || Boolean(container.querySelector('[data-modname="quiz"], a[href*="/mod/quiz/"]'));
+            if (isQuizOrExam) {
+                const link = container.querySelector('a.aal_link, a[href*="/mod/quiz/"], a[href*="/mod/"]');
+                if (!link || link.getAttribute('aria-disabled') === 'true' || link.classList.contains('dimmed') || link.hasAttribute('disabled')) {
+                    if (container.matches('.activity, .activity-item, li.activity, div[data-region="activity-card"]')) {
+                        return true;
+                    }
+                }
             }
         }
 
@@ -8997,32 +9027,36 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 'button.btn-outline-secondary, ' +
                 'button.btn-outline-success, ' +
                 'button.btn-success, ' +
-                'button'
+                'button, ' +
+                'input[type="submit"][name*="completion" i], ' +
+                'input[type="submit"][value*="done" i], ' +
+                'input[type="image"][name*="completion" i], ' +
+                'form.togglecompletion input[type="submit"], ' +
+                'form.togglecompletion button'
             );
 
             let foundManualButton = false;
             for (const btn of buttons) {
                 if (processedButtons.has(btn)) continue;
 
-                const text = (btn.innerText || btn.getAttribute('aria-label') || '').trim().toLowerCase();
+                const text = (btn.innerText || btn.getAttribute('aria-label') || btn.value || '').trim().toLowerCase();
                 const toggleType = (btn.getAttribute('data-toggletype') || '').toLowerCase();
+                const isToggleAction = btn.getAttribute('data-action') === 'toggle-manual-completion';
+                const isToggleCompletionForm = Boolean(btn.closest('form.togglecompletion'));
 
-                const isCurrentlyDone =
+                const isMarkDoneText = text.includes('mark as done') || text === 'mark as done' || toggleType === 'manual:mark-done';
+
+                const isCurrentlyDone = !isMarkDoneText && (
                     toggleType === 'manual:undo' ||
-                    text === 'done' ||
-                    /\bdone\b/i.test(text) ||
-                    text.includes('✓') ||
-                    text.includes('✔') ||
-                    text.includes('completed') ||
-                    btn.classList.contains('btn-success') ||
-                    btn.classList.contains('btn-outline-success');
+                    ((text === 'done' || text.startsWith('done') || text.includes('✓') || text.includes('✔') || (text.includes('completed') && !text.includes('incomplete'))) &&
+                     (isToggleAction || toggleType || isToggleCompletionForm || btn.classList.contains('btn-outline-success') || btn.classList.contains('btn-success'))) ||
+                    ((btn.classList.contains('btn-success') || btn.classList.contains('btn-outline-success')) && (isToggleAction || toggleType))
+                );
 
-                const isCurrentlyUncompleted =
-                    toggleType === 'manual:mark-done' ||
-                    text === 'mark as done' ||
-                    text === 'to do' ||
-                    text.includes('mark as done') ||
-                    (btn.dataset.action === 'toggle-manual-completion' && !isCurrentlyDone);
+                const isCurrentlyUncompleted = isMarkDoneText ||
+                    (text === 'to do' && (isToggleAction || toggleType)) ||
+                    (isToggleAction && !isCurrentlyDone) ||
+                    (isToggleCompletionForm && !isCurrentlyDone);
 
                 let matchesGoal = false;
                 if (goal === 'mark_done' && isCurrentlyUncompleted && !isCurrentlyDone) {
@@ -9079,7 +9113,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     if (badge.closest('.badge-success, .completed, .iscompleted')) continue;
 
                     const text = (badge.innerText || badge.textContent || '').trim().toLowerCase();
-                    const isTodoView = text.includes('to do: view') || text.includes('to do:view') || (text.includes('to do') && text.includes('view'));
+                    const isTodoView = text.includes('to do: view') || text.includes('to do:view') || (text.includes('to do') && text.includes('view')) || text === 'view';
 
                     if (isTodoView && !text.includes('done') && !text.includes('completed') && !badge.classList.contains('badge-success')) {
                         uncompletedViewBadge = badge;
@@ -9088,7 +9122,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 }
 
                 if (uncompletedViewBadge) {
-                    const linkElem = container.querySelector('a.aal_link, a[href*="/mod/"], a.activityname');
+                    const linkElem = container.querySelector('a.aal_link, a[href*="/mod/"], a.activityname, a.stretched-link, a[href*="view.php"]');
                     const activityUrl = linkElem ? linkElem.href : null;
                     if (activityUrl) {
                         const classification = classifyActivity(container);
@@ -9121,9 +9155,11 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         if (activityElements.length > 0) {
             activityElements.forEach(scanBlock);
         } else {
-            const rawButtons = document.querySelectorAll('button[data-action="toggle-manual-completion"], button[data-toggletype]');
+            const rawButtons = document.querySelectorAll(
+                'button[data-action="toggle-manual-completion"], button[data-toggletype], form.togglecompletion input[type="submit"], form.togglecompletion button'
+            );
             rawButtons.forEach(btn => {
-                const parent = btn.closest('li, div.activity, div.row, div.card') || btn.parentElement;
+                const parent = btn.closest('li, div.activity, div.row, div.card, div.activity-item') || btn.parentElement;
                 scanBlock(parent);
             });
         }
@@ -9154,6 +9190,19 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         } catch (err) {
             // Even if fetch throws (e.g. cross-origin redirect on URL module), Moodle logged course_module_viewed
             logDebug(`Auto-view fetch handled for ${url}: ${err.message}`);
+            if (typeof GM_xmlhttpRequest === 'function') {
+                try {
+                    await new Promise(res => {
+                        GM_xmlhttpRequest({
+                            method: 'GET',
+                            url: url,
+                            onload: () => res(true),
+                            onerror: () => res(false),
+                            ontimeout: () => res(false)
+                        });
+                    });
+                } catch (_) {}
+            }
         }
 
         if (badgeElem) {
@@ -9207,7 +9256,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     if (badge.dataset.amaesAutoViewBound) continue;
                     badge.dataset.amaesAutoViewBound = 'true';
 
-                    const linkElem = container.querySelector('a.aal_link, a[href*="/mod/"], a.activityname');
+                    const linkElem = container.querySelector('a.aal_link, a[href*="/mod/"], a.activityname, a.stretched-link, a[href*="view.php"]');
                     const activityUrl = linkElem ? linkElem.href : null;
                     if (!activityUrl) continue;
 
@@ -23127,7 +23176,18 @@ function setupAccountTransferUI() {
                         await autoViewActivity(item.autoViewUrl, item.badgeElem, item.container);
                     }
                 } else if (item.button) {
-                    item.button.click();
+                    if (typeof triggerClick === 'function') {
+                        triggerClick(item.button);
+                    } else {
+                        item.button.click();
+                    }
+                    if (goal === 'mark_done') {
+                        try {
+                            item.button.classList.remove('btn-outline-secondary');
+                            item.button.classList.add('btn-outline-success');
+                            item.button.style.opacity = '0.8';
+                        } catch (_) {}
+                    }
                 }
                 processedCount++;
 

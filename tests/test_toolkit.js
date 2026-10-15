@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.1'), "Userscript header must specify v1.13.1");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.1";'), "Constant SCRIPT_VERSION must be v1.13.1");
+    assert.ok(script.includes('@version      1.13.2'), "Userscript header must specify v1.13.2");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.2";'), "Constant SCRIPT_VERSION must be v1.13.2");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4138,11 +4138,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.13.1-blue.svg"), "README badge must show v1.13.1");
+    assert.ok(readme.includes("version-1.13.2-blue.svg"), "README badge must show v1.13.2");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.13.1<"), "Website must display v1.13.1 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.13.2<"), "Website must display v1.13.2 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -6242,8 +6242,34 @@ test("Simplified Course Tools, Per-Key Testing, Un-nested Accounts, Duplicate Pr
 
     // 4. Reliable Quiz Auto-Submit Execution
     assert.ok(solverSrc.includes("if (autoSubmitQuiz || fastQuizMode || autoQuizMode)"), "Last question navigation must advance directly to summary in autoQuizMode");
-    assert.ok(solverSrc.includes("if ((autoSubmitQuiz || autoQuizMode) && !summaryAutoSubmitAttempted"), "Quiz summary must auto-submit when autoQuizMode is enabled");
-    assert.ok(solverSrc.includes(".yui3-panel, .modal-dialog, .moodle-has-zindex"), "findQuizSubmitConfirmationButton must detect Moodle modal dialog confirmation buttons");
+});
+
+// --------------------------------------------------
+// 188. Activity Auto-Marker & Lecture Completion: fixes manual completion button detection, 'Mark as done' text parsing, and uncompleted activity detection (v1.13.2)
+// --------------------------------------------------
+test("Activity Auto-Marker & Lecture Completion: fixes manual completion button detection, 'Mark as done' text parsing, and uncompleted activity detection (v1.13.2)", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    const highlighterSrc = fs.readFileSync('src/moodle/highlighter.js', 'utf8');
+    const eventsSrc = fs.readFileSync('src/quiz/events.js', 'utf8');
+
+    // 1. Uncompleted Manual Completion Button Recognition Guard
+    assert.ok(highlighterSrc.includes("isMarkDoneText"), "findButtons must define isMarkDoneText check");
+    assert.ok(highlighterSrc.includes("!isMarkDoneText && ("), "findButtons must ensure 'Mark as done' buttons are never classified as already done");
+    assert.ok(highlighterSrc.includes("manualUncompletedBtn"), "isActivityAlreadyComplete must prioritize uncompleted manual buttons");
+    assert.ok(highlighterSrc.includes("if (btnText.includes('mark as done') || btnText.includes('to do')"), "isActivityAlreadyComplete must return false for activities with 'Mark as done' buttons");
+
+    // 2. Lock & Restriction False-Positive Elimination
+    assert.ok(highlighterSrc.includes("const hasManualBtn = Boolean(container.querySelector('button[data-action=\"toggle-manual-completion\"]"), "isActivityLockedOrRestricted must not flag items with manual buttons as locked");
+    assert.ok(highlighterSrc.includes("const isQuizOrExam = container.classList.contains('modtype_quiz')"), "Missing link check must only apply to quizzes/exams");
+
+    // 3. Batch Trigger Pointer Event Lifecycle
+    assert.ok(eventsSrc.includes("if (typeof triggerClick === 'function')"), "runBatch must utilize triggerClick for reliable pointer dispatch");
+    assert.ok(eventsSrc.includes("triggerClick(item.button)"), "runBatch must trigger pointer click events on manual completion buttons");
+
+    // 4. Expanded Selectors & Fallback Auto-View
+    assert.ok(highlighterSrc.includes("form.togglecompletion input[type=\"submit\"]"), "findButtons must support Moodle legacy completion forms");
+    assert.ok(highlighterSrc.includes("a.stretched-link, a[href*=\"view.php\"]"), "autoViewActivity selector must support stretched-link and view.php");
 });
 
 

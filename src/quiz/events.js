@@ -1695,7 +1695,18 @@
                         await autoViewActivity(item.autoViewUrl, item.badgeElem, item.container);
                     }
                 } else if (item.button) {
-                    item.button.click();
+                    if (typeof triggerClick === 'function') {
+                        triggerClick(item.button);
+                    } else {
+                        item.button.click();
+                    }
+                    if (goal === 'mark_done') {
+                        try {
+                            item.button.classList.remove('btn-outline-secondary');
+                            item.button.classList.add('btn-outline-success');
+                            item.button.style.opacity = '0.8';
+                        } catch (_) {}
+                    }
                 }
                 processedCount++;
 
