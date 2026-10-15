@@ -104,11 +104,28 @@
     // ==========================================
 
     async function fetchCourseGradesMap() {
-        if (!checkIsCoursePage()) return {};
+        const courseInfo = typeof detectCourseInfo === 'function' ? detectCourseInfo() : {};
+        const courseId = courseInfo && courseInfo.courseId ? courseInfo.courseId : '';
 
-        // In-memory cache valid for 60s
+        // 1. In-memory cache valid for 60s
         if (typeof window !== 'undefined' && window.__amaesCourseGradesCache && window.__amaesCourseGradesCacheTime && (Date.now() - window.__amaesCourseGradesCacheTime < 60000)) {
             return window.__amaesCourseGradesCache;
+        }
+
+        // 2. Persistent localStorage cache valid for 10 minutes
+        if (courseId) {
+            try {
+                const storedRaw = localStorage.getItem(`amaes_course_grades_cache_${courseId}`);
+                const storedTime = parseInt(localStorage.getItem(`amaes_course_grades_cache_time_${courseId}`) || '0', 10);
+                if (storedRaw && storedTime && (Date.now() - storedTime < 600000)) {
+                    const parsed = JSON.parse(storedRaw);
+                    if (typeof window !== 'undefined') {
+                        window.__amaesCourseGradesCache = parsed;
+                        window.__amaesCourseGradesCacheTime = storedTime;
+                    }
+                    return parsed;
+                }
+            } catch (_) {}
         }
 
         let gradesUrl = null;
@@ -116,12 +133,9 @@
             const gradesLink = document.querySelector('a[href*="/grade/report/user/index.php"]');
             if (gradesLink && gradesLink.href) {
                 gradesUrl = gradesLink.href;
-            } else if (typeof detectCourseInfo === 'function') {
-                const courseInfo = detectCourseInfo();
-                if (courseInfo && courseInfo.courseId) {
-                    const semPath = typeof getSemesterBasePath === 'function' ? getSemesterBasePath() : '/';
-                    gradesUrl = `${window.location.origin}${semPath}grade/report/user/index.php?id=${courseInfo.courseId}`;
-                }
+            } else if (courseId) {
+                const semPath = typeof getSemesterBasePath === 'function' ? getSemesterBasePath() : '/';
+                gradesUrl = `${window.location.origin}${semPath}grade/report/user/index.php?id=${courseId}`;
             }
         }
 
@@ -204,6 +218,12 @@
             if (typeof window !== 'undefined') {
                 window.__amaesCourseGradesCache = map;
                 window.__amaesCourseGradesCacheTime = Date.now();
+                if (courseId) {
+                    try {
+                        localStorage.setItem(`amaes_course_grades_cache_${courseId}`, JSON.stringify(map));
+                        localStorage.setItem(`amaes_course_grades_cache_time_${courseId}`, String(Date.now()));
+                    } catch (_) {}
+                }
             }
             return map;
         } catch (e) {

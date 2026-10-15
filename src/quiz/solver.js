@@ -2010,10 +2010,12 @@
     let summaryAutoSubmitTimer = null;
     let summaryAutoSubmitAttempted = false;
     let summaryAutoSubmitHastenMultiplier = 1;
+    let summaryAutoSubmitPaused = false;
 
     // Updates Moodle's native submit buttons, sidebar indicator, and panel buttons on summary.php
     function updateQuizSummarySubmitButtons(remainingSec, multiplier = 1) {
         if (!checkIsQuizSummaryPage()) return;
+        const isPaused = Boolean(summaryAutoSubmitPaused);
         const submitBtn = findQuizSummarySubmitButton();
         if (submitBtn) {
             if (!submitBtn.dataset.amaesOrigText) {
@@ -2021,9 +2023,14 @@
             }
             const orig = submitBtn.dataset.amaesOrigText || 'Submit all and finish';
             const speedTag = multiplier > 1 ? ` · ${multiplier}x` : '';
-            const btnText = remainingSec > 0
-                ? `${orig.trim()} (${remainingSec}s${speedTag} · Press N to hasten)`
-                : `${orig.trim()} (Press N)`;
+            let btnText;
+            if (isPaused) {
+                btnText = `${orig.trim()} (Auto-submit Paused · Press N or Click to submit)`;
+            } else if (remainingSec > 0) {
+                btnText = `${orig.trim()} (${remainingSec}s${speedTag} · Press N to hasten)`;
+            } else {
+                btnText = `${orig.trim()} (Press N)`;
+            }
             if (submitBtn.tagName === 'INPUT') {
                 submitBtn.value = btnText;
             } else {
@@ -2038,31 +2045,152 @@
             if (!navInd) {
                 navInd = document.createElement('div');
                 navInd.id = 'amaes-navblock-submit-indicator';
-                navInd.style.cssText = 'margin-top:10px; padding:8px 12px; background:#ecfdf5; border:1px solid #10b981; border-radius:6px; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size:11px; color:#065f46; box-sizing:border-box; text-align:center;';
                 rightNav.appendChild(navInd);
             }
-            const speedTag = multiplier > 1 ? ` (${multiplier}x speed)` : '';
-            navInd.innerHTML = remainingSec > 0
-                ? `<div style="font-weight:700;">Auto-submit in <span id="amaes-navblock-countdown-sec">${remainingSec}s</span>${speedTag}</div><div style="font-size:10px; color:#047857; margin-top:2px;">Press <b>N</b> to hasten (-2s)</div>`
-                : `<div style="font-weight:700;">Submitting attempt...</div>`;
+            if (isPaused) {
+                navInd.style.cssText = 'margin-top:10px; padding:8px 12px; background:#fffbeb; border:1px solid #f59e0b; border-radius:6px; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size:11px; color:#92400e; box-sizing:border-box; text-align:center;';
+                navInd.innerHTML = `
+                    <div style="font-weight:700; color:#b45309;">Auto-submit Paused</div>
+                    <div style="font-size:10px; color:#92400e; margin-top:2px;">Press <b>P</b> to resume · <b>N</b> to hasten/submit</div>
+                    <button id="amaes-navblock-pause-btn" type="button" style="margin-top:5px; padding:2px 8px; font-size:10px; font-weight:600; background:#ffffff; border:1px solid #f59e0b; border-radius:4px; cursor:pointer; color:#b45309;">Resume (P)</button>
+                `;
+            } else {
+                navInd.style.cssText = 'margin-top:10px; padding:8px 12px; background:#ecfdf5; border:1px solid #10b981; border-radius:6px; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size:11px; color:#065f46; box-sizing:border-box; text-align:center;';
+                const speedTag = multiplier > 1 ? ` (${multiplier}x speed)` : '';
+                navInd.innerHTML = remainingSec > 0
+                    ? `<div style="font-weight:700;">Auto-submit in <span id="amaes-navblock-countdown-sec">${remainingSec}s</span>${speedTag}</div>
+                       <div style="font-size:10px; color:#047857; margin-top:2px;">Press <b>N</b> to hasten (-2s) · <b>P</b> to pause</div>
+                       <button id="amaes-navblock-pause-btn" type="button" style="margin-top:5px; padding:2px 8px; font-size:10px; font-weight:600; background:#ffffff; border:1px solid #10b981; border-radius:4px; cursor:pointer; color:#065f46;">Pause (P)</button>`
+                    : `<div style="font-weight:700;">Submitting attempt...</div>`;
+            }
+
+            const navPauseBtn = navInd.querySelector('#amaes-navblock-pause-btn');
+            if (navPauseBtn) {
+                navPauseBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    pauseQuizSummaryAutoSubmit();
+                };
+            }
         }
 
         // Quick submit button on readyBanner
         const quickSubmitBtn = document.getElementById('amaes-btn-quick-submit');
         if (quickSubmitBtn) {
             const speedTag = multiplier > 1 ? ` · ${multiplier}x` : '';
-            quickSubmitBtn.textContent = remainingSec > 0
-                ? `Submit All & Finish (${remainingSec}s${speedTag} · Press N) →`
-                : 'Submit All & Finish (Press N) →';
+            quickSubmitBtn.textContent = isPaused
+                ? 'Submit All & Finish (Press N) →'
+                : (remainingSec > 0
+                    ? `Submit All & Finish (${remainingSec}s${speedTag} · Press N) →`
+                    : 'Submit All & Finish (Press N) →');
+        }
+
+        // Pause/Resume button on readyBanner
+        const bannerPauseBtn = document.getElementById('amaes-btn-pause-auto-submit');
+        if (bannerPauseBtn) {
+            bannerPauseBtn.textContent = isPaused ? 'Resume (P)' : 'Pause (P)';
+            bannerPauseBtn.style.color = isPaused ? '#b45309' : '#065f46';
+            bannerPauseBtn.style.borderColor = isPaused ? '#f59e0b' : '#10b981';
+            bannerPauseBtn.style.background = isPaused ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)';
+        }
+
+        // Description text on readyBanner
+        const bannerDescEl = document.getElementById('amaes-summary-banner-desc');
+        if (bannerDescEl) {
+            if (isPaused) {
+                bannerDescEl.innerHTML = `Auto-submit paused (<b id="amaes-summary-countdown-sec">${remainingSec}s</b> remaining). Review at your own pace or press <b>P</b> to resume.`;
+            } else if (remainingSec > 0) {
+                const speedTag = multiplier > 1 ? ` (${multiplier}x)` : '';
+                bannerDescEl.innerHTML = `Auto-submitting attempt in <b id="amaes-summary-countdown-sec">${remainingSec}s${speedTag}</b> (Press N to hasten · P to pause)...`;
+            } else {
+                bannerDescEl.textContent = 'Auto-submitting attempt...';
+            }
         }
 
         // Toolkit panel button
         const btnMasterAutoQuiz = document.getElementById('btn-master-auto-quiz');
         if (btnMasterAutoQuiz) {
-            btnMasterAutoQuiz.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-            const speedTag = multiplier > 1 ? ` ${multiplier}x` : '';
-            btnMasterAutoQuiz.innerHTML = `${ICONS.checkCircle} <span>Submit (${remainingSec}s${speedTag} · Press N)</span>`;
-            btnMasterAutoQuiz.title = 'Click or press N to hasten countdown (-2s) or submit immediately';
+            if (isPaused) {
+                btnMasterAutoQuiz.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+                btnMasterAutoQuiz.innerHTML = `${ICONS.pause || ICONS.zap} <span>Paused (Press P to resume)</span>`;
+                btnMasterAutoQuiz.title = 'Auto-submit paused. Click or press P to resume, or N to submit';
+            } else {
+                btnMasterAutoQuiz.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                const speedTag = multiplier > 1 ? ` ${multiplier}x` : '';
+                btnMasterAutoQuiz.innerHTML = `${ICONS.checkCircle} <span>Submit (${remainingSec}s${speedTag} · Press N)</span>`;
+                btnMasterAutoQuiz.title = 'Click or press N to hasten countdown (-2s) or submit immediately. Press P to pause';
+            }
+        }
+    }
+
+    // Pauses or resumes auto-submit countdown on summary.php
+    function pauseQuizSummaryAutoSubmit(forcePause = null) {
+        if (!checkIsQuizSummaryPage()) return false;
+        const deadlineKey = 'amaes_summary_deadline_' + window.location.href;
+        const pausedSecKey = 'amaes_summary_paused_sec_' + window.location.href;
+
+        if (forcePause === null) {
+            summaryAutoSubmitPaused = !summaryAutoSubmitPaused;
+        } else {
+            summaryAutoSubmitPaused = Boolean(forcePause);
+        }
+
+        if (summaryAutoSubmitPaused) {
+            if (summaryAutoSubmitTimer) {
+                clearInterval(summaryAutoSubmitTimer);
+                clearTimeout(summaryAutoSubmitTimer);
+                summaryAutoSubmitTimer = null;
+            }
+            const targetDeadline = parseInt(sessionStorage.getItem(deadlineKey) || '0', 10);
+            let remainingSec = 5;
+            if (targetDeadline && !isNaN(targetDeadline)) {
+                remainingSec = Math.max(1, Math.ceil((targetDeadline - Date.now()) / 1000));
+            }
+            sessionStorage.removeItem(deadlineKey);
+            sessionStorage.setItem(pausedSecKey, String(remainingSec));
+
+            updateQuizSummarySubmitButtons(remainingSec, summaryAutoSubmitHastenMultiplier);
+            showToast("Auto-submit paused. Review at your own pace.", 2500);
+            setLog("<b>Auto-Submit:</b> Paused via <b>[P]</b>. Countdown stopped.", "var(--accent-amber, #f59e0b)");
+            return true;
+        } else {
+            // Resume
+            let remainingSec = parseInt(sessionStorage.getItem(pausedSecKey) || '5', 10);
+            if (remainingSec <= 0) remainingSec = 5;
+            sessionStorage.removeItem(pausedSecKey);
+            let targetDeadline = Date.now() + (remainingSec * 1000);
+            sessionStorage.setItem(deadlineKey, String(targetDeadline));
+            summaryAutoSubmitPaused = false;
+
+            setLog(`<b>Auto-Submit:</b> Resumed via <b>[P]</b> (${remainingSec}s remaining).`, "var(--accent-green)");
+            showToast(`Auto-submit resumed (${remainingSec}s)...`, 2000);
+            updateQuizSummarySubmitButtons(remainingSec, summaryAutoSubmitHastenMultiplier);
+
+            const countdownInterval = setInterval(() => {
+                if (summaryAutoSubmitPaused) return;
+                if (summaryAutoSubmitHastenMultiplier > 1) {
+                    targetDeadline -= (summaryAutoSubmitHastenMultiplier - 1) * 1000;
+                }
+                remainingSec = Math.max(0, Math.ceil((targetDeadline - Date.now()) / 1000));
+                const secEl = document.getElementById('amaes-summary-countdown-sec');
+                if (secEl) {
+                    secEl.textContent = summaryAutoSubmitHastenMultiplier > 1
+                        ? `${remainingSec}s (${summaryAutoSubmitHastenMultiplier}x)`
+                        : `${remainingSec}s`;
+                }
+                updateQuizSummarySubmitButtons(remainingSec, summaryAutoSubmitHastenMultiplier);
+                if (remainingSec <= 0) {
+                    clearInterval(countdownInterval);
+                    sessionStorage.removeItem(deadlineKey);
+                    summaryAutoSubmitTimer = null;
+                    setLog("<b>Auto-Submit:</b> Leeway finished. Submitting attempt now...", "var(--accent-green)");
+                    executeQuizSummaryFinalSubmit();
+                } else if (remainingSec % 5 === 0 || remainingSec <= 3) {
+                    setLog(`<b>Auto-Submit:</b> Submitting attempt in <b>${remainingSec}s</b>...`, "var(--accent-green)");
+                }
+            }, 1000);
+            summaryAutoSubmitTimer = countdownInterval;
+            return true;
         }
     }
 
@@ -2070,6 +2198,14 @@
     function hastenQuizSummaryAutoSubmit() {
         if (!checkIsQuizSummaryPage()) return false;
         const deadlineKey = 'amaes_summary_deadline_' + window.location.href;
+        const pausedSecKey = 'amaes_summary_paused_sec_' + window.location.href;
+
+        // If paused, unpause immediately
+        if (summaryAutoSubmitPaused) {
+            summaryAutoSubmitPaused = false;
+            sessionStorage.removeItem(pausedSecKey);
+        }
+
         let targetDeadline = parseInt(sessionStorage.getItem(deadlineKey) || '0', 10);
 
         if (!targetDeadline || isNaN(targetDeadline) || !summaryAutoSubmitTimer) {
@@ -2321,6 +2457,7 @@
                 </div>
                 <div style="display:flex; align-items:center; gap:6px;">
                     ${shouldAutoSubmit ? `
+                    <button id="amaes-btn-pause-auto-submit" type="button" style="padding:4px 10px; background:rgba(16,185,129,0.1); color:#065f46; border:1px solid #10b981; border-radius:5px; font-weight:700; font-size:11px; cursor:pointer; white-space:nowrap;">Pause (P)</button>
                     <button id="amaes-btn-cancel-auto-submit" type="button" style="padding:4px 10px; background:rgba(239,68,68,0.1); color:#dc2626; border:1px solid rgba(239,68,68,0.25); border-radius:5px; font-weight:700; font-size:11px; cursor:pointer; white-space:nowrap;">Cancel Auto-Submit</button>
                     ` : ''}
                     <button id="amaes-btn-quick-submit" type="button" style="padding:5px 14px; background:#10b981; color:#ffffff; border:none; border-radius:5px; font-weight:700; font-size:11.5px; cursor:pointer; white-space:nowrap;">Submit All & Finish (Press N) &rarr;</button>
@@ -2338,6 +2475,12 @@
                 summaryAutoSubmitAttempted = false;
                 executeQuizSummaryFinalSubmit();
             };
+            const pauseBtn = readyBanner.querySelector('#amaes-btn-pause-auto-submit');
+            if (pauseBtn) {
+                pauseBtn.onclick = () => {
+                    pauseQuizSummaryAutoSubmit();
+                };
+            }
             const cancelBtn = readyBanner.querySelector('#amaes-btn-cancel-auto-submit');
             if (cancelBtn) {
                 cancelBtn.onclick = () => {
@@ -3092,8 +3235,284 @@
         }
     }
 
+    // ----------------------------------------------------
+    // Quiz & Exam Sequential Cycle Navigation (] and [)
+    // ----------------------------------------------------
+
+    // Extracts ordered activities from Moodle's native .activity-navigation select (Jump to...)
+    function getActivitiesFromUrlSelect() {
+        if (typeof document === 'undefined') return [];
+        const select = document.querySelector('.activity-navigation select, select.urlselect, form.urlselect select');
+        if (!select) return [];
+        const options = Array.from(select.querySelectorAll('option'));
+        const items = [];
+        options.forEach((opt, idx) => {
+            const val = (opt.value || '').trim();
+            const text = (opt.textContent || '').trim();
+            if (val && (val.includes('/mod/quiz/') || /\b(quiz|exam|assessment|prelim|midterm|prefinal|final)\b/i.test(text))) {
+                const mId = val.match(/[?&]id=(\d+)/);
+                items.push({
+                    url: val,
+                    title: text,
+                    cmid: mId ? mId[1] : null,
+                    index: idx
+                });
+            }
+        });
+        return items;
+    }
+
+    // Resolves full ordered list of course quizzes from DOM, urlselect, or localStorage cache
+    function getCourseQuizzesList() {
+        if (typeof document === 'undefined') return [];
+        const courseInfo = typeof detectCourseInfo === 'function' ? detectCourseInfo() : {};
+        const courseId = courseInfo && courseInfo.courseId ? courseInfo.courseId : '';
+
+        // 1. From DOM if on course page (/course/view.php)
+        if (checkIsCoursePage()) {
+            const activities = Array.from(document.querySelectorAll(
+                'li.activity, .activity-item, .course-section .activity, div[data-region="activity-card"]'
+            ));
+            const list = [];
+            activities.forEach(el => {
+                const link = el.querySelector('a[href*="/mod/quiz/view.php?id="], a[href*="/mod/quiz/"]');
+                const isQuiz = (typeof classifyActivity === 'function' && classifyActivity(el).type === 'quiz') || Boolean(link);
+                if (isQuiz && link && link.href) {
+                    const mId = link.href.match(/[?&]id=(\d+)/);
+                    const titleElem = el.querySelector('.instancename, .activityname, a.aal_link, .activity-title');
+                    const rawTitle = titleElem ? titleElem.innerText.trim() : (link.innerText.trim() || el.innerText.split('\n')[0]);
+                    const cleanTitle = rawTitle.replace(/\s*Quiz\s*$/i, '').trim() || rawTitle;
+                    list.push({
+                        url: link.href,
+                        title: cleanTitle,
+                        cmid: mId ? mId[1] : null
+                    });
+                }
+            });
+            if (list.length > 0) {
+                if (courseId) {
+                    try {
+                        localStorage.setItem(`amaes_course_quizzes_${courseId}`, JSON.stringify(list));
+                    } catch (_) {}
+                }
+                return list;
+            }
+        }
+
+        // 2. From urlselect dropdown inside .activity-navigation
+        const selectItems = getActivitiesFromUrlSelect();
+        if (selectItems.length > 0) {
+            if (courseId) {
+                try {
+                    localStorage.setItem(`amaes_course_quizzes_${courseId}`, JSON.stringify(selectItems));
+                } catch (_) {}
+            }
+            return selectItems;
+        }
+
+        // 3. From cached course quiz list in localStorage
+        if (courseId) {
+            try {
+                const cached = localStorage.getItem(`amaes_course_quizzes_${courseId}`);
+                if (cached) return JSON.parse(cached);
+            } catch (_) {}
+        }
+        return [];
+    }
+
+    function getCurrentQuizCmid() {
+        if (typeof window === 'undefined') return '';
+        const search = window.location.search || '';
+        const m = search.match(/[?&]id=(\d+)/) || search.match(/[?&]cmid=(\d+)/);
+        if (m) return m[1];
+        const idInput = document.querySelector('input[name="cmid"], input[name="id"]');
+        if (idInput && idInput.value) return idInput.value;
+        return '';
+    }
+
+    // Decorates native Moodle .activity-navigation buttons (#next-activity-link a / #prev-activity-link a)
+    function decorateNativeActivityNavigation() {
+        if (typeof document === 'undefined') return;
+
+        // Next activity link: decorate with (Press ])
+        const nextLink = document.querySelector('#next-activity-link a, .activity-navigation .pull-right a, a[title*="Next activity"], .next-activity a');
+        if (nextLink) {
+            if (!nextLink.dataset.amaesDecorated) {
+                nextLink.dataset.amaesDecorated = 'true';
+                const rarrow = nextLink.querySelector('.rarrow, .icon');
+                const badge = '<span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; margin: 0 4px; font-weight: 600;">(Press ])</span>';
+                if (rarrow) {
+                    rarrow.insertAdjacentHTML('beforebegin', badge);
+                } else {
+                    nextLink.insertAdjacentHTML('beforeend', ' ' + badge);
+                }
+            }
+        }
+
+        // Previous activity link: decorate with (Press [)
+        const prevLink = document.querySelector('#prev-activity-link a, .activity-navigation .pull-left a, a[title*="Previous activity"], .prev-activity a');
+        if (prevLink) {
+            if (!prevLink.dataset.amaesDecorated) {
+                prevLink.dataset.amaesDecorated = 'true';
+                const larrow = prevLink.querySelector('.larrow, .icon');
+                const badge = '<span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; margin: 0 4px; font-weight: 600;">(Press [)</span>';
+                if (larrow) {
+                    larrow.insertAdjacentHTML('afterend', badge);
+                } else {
+                    prevLink.insertAdjacentHTML('afterbegin', badge + ' ');
+                }
+            }
+        }
+    }
+
+    // Cycles to the next or previous quiz/exam
+    function cycleQuizOrExam(direction = 'next', opts = {}) {
+        if (typeof window === 'undefined') return false;
+
+        // 1. Strict Page Guard: Must ONLY operate on Moodle quiz, course, or exam pages
+        const isExamHost = (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam) ||
+            (typeof window !== 'undefined' && window.location.hostname.includes('exam'));
+        const isAcademicPage = checkIsCoursePage() ||
+            checkIsQuizPage() ||
+            isExamHost;
+
+        if (!isAcademicPage) return false;
+
+        // 2. Exam Portal Adaptation: semestralexam.amaes.com
+        // On exams, Moodle already provides sequential navigation links (#next-activity-link a / #prev-activity-link a)
+        // Skip settings are strictly bypassed on exams as exams are not repeatable quizzes
+        if (isExamHost) {
+            if (direction === 'next') {
+                const nextLink = document.querySelector('#next-activity-link a, .activity-navigation .pull-right a, a[title*="Next activity"], .next-activity a');
+                if (nextLink && nextLink.href) {
+                    const title = (nextLink.innerText || 'Next Exam').replace(/\(Press \]\)/g, '').replace(/[►▶]/g, '').trim();
+                    showToast(`Advancing to next exam: ${title}`, 2000);
+                    setLog(`<b>Exam Navigation:</b> Cycling to <b>${title}</b> via <b>]</b>.`, "var(--accent-blue)");
+                    window.location.href = nextLink.href;
+                    return true;
+                }
+            } else {
+                const prevLink = document.querySelector('#prev-activity-link a, .activity-navigation .pull-left a, a[title*="Previous activity"], .prev-activity a');
+                if (prevLink && prevLink.href) {
+                    const title = (prevLink.innerText || 'Previous Exam').replace(/\(Press \[\)/g, '').replace(/[◄◀]/g, '').trim();
+                    showToast(`Returning to previous exam: ${title}`, 2000);
+                    setLog(`<b>Exam Navigation:</b> Cycling to <b>${title}</b> via <b>[</b>.`, "var(--accent-blue)");
+                    window.location.href = prevLink.href;
+                    return true;
+                }
+            }
+        }
+
+        // 3. Quiz Portal Sequential Navigation
+        const skipPassed = !isExamHost && (
+            opts.skipPassed !== undefined
+                ? Boolean(opts.skipPassed)
+                : (typeof localStorage !== 'undefined' && localStorage.getItem('amaes_skip_passed_quizzes') === 'true')
+        );
+
+        const list = getCourseQuizzesList();
+        const currentCmid = getCurrentQuizCmid();
+
+        // Determine current index in list
+        let currentIndex = -1;
+        if (currentCmid) {
+            currentIndex = list.findIndex(item => item.cmid === currentCmid);
+        }
+        if (currentIndex === -1 && list.length > 0) {
+            currentIndex = list.findIndex(item => item.url && window.location.href.includes(item.url));
+        }
+
+        // If list is available, traverse in sequence
+        if (list.length > 0) {
+            let gradesMap = {};
+            if (skipPassed) {
+                if (typeof window !== 'undefined' && window.__amaesCourseGradesCache) {
+                    gradesMap = window.__amaesCourseGradesCache;
+                } else {
+                    const courseInfo = typeof detectCourseInfo === 'function' ? detectCourseInfo() : {};
+                    const courseId = courseInfo && courseInfo.courseId ? courseInfo.courseId : '';
+                    if (courseId) {
+                        try {
+                            const cachedGrades = localStorage.getItem(`amaes_course_grades_cache_${courseId}`);
+                            if (cachedGrades) gradesMap = JSON.parse(cachedGrades);
+                        } catch (_) {}
+                    }
+                }
+            }
+
+            const step = direction === 'next' ? 1 : -1;
+            let startIndex = currentIndex !== -1 ? currentIndex + step : (direction === 'next' ? 0 : list.length - 1);
+            let targetQuiz = null;
+
+            for (let i = startIndex; direction === 'next' ? i < list.length : i >= 0; i += step) {
+                const candidate = list[i];
+                if (!candidate) continue;
+
+                if (skipPassed) {
+                    const cmidKey = candidate.cmid ? `cmid_${candidate.cmid}` : '';
+                    const normTitle = (candidate.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const gradeEntry = (cmidKey && gradesMap[cmidKey]) || gradesMap[normTitle] || null;
+
+                    // If student already has >=80% on this quiz, skip over it
+                    if (gradeEntry && gradeEntry.isPassable === true) {
+                        continue;
+                    }
+                }
+
+                targetQuiz = candidate;
+                break;
+            }
+
+            if (targetQuiz && targetQuiz.url) {
+                const toastMsg = skipPassed
+                    ? `Cycling to unpassed quiz: ${targetQuiz.title}`
+                    : `Cycling to: ${targetQuiz.title}`;
+                showToast(toastMsg, 2000);
+                setLog(`<b>Quiz Navigation:</b> Cycling to <b>${targetQuiz.title}</b> via <b>[${direction === 'next' ? ']' : '['}]</b>.`, "var(--accent-blue)");
+                window.location.href = targetQuiz.url;
+                return true;
+            }
+
+            if (skipPassed) {
+                showToast("All subsequent quizzes have passing scores (≥80%).", 2500);
+                setLog("<b>Quiz Navigation:</b> All subsequent quizzes passed (≥80%).", "var(--accent-green)");
+                return false;
+            } else {
+                showToast(direction === 'next' ? "Reached the end of course quizzes." : "Reached the beginning of course quizzes.", 2000);
+                return false;
+            }
+        }
+
+        // 4. Fallback: If no list found, attempt native #next-activity-link / #prev-activity-link
+        if (direction === 'next') {
+            const nextLink = document.querySelector('#next-activity-link a, .activity-navigation .pull-right a, .next-activity a');
+            if (nextLink && nextLink.href) {
+                window.location.href = nextLink.href;
+                return true;
+            }
+        } else {
+            const prevLink = document.querySelector('#prev-activity-link a, .activity-navigation .pull-left a, .prev-activity a');
+            if (prevLink && prevLink.href) {
+                window.location.href = prevLink.href;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function cycleToNextQuizOrExam(opts = {}) {
+        return cycleQuizOrExam('next', opts);
+    }
+
+    function cycleToPrevQuizOrExam(opts = {}) {
+        return cycleQuizOrExam('prev', opts);
+    }
+
     // Toggleable Keyboard Navigation & Fast Shortcuts for Quiz
     function setupQuizKeyboardShortcuts() {
+        decorateNativeActivityNavigation();
+
         window.addEventListener('keydown', (e) => {
             if (!enableKeyboardShortcuts) return;
 
@@ -3202,13 +3621,20 @@
                 }
             }
 
-            // Pause / Start Auto-Quiz: 'P' (Allowed globally so student can arm/disarm anytime)
+            // Pause / Start Auto-Quiz or Auto-Submit: 'P'
             if (e.key === 'p' || e.key === 'P') {
+                if (checkIsQuizSummaryPage()) {
+                    e.preventDefault();
+                    if (active && typeof active.blur === 'function') active.blur();
+                    pauseQuizSummaryAutoSubmit();
+                    return;
+                }
                 e.preventDefault();
                 toggleAutoQuizMode();
                 return;
             }
 
+            // Quiz Summary page shortcuts: N / Space / Enter to hasten countdown or submit
             if (checkIsQuizSummaryPage()) {
                 const key = e.key ? e.key.toUpperCase() : '';
                 if (key === 'N' || key === ' ' || key === 'ENTER') {
@@ -3217,9 +3643,29 @@
                     hastenQuizSummaryAutoSubmit();
                     return;
                 }
-                return;
             }
 
+            // Quiz & Exam Sequential Navigation Shortcuts: ']' (Next) and '[' (Previous)
+            if (e.key === ']' || e.key === '[') {
+                const isExamHost = (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam) ||
+                    (typeof window !== 'undefined' && window.location.hostname.includes('exam'));
+                const isAcademicPage = checkIsCoursePage() ||
+                    checkIsQuizPage() ||
+                    isExamHost;
+
+                if (isAcademicPage && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                    e.preventDefault();
+                    if (active && typeof active.blur === 'function') active.blur();
+                    if (e.key === ']') {
+                        cycleToNextQuizOrExam();
+                    } else {
+                        cycleToPrevQuizOrExam();
+                    }
+                    return;
+                }
+            }
+
+            if (checkIsQuizSummaryPage()) return;
             if (!checkIsQuizAttemptPage()) return;
 
             const key = e.key ? e.key.toUpperCase() : '';

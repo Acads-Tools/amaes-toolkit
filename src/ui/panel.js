@@ -20,6 +20,7 @@
         const defaultAmauoedUrl = subCode ? getStoredAmauoedUrl(subCode) : '';
         const isQuiz = checkIsQuizPage();
         const isExamPortal = (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam) || (typeof window !== 'undefined' && window.location.hostname.includes('exam'));
+        const skipPassedQuizzes = (typeof localStorage !== 'undefined' && localStorage.getItem('amaes_skip_passed_quizzes') === 'true');
 
         let initialKeyword = "";
         if (courseInfo.subjectCode) {
@@ -263,10 +264,16 @@
 
                             <!-- Section: Navigation & Interface -->
                             <div style="font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding-bottom: 2px; border-bottom: 1px solid rgba(255,255,255,0.06);">Navigation & Interface</div>
-                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Keyboard shortcuts: Space / N for Next page, C for Copy AI, V for Paste AI, P for Pause/Start, 1-4 / A-D to pick choices, H to Highlight">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Keyboard shortcuts: Space / N for Next page, [ / ] to cycle quizzes/exams, P to Pause auto-submit or auto-quiz, C for Copy AI, V for Paste AI, 1-4 / A-D to pick choices, H to Highlight">
                                 <input id="chk-keyboard-shortcuts" type="checkbox" ${enableKeyboardShortcuts ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Keyboard Shortcuts</span>
                             </label>
+                            ${!isExamPortal ? `
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="When cycling with [ and ], automatically skip quizzes with passing scores (≥80%) and jump to the next unpassed or unattempted quiz">
+                                <input id="chk-skip-passed-quizzes" type="checkbox" ${skipPassedQuizzes ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Skip Passed Quizzes (≥80%)</span>
+                            </label>
+                            ` : ''}
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Audio feedback: Plays a chime ding when the quiz is finished and an alert chime when manual intervention is needed">
                                 <input id="chk-audio-alerts" type="checkbox" ${enableAudioAlerts ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Audio Notifications</span>

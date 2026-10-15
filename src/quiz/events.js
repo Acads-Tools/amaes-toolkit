@@ -236,7 +236,17 @@
                 enableKeyboardShortcuts = chkKeyboardShortcuts.checked;
                 localStorage.setItem('amaes_enable_hotkeys', enableKeyboardShortcuts);
                 showToast(`Keyboard Navigation: ${enableKeyboardShortcuts ? 'Enabled' : 'Disabled'}`);
-                setLog(`Keyboard Navigation: <b>${enableKeyboardShortcuts ? 'ON' : 'OFF'}</b>`, enableKeyboardShortcuts ? "var(--accent-blue)" : "var(--accent-amber)", enableKeyboardShortcuts ? "N, Space, 1-4, C, P, H active" : "Key navigation disabled");
+                setLog(`Keyboard Navigation: <b>${enableKeyboardShortcuts ? 'ON' : 'OFF'}</b>`, enableKeyboardShortcuts ? "var(--accent-blue)" : "var(--accent-amber)", enableKeyboardShortcuts ? "N, Space, [ ], 1-4, C, P, H active" : "Key navigation disabled");
+            };
+        }
+
+        const chkSkipPassedQuizzes = document.getElementById('chk-skip-passed-quizzes');
+        if (chkSkipPassedQuizzes) {
+            chkSkipPassedQuizzes.onchange = () => {
+                const isSkip = chkSkipPassedQuizzes.checked;
+                localStorage.setItem('amaes_skip_passed_quizzes', isSkip ? 'true' : 'false');
+                showToast(`Skip Passed Quizzes: ${isSkip ? 'Enabled (≥80%)' : 'Disabled (Cycle all)'}`);
+                setLog(`Quiz Cycling: <b>${isSkip ? 'Skip Passed (≥80%)' : 'All Quizzes'}</b>`, isSkip ? "var(--accent-blue)" : "var(--text-secondary)", isSkip ? "Keyboard cycling [ and ] jumps over completed/passing quizzes" : "Keyboard cycling advances to every quiz in sequence");
             };
         }
 

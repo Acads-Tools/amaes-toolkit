@@ -38,6 +38,9 @@
         startCapabilityTips();
         setupQuizAutomation();
         setupQuizKeyboardShortcuts();
+        if (typeof decorateNativeActivityNavigation === 'function') {
+            decorateNativeActivityNavigation();
+        }
         setupBreadcrumbListeners();
         if (typeof setupAutoViewBadges === 'function') {
             setupAutoViewBadges();

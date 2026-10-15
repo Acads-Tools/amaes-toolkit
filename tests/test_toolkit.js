@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.7'), "Userscript header must specify v1.13.7");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.7";'), "Constant SCRIPT_VERSION must be v1.13.7");
+    assert.ok(script.includes('@version      1.13.8'), "Userscript header must specify v1.13.8");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.8";'), "Constant SCRIPT_VERSION must be v1.13.8");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4138,11 +4138,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.13.7-blue.svg"), "README badge must show v1.13.7");
+    assert.ok(readme.includes("version-1.13.8-blue.svg"), "README badge must show v1.13.8");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.13.7<"), "Website must display v1.13.7 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.13.8<"), "Website must display v1.13.8 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -6430,6 +6430,58 @@ test("Summary Auto-Submit Hasten Key [N], Speed Multiplier & Native Right-Side I
 
     // 6. Panel Master Auto-Quiz button triggers hasten on summary page
     assert.ok(eventsSrc.includes("if (checkIsQuizSummaryPage()) {\n                    if (typeof hastenQuizSummaryAutoSubmit === 'function') {\n                        hastenQuizSummaryAutoSubmit();"), "Panel auto-quiz button must trigger hasten on summary page");
+});
+
+// --------------------------------------------------
+// 194. Quiz & Exam Sequential Navigation [ ] / [ ], Skip Passed Quizzes & Summary Auto-Submit Pause [P] (v1.13.8)
+// --------------------------------------------------
+test("Quiz & Exam Sequential Navigation [ ] / [ ], Skip Passed Quizzes & Summary Auto-Submit Pause [P] (v1.13.8)", () => {
+    const fs = require('fs');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const panelSrc = fs.readFileSync('src/ui/panel.js', 'utf8');
+    const eventsSrc = fs.readFileSync('src/quiz/events.js', 'utf8');
+    const highlighterSrc = fs.readFileSync('src/moodle/highlighter.js', 'utf8');
+    const modalsSrc = fs.readFileSync('src/ui/modals.js', 'utf8');
+    const initSrc = fs.readFileSync('src/init.js', 'utf8');
+
+    // 1. Summary Auto-Submit Pause via P key & clickable UI controls
+    assert.ok(solverSrc.includes("let summaryAutoSubmitPaused = false;"), "solver.js must track summaryAutoSubmitPaused state");
+    assert.ok(solverSrc.includes("function pauseQuizSummaryAutoSubmit("), "solver.js must define pauseQuizSummaryAutoSubmit");
+    assert.ok(solverSrc.includes("pauseQuizSummaryAutoSubmit();"), "Keydown listener must call pauseQuizSummaryAutoSubmit on P key when on summary page");
+    assert.ok(solverSrc.includes("id=\"amaes-btn-pause-auto-submit\""), "readyBanner must render clickable Pause (P) button");
+    assert.ok(solverSrc.includes("id=\"amaes-navblock-pause-btn\""), "Navblock indicator must render clickable Pause (P) / Resume button");
+    assert.ok(solverSrc.includes("Auto-submit Paused"), "Submit buttons and navblock must display paused state cleanly");
+
+    // 2. Sequential Cycle Navigation Helpers
+    assert.ok(solverSrc.includes("function getActivitiesFromUrlSelect()"), "solver.js must define getActivitiesFromUrlSelect");
+    assert.ok(solverSrc.includes("function getCourseQuizzesList()"), "solver.js must define getCourseQuizzesList");
+    assert.ok(solverSrc.includes("function cycleQuizOrExam("), "solver.js must define cycleQuizOrExam");
+    assert.ok(solverSrc.includes("function cycleToNextQuizOrExam("), "solver.js must define cycleToNextQuizOrExam");
+    assert.ok(solverSrc.includes("function cycleToPrevQuizOrExam("), "solver.js must define cycleToPrevQuizOrExam");
+    assert.ok(solverSrc.includes("function decorateNativeActivityNavigation()"), "solver.js must define decorateNativeActivityNavigation");
+
+    // 3. Native Navigation Button Decoration
+    assert.ok(solverSrc.includes("dataset.amaesDecorated"), "decorateNativeActivityNavigation must prevent duplicate decorations");
+    assert.ok(solverSrc.includes("(Press ])"), "decorateNativeActivityNavigation must decorate next link with (Press ])");
+    assert.ok(solverSrc.includes("(Press [)"), "decorateNativeActivityNavigation must decorate previous link with (Press [)");
+
+    // 4. Keyboard Shortcuts [ and ] with Strict Scope & Input Guards
+    assert.ok(solverSrc.includes("e.key === ']' || e.key === '['"), "setupQuizKeyboardShortcuts must listen for ] and [ keys");
+    assert.ok(solverSrc.includes("isAcademicPage"), "Cycle navigation must be guarded strictly to academic quiz, course, and exam pages");
+    assert.ok(solverSrc.includes("isTextInput && e.key !== 'Escape'"), "Keyboard listener must strictly ignore hotkeys when typing in text fields");
+
+    // 5. Skip Passed Quizzes Setting in Advanced Settings (Hidden on Exam Portal)
+    assert.ok(panelSrc.includes("id=\"chk-skip-passed-quizzes\""), "panel.js must define chk-skip-passed-quizzes checkbox");
+    assert.ok(panelSrc.includes("${!isExamPortal ?"), "chk-skip-passed-quizzes must be omitted on exam portal");
+    assert.ok(eventsSrc.includes("chkSkipPassedQuizzes.onchange"), "events.js must bind chk-skip-passed-quizzes onchange");
+    assert.ok(eventsSrc.includes("amaes_skip_passed_quizzes"), "events.js must store amaes_skip_passed_quizzes in localStorage");
+
+    // 6. Persistent Grades Caching in highlighter.js
+    assert.ok(highlighterSrc.includes("amaes_course_grades_cache_"), "highlighter.js must cache grades map in localStorage for instant cycling");
+
+    // 7. Cheatsheet & Startup Decorator
+    assert.ok(modalsSrc.includes("Cycle Prev / Next Quiz or Exam"), "modals.js cheatsheet must document [ and ] shortcuts");
+    assert.ok(initSrc.includes("decorateNativeActivityNavigation()"), "init.js must call decorateNativeActivityNavigation on startup");
 });
 
 console.log("\n==================================================");
