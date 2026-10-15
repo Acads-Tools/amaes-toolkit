@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.8'), "Userscript header must specify v1.13.8");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.8";'), "Constant SCRIPT_VERSION must be v1.13.8");
+    assert.ok(script.includes('@version      1.13.9'), "Userscript header must specify v1.13.9");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.9";'), "Constant SCRIPT_VERSION must be v1.13.9");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4138,11 +4138,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.13.8-blue.svg"), "README badge must show v1.13.8");
+    assert.ok(readme.includes("version-1.13.9-blue.svg"), "README badge must show v1.13.9");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.13.8<"), "Website must display v1.13.8 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.13.9<"), "Website must display v1.13.9 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -6482,6 +6482,59 @@ test("Quiz & Exam Sequential Navigation [ ] / [ ], Skip Passed Quizzes & Summary
     // 7. Cheatsheet & Startup Decorator
     assert.ok(modalsSrc.includes("Cycle Prev / Next Quiz or Exam"), "modals.js cheatsheet must document [ and ] shortcuts");
     assert.ok(initSrc.includes("decorateNativeActivityNavigation()"), "init.js must call decorateNativeActivityNavigation on startup");
+});
+
+// --------------------------------------------------
+// 195. Quiz Bottom Cycle Navigation, Course Confidence Intelligence & Auto-Close Drawer (v1.13.9)
+// --------------------------------------------------
+test("Quiz Bottom Cycle Navigation, Course Confidence Intelligence & Auto-Close Drawer (v1.13.9)", () => {
+    const fs = require('fs');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const iconsSrc = fs.readFileSync('src/ui/icons.js', 'utf8');
+    const detectorSrc = fs.readFileSync('src/moodle/detector.js', 'utf8');
+    const panelSrc = fs.readFileSync('src/ui/panel.js', 'utf8');
+    const eventsSrc = fs.readFileSync('src/quiz/events.js', 'utf8');
+    const diagSrc = fs.readFileSync('src/dev/diagnostics.js', 'utf8');
+    const initSrc = fs.readFileSync('src/init.js', 'utf8');
+    const configSrc = fs.readFileSync('src/core/config.js', 'utf8');
+
+    // 1. Quiz Bottom Navigation Bar
+    assert.ok(solverSrc.includes("function injectQuizBottomNavigation()"), "solver.js must define injectQuizBottomNavigation");
+    assert.ok(solverSrc.includes("amaes-quiz-bottom-nav"), "Must inject #amaes-quiz-bottom-nav container");
+    assert.ok(solverSrc.includes("id=\"amaes-btn-prev-quiz\""), "Must render Previous Quiz button");
+    assert.ok(solverSrc.includes("id=\"amaes-btn-next-quiz\""), "Must render Next Quiz button");
+    assert.ok(solverSrc.includes("id=\"amaes-quiz-cycle-select\""), "Must render Jump to Quiz dropdown selector");
+    assert.ok(solverSrc.includes("function populateCourseQuizzesFromRemote("), "solver.js must define populateCourseQuizzesFromRemote");
+
+    // 2. Moodle 4 Course Index Drawer Quiz List Extraction
+    assert.ok(solverSrc.includes("#courseindex a[href*=\"/mod/quiz/\"]"), "getCourseQuizzesList must parse quiz links from #courseindex drawer");
+    assert.ok(solverSrc.includes(".courseindex a[href*=\"/mod/quiz/\"]"), "getCourseQuizzesList must parse quiz links from .courseindex");
+
+    // 3. Course Confidence & Autonomous Intelligence
+    assert.ok(iconsSrc.includes("function calculateCourseConfidence("), "icons.js must define calculateCourseConfidence");
+    assert.ok(iconsSrc.includes("function injectCourseConfidenceCard()"), "icons.js must define injectCourseConfidenceCard");
+    assert.ok(iconsSrc.includes("amaes-course-confidence-card"), "Card must use id amaes-course-confidence-card");
+    assert.ok(iconsSrc.includes("Autonomous Confidence"), "Card must display Autonomous Confidence rating");
+    assert.ok(iconsSrc.includes("Non-Reviewable Course Policy Active"), "Card must display non-reviewable course policy callout");
+
+    // 4. Auto-Close Course Index Drawer
+    assert.ok(detectorSrc.includes("function autoCloseCourseIndexDrawer()"), "detector.js must define autoCloseCourseIndexDrawer");
+    assert.ok(detectorSrc.includes("[data-action=\"closedrawer\"]"), "autoCloseCourseIndexDrawer must target native close button");
+    assert.ok(panelSrc.includes("id=\"chk-auto-close-course-index\""), "panel.js must define chk-auto-close-course-index toggle");
+    assert.ok(eventsSrc.includes("chkAutoCloseCourseIndex.onchange"), "events.js must bind chk-auto-close-course-index onchange");
+    assert.ok(configSrc.includes("'amaes_auto_close_course_index'"), "config.js must include amaes_auto_close_course_index in SHARED_STORAGE_KEYS");
+
+    // 5. Capability Tips: 4-Second Duration & New Utility Tips
+    assert.ok(diagSrc.includes("showToast(tip, 4000)"), "diagnostics.js must set capability tips duration to 4000ms");
+    assert.ok(diagSrc.includes("Tip: Press ] to cycle forward"), "diagnostics.js must include tip for ] shortcut");
+    assert.ok(diagSrc.includes("Tip: Press [ to cycle backward"), "diagnostics.js must include tip for [ shortcut");
+    assert.ok(diagSrc.includes("Tip: On the Quiz Summary page, press P"), "diagnostics.js must include tip for P pause");
+    assert.ok(diagSrc.includes("Tip: Press N, Space, or Enter during the Auto-Submit countdown"), "diagnostics.js must include tip for N hasten");
+
+    // 6. Init Lifecycle Hooks
+    assert.ok(initSrc.includes("injectQuizBottomNavigation()"), "init.js must call injectQuizBottomNavigation on startup");
+    assert.ok(initSrc.includes("autoCloseCourseIndexDrawer()"), "init.js must call autoCloseCourseIndexDrawer on startup");
+    assert.ok(initSrc.includes("injectCourseConfidenceCard()"), "init.js must call injectCourseConfidenceCard on startup");
 });
 
 console.log("\n==================================================");

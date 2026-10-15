@@ -401,3 +401,42 @@
             return null;
         }).filter(Boolean);
     }
+
+    // Auto-closes Moodle 4 Course Index Drawer on course view pages by default
+    function autoCloseCourseIndexDrawer() {
+        if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+        if (!window.location.pathname.includes('/course/view.php')) return false;
+
+        const autoClose = typeof localStorage !== 'undefined'
+            ? localStorage.getItem('amaes_auto_close_course_index') !== 'false'
+            : true;
+        if (!autoClose) return false;
+
+        function tryClose() {
+            const drawer = document.querySelector('#theme_boost-drawers-courseindex, .drawer-left');
+            const isOpen = (drawer && drawer.classList.contains('show')) ||
+                           document.body.classList.contains('drawer-open-left');
+            if (!isOpen) return false;
+
+            const closeBtn = document.querySelector(
+                'button[data-action="closedrawer"][data-side="left"], ' +
+                'button[title*="Close course index" i], ' +
+                'button[aria-label*="Close course index" i], ' +
+                '#theme_boost-drawers-courseindex [data-action="closedrawer"], ' +
+                '.drawer-left [data-action="closedrawer"]'
+            );
+
+            if (closeBtn) {
+                closeBtn.click();
+                return true;
+            }
+            return false;
+        }
+
+        if (!tryClose()) {
+            setTimeout(tryClose, 200);
+            setTimeout(tryClose, 500);
+            setTimeout(tryClose, 1000);
+        }
+        return true;
+    }

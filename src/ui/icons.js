@@ -573,6 +573,353 @@
         });
     }
 
+    // Calculates comprehensive autonomous readiness and confidence score for a course
+    function calculateCourseConfidence(subCode, courseId, gradesMap = {}) {
+        const questions = (typeof getCachedAnswers === 'function' && subCode) ? (getCachedAnswers(subCode) || []) : [];
+        const total = questions.length;
+
+        let verifiedCount = 0;
+        let amauoedCount = 0;
+        let eliminatedCount = 0;
+
+        questions.forEach(q => {
+            const s = (q.source || '').toLowerCase();
+            const sources = Array.isArray(q.sources) ? q.sources.map(x => (x || '').toLowerCase()) : [];
+            const isStudyGuide = s.includes('amauoed') || s.includes('jennysonline') || sources.some(x => x.includes('amauoed') || x.includes('jennysonline'));
+            if (isStudyGuide) {
+                amauoedCount++;
+            } else {
+                verifiedCount++;
+            }
+            if (Array.isArray(q.wrongAnswers)) {
+                eliminatedCount += q.wrongAnswers.length;
+            }
+        });
+
+        const termStats = typeof getSubjectTermBreakdown === 'function'
+            ? getSubjectTermBreakdown(subCode)
+            : { prelim: 0, midterm: 0, prefi: 0, final: 0, general: 0, total: 0 };
+
+        // 1. Volume Score (Max 45%)
+        const weightedCount = (verifiedCount * 1.0) + (amauoedCount * 0.65);
+        const wVolume = Math.min(45, Math.round((weightedCount / 80) * 45));
+
+        // 2. Term Distribution Score (Max 35%)
+        const termsCovered = [termStats.prelim >= 5, termStats.midterm >= 5, termStats.prefi >= 5, termStats.final >= 5].filter(Boolean).length;
+        let wTerms = 0;
+        if (termsCovered === 4) wTerms = 35;
+        else if (termsCovered === 3) wTerms = 25;
+        else if (termsCovered === 2) wTerms = 15;
+        else if (termsCovered === 1) wTerms = 8;
+        else if (total > 0) wTerms = 5;
+
+        // 3. Verification Accuracy Ratio (Max 12%)
+        const wVer = total > 0 ? Math.round((verifiedCount / total) * 12) : 0;
+
+        // 4. Eliminated Wrong Distractor Score (Max 8%)
+        const wElim = Math.min(8, Math.round(eliminatedCount * 0.5));
+
+        const score = total === 0 ? 0 : Math.min(100, Math.max(0, wVolume + wTerms + wVer + wElim));
+
+        let tier = '';
+        let badgeColor = '';
+        let badgeBg = '';
+        let aiDependency = '';
+        let desc = '';
+
+        if (score >= 85) {
+            tier = 'Autonomous Ready';
+            badgeColor = '#059669';
+            badgeBg = 'rgba(16, 185, 129, 0.12)';
+            aiDependency = 'Low AI Usage';
+            desc = 'Question bank covers nearly all questions. Quizzes run hands-free with instant answer selection and low to zero AI quota consumption.';
+        } else if (score >= 50) {
+            tier = 'Substantial Coverage';
+            badgeColor = '#2563eb';
+            badgeBg = 'rgba(37, 99, 235, 0.12)';
+            aiDependency = 'Moderate AI Fallback';
+            desc = 'Most core questions are cached locally. Unknown questions smoothly fall back to Gemini AI.';
+        } else if (score >= 20) {
+            tier = 'Developing Bank';
+            badgeColor = '#d97706';
+            badgeBg = 'rgba(217, 119, 6, 0.12)';
+            aiDependency = 'Frequent AI Fallback';
+            desc = 'Certain terms have question coverage; remaining terms rely on Gemini AI solving and student review.';
+        } else {
+            tier = 'Uncached / AI Driven';
+            badgeColor = '#64748b';
+            badgeBg = 'rgba(100, 116, 139, 0.12)';
+            aiDependency = 'Full AI Reliance';
+            desc = 'No cached answers found yet. Gemini AI solves questions on demand, harvesting 100% attempts to build the database.';
+        }
+
+        // Quiz grade stats per term
+        const termQuizzes = {
+            prelim: { total: 0, passed: 0, attempted: 0 },
+            midterm: { total: 0, passed: 0, attempted: 0 },
+            prefi: { total: 0, passed: 0, attempted: 0 },
+            final: { total: 0, passed: 0, attempted: 0 }
+        };
+
+        let totalQuizzes = 0;
+        let totalPassed = 0;
+        let totalAttempted = 0;
+
+        if (gradesMap && typeof gradesMap === 'object') {
+            const seen = new Set();
+            Object.values(gradesMap).forEach(entry => {
+                if (!entry || !entry.title) return;
+                const key = entry.cmid || entry.normTitle;
+                if (seen.has(key)) return;
+                seen.add(key);
+
+                totalQuizzes++;
+                if (entry.hasGrade) totalAttempted++;
+                if (entry.isPassable) totalPassed++;
+
+                const t = typeof detectTermFromText === 'function' ? detectTermFromText(entry.title) : null;
+                if (t === 'Prelim') {
+                    termQuizzes.prelim.total++;
+                    if (entry.hasGrade) termQuizzes.prelim.attempted++;
+                    if (entry.isPassable) termQuizzes.prelim.passed++;
+                } else if (t === 'Midterm') {
+                    termQuizzes.midterm.total++;
+                    if (entry.hasGrade) termQuizzes.midterm.attempted++;
+                    if (entry.isPassable) termQuizzes.midterm.passed++;
+                } else if (t === 'Prefi') {
+                    termQuizzes.prefi.total++;
+                    if (entry.hasGrade) termQuizzes.prefi.attempted++;
+                    if (entry.isPassable) termQuizzes.prefi.passed++;
+                } else if (t === 'Final') {
+                    termQuizzes.final.total++;
+                    if (entry.hasGrade) termQuizzes.final.attempted++;
+                    if (entry.isPassable) termQuizzes.final.passed++;
+                }
+            });
+        }
+
+        return {
+            score,
+            tier,
+            badgeColor,
+            badgeBg,
+            aiDependency,
+            desc,
+            total,
+            verifiedCount,
+            amauoedCount,
+            eliminatedCount,
+            termStats,
+            termQuizzes,
+            totalQuizzes,
+            totalPassed,
+            totalAttempted
+        };
+    }
+
+    // Injects dynamic Course Confidence and Autonomous Readiness Card on Moodle course pages (/course/view.php)
+    async function injectCourseConfidenceCard() {
+        if (typeof window === 'undefined' || typeof document === 'undefined') return;
+        if (!window.location.pathname.includes('/course/view.php')) {
+            const old = document.getElementById('amaes-course-confidence-card');
+            if (old) old.remove();
+            return;
+        }
+
+        const courseInfo = typeof detectCourseInfo === 'function' ? detectCourseInfo() : {};
+        const subjectCode = courseInfo.subjectCode;
+        const courseId = courseInfo.courseId || new URLSearchParams(window.location.search).get('id') || '';
+        if (!subjectCode || subjectCode === 'DEFAULT' || subjectCode === 'GENERAL') return;
+
+        // Fetch grades map from cache or trigger async lookup
+        let gradesMap = {};
+        if (typeof window !== 'undefined' && window.__amaesCourseGradesCache) {
+            gradesMap = window.__amaesCourseGradesCache;
+        } else if (courseId) {
+            try {
+                const storedRaw = localStorage.getItem(`amaes_course_grades_cache_${courseId}`);
+                if (storedRaw) gradesMap = JSON.parse(storedRaw);
+            } catch (_) {}
+        }
+
+        if (Object.keys(gradesMap).length === 0 && courseId && typeof fetchCourseGradesMap === 'function') {
+            fetchCourseGradesMap(courseId).then(freshMap => {
+                if (freshMap && Object.keys(freshMap).length > 0) {
+                    injectCourseConfidenceCard();
+                }
+            }).catch(() => {});
+        }
+
+        // Determine non-reviewable status
+        let locallyObservedRestricted = false;
+        try {
+            const localStatus = JSON.parse(localStorage.getItem(`amaes_course_reviewability_${subjectCode}`) || 'null');
+            locallyObservedRestricted = localStatus && localStatus.status === 'restricted-observed';
+        } catch (_) {}
+
+        let sharedStatus = null;
+        try {
+            const statusUrl = new URL(`${communityRelayUrl}/course-reviewability`);
+            statusUrl.searchParams.set('subjectCode', subjectCode);
+            const response = await fetch(statusUrl.href);
+            if (response.ok) sharedStatus = await response.json();
+        } catch (_) {}
+
+        const sharedRestricted = sharedStatus && sharedStatus.subjectCode === subjectCode &&
+            sharedStatus.status === 'restricted-reported';
+        const isRestrictedCourse = locallyObservedRestricted || sharedRestricted;
+
+        const metrics = calculateCourseConfidence(subjectCode, courseId, gradesMap);
+
+        const target = document.querySelector('#region-main .course-content, #region-main [role="main"], #region-main, .course-content');
+        if (!target) return;
+
+        let card = document.getElementById('amaes-course-confidence-card');
+        if (!card) {
+            card = document.createElement('div');
+            card.id = 'amaes-course-confidence-card';
+            card.className = 'amaes-course-confidence-card card';
+            target.prepend(card);
+        }
+
+        card.style.cssText = `
+            margin: 16px 0 24px 0;
+            padding: 16px 20px;
+            background: rgba(15, 23, 42, 0.03);
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-radius: 8px;
+            color: inherit;
+            font-size: 13px;
+            line-height: 1.5;
+            user-select: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        `;
+
+        const terms = [
+            { name: 'Prelim', count: metrics.termStats.prelim, qz: metrics.termQuizzes.prelim },
+            { name: 'Midterm', count: metrics.termStats.midterm, qz: metrics.termQuizzes.midterm },
+            { name: 'Prefinal', count: metrics.termStats.prefi, qz: metrics.termQuizzes.prefi },
+            { name: 'Final', count: metrics.termStats.final, qz: metrics.termQuizzes.final }
+        ];
+
+        card.innerHTML = `
+            <!-- Top Header Row -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(148, 163, 184, 0.2);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="color: #0f6cbf; display: flex; align-items: center;">${ICONS.shieldCheck}</span>
+                    <div>
+                        <div style="font-size: 14px; font-weight: 700; color: inherit; display: flex; align-items: center; gap: 6px;">
+                            <span>${escapeHtml(subjectCode)} Course Intelligence</span>
+                            <span style="font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 4px; background: rgba(15, 108, 191, 0.1); color: #0f6cbf;">Toolkit Live</span>
+                        </div>
+                        <div style="font-size: 11.5px; opacity: 0.75; margin-top: 1px;">${escapeHtml(courseInfo.subjectName || courseInfo.fullTitle || 'Course Overview')}</div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; background: ${metrics.badgeBg}; color: ${metrics.badgeColor}; border: 1px solid ${metrics.badgeColor}40;">
+                        <span>${metrics.score}% Autonomous Confidence</span>
+                        <span style="font-weight: 500; opacity: 0.85;">• ${metrics.tier}</span>
+                    </span>
+                    <span style="display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: rgba(148, 163, 184, 0.12); color: inherit; border: 1px solid rgba(148, 163, 184, 0.25);">
+                        ${metrics.aiDependency}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Operational Description -->
+            <div style="font-size: 12px; opacity: 0.85; margin-bottom: 14px; line-height: 1.45;">
+                ${escapeHtml(metrics.desc)}
+            </div>
+
+            <!-- 4 Metrics Counters -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 14px;">
+                <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 6px 10px; text-align: center;">
+                    <div style="font-size: 10px; font-weight: 700; color: #059669; text-transform: uppercase;">Verified DB</div>
+                    <div style="font-size: 15px; font-weight: 800; color: #047857;">${metrics.verifiedCount} Qs</div>
+                </div>
+                <div style="background: rgba(147, 51, 234, 0.08); border: 1px solid rgba(147, 51, 234, 0.3); border-radius: 6px; padding: 6px 10px; text-align: center;">
+                    <div style="font-size: 10px; font-weight: 700; color: #7e22ce; text-transform: uppercase;">Study Guides</div>
+                    <div style="font-size: 15px; font-weight: 800; color: #6b21a8;">${metrics.amauoedCount} Qs</div>
+                </div>
+                <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 6px 10px; text-align: center;">
+                    <div style="font-size: 10px; font-weight: 700; color: #dc2626; text-transform: uppercase;">Eliminated Wrong</div>
+                    <div style="font-size: 15px; font-weight: 800; color: #b91c1c;">${metrics.eliminatedCount}</div>
+                </div>
+                <div style="background: rgba(15, 108, 191, 0.08); border: 1px solid rgba(15, 108, 191, 0.3); border-radius: 6px; padding: 6px 10px; text-align: center;">
+                    <div style="font-size: 10px; font-weight: 700; color: #0f6cbf; text-transform: uppercase;">Passable Quizzes</div>
+                    <div style="font-size: 15px; font-weight: 800; color: #0369a1;">${metrics.totalPassed}${metrics.totalQuizzes ? '/' + metrics.totalQuizzes : ''} Passed</div>
+                </div>
+            </div>
+
+            <!-- Term Breakdown Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px;">
+                ${terms.map(t => {
+                    const isReady = t.count >= 15;
+                    const hasSome = t.count > 0;
+                    const passText = t.qz.total > 0 ? `${t.qz.passed}/${t.qz.total} Passed` : (hasSome ? `${t.count} Qs Stored` : 'No Qs Stored');
+                    return `
+                        <div style="border: 1px solid ${isReady ? 'rgba(16, 185, 129, 0.4)' : hasSome ? 'rgba(59, 130, 246, 0.35)' : 'rgba(148, 163, 184, 0.25)'}; background: ${isReady ? 'rgba(16, 185, 129, 0.05)' : hasSome ? 'rgba(59, 130, 246, 0.04)' : 'rgba(148, 163, 184, 0.03)'}; border-radius: 6px; padding: 7px 9px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                                <span style="font-size: 11px; font-weight: 700; color: inherit;">${t.name}</span>
+                                <span style="font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 3px; ${isReady ? 'background: rgba(16,185,129,0.15); color: #059669;' : hasSome ? 'background: rgba(59,130,246,0.15); color: #2563eb;' : 'background: rgba(148,163,184,0.15); color: #64748b;'}">
+                                    ${isReady ? 'Ready' : hasSome ? 'AI Fallback' : 'Uncached'}
+                                </span>
+                            </div>
+                            <div style="font-size: 12px; font-weight: 700; color: inherit;">${t.count} Questions</div>
+                            <div style="font-size: 10.5px; opacity: 0.75; margin-top: 2px;">${passText}</div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+
+            <!-- Non-Reviewable Notice Callout if applicable -->
+            ${isRestrictedCourse ? `
+                <div style="margin-top: 10px; padding: 9px 12px; background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 11.5px; line-height: 1.45;">
+                    <span style="font-weight: 700; color: #b45309;">Non-Reviewable Course Policy Active:</span>
+                    <span style="opacity: 0.9;"> Quiz review access is restricted in this course. Only 100% perfect score attempts are harvested to maintain absolute database accuracy. Unreviewed attempts use adaptive probing across attempts.</span>
+                </div>
+            ` : ''}
+
+            <!-- Footer Action Row -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(148, 163, 184, 0.18);">
+                <div style="font-size: 11px; opacity: 0.75;">
+                    Auto-Submit Mode: High-confidence quizzes execute hands-free with instant local answers.
+                </div>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <button id="amaes-card-btn-highlight" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 3px 8px; border-radius: 4px;" title="Scan course page and highlight quizzes needing attention">
+                        Highlight Missing Quizzes
+                    </button>
+                    <button id="amaes-card-btn-next-quiz" class="btn btn-sm btn-primary" style="font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #0f6cbf; border-color: #0f6cbf;" title="Cycle to next quiz in academic sequence (Press ])">
+                        Next Quiz (Press ]) &#9658;
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Bind Card Action Buttons
+        const btnHighlight = card.querySelector('#amaes-card-btn-highlight');
+        if (btnHighlight) {
+            btnHighlight.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (typeof highlightUnfinishedActivities === 'function') {
+                    highlightUnfinishedActivities();
+                } else if (typeof highlightMissingQuizzesUI === 'function') {
+                    highlightMissingQuizzesUI();
+                }
+            });
+        }
+
+        const btnNextQuiz = card.querySelector('#amaes-card-btn-next-quiz');
+        if (btnNextQuiz) {
+            btnNextQuiz.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (typeof cycleToNextQuizOrExam === 'function') {
+                    cycleToNextQuizOrExam();
+                }
+            });
+        }
+    }
+
     async function injectCourseReviewabilityNotice() {
         const existing = document.getElementById('amaes-course-reviewability-notice');
         if (!window.location.pathname.includes('/course/view.php')) {

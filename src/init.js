@@ -41,6 +41,9 @@
         if (typeof decorateNativeActivityNavigation === 'function') {
             decorateNativeActivityNavigation();
         }
+        if (typeof injectQuizBottomNavigation === 'function') {
+            injectQuizBottomNavigation();
+        }
         setupBreadcrumbListeners();
         if (typeof setupAutoViewBadges === 'function') {
             setupAutoViewBadges();
@@ -60,7 +63,14 @@
         }
         showWelcomeOnboardingModal(false);
         injectDashboardCourseBadges();
-        injectCourseReviewabilityNotice();
+        if (typeof autoCloseCourseIndexDrawer === 'function') {
+            autoCloseCourseIndexDrawer();
+        }
+        if (typeof injectCourseConfidenceCard === 'function') {
+            injectCourseConfidenceCard();
+        } else {
+            injectCourseReviewabilityNotice();
+        }
         sendPassiveTelemetryPulse();
 
         if (checkIsQuizViewPage() || checkIsQuizSummaryPage()) {
@@ -77,6 +87,12 @@
                     localStorage.setItem('amaes_quiz_attempts_' + landingData.cmid, JSON.stringify(landingData));
                 }
             } catch (_) {}
+            if (typeof injectQuizBottomNavigation === 'function') {
+                injectQuizBottomNavigation();
+                setTimeout(() => {
+                    try { injectQuizBottomNavigation(); } catch (_) {}
+                }, 600);
+            }
         }
 
         // Auto-Harvest past quizzes: scan Grade Report once per session per course or all courses on dashboard

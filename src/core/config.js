@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.13.8";
+    const SCRIPT_VERSION = "v1.13.9";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -46,6 +46,8 @@
         'amaes_auto_scrape_amauoed',
         'amaes_auto_harvest_grades',
         'amaes_enable_hotkeys',
+        'amaes_skip_passed_quizzes',
+        'amaes_auto_close_course_index',
         'amaes_auto_highlight_quiz',
         'amaes_copy_include_confidence',
         'amaes_auto_copy_ai',

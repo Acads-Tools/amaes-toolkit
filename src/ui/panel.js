@@ -21,6 +21,7 @@
         const isQuiz = checkIsQuizPage();
         const isExamPortal = (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam) || (typeof window !== 'undefined' && window.location.hostname.includes('exam'));
         const skipPassedQuizzes = (typeof localStorage !== 'undefined' && localStorage.getItem('amaes_skip_passed_quizzes') === 'true');
+        const autoCloseCourseIndex = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_close_course_index') !== 'false' : true);
 
         let initialKeyword = "";
         if (courseInfo.subjectCode) {
@@ -272,6 +273,10 @@
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="When cycling with [ and ], automatically skip quizzes with passing scores (≥80%) and jump to the next unpassed or unattempted quiz">
                                 <input id="chk-skip-passed-quizzes" type="checkbox" ${skipPassedQuizzes ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Skip Passed Quizzes (≥80%)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically close the left Course Index drawer when landing on a course page so course content expands to full width">
+                                <input id="chk-auto-close-course-index" type="checkbox" ${autoCloseCourseIndex ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Auto-Close Course Index Drawer</span>
                             </label>
                             ` : ''}
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Audio feedback: Plays a chime ding when the quiz is finished and an alert chime when manual intervention is needed">

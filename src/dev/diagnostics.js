@@ -201,7 +201,14 @@
         'Tip: Click inside a quiz question and press C to copy the question and choices, ready to paste into another AI tool.',
         'Tip: After another AI tool gives you an answer, click the question and press V to paste it back and match the choice.',
         'Tip: Click inside a question and press N when you are ready to continue to the next question or page.',
-        'Tip: Press P to pause or resume automatic quiz help while you review a question.'
+        'Tip: Press P to pause or resume automatic quiz help while you review a question.',
+        'Tip: Press ] to cycle forward to the next quiz or exam in academic sequence.',
+        'Tip: Press [ to cycle backward to the previous quiz or exam in sequence.',
+        'Tip: Toggle Skip Passed Quizzes (≥80%) in Advanced Settings to automatically bypass quizzes you already passed.',
+        'Tip: On the Quiz Summary page, press P or click Pause to halt the Auto-Submit countdown timer.',
+        'Tip: Press N, Space, or Enter during the Auto-Submit countdown to hasten submission by -2 seconds per tap.',
+        'Tip: On course pages, the Course Intelligence Card displays Autonomous Confidence and question bank coverage across all terms.',
+        'Tip: On Non-Reviewable courses, the toolkit only harvests 100% score attempts to maintain absolute database accuracy.'
     ];
 
     function startCapabilityTips() {
@@ -209,7 +216,7 @@
         capabilityTipsInterval = setInterval(() => {
             const tip = CAPABILITY_TIPS[capabilityTipIndex % CAPABILITY_TIPS.length];
             capabilityTipIndex += 1;
-            showToast(tip, 7500);
+            showToast(tip, 4000);
         }, 15000);
     }
 

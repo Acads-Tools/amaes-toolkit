@@ -247,6 +247,22 @@
                 localStorage.setItem('amaes_skip_passed_quizzes', isSkip ? 'true' : 'false');
                 showToast(`Skip Passed Quizzes: ${isSkip ? 'Enabled (≥80%)' : 'Disabled (Cycle all)'}`);
                 setLog(`Quiz Cycling: <b>${isSkip ? 'Skip Passed (≥80%)' : 'All Quizzes'}</b>`, isSkip ? "var(--accent-blue)" : "var(--text-secondary)", isSkip ? "Keyboard cycling [ and ] jumps over completed/passing quizzes" : "Keyboard cycling advances to every quiz in sequence");
+                if (typeof injectQuizBottomNavigation === 'function') {
+                    injectQuizBottomNavigation();
+                }
+            };
+        }
+
+        const chkAutoCloseCourseIndex = document.getElementById('chk-auto-close-course-index');
+        if (chkAutoCloseCourseIndex) {
+            chkAutoCloseCourseIndex.onchange = () => {
+                const isAuto = chkAutoCloseCourseIndex.checked;
+                localStorage.setItem('amaes_auto_close_course_index', isAuto ? 'true' : 'false');
+                showToast(`Auto-Close Course Index: ${isAuto ? 'Enabled' : 'Disabled'}`);
+                setLog(`Course Index Drawer: <b>${isAuto ? 'Auto-Close ON' : 'Keep Open'}</b>`, isAuto ? "var(--accent-blue)" : "var(--text-secondary)", isAuto ? "Course index drawer automatically closes on course pages" : "Course index drawer remains in default state");
+                if (isAuto && typeof autoCloseCourseIndexDrawer === 'function') {
+                    autoCloseCourseIndexDrawer();
+                }
             };
         }
 
