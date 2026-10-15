@@ -1172,3 +1172,97 @@
         return { count, isGrades, isCourse, isQuizLanding };
     }
 
+    // Check if a quiz review attempt or score indicates a 100% perfect score
+    function checkQuizAttemptIs100Percent(harvested, rootDoc = (typeof document !== 'undefined' ? document : null)) {
+        if (!harvested && !rootDoc) return false;
+
+        // 1. Check harvested grade text
+        if (harvested && harvested.gradeText) {
+            const gradeStr = String(harvested.gradeText).toLowerCase();
+            if (gradeStr.includes('100%') || gradeStr.includes('100.00%') || gradeStr.includes('100.0%')) {
+                return true;
+            }
+            const matchOutOf = gradeStr.match(/(\d+(?:\.\d+)?)\s*(?:out of|\/)\s*(\d+(?:\.\d+)?)/i);
+            if (matchOutOf) {
+                const scored = parseFloat(matchOutOf[1]);
+                const max = parseFloat(matchOutOf[2]);
+                if (!isNaN(scored) && !isNaN(max) && max > 0 && scored >= max) {
+                    return true;
+                }
+            }
+        }
+
+        // 2. Check review summary table in DOM
+        if (rootDoc) {
+            const summaryTable = rootDoc.querySelector('.quizreviewsummary, table.generaltable, #region-main table');
+            if (summaryTable) {
+                const text = summaryTable.innerText.toLowerCase();
+                if (text.includes('100%') || text.includes('100.00%')) return true;
+                const m = text.match(/grade[\s:]*(\d+(?:\.\d+)?)\s*(?:out of|\/)\s*(\d+(?:\.\d+)?)/i);
+                if (m) {
+                    const sc = parseFloat(m[1]);
+                    const mx = parseFloat(m[2]);
+                    if (!isNaN(sc) && !isNaN(mx) && mx > 0 && sc >= mx) return true;
+                }
+            }
+        }
+
+        // 3. Check harvested question count: all questions correct
+        if (harvested && harvested.totalQuestions > 0 && harvested.harvestedCount === harvested.totalQuestions) {
+            return true;
+        }
+
+        return false;
+    }
+
+    // Trigger manual completion toggle on the current page if activity is not yet marked Done
+    function triggerManualCompletionOnPage() {
+        if (typeof document === 'undefined') return false;
+        const compButtons = document.querySelectorAll(
+            'button[data-action="toggle-manual-completion"], ' +
+            'button[data-toggletype="manual:mark-done"], ' +
+            'form.togglecompletion input[type="submit"], ' +
+            'form.togglecompletion button'
+        );
+        for (const btn of compButtons) {
+            const text = (btn.innerText || btn.getAttribute('aria-label') || btn.value || '').trim().toLowerCase();
+            const toggleType = (btn.getAttribute('data-toggletype') || '').toLowerCase();
+            const isToggleAction = btn.getAttribute('data-action') === 'toggle-manual-completion';
+            const isToggleCompletionForm = Boolean(btn.closest('form.togglecompletion'));
+
+            const isMarkDoneText = text.includes('mark as done') || toggleType === 'manual:mark-done';
+            const isAlreadyDone = toggleType === 'manual:undo' || text === 'done' || text.startsWith('done') || btn.classList.contains('btn-success');
+
+            if (!isAlreadyDone && (isMarkDoneText || isToggleAction || isToggleCompletionForm)) {
+                if (typeof triggerClick === 'function') triggerClick(btn);
+                else btn.click();
+                if (typeof showToast === 'function') showToast("Quiz scored 100%! Auto-marked activity as Done.", 3500);
+                if (typeof setLog === 'function') setLog("<b>Auto-Completion:</b> Quiz achieved 100%! Auto-marked activity as Done.", "var(--accent-green)");
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Auto-mark activity as Done on Quiz Landing page (/mod/quiz/view.php) if 100% grade is recorded
+    function checkAndAutoMarkDoneOnQuizLanding() {
+        if (typeof window === 'undefined' || !window.location.pathname.includes('/mod/quiz/view.php')) return;
+        const autoMark100 = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_mark_done_100') !== 'false' : true);
+        if (!autoMark100) return;
+
+        const cmid = new URLSearchParams(window.location.search).get('id') || '';
+        const cached100 = cmid && localStorage.getItem(`amaes_quiz_100_cmid_${cmid}`) === 'true';
+
+        const pageText = document.body ? document.body.innerText : '';
+        const has100Grade = /highest grade:\s*(\d+(?:\.\d+)?)\s*\/\s*\1/i.test(pageText) ||
+                           /highest grade:\s*100(?:\.00)?%/i.test(pageText) ||
+                           /overall feedback[^\n]*100%/i.test(pageText) ||
+                           cached100;
+
+        if (has100Grade) {
+            if (cmid) localStorage.setItem(`amaes_quiz_100_cmid_${cmid}`, 'true');
+            triggerManualCompletionOnPage();
+        }
+    }
+
+

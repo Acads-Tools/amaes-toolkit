@@ -155,6 +155,7 @@
     let autoSubmitQuiz = localStorage.getItem('amaes_auto_submit_quiz') === 'true'; // default false: safe manual review before final submission
     let autoSubmitDelay = parseInt(localStorage.getItem('amaes_auto_submit_delay') || '10', 10);
     if (isNaN(autoSubmitDelay) || autoSubmitDelay < 0) autoSubmitDelay = 10;
+    let autoMarkDoneOn100 = localStorage.getItem('amaes_auto_mark_done_100') !== 'false'; // default true: auto-mark activity as done on 100% quiz score
     let autoNextTimer = null;
     let pageLoadSolverTimer = null;
 

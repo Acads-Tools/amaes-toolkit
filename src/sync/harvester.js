@@ -2458,6 +2458,20 @@
             }
         }
 
+        // Check for 100% score and trigger auto-mark activity as Done if enabled
+        if (typeof checkQuizAttemptIs100Percent === 'function' && checkQuizAttemptIs100Percent(harvested, document)) {
+            const cmid = new URLSearchParams(window.location.search).get('cmid') ||
+                         new URLSearchParams(window.location.search).get('id') ||
+                         (document.querySelector('a[href*="/mod/quiz/view.php?id="]')?.href.match(/[?&]id=(\d+)/)?.[1]) || '';
+            if (cmid) {
+                localStorage.setItem(`amaes_quiz_100_cmid_${cmid}`, 'true');
+            }
+            const autoMark100 = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_mark_done_100') !== 'false' : true);
+            if (autoMark100 && typeof triggerManualCompletionOnPage === 'function') {
+                triggerManualCompletionOnPage();
+            }
+        }
+
         // Auto-save verified answers and eliminated wrong choices to local subject cache
         const cacheRes = mergeAnswersIntoCache(harvested.subjectCode, harvested.questions, 'Review');
 

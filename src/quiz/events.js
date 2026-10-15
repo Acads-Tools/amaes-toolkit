@@ -266,6 +266,16 @@
             };
         }
 
+        const chkAutoMarkDone100 = document.getElementById('chk-auto-mark-done-100');
+        if (chkAutoMarkDone100) {
+            chkAutoMarkDone100.onchange = () => {
+                autoMarkDoneOn100 = chkAutoMarkDone100.checked;
+                localStorage.setItem('amaes_auto_mark_done_100', autoMarkDoneOn100 ? 'true' : 'false');
+                showToast(`Auto-Mark 100% Done: ${autoMarkDoneOn100 ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-Mark Done on 100%: <b>${autoMarkDoneOn100 ? 'ON' : 'OFF'}</b>`, autoMarkDoneOn100 ? "var(--accent-green)" : "var(--accent-amber)", autoMarkDoneOn100 ? "Automatically marks Moodle activity as Done upon achieving a 100% quiz score" : "Requires manual activity completion click");
+            };
+        }
+
         const chkAudioAlerts = document.getElementById('chk-audio-alerts');
         if (chkAudioAlerts) {
             chkAudioAlerts.onchange = () => {

@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.10'), "Userscript header must specify v1.13.10");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.10";'), "Constant SCRIPT_VERSION must be v1.13.10");
+    assert.ok(script.includes('@version      1.13.12'), "Userscript header must specify v1.13.12");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.12";'), "Constant SCRIPT_VERSION must be v1.13.12");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -6605,6 +6605,41 @@ test("Gapselect Dropdown Normalization, Term Completed Attempts Breakdown, Fast 
 
     // 6. Non-blocking Missing Quiz Highlighter in highlighter.js
     assert.ok(!hlSrc.includes("await fetch(linkElem.href)"), "highlighter.js must avoid blocking sequential fetches in highlightMissingOrUnansweredQuizzes");
+});
+
+// --------------------------------------------------
+// 198. Summary Page Modal Submission, Short-Answer Auto-Fill & 100% Activity Auto-Marker (v1.13.12)
+// --------------------------------------------------
+test("Summary Page Modal Submission, Short-Answer Auto-Fill & 100% Activity Auto-Marker (v1.13.12)", () => {
+    const fs = require('fs');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const hlSrc = fs.readFileSync('src/moodle/highlighter.js', 'utf8');
+    const panelSrc = fs.readFileSync('src/ui/panel.js', 'utf8');
+    const eventsSrc = fs.readFileSync('src/quiz/events.js', 'utf8');
+    const harvesterSrc = fs.readFileSync('src/sync/harvester.js', 'utf8');
+
+    // 1. Modal submit discovery and execution in solver.js
+    assert.ok(solverSrc.includes("function isElementVisible(el)"), "solver.js must define isElementVisible helper");
+    assert.ok(solverSrc.includes("function findQuizSubmitConfirmationButton("), "solver.js must define findQuizSubmitConfirmationButton helper");
+    assert.ok(solverSrc.includes("function executeQuizSummaryFinalSubmit("), "solver.js must define executeQuizSummaryFinalSubmit helper");
+    assert.ok(solverSrc.includes("hastenQuizSummaryAutoSubmit"), "solver.js must export or define hastenQuizSummaryAutoSubmit");
+    assert.ok(solverSrc.includes("const existingConfirmBtn = findQuizSubmitConfirmationButton();"), "hastenQuizSummaryAutoSubmit must inspect existing modal confirm button");
+
+    // 2. Short-Answer text input auto-fill & event dispatching
+    assert.ok(solverSrc.includes("function setInputValueWithEvents(input, val)"), "solver.js must define setInputValueWithEvents helper");
+    assert.ok(solverSrc.includes("Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')"), "setInputValueWithEvents must use prototype value descriptor setter");
+    assert.ok(solverSrc.includes("setInputValueWithEvents(textInput, targetAns);"), "solver.js must auto-fill text inputs using setInputValueWithEvents");
+
+    // 3. 100% activity auto-marker in highlighter.js and harvester.js
+    assert.ok(hlSrc.includes("function checkQuizAttemptIs100Percent("), "highlighter.js must define checkQuizAttemptIs100Percent");
+    assert.ok(hlSrc.includes("function triggerManualCompletionOnPage("), "highlighter.js must define triggerManualCompletionOnPage");
+    assert.ok(hlSrc.includes("function checkAndAutoMarkDoneOnQuizLanding("), "highlighter.js must define checkAndAutoMarkDoneOnQuizLanding");
+    assert.ok(harvesterSrc.includes("checkQuizAttemptIs100Percent(harvested, document)"), "harvester.js must check for 100% score on review page");
+    assert.ok(harvesterSrc.includes("triggerManualCompletionOnPage()"), "harvester.js must trigger manual completion when 100% score achieved");
+
+    // 4. Advanced Settings checkbox and events
+    assert.ok(panelSrc.includes("id=\"chk-auto-mark-done-100\""), "panel.js must render Auto-Mark Activity Done on 100% Score checkbox");
+    assert.ok(eventsSrc.includes("chkAutoMarkDone100"), "events.js must bind chkAutoMarkDone100 change event");
 });
 
 console.log("\n==================================================");

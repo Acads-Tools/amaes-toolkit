@@ -22,6 +22,7 @@
         const isExamPortal = (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam) || (typeof window !== 'undefined' && window.location.hostname.includes('exam'));
         const skipPassedQuizzes = (typeof localStorage !== 'undefined' && localStorage.getItem('amaes_skip_passed_quizzes') === 'true');
         const autoCloseCourseIndex = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_close_course_index') !== 'false' : true);
+        const autoMarkDoneOn100 = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_mark_done_100') !== 'false' : true);
 
         let initialKeyword = "";
         if (courseInfo.subjectCode) {
@@ -277,6 +278,10 @@
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically close the left Course Index drawer when landing on a course page so course content expands to full width">
                                 <input id="chk-auto-close-course-index" type="checkbox" ${autoCloseCourseIndex ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Auto-Close Course Index Drawer</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically mark the Moodle activity as Done when a quiz achieves a 100% perfect score">
+                                <input id="chk-auto-mark-done-100" type="checkbox" ${autoMarkDoneOn100 ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Auto-Mark Activity Done on 100% Score</span>
                             </label>
                             ` : ''}
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Audio feedback: Plays a chime ding when the quiz is finished and an alert chime when manual intervention is needed">

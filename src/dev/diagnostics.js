@@ -208,7 +208,9 @@
         'Tip: On the Quiz Summary page, press P or click Pause to halt the Auto-Submit countdown timer.',
         'Tip: Press N, Space, or Enter during the Auto-Submit countdown to hasten submission by -2 seconds per tap.',
         'Tip: On course pages, the Course Intelligence Card displays Autonomous Confidence and question bank coverage across all terms.',
-        'Tip: On Non-Reviewable courses, the toolkit only harvests 100% score attempts to maintain absolute database accuracy.'
+        'Tip: On Non-Reviewable courses, the toolkit only harvests 100% score attempts to maintain absolute database accuracy.',
+        'Tip: Quizzes with 100% scores automatically mark their Moodle activities as Done (Enabled in Advanced Settings).',
+        'Tip: On the Quiz Summary page, pressing N or Space automatically confirms and submits the Moodle submission modal.'
     ];
 
     function startCapabilityTips() {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.13.10
+// @version      1.13.12
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.13.10";
+    const SCRIPT_VERSION = "v1.13.12";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -2326,6 +2326,7 @@
     let autoSubmitQuiz = localStorage.getItem('amaes_auto_submit_quiz') === 'true'; // default false: safe manual review before final submission
     let autoSubmitDelay = parseInt(localStorage.getItem('amaes_auto_submit_delay') || '10', 10);
     if (isNaN(autoSubmitDelay) || autoSubmitDelay < 0) autoSubmitDelay = 10;
+    let autoMarkDoneOn100 = localStorage.getItem('amaes_auto_mark_done_100') !== 'false'; // default true: auto-mark activity as done on 100% quiz score
     let autoNextTimer = null;
     let pageLoadSolverTimer = null;
 
@@ -4322,7 +4323,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             }
 
             // 4. Text input / textarea (shortanswer questions)
-            const textInputs = que.querySelectorAll('input[type="text"].form-control, input.form-control, textarea');
+            const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
             if (textInputs.length > 0) {
                 const allFilled = Array.from(textInputs).every(inp => inp.value && inp.value.trim().length > 0);
                 if (!allFilled) return false;
@@ -4374,7 +4375,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     answered = Array.from(selects).every(select => select.value && select.value !== '0');
                 } else {
                     const textInputs = que.querySelectorAll(
-                        'input[type="text"].form-control, input.form-control, textarea'
+                        'input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])'
                     );
                     if (textInputs.length > 0) {
                         answered = Array.from(textInputs).every(input => input.value && input.value.trim());
@@ -5335,7 +5336,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 : externalStudyGuideAnswers;
             const availableAnswers = (cached || []).concat(freshExternalStudyGuideAnswers);
             if (availableAnswers.length > 0) {
-                res = highlightQuizAnswers(availableAnswers, Boolean(autoQuizMode && autoPickQuiz));
+                res = highlightQuizAnswers(availableAnswers, Boolean(autoQuizMode || autoPickQuiz));
             } else {
                 setLog(`<b>No Answers in DB:</b> Open amauoed or click Cloud Sync for <b>${subCode}</b>!`, "var(--accent-amber)");
             }
@@ -5391,7 +5392,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
                 const dropZones = que.querySelectorAll('.drop, .dropzone, span.droptarget, .droppable');
                 const selectInputs = que.querySelectorAll('select');
-                const textInputs = que.querySelectorAll('input[type="text"].form-control, input.form-control');
+                const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
 
                 let isFullyVerified = false;
                 if (hasVerifiedBadge && !hasUnreviewedNote && !hasAdaptiveBadge && !hasAiBadge && !hasUnverifiedBadge) {
@@ -5865,10 +5866,13 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 // Listen for user selecting or typing a choice: show visual confirmation, DO NOT auto-next by default
                 const inputElements = firstBlockedQue.querySelectorAll('input[type="radio"], input[type="checkbox"], input[type="text"], select, .draghome, .drop, input.placeinput');
                 const onUserPickedChoice = () => {
+                    if (!isQuestionAnswered(firstBlockedQue)) {
+                        return;
+                    }
                     const selectedInput = firstBlockedQue.querySelector('.answer input[type="radio"]:checked, .answer input[type="checkbox"]:checked');
                     const selectedLabel = selectedInput && (selectedInput.closest('label') || selectedInput.parentElement);
                     const selectedText = selectedLabel ? cleanDOMToAI(selectedLabel).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim() : '';
-                    const textInput = firstBlockedQue.querySelector('input[type="text"].form-control, input.form-control, textarea');
+                    const textInput = firstBlockedQue.querySelector('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
                     const selectInput = firstBlockedQue.querySelector('select');
                     const selectedOption = selectInput && selectInput.options[selectInput.selectedIndex];
                     recordAttemptAnswerEvidence(
@@ -5957,6 +5961,38 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         try { el.click(); } catch (_) {}
     }
 
+    function setInputValueWithEvents(input, val) {
+        if (!input) return;
+        try {
+            const proto = Object.getPrototypeOf(input);
+            const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set ||
+                                 Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+            if (nativeSetter) {
+                nativeSetter.call(input, val);
+            } else {
+                input.value = val;
+            }
+        } catch (_) {
+            input.value = val;
+        }
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.dispatchEvent(new Event('blur', { bubbles: true }));
+    }
+
+    function isElementVisible(el) {
+        if (!el) return false;
+        if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return false;
+        if (el.classList && (el.classList.contains('hidden') || el.classList.contains('yui3-panel-hidden'))) return false;
+        try {
+            const style = window.getComputedStyle(el);
+            if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+        } catch (_) {}
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) return false;
+        return true;
+    }
+
     function findQuizSummarySubmitButton() {
         const candidates = document.querySelectorAll(
             '.btn-finishattempt button, .btn-finishattempt input[type="submit"], .btn-finishattempt input[type="button"], ' +
@@ -5995,43 +6031,171 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     }
 
     function findQuizSubmitConfirmationButton() {
-        const dialogs = document.querySelectorAll(
-            '.modal.show, .modal.in, .modal:not([aria-hidden="true"]), ' +
-            'div[data-region="modal"], div[data-region="modal-container"], ' +
-            '.moodle-dialogue:not(.yui3-panel-hidden), .moodle-dialogue-focused, .confirmation-dialogue, ' +
-            '.yui3-panel:not(.yui3-panel-hidden), [role="dialog"]:not([aria-hidden="true"]), ' +
-            '.moodle-dialogue, .modal, [role="dialog"], .yui3-panel, .modal-dialog, .moodle-has-zindex'
+        // Priority 1: Actively open Bootstrap / Moodle 4+ modals
+        const openModals = document.querySelectorAll(
+            '.modal.show, .modal.in, div[data-region="modal-container"].show, .modal[style*="display: block"], ' +
+            '.modal.moodle-has-zindex.show, [role="dialog"].show'
         );
+        for (const modal of openModals) {
+            if (!isElementVisible(modal)) continue;
+            // Target save / primary button
+            const saveBtn = modal.querySelector('button[data-action="save"], .modal-footer .btn-primary, button.btn-primary, input[type="submit"].btn-primary, input[value*="Submit"]');
+            if (saveBtn && isElementVisible(saveBtn) && !saveBtn.disabled) {
+                const label = `${saveBtn.value || ''} ${saveBtn.innerText || saveBtn.textContent || ''}`.trim();
+                if (!/cancel|close|dismiss|back/i.test(label)) return saveBtn;
+            }
+            const allBtns = modal.querySelectorAll('button, input[type="submit"], input[type="button"]');
+            for (const b of allBtns) {
+                if (!b || b.disabled || !isElementVisible(b)) continue;
+                const label = `${b.value || ''} ${b.innerText || b.textContent || ''}`.trim();
+                if (/cancel|close|dismiss|back/i.test(label)) continue;
+                if (/submit all and finish|submit attempt|^submit$|^finish$/i.test(label)) return b;
+            }
+        }
+
+        // Priority 2: Moodle YUI confirmation dialogue
+        const yuiDialogues = document.querySelectorAll('.moodle-dialogue:not(.yui3-panel-hidden), .moodle-dialogue-focused, .confirmation-dialogue');
+        for (const dialogue of yuiDialogues) {
+            if (!isElementVisible(dialogue)) continue;
+            const primaryBtn = dialogue.querySelector('.confirmation-buttons .btn-primary, .confirmation-buttons input[type="button"], .confirmation-buttons button, .moodle-dialogue-ft .btn-primary');
+            if (primaryBtn && isElementVisible(primaryBtn) && !primaryBtn.disabled) {
+                const label = `${primaryBtn.value || ''} ${primaryBtn.innerText || primaryBtn.textContent || ''}`.trim();
+                if (!/cancel|close|dismiss|back/i.test(label)) return primaryBtn;
+            }
+        }
+
+        // Priority 3: Visible dialogs with role="dialog" or class="modal"
+        const dialogs = document.querySelectorAll('[role="dialog"], .modal, .yui3-panel');
         for (const dialog of dialogs) {
-            const buttons = dialog.querySelectorAll('button, input[type="submit"], input[type="button"], .btn-primary, button[data-action="save"]');
+            if (!isElementVisible(dialog)) continue;
+            const buttons = dialog.querySelectorAll('button[data-action="save"], .modal-footer .btn-primary, .btn-primary, input[type="submit"], input[type="button"], button');
             for (const button of buttons) {
-                if (!button || button.disabled) continue;
-
-                // Priority 1: Moodle modal save action
+                if (!button || button.disabled || !isElementVisible(button)) continue;
                 if (button.getAttribute('data-action') === 'save') return button;
-
                 const label = `${button.value || ''} ${button.innerText || button.textContent || ''}`.trim();
-                if (/cancel|do not submit|close|dismiss/i.test(label)) continue;
-
+                if (/cancel|do not submit|close|dismiss|back/i.test(label)) continue;
                 if (/submit all and finish|submit attempt|^submit$|^finish$/i.test(label)) {
                     return button;
                 }
             }
         }
 
-        // Direct fallback: check document for modal-footer or confirmation primary buttons
+        // Priority 4: Standalone visible confirmation button
         const directButtons = document.querySelectorAll(
             '.modal-footer button[data-action="save"], .modal-footer .btn-primary, ' +
             '.confirmation-buttons .btn-primary, .confirmation-buttons input, ' +
             '[data-region="modal"] button[data-action="save"], [data-region="modal"] .btn-primary'
         );
         for (const b of directButtons) {
-            if (!b || b.disabled) continue;
+            if (!b || b.disabled || !isElementVisible(b)) continue;
             const label = `${b.value || ''} ${b.innerText || b.textContent || ''}`.trim();
             if (!/cancel|close|dismiss/i.test(label)) return b;
         }
 
         return null;
+    }
+
+    function monitorConfirmationSubmission() {
+        const confirmUntil = Date.now() + 6_000;
+        const verifySubmission = () => {
+            if (!checkIsQuizSummaryPage()) return;
+            if (Date.now() < confirmUntil) {
+                summaryAutoSubmitTimer = setTimeout(verifySubmission, 150);
+                return;
+            }
+            // If still on summary page after 6s:
+            const parentForm = document.querySelector('form[action*="processattempt.php"]');
+            if (parentForm) {
+                try {
+                    setLog("<b>Auto-Submit:</b> Form still present after confirmation; dispatching direct form submit...", "var(--accent-green)");
+                    if (parentForm.requestSubmit) parentForm.requestSubmit();
+                    else parentForm.submit();
+                    return;
+                } catch (_) {
+                    try { parentForm.submit(); return; } catch (_) {}
+                }
+            }
+            const stillOpenConfirmation = findQuizSubmitConfirmationButton();
+            showQuizSubmitFallback(
+                stillOpenConfirmation
+                    ? 'Moodle’s confirmation is still open. Click its submit button to finish submitting.'
+                    : 'Moodle did not leave the summary page after confirmation. Check the attempt and click Moodle’s submit button if it is still available.',
+                () => findQuizSubmitConfirmationButton() || findQuizSummarySubmitButton(),
+                stillOpenConfirmation ? 'Find confirmation button' : 'Find Moodle’s submit button'
+            );
+        };
+        setLog("<b>Auto-Submit:</b> Confirmation clicked; checking that Moodle completes submission.", "var(--accent-green)");
+        summaryAutoSubmitTimer = setTimeout(verifySubmission, 150);
+    }
+
+    function executeQuizSummaryFinalSubmit() {
+        if (!checkIsQuizSummaryPage()) return;
+
+        // Check if confirmation modal is already open
+        const existingConfirm = findQuizSubmitConfirmationButton();
+        if (existingConfirm) {
+            summaryAutoSubmitAttempted = true;
+            triggerClick(existingConfirm);
+            monitorConfirmationSubmission();
+            return;
+        }
+
+        const currentSubmitBtn = findQuizSummarySubmitButton();
+        if (!currentSubmitBtn) {
+            showQuizSubmitFallback(
+                'Auto-submit could not continue because Moodle’s submit button disappeared. Use Moodle’s submission controls on this page to finish.',
+                () => findQuizSubmitConfirmationButton() || findQuizSummarySubmitButton(),
+                'Find Moodle’s submit button'
+            );
+            return;
+        }
+        summaryAutoSubmitAttempted = true;
+        triggerClick(currentSubmitBtn);
+        const submitStartTime = Date.now();
+        let formSubmittedDirectly = false;
+        const confirmUntil = Date.now() + 5_000;
+
+        const confirmSubmission = () => {
+            if (!checkIsQuizSummaryPage()) return;
+            const confirmationButton = findQuizSubmitConfirmationButton();
+            if (confirmationButton) {
+                triggerClick(confirmationButton);
+                monitorConfirmationSubmission();
+                return;
+            }
+
+            // Direct form submission fallback after 2s if no confirmation modal appeared:
+            if (!formSubmittedDirectly && Date.now() - submitStartTime > 2000) {
+                const parentForm = currentSubmitBtn.form || currentSubmitBtn.closest('form') || document.querySelector('form[action*="processattempt.php"]');
+                if (parentForm && parentForm.action && parentForm.action.includes('processattempt.php')) {
+                    formSubmittedDirectly = true;
+                    setLog("<b>Auto-Submit:</b> Submitting Moodle attempt form directly...", "var(--accent-green)");
+                    try {
+                        if (parentForm.requestSubmit) {
+                            parentForm.requestSubmit(currentSubmitBtn);
+                        } else {
+                            parentForm.submit();
+                        }
+                    } catch (_) {
+                        try { parentForm.submit(); } catch (_) {}
+                    }
+                }
+            }
+
+            if (Date.now() < confirmUntil) {
+                summaryAutoSubmitTimer = setTimeout(confirmSubmission, 100);
+                return;
+            }
+            const fallbackConfirmationButton = findQuizSubmitConfirmationButton();
+            showQuizSubmitFallback(
+                fallbackConfirmationButton
+                    ? 'Moodle opened a submission confirmation that could not be completed automatically. Click the confirmation button to finish submitting.'
+                    : 'Auto-submit could not confirm that Moodle started submission. Click Moodle’s “Submit all and finish” button to finish.',
+                () => findQuizSubmitConfirmationButton() || findQuizSummarySubmitButton(),
+                fallbackConfirmationButton ? 'Find confirmation button' : 'Find Moodle’s submit button'
+            );
+        };
+        summaryAutoSubmitTimer = setTimeout(confirmSubmission, 100);
     }
 
     function showQuizSubmitFallback(message, targetFinder = findQuizSummarySubmitButton, actionLabel = 'Show Moodle submit control') {
@@ -6269,15 +6433,20 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             sessionStorage.removeItem(pausedSecKey);
         }
 
+        // Priority Check: If confirmation modal is ALREADY visible on screen, click its confirmation button immediately!
+        const existingConfirmBtn = findQuizSubmitConfirmationButton();
+        if (existingConfirmBtn) {
+            setLog("<b>Auto-Submit:</b> Submitting confirmation modal via <b>[N]</b>...", "var(--accent-green)");
+            showToast("Submitting confirmation...", 1500);
+            triggerClick(existingConfirmBtn);
+            monitorConfirmationSubmission();
+            return true;
+        }
+
         let targetDeadline = parseInt(sessionStorage.getItem(deadlineKey) || '0', 10);
 
         if (!targetDeadline || isNaN(targetDeadline) || !summaryAutoSubmitTimer) {
-            if (typeof executeQuizSummaryFinalSubmit === 'function') {
-                executeQuizSummaryFinalSubmit();
-            } else {
-                const submitBtn = findQuizSummarySubmitButton();
-                if (submitBtn) triggerClick(submitBtn);
-            }
+            executeQuizSummaryFinalSubmit();
             return true;
         }
 
@@ -6311,12 +6480,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             sessionStorage.removeItem(deadlineKey);
             setLog("<b>Auto-Submit:</b> Hastened to 0s via <b>[N]</b>. Submitting attempt now...", "var(--accent-green)");
             showToast("Submitting attempt now...", 1500);
-            if (typeof executeQuizSummaryFinalSubmit === 'function') {
-                executeQuizSummaryFinalSubmit();
-            } else {
-                const submitBtn = findQuizSummarySubmitButton();
-                if (submitBtn) triggerClick(submitBtn);
-            }
+            executeQuizSummaryFinalSubmit();
         } else {
             showToast(`Auto-submitting: ${remainingSec}s (-2s · ${summaryAutoSubmitHastenMultiplier}x speed)`, 1200);
             setLog(`<b>Auto-Submit:</b> Hastened via <b>[N]</b> (-2s, ${summaryAutoSubmitHastenMultiplier}x speed, ${remainingSec}s remaining).`, "var(--accent-green)");
@@ -6424,83 +6588,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
         const shouldAutoSubmit = autoSubmitQuiz || autoQuizMode;
         const delaySec = (typeof autoSubmitDelay === 'number' && !isNaN(autoSubmitDelay)) ? autoSubmitDelay : 10;
-
-        // Core final submission execution helper
-        function executeQuizSummaryFinalSubmit() {
-            if (!checkIsQuizSummaryPage()) return;
-            const currentSubmitBtn = findQuizSummarySubmitButton();
-            if (!currentSubmitBtn) {
-                showQuizSubmitFallback(
-                    'Auto-submit could not continue because Moodle’s submit button disappeared. Use Moodle’s submission controls on this page to finish.',
-                    () => findQuizSummarySubmitButton(),
-                    'Find Moodle’s submit button'
-                );
-                return;
-            }
-            summaryAutoSubmitAttempted = true;
-            triggerClick(currentSubmitBtn);
-            const submitStartTime = Date.now();
-            let formSubmittedDirectly = false;
-            const confirmUntil = Date.now() + 5_000;
-            const confirmSubmission = () => {
-                if (!checkIsQuizSummaryPage()) return;
-                const confirmationButton = findQuizSubmitConfirmationButton();
-                if (confirmationButton) {
-                    triggerClick(confirmationButton);
-                    const confirmUntil = Date.now() + 10_000;
-                    const verifySubmission = () => {
-                        if (!checkIsQuizSummaryPage()) return;
-                        if (Date.now() < confirmUntil) {
-                            summaryAutoSubmitTimer = setTimeout(verifySubmission, 150);
-                            return;
-                        }
-                        const stillOpenConfirmation = findQuizSubmitConfirmationButton();
-                        showQuizSubmitFallback(
-                            stillOpenConfirmation
-                                ? 'Moodle’s confirmation is still open. Click its submit button to finish submitting.'
-                                : 'Moodle did not leave the summary page after confirmation. Check the attempt and click Moodle’s submit button if it is still available.',
-                            () => findQuizSubmitConfirmationButton() || findQuizSummarySubmitButton(),
-                            stillOpenConfirmation ? 'Find confirmation button' : 'Find Moodle’s submit button'
-                        );
-                    };
-                    setLog("<b>Auto-Submit:</b> Confirmation clicked; checking that Moodle completes submission.", "var(--accent-green)");
-                    summaryAutoSubmitTimer = setTimeout(verifySubmission, 150);
-                    return;
-                }
-
-                // Direct form submission fallback after 2.5s if no confirmation modal appeared:
-                if (!formSubmittedDirectly && Date.now() - submitStartTime > 2500) {
-                    const parentForm = currentSubmitBtn.form || currentSubmitBtn.closest('form');
-                    if (parentForm && parentForm.action && parentForm.action.includes('processattempt.php')) {
-                        formSubmittedDirectly = true;
-                        setLog("<b>Auto-Submit:</b> Submitting Moodle attempt form directly...", "var(--accent-green)");
-                        try {
-                            if (parentForm.requestSubmit) {
-                                parentForm.requestSubmit(currentSubmitBtn);
-                            } else {
-                                parentForm.submit();
-                            }
-                        } catch (_) {
-                            try { parentForm.submit(); } catch (_) {}
-                        }
-                    }
-                }
-
-                if (Date.now() < confirmUntil) {
-                    summaryAutoSubmitTimer = setTimeout(confirmSubmission, 150);
-                    return;
-                }
-                const fallbackConfirmationButton = findQuizSubmitConfirmationButton();
-                showQuizSubmitFallback(
-                    fallbackConfirmationButton
-                        ? 'Moodle opened a submission confirmation that could not be completed automatically. Click the confirmation button to finish submitting.'
-                        : 'Auto-submit could not confirm that Moodle started submission. Click Moodle’s “Submit all and finish” button to finish.',
-                    () => findQuizSubmitConfirmationButton() || findQuizSummarySubmitButton(),
-                    fallbackConfirmationButton ? 'Find confirmation button' : 'Find Moodle’s submit button'
-                );
-            };
-            summaryAutoSubmitTimer = setTimeout(confirmSubmission, 200);
-        }
 
         // Render Ready Banner
         let readyBanner = document.getElementById('amaes-summary-ready-banner');
@@ -8023,6 +8110,10 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             if (!startBtn.value.includes('(Press A)')) {
                 startBtn.value = `${startBtn.value} (Press A)`;
             }
+        }
+
+        if (typeof checkAndAutoMarkDoneOnQuizLanding === 'function') {
+            checkAndAutoMarkDoneOnQuizLanding();
         }
     }
 
@@ -9690,10 +9781,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                                     e.preventDefault();
                                     e.stopPropagation();
                                 }
-                                textInput.value = targetAns;
-                                textInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                textInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                textInput.dispatchEvent(new Event('blur', { bubbles: true }));
+                                setInputValueWithEvents(textInput, targetAns);
                                 showToast(`Filled: ${targetAns}`);
                                 hint.style.background = 'rgba(16, 185, 129, 0.2)';
                                 const btn = hint.querySelector('.amaes-fill-btn');
@@ -9722,10 +9810,10 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             normalizeChoice(w.norm || w.text || w) === currentInputNorm
                         );
                         if (canAutoFill && (!textInput.value || currentInputIsKnownWrong)) {
-                            textInput.value = targetAns;
-                            textInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            textInput.dispatchEvent(new Event('change', { bubbles: true }));
-                            textInput.dispatchEvent(new Event('blur', { bubbles: true }));
+                            setInputValueWithEvents(textInput, targetAns);
+                            hint.style.background = 'rgba(16, 185, 129, 0.2)';
+                            const btn = hint.querySelector('.amaes-fill-btn');
+                            if (btn) btn.innerText = 'Filled';
                         }
                     });
 
@@ -11434,6 +11522,100 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         return { count, isGrades, isCourse, isQuizLanding };
     }
 
+    // Check if a quiz review attempt or score indicates a 100% perfect score
+    function checkQuizAttemptIs100Percent(harvested, rootDoc = (typeof document !== 'undefined' ? document : null)) {
+        if (!harvested && !rootDoc) return false;
+
+        // 1. Check harvested grade text
+        if (harvested && harvested.gradeText) {
+            const gradeStr = String(harvested.gradeText).toLowerCase();
+            if (gradeStr.includes('100%') || gradeStr.includes('100.00%') || gradeStr.includes('100.0%')) {
+                return true;
+            }
+            const matchOutOf = gradeStr.match(/(\d+(?:\.\d+)?)\s*(?:out of|\/)\s*(\d+(?:\.\d+)?)/i);
+            if (matchOutOf) {
+                const scored = parseFloat(matchOutOf[1]);
+                const max = parseFloat(matchOutOf[2]);
+                if (!isNaN(scored) && !isNaN(max) && max > 0 && scored >= max) {
+                    return true;
+                }
+            }
+        }
+
+        // 2. Check review summary table in DOM
+        if (rootDoc) {
+            const summaryTable = rootDoc.querySelector('.quizreviewsummary, table.generaltable, #region-main table');
+            if (summaryTable) {
+                const text = summaryTable.innerText.toLowerCase();
+                if (text.includes('100%') || text.includes('100.00%')) return true;
+                const m = text.match(/grade[\s:]*(\d+(?:\.\d+)?)\s*(?:out of|\/)\s*(\d+(?:\.\d+)?)/i);
+                if (m) {
+                    const sc = parseFloat(m[1]);
+                    const mx = parseFloat(m[2]);
+                    if (!isNaN(sc) && !isNaN(mx) && mx > 0 && sc >= mx) return true;
+                }
+            }
+        }
+
+        // 3. Check harvested question count: all questions correct
+        if (harvested && harvested.totalQuestions > 0 && harvested.harvestedCount === harvested.totalQuestions) {
+            return true;
+        }
+
+        return false;
+    }
+
+    // Trigger manual completion toggle on the current page if activity is not yet marked Done
+    function triggerManualCompletionOnPage() {
+        if (typeof document === 'undefined') return false;
+        const compButtons = document.querySelectorAll(
+            'button[data-action="toggle-manual-completion"], ' +
+            'button[data-toggletype="manual:mark-done"], ' +
+            'form.togglecompletion input[type="submit"], ' +
+            'form.togglecompletion button'
+        );
+        for (const btn of compButtons) {
+            const text = (btn.innerText || btn.getAttribute('aria-label') || btn.value || '').trim().toLowerCase();
+            const toggleType = (btn.getAttribute('data-toggletype') || '').toLowerCase();
+            const isToggleAction = btn.getAttribute('data-action') === 'toggle-manual-completion';
+            const isToggleCompletionForm = Boolean(btn.closest('form.togglecompletion'));
+
+            const isMarkDoneText = text.includes('mark as done') || toggleType === 'manual:mark-done';
+            const isAlreadyDone = toggleType === 'manual:undo' || text === 'done' || text.startsWith('done') || btn.classList.contains('btn-success');
+
+            if (!isAlreadyDone && (isMarkDoneText || isToggleAction || isToggleCompletionForm)) {
+                if (typeof triggerClick === 'function') triggerClick(btn);
+                else btn.click();
+                if (typeof showToast === 'function') showToast("Quiz scored 100%! Auto-marked activity as Done.", 3500);
+                if (typeof setLog === 'function') setLog("<b>Auto-Completion:</b> Quiz achieved 100%! Auto-marked activity as Done.", "var(--accent-green)");
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Auto-mark activity as Done on Quiz Landing page (/mod/quiz/view.php) if 100% grade is recorded
+    function checkAndAutoMarkDoneOnQuizLanding() {
+        if (typeof window === 'undefined' || !window.location.pathname.includes('/mod/quiz/view.php')) return;
+        const autoMark100 = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_mark_done_100') !== 'false' : true);
+        if (!autoMark100) return;
+
+        const cmid = new URLSearchParams(window.location.search).get('id') || '';
+        const cached100 = cmid && localStorage.getItem(`amaes_quiz_100_cmid_${cmid}`) === 'true';
+
+        const pageText = document.body ? document.body.innerText : '';
+        const has100Grade = /highest grade:\s*(\d+(?:\.\d+)?)\s*\/\s*\1/i.test(pageText) ||
+                           /highest grade:\s*100(?:\.00)?%/i.test(pageText) ||
+                           /overall feedback[^\n]*100%/i.test(pageText) ||
+                           cached100;
+
+        if (has100Grade) {
+            if (cmid) localStorage.setItem(`amaes_quiz_100_cmid_${cmid}`, 'true');
+            triggerManualCompletionOnPage();
+        }
+    }
+
+
     const ACCOUNT_SWITCHER_ACCOUNTS_KEY = 'amaes_account_switcher_accounts';
     const ACCOUNT_SWITCHER_RETURN_KEY = 'amaes_account_switcher_return_url';
     const ACCOUNT_SWITCHER_PENDING_KEY = 'amaes_account_switcher_pending';
@@ -12694,7 +12876,9 @@ function setupAccountTransferUI() {
         'Tip: On the Quiz Summary page, press P or click Pause to halt the Auto-Submit countdown timer.',
         'Tip: Press N, Space, or Enter during the Auto-Submit countdown to hasten submission by -2 seconds per tap.',
         'Tip: On course pages, the Course Intelligence Card displays Autonomous Confidence and question bank coverage across all terms.',
-        'Tip: On Non-Reviewable courses, the toolkit only harvests 100% score attempts to maintain absolute database accuracy.'
+        'Tip: On Non-Reviewable courses, the toolkit only harvests 100% score attempts to maintain absolute database accuracy.',
+        'Tip: Quizzes with 100% scores automatically mark their Moodle activities as Done (Enabled in Advanced Settings).',
+        'Tip: On the Quiz Summary page, pressing N or Space automatically confirms and submits the Moodle submission modal.'
     ];
 
     function startCapabilityTips() {
@@ -20098,6 +20282,20 @@ function setupAccountTransferUI() {
             }
         }
 
+        // Check for 100% score and trigger auto-mark activity as Done if enabled
+        if (typeof checkQuizAttemptIs100Percent === 'function' && checkQuizAttemptIs100Percent(harvested, document)) {
+            const cmid = new URLSearchParams(window.location.search).get('cmid') ||
+                         new URLSearchParams(window.location.search).get('id') ||
+                         (document.querySelector('a[href*="/mod/quiz/view.php?id="]')?.href.match(/[?&]id=(\d+)/)?.[1]) || '';
+            if (cmid) {
+                localStorage.setItem(`amaes_quiz_100_cmid_${cmid}`, 'true');
+            }
+            const autoMark100 = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_mark_done_100') !== 'false' : true);
+            if (autoMark100 && typeof triggerManualCompletionOnPage === 'function') {
+                triggerManualCompletionOnPage();
+            }
+        }
+
         // Auto-save verified answers and eliminated wrong choices to local subject cache
         const cacheRes = mergeAnswersIntoCache(harvested.subjectCode, harvested.questions, 'Review');
 
@@ -21354,6 +21552,7 @@ function setupAccountTransferUI() {
         const isExamPortal = (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam) || (typeof window !== 'undefined' && window.location.hostname.includes('exam'));
         const skipPassedQuizzes = (typeof localStorage !== 'undefined' && localStorage.getItem('amaes_skip_passed_quizzes') === 'true');
         const autoCloseCourseIndex = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_close_course_index') !== 'false' : true);
+        const autoMarkDoneOn100 = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_mark_done_100') !== 'false' : true);
 
         let initialKeyword = "";
         if (courseInfo.subjectCode) {
@@ -21609,6 +21808,10 @@ function setupAccountTransferUI() {
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically close the left Course Index drawer when landing on a course page so course content expands to full width">
                                 <input id="chk-auto-close-course-index" type="checkbox" ${autoCloseCourseIndex ? 'checked' : ''} style="cursor: pointer;" />
                                 <span>Auto-Close Course Index Drawer</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; font-weight: 500;" title="Automatically mark the Moodle activity as Done when a quiz achieves a 100% perfect score">
+                                <input id="chk-auto-mark-done-100" type="checkbox" ${autoMarkDoneOn100 ? 'checked' : ''} style="cursor: pointer;" />
+                                <span>Auto-Mark Activity Done on 100% Score</span>
                             </label>
                             ` : ''}
                             <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer;" title="Audio feedback: Plays a chime ding when the quiz is finished and an alert chime when manual intervention is needed">
@@ -23547,6 +23750,16 @@ function setupAccountTransferUI() {
                 if (isAuto && typeof autoCloseCourseIndexDrawer === 'function') {
                     autoCloseCourseIndexDrawer();
                 }
+            };
+        }
+
+        const chkAutoMarkDone100 = document.getElementById('chk-auto-mark-done-100');
+        if (chkAutoMarkDone100) {
+            chkAutoMarkDone100.onchange = () => {
+                autoMarkDoneOn100 = chkAutoMarkDone100.checked;
+                localStorage.setItem('amaes_auto_mark_done_100', autoMarkDoneOn100 ? 'true' : 'false');
+                showToast(`Auto-Mark 100% Done: ${autoMarkDoneOn100 ? 'Enabled' : 'Disabled'}`);
+                setLog(`Auto-Mark Done on 100%: <b>${autoMarkDoneOn100 ? 'ON' : 'OFF'}</b>`, autoMarkDoneOn100 ? "var(--accent-green)" : "var(--accent-amber)", autoMarkDoneOn100 ? "Automatically marks Moodle activity as Done upon achieving a 100% quiz score" : "Requires manual activity completion click");
             };
         }
 

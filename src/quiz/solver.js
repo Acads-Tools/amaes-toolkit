@@ -259,7 +259,7 @@
             }
 
             // 4. Text input / textarea (shortanswer questions)
-            const textInputs = que.querySelectorAll('input[type="text"].form-control, input.form-control, textarea');
+            const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
             if (textInputs.length > 0) {
                 const allFilled = Array.from(textInputs).every(inp => inp.value && inp.value.trim().length > 0);
                 if (!allFilled) return false;
@@ -311,7 +311,7 @@
                     answered = Array.from(selects).every(select => select.value && select.value !== '0');
                 } else {
                     const textInputs = que.querySelectorAll(
-                        'input[type="text"].form-control, input.form-control, textarea'
+                        'input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])'
                     );
                     if (textInputs.length > 0) {
                         answered = Array.from(textInputs).every(input => input.value && input.value.trim());
@@ -1272,7 +1272,7 @@
                 : externalStudyGuideAnswers;
             const availableAnswers = (cached || []).concat(freshExternalStudyGuideAnswers);
             if (availableAnswers.length > 0) {
-                res = highlightQuizAnswers(availableAnswers, Boolean(autoQuizMode && autoPickQuiz));
+                res = highlightQuizAnswers(availableAnswers, Boolean(autoQuizMode || autoPickQuiz));
             } else {
                 setLog(`<b>No Answers in DB:</b> Open amauoed or click Cloud Sync for <b>${subCode}</b>!`, "var(--accent-amber)");
             }
@@ -1328,7 +1328,7 @@
 
                 const dropZones = que.querySelectorAll('.drop, .dropzone, span.droptarget, .droppable');
                 const selectInputs = que.querySelectorAll('select');
-                const textInputs = que.querySelectorAll('input[type="text"].form-control, input.form-control');
+                const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
 
                 let isFullyVerified = false;
                 if (hasVerifiedBadge && !hasUnreviewedNote && !hasAdaptiveBadge && !hasAiBadge && !hasUnverifiedBadge) {
@@ -1802,10 +1802,13 @@
                 // Listen for user selecting or typing a choice: show visual confirmation, DO NOT auto-next by default
                 const inputElements = firstBlockedQue.querySelectorAll('input[type="radio"], input[type="checkbox"], input[type="text"], select, .draghome, .drop, input.placeinput');
                 const onUserPickedChoice = () => {
+                    if (!isQuestionAnswered(firstBlockedQue)) {
+                        return;
+                    }
                     const selectedInput = firstBlockedQue.querySelector('.answer input[type="radio"]:checked, .answer input[type="checkbox"]:checked');
                     const selectedLabel = selectedInput && (selectedInput.closest('label') || selectedInput.parentElement);
                     const selectedText = selectedLabel ? cleanDOMToAI(selectedLabel).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim() : '';
-                    const textInput = firstBlockedQue.querySelector('input[type="text"].form-control, input.form-control, textarea');
+                    const textInput = firstBlockedQue.querySelector('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
                     const selectInput = firstBlockedQue.querySelector('select');
                     const selectedOption = selectInput && selectInput.options[selectInput.selectedIndex];
                     recordAttemptAnswerEvidence(
@@ -1894,6 +1897,38 @@
         try { el.click(); } catch (_) {}
     }
 
+    function setInputValueWithEvents(input, val) {
+        if (!input) return;
+        try {
+            const proto = Object.getPrototypeOf(input);
+            const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set ||
+                                 Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+            if (nativeSetter) {
+                nativeSetter.call(input, val);
+            } else {
+                input.value = val;
+            }
+        } catch (_) {
+            input.value = val;
+        }
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.dispatchEvent(new Event('blur', { bubbles: true }));
+    }
+
+    function isElementVisible(el) {
+        if (!el) return false;
+        if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return false;
+        if (el.classList && (el.classList.contains('hidden') || el.classList.contains('yui3-panel-hidden'))) return false;
+        try {
+            const style = window.getComputedStyle(el);
+            if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+        } catch (_) {}
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) return false;
+        return true;
+    }
+
     function findQuizSummarySubmitButton() {
         const candidates = document.querySelectorAll(
             '.btn-finishattempt button, .btn-finishattempt input[type="submit"], .btn-finishattempt input[type="button"], ' +
@@ -1932,43 +1967,171 @@
     }
 
     function findQuizSubmitConfirmationButton() {
-        const dialogs = document.querySelectorAll(
-            '.modal.show, .modal.in, .modal:not([aria-hidden="true"]), ' +
-            'div[data-region="modal"], div[data-region="modal-container"], ' +
-            '.moodle-dialogue:not(.yui3-panel-hidden), .moodle-dialogue-focused, .confirmation-dialogue, ' +
-            '.yui3-panel:not(.yui3-panel-hidden), [role="dialog"]:not([aria-hidden="true"]), ' +
-            '.moodle-dialogue, .modal, [role="dialog"], .yui3-panel, .modal-dialog, .moodle-has-zindex'
+        // Priority 1: Actively open Bootstrap / Moodle 4+ modals
+        const openModals = document.querySelectorAll(
+            '.modal.show, .modal.in, div[data-region="modal-container"].show, .modal[style*="display: block"], ' +
+            '.modal.moodle-has-zindex.show, [role="dialog"].show'
         );
+        for (const modal of openModals) {
+            if (!isElementVisible(modal)) continue;
+            // Target save / primary button
+            const saveBtn = modal.querySelector('button[data-action="save"], .modal-footer .btn-primary, button.btn-primary, input[type="submit"].btn-primary, input[value*="Submit"]');
+            if (saveBtn && isElementVisible(saveBtn) && !saveBtn.disabled) {
+                const label = `${saveBtn.value || ''} ${saveBtn.innerText || saveBtn.textContent || ''}`.trim();
+                if (!/cancel|close|dismiss|back/i.test(label)) return saveBtn;
+            }
+            const allBtns = modal.querySelectorAll('button, input[type="submit"], input[type="button"]');
+            for (const b of allBtns) {
+                if (!b || b.disabled || !isElementVisible(b)) continue;
+                const label = `${b.value || ''} ${b.innerText || b.textContent || ''}`.trim();
+                if (/cancel|close|dismiss|back/i.test(label)) continue;
+                if (/submit all and finish|submit attempt|^submit$|^finish$/i.test(label)) return b;
+            }
+        }
+
+        // Priority 2: Moodle YUI confirmation dialogue
+        const yuiDialogues = document.querySelectorAll('.moodle-dialogue:not(.yui3-panel-hidden), .moodle-dialogue-focused, .confirmation-dialogue');
+        for (const dialogue of yuiDialogues) {
+            if (!isElementVisible(dialogue)) continue;
+            const primaryBtn = dialogue.querySelector('.confirmation-buttons .btn-primary, .confirmation-buttons input[type="button"], .confirmation-buttons button, .moodle-dialogue-ft .btn-primary');
+            if (primaryBtn && isElementVisible(primaryBtn) && !primaryBtn.disabled) {
+                const label = `${primaryBtn.value || ''} ${primaryBtn.innerText || primaryBtn.textContent || ''}`.trim();
+                if (!/cancel|close|dismiss|back/i.test(label)) return primaryBtn;
+            }
+        }
+
+        // Priority 3: Visible dialogs with role="dialog" or class="modal"
+        const dialogs = document.querySelectorAll('[role="dialog"], .modal, .yui3-panel');
         for (const dialog of dialogs) {
-            const buttons = dialog.querySelectorAll('button, input[type="submit"], input[type="button"], .btn-primary, button[data-action="save"]');
+            if (!isElementVisible(dialog)) continue;
+            const buttons = dialog.querySelectorAll('button[data-action="save"], .modal-footer .btn-primary, .btn-primary, input[type="submit"], input[type="button"], button');
             for (const button of buttons) {
-                if (!button || button.disabled) continue;
-
-                // Priority 1: Moodle modal save action
+                if (!button || button.disabled || !isElementVisible(button)) continue;
                 if (button.getAttribute('data-action') === 'save') return button;
-
                 const label = `${button.value || ''} ${button.innerText || button.textContent || ''}`.trim();
-                if (/cancel|do not submit|close|dismiss/i.test(label)) continue;
-
+                if (/cancel|do not submit|close|dismiss|back/i.test(label)) continue;
                 if (/submit all and finish|submit attempt|^submit$|^finish$/i.test(label)) {
                     return button;
                 }
             }
         }
 
-        // Direct fallback: check document for modal-footer or confirmation primary buttons
+        // Priority 4: Standalone visible confirmation button
         const directButtons = document.querySelectorAll(
             '.modal-footer button[data-action="save"], .modal-footer .btn-primary, ' +
             '.confirmation-buttons .btn-primary, .confirmation-buttons input, ' +
             '[data-region="modal"] button[data-action="save"], [data-region="modal"] .btn-primary'
         );
         for (const b of directButtons) {
-            if (!b || b.disabled) continue;
+            if (!b || b.disabled || !isElementVisible(b)) continue;
             const label = `${b.value || ''} ${b.innerText || b.textContent || ''}`.trim();
             if (!/cancel|close|dismiss/i.test(label)) return b;
         }
 
         return null;
+    }
+
+    function monitorConfirmationSubmission() {
+        const confirmUntil = Date.now() + 6_000;
+        const verifySubmission = () => {
+            if (!checkIsQuizSummaryPage()) return;
+            if (Date.now() < confirmUntil) {
+                summaryAutoSubmitTimer = setTimeout(verifySubmission, 150);
+                return;
+            }
+            // If still on summary page after 6s:
+            const parentForm = document.querySelector('form[action*="processattempt.php"]');
+            if (parentForm) {
+                try {
+                    setLog("<b>Auto-Submit:</b> Form still present after confirmation; dispatching direct form submit...", "var(--accent-green)");
+                    if (parentForm.requestSubmit) parentForm.requestSubmit();
+                    else parentForm.submit();
+                    return;
+                } catch (_) {
+                    try { parentForm.submit(); return; } catch (_) {}
+                }
+            }
+            const stillOpenConfirmation = findQuizSubmitConfirmationButton();
+            showQuizSubmitFallback(
+                stillOpenConfirmation
+                    ? 'Moodle’s confirmation is still open. Click its submit button to finish submitting.'
+                    : 'Moodle did not leave the summary page after confirmation. Check the attempt and click Moodle’s submit button if it is still available.',
+                () => findQuizSubmitConfirmationButton() || findQuizSummarySubmitButton(),
+                stillOpenConfirmation ? 'Find confirmation button' : 'Find Moodle’s submit button'
+            );
+        };
+        setLog("<b>Auto-Submit:</b> Confirmation clicked; checking that Moodle completes submission.", "var(--accent-green)");
+        summaryAutoSubmitTimer = setTimeout(verifySubmission, 150);
+    }
+
+    function executeQuizSummaryFinalSubmit() {
+        if (!checkIsQuizSummaryPage()) return;
+
+        // Check if confirmation modal is already open
+        const existingConfirm = findQuizSubmitConfirmationButton();
+        if (existingConfirm) {
+            summaryAutoSubmitAttempted = true;
+            triggerClick(existingConfirm);
+            monitorConfirmationSubmission();
+            return;
+        }
+
+        const currentSubmitBtn = findQuizSummarySubmitButton();
+        if (!currentSubmitBtn) {
+            showQuizSubmitFallback(
+                'Auto-submit could not continue because Moodle’s submit button disappeared. Use Moodle’s submission controls on this page to finish.',
+                () => findQuizSubmitConfirmationButton() || findQuizSummarySubmitButton(),
+                'Find Moodle’s submit button'
+            );
+            return;
+        }
+        summaryAutoSubmitAttempted = true;
+        triggerClick(currentSubmitBtn);
+        const submitStartTime = Date.now();
+        let formSubmittedDirectly = false;
+        const confirmUntil = Date.now() + 5_000;
+
+        const confirmSubmission = () => {
+            if (!checkIsQuizSummaryPage()) return;
+            const confirmationButton = findQuizSubmitConfirmationButton();
+            if (confirmationButton) {
+                triggerClick(confirmationButton);
+                monitorConfirmationSubmission();
+                return;
+            }
+
+            // Direct form submission fallback after 2s if no confirmation modal appeared:
+            if (!formSubmittedDirectly && Date.now() - submitStartTime > 2000) {
+                const parentForm = currentSubmitBtn.form || currentSubmitBtn.closest('form') || document.querySelector('form[action*="processattempt.php"]');
+                if (parentForm && parentForm.action && parentForm.action.includes('processattempt.php')) {
+                    formSubmittedDirectly = true;
+                    setLog("<b>Auto-Submit:</b> Submitting Moodle attempt form directly...", "var(--accent-green)");
+                    try {
+                        if (parentForm.requestSubmit) {
+                            parentForm.requestSubmit(currentSubmitBtn);
+                        } else {
+                            parentForm.submit();
+                        }
+                    } catch (_) {
+                        try { parentForm.submit(); } catch (_) {}
+                    }
+                }
+            }
+
+            if (Date.now() < confirmUntil) {
+                summaryAutoSubmitTimer = setTimeout(confirmSubmission, 100);
+                return;
+            }
+            const fallbackConfirmationButton = findQuizSubmitConfirmationButton();
+            showQuizSubmitFallback(
+                fallbackConfirmationButton
+                    ? 'Moodle opened a submission confirmation that could not be completed automatically. Click the confirmation button to finish submitting.'
+                    : 'Auto-submit could not confirm that Moodle started submission. Click Moodle’s “Submit all and finish” button to finish.',
+                () => findQuizSubmitConfirmationButton() || findQuizSummarySubmitButton(),
+                fallbackConfirmationButton ? 'Find confirmation button' : 'Find Moodle’s submit button'
+            );
+        };
+        summaryAutoSubmitTimer = setTimeout(confirmSubmission, 100);
     }
 
     function showQuizSubmitFallback(message, targetFinder = findQuizSummarySubmitButton, actionLabel = 'Show Moodle submit control') {
@@ -2206,15 +2369,20 @@
             sessionStorage.removeItem(pausedSecKey);
         }
 
+        // Priority Check: If confirmation modal is ALREADY visible on screen, click its confirmation button immediately!
+        const existingConfirmBtn = findQuizSubmitConfirmationButton();
+        if (existingConfirmBtn) {
+            setLog("<b>Auto-Submit:</b> Submitting confirmation modal via <b>[N]</b>...", "var(--accent-green)");
+            showToast("Submitting confirmation...", 1500);
+            triggerClick(existingConfirmBtn);
+            monitorConfirmationSubmission();
+            return true;
+        }
+
         let targetDeadline = parseInt(sessionStorage.getItem(deadlineKey) || '0', 10);
 
         if (!targetDeadline || isNaN(targetDeadline) || !summaryAutoSubmitTimer) {
-            if (typeof executeQuizSummaryFinalSubmit === 'function') {
-                executeQuizSummaryFinalSubmit();
-            } else {
-                const submitBtn = findQuizSummarySubmitButton();
-                if (submitBtn) triggerClick(submitBtn);
-            }
+            executeQuizSummaryFinalSubmit();
             return true;
         }
 
@@ -2248,12 +2416,7 @@
             sessionStorage.removeItem(deadlineKey);
             setLog("<b>Auto-Submit:</b> Hastened to 0s via <b>[N]</b>. Submitting attempt now...", "var(--accent-green)");
             showToast("Submitting attempt now...", 1500);
-            if (typeof executeQuizSummaryFinalSubmit === 'function') {
-                executeQuizSummaryFinalSubmit();
-            } else {
-                const submitBtn = findQuizSummarySubmitButton();
-                if (submitBtn) triggerClick(submitBtn);
-            }
+            executeQuizSummaryFinalSubmit();
         } else {
             showToast(`Auto-submitting: ${remainingSec}s (-2s · ${summaryAutoSubmitHastenMultiplier}x speed)`, 1200);
             setLog(`<b>Auto-Submit:</b> Hastened via <b>[N]</b> (-2s, ${summaryAutoSubmitHastenMultiplier}x speed, ${remainingSec}s remaining).`, "var(--accent-green)");
@@ -2361,83 +2524,6 @@
 
         const shouldAutoSubmit = autoSubmitQuiz || autoQuizMode;
         const delaySec = (typeof autoSubmitDelay === 'number' && !isNaN(autoSubmitDelay)) ? autoSubmitDelay : 10;
-
-        // Core final submission execution helper
-        function executeQuizSummaryFinalSubmit() {
-            if (!checkIsQuizSummaryPage()) return;
-            const currentSubmitBtn = findQuizSummarySubmitButton();
-            if (!currentSubmitBtn) {
-                showQuizSubmitFallback(
-                    'Auto-submit could not continue because Moodle’s submit button disappeared. Use Moodle’s submission controls on this page to finish.',
-                    () => findQuizSummarySubmitButton(),
-                    'Find Moodle’s submit button'
-                );
-                return;
-            }
-            summaryAutoSubmitAttempted = true;
-            triggerClick(currentSubmitBtn);
-            const submitStartTime = Date.now();
-            let formSubmittedDirectly = false;
-            const confirmUntil = Date.now() + 5_000;
-            const confirmSubmission = () => {
-                if (!checkIsQuizSummaryPage()) return;
-                const confirmationButton = findQuizSubmitConfirmationButton();
-                if (confirmationButton) {
-                    triggerClick(confirmationButton);
-                    const confirmUntil = Date.now() + 10_000;
-                    const verifySubmission = () => {
-                        if (!checkIsQuizSummaryPage()) return;
-                        if (Date.now() < confirmUntil) {
-                            summaryAutoSubmitTimer = setTimeout(verifySubmission, 150);
-                            return;
-                        }
-                        const stillOpenConfirmation = findQuizSubmitConfirmationButton();
-                        showQuizSubmitFallback(
-                            stillOpenConfirmation
-                                ? 'Moodle’s confirmation is still open. Click its submit button to finish submitting.'
-                                : 'Moodle did not leave the summary page after confirmation. Check the attempt and click Moodle’s submit button if it is still available.',
-                            () => findQuizSubmitConfirmationButton() || findQuizSummarySubmitButton(),
-                            stillOpenConfirmation ? 'Find confirmation button' : 'Find Moodle’s submit button'
-                        );
-                    };
-                    setLog("<b>Auto-Submit:</b> Confirmation clicked; checking that Moodle completes submission.", "var(--accent-green)");
-                    summaryAutoSubmitTimer = setTimeout(verifySubmission, 150);
-                    return;
-                }
-
-                // Direct form submission fallback after 2.5s if no confirmation modal appeared:
-                if (!formSubmittedDirectly && Date.now() - submitStartTime > 2500) {
-                    const parentForm = currentSubmitBtn.form || currentSubmitBtn.closest('form');
-                    if (parentForm && parentForm.action && parentForm.action.includes('processattempt.php')) {
-                        formSubmittedDirectly = true;
-                        setLog("<b>Auto-Submit:</b> Submitting Moodle attempt form directly...", "var(--accent-green)");
-                        try {
-                            if (parentForm.requestSubmit) {
-                                parentForm.requestSubmit(currentSubmitBtn);
-                            } else {
-                                parentForm.submit();
-                            }
-                        } catch (_) {
-                            try { parentForm.submit(); } catch (_) {}
-                        }
-                    }
-                }
-
-                if (Date.now() < confirmUntil) {
-                    summaryAutoSubmitTimer = setTimeout(confirmSubmission, 150);
-                    return;
-                }
-                const fallbackConfirmationButton = findQuizSubmitConfirmationButton();
-                showQuizSubmitFallback(
-                    fallbackConfirmationButton
-                        ? 'Moodle opened a submission confirmation that could not be completed automatically. Click the confirmation button to finish submitting.'
-                        : 'Auto-submit could not confirm that Moodle started submission. Click Moodle’s “Submit all and finish” button to finish.',
-                    () => findQuizSubmitConfirmationButton() || findQuizSummarySubmitButton(),
-                    fallbackConfirmationButton ? 'Find confirmation button' : 'Find Moodle’s submit button'
-                );
-            };
-            summaryAutoSubmitTimer = setTimeout(confirmSubmission, 200);
-        }
 
         // Render Ready Banner
         let readyBanner = document.getElementById('amaes-summary-ready-banner');
@@ -3960,6 +4046,10 @@
             if (!startBtn.value.includes('(Press A)')) {
                 startBtn.value = `${startBtn.value} (Press A)`;
             }
+        }
+
+        if (typeof checkAndAutoMarkDoneOnQuizLanding === 'function') {
+            checkAndAutoMarkDoneOnQuizLanding();
         }
     }
 
@@ -5627,10 +5717,7 @@
                                     e.preventDefault();
                                     e.stopPropagation();
                                 }
-                                textInput.value = targetAns;
-                                textInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                textInput.dispatchEvent(new Event('change', { bubbles: true }));
-                                textInput.dispatchEvent(new Event('blur', { bubbles: true }));
+                                setInputValueWithEvents(textInput, targetAns);
                                 showToast(`Filled: ${targetAns}`);
                                 hint.style.background = 'rgba(16, 185, 129, 0.2)';
                                 const btn = hint.querySelector('.amaes-fill-btn');
@@ -5659,10 +5746,10 @@
                             normalizeChoice(w.norm || w.text || w) === currentInputNorm
                         );
                         if (canAutoFill && (!textInput.value || currentInputIsKnownWrong)) {
-                            textInput.value = targetAns;
-                            textInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            textInput.dispatchEvent(new Event('change', { bubbles: true }));
-                            textInput.dispatchEvent(new Event('blur', { bubbles: true }));
+                            setInputValueWithEvents(textInput, targetAns);
+                            hint.style.background = 'rgba(16, 185, 129, 0.2)';
+                            const btn = hint.querySelector('.amaes-fill-btn');
+                            if (btn) btn.innerText = 'Filled';
                         }
                     });
 
