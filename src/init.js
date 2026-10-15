@@ -119,8 +119,13 @@
                     if (!sessionStorage.getItem(sessKey)) {
                         sessionStorage.setItem(sessKey, '1');
                         setTimeout(() => {
-                            setLog(`Auto-Harvest: Scanning past quizzes for <b>${courseKey}</b>...`, "var(--accent-blue)");
-                            executeGradesHarvester();
+                            if (isCoursePage && typeof batchHarvestCourseReviews === 'function') {
+                                setLog(`Auto-Harvest: Scanning all available reviews for <b>${courseKey}</b>...`, "var(--accent-blue)");
+                                batchHarvestCourseReviews(cInfo?.courseId, cInfo?.subjectCode);
+                            } else {
+                                setLog(`Auto-Harvest: Scanning past quizzes for <b>${courseKey}</b>...`, "var(--accent-blue)");
+                                executeGradesHarvester();
+                            }
                         }, 1800);
                     }
                 }

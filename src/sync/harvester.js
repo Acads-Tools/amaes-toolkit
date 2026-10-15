@@ -1679,6 +1679,168 @@
         return { success: false, count: 0, quizzes: completedQuizzes.length, subCode };
     }
 
+    async function batchHarvestCourseReviews(targetCourseId, targetSubCode, statusCallback) {
+        if (isHarvestingInProgress) {
+            showToast("Answer collection is already running in background...", 2500);
+            return { success: false, inProgress: true };
+        }
+        isHarvestingInProgress = true;
+
+        try {
+            const courseInfo = typeof detectCourseInfo === 'function' ? detectCourseInfo() : {};
+            const subCode = targetSubCode || courseInfo.subjectCode || 'GENERAL';
+            const courseId = targetCourseId || courseInfo.courseId || new URLSearchParams(window.location.search).get('id') || '';
+
+            setLog(`<b>Batch Harvester:</b> Discovering completed quiz reviews for <b>${escapeHtml(subCode)}</b>...`, "var(--accent-blue)");
+            showToast(`Batch Harvester: Scanning reviews for ${subCode}...`, 3000);
+
+            // 1. Gather all quiz links from course page DOM and/or grade report
+            const quizLinksMap = new Map();
+            document.querySelectorAll('a[href*="/mod/quiz/view.php"], a[href*="/mod/quiz/"]').forEach(a => {
+                const href = a.getAttribute('href') || a.href;
+                if (!href || href.includes('attempt.php')) return;
+                try {
+                    const fullUrl = new URL(href, window.location.origin).href;
+                    const title = (a.innerText || '').trim() || 'Quiz';
+                    if (!quizLinksMap.has(fullUrl)) quizLinksMap.set(fullUrl, title);
+                } catch (_) {}
+            });
+
+            // Fallback/enrichment: also scan Grade Report if available
+            let singleGradesUrl = null;
+            const gradesLink = document.querySelector('a[href*="/grade/report/user/index.php"]');
+            if (gradesLink && gradesLink.href) {
+                singleGradesUrl = gradesLink.href;
+            } else if (courseId) {
+                singleGradesUrl = `${window.location.origin}${getSemesterBasePath()}grade/report/user/index.php?id=${courseId}`;
+            }
+
+            if (singleGradesUrl) {
+                try {
+                    const gResp = await fetch(singleGradesUrl);
+                    if (gResp.ok) {
+                        const gHtml = await gResp.text();
+                        const gDoc = new DOMParser().parseFromString(gHtml, 'text/html');
+                        gDoc.querySelectorAll('a[href*="/mod/quiz/view.php"], a[href*="/mod/quiz/"]').forEach(a => {
+                            const href = a.getAttribute('href') || a.href;
+                            if (!href || href.includes('attempt.php')) return;
+                            try {
+                                const fullUrl = new URL(href, window.location.origin).href;
+                                const title = (a.innerText || '').trim() || 'Quiz';
+                                if (!quizLinksMap.has(fullUrl)) quizLinksMap.set(fullUrl, title);
+                            } catch (_) {}
+                        });
+                    }
+                } catch (_) {}
+            }
+
+            const quizList = Array.from(quizLinksMap.entries()).map(([url, title]) => ({ url, title }));
+            if (quizList.length === 0) {
+                showToast(`No quiz links found for ${subCode}.`);
+                setLog(`Batch Harvester: No quiz links found for <b>${escapeHtml(subCode)}</b>.`, "var(--accent-amber)");
+                return { success: false, count: 0, quizzes: 0 };
+            }
+
+            // 2. Discover review links for each quiz
+            const reviewUrlsToHarvest = [];
+            const seenReviewUrls = new Set();
+
+            for (let i = 0; i < quizList.length; i++) {
+                const qz = quizList[i];
+                if (statusCallback) statusCallback(i + 1, quizList.length, `Checking ${qz.title}`);
+
+                try {
+                    const qResp = await fetch(qz.url);
+                    if (!qResp.ok) continue;
+                    const qHtml = await qResp.text();
+                    const qDoc = new DOMParser().parseFromString(qHtml, 'text/html');
+
+                    qDoc.querySelectorAll('a[href*="review.php"], a[href*="/mod/quiz/review.php"]').forEach(rLink => {
+                        const raw = rLink.getAttribute('href') || rLink.href;
+                        if (!raw) return;
+                        try {
+                            const rUrl = new URL(raw, qz.url);
+                            rUrl.searchParams.set('showall', '1');
+                            const finalUrl = rUrl.href;
+                            if (!seenReviewUrls.has(finalUrl)) {
+                                seenReviewUrls.add(finalUrl);
+                                reviewUrlsToHarvest.push({ url: finalUrl, title: qz.title });
+                            }
+                        } catch (_) {}
+                    });
+                } catch (err) {
+                    console.warn(`Error inspecting quiz landing ${qz.url}:`, err);
+                }
+            }
+
+            if (reviewUrlsToHarvest.length === 0) {
+                showToast("No completed review attempts available for this course.");
+                setLog(`Batch Harvester: No completed review attempts available for <b>${escapeHtml(subCode)}</b>.`, "var(--accent-amber)");
+                return { success: false, count: 0, reviews: 0 };
+            }
+
+            setLog(`Batch Harvester: Found <b>${reviewUrlsToHarvest.length} review attempt(s)</b>. Extracting verified answers...`, "var(--accent-cyan)");
+            showToast(`Harvesting ${reviewUrlsToHarvest.length} review attempt(s)...`, 3000);
+
+            // 3. Fetch each review page and extract answers
+            let totalHarvested = 0;
+            const allQuestions = [];
+            const knownQuestionKeys = new Set();
+
+            for (let rIdx = 0; rIdx < reviewUrlsToHarvest.length; rIdx++) {
+                const rev = reviewUrlsToHarvest[rIdx];
+                if (statusCallback) statusCallback(rIdx + 1, reviewUrlsToHarvest.length, `Harvesting: ${rev.title}`);
+                setLog(`[${rIdx + 1}/${reviewUrlsToHarvest.length}] Harvesting <b>${escapeHtml(rev.title)}</b>...`, "var(--accent-cyan)");
+
+                try {
+                    const revResp = await fetch(rev.url);
+                    if (!revResp.ok) continue;
+                    const revHtml = await revResp.text();
+                    const revDoc = new DOMParser().parseFromString(revHtml, 'text/html');
+
+                    const res = harvestFromReviewDOM(revDoc, subCode, rev.title, courseInfo.fullTitle || subCode);
+                    if (res.success && res.questions && res.questions.length > 0) {
+                        res.questions.forEach(q => {
+                            if (!q.qNorm) return;
+                            const qKey = getQuestionIdentity(q);
+                            if (knownQuestionKeys.has(qKey)) return;
+                            knownQuestionKeys.add(qKey);
+                            allQuestions.push(q);
+                            totalHarvested += q.ansRaw ? 1 : 0;
+                        });
+                    }
+                } catch (err) {
+                    console.warn(`Error harvesting review ${rev.url}:`, err);
+                }
+            }
+
+            if (allQuestions.length > 0) {
+                mergeAnswersIntoCache(subCode, allQuestions, 'Batch-Course-Harvester');
+                flushCommunityContributions(subCode, { source: 'batch_course_harvester' }).catch(() => {});
+                setLog(`Batch Harvest Complete! Saved <b>${totalHarvested} verified answers</b> from ${reviewUrlsToHarvest.length} review(s) into <b>${escapeHtml(subCode)}</b>.`, "var(--accent-green)");
+                showToast(`Harvest Complete: ${totalHarvested} verified answers saved!`, 4500);
+
+                if (typeof injectCourseConfidenceCard === 'function') {
+                    injectCourseConfidenceCard();
+                }
+                if (typeof syncAutoQuizUI === 'function') {
+                    syncAutoQuizUI();
+                }
+                return { success: true, count: totalHarvested, reviews: reviewUrlsToHarvest.length, subCode };
+            } else {
+                setLog(`Batch Harvester finished. No new verified answers found in <b>${reviewUrlsToHarvest.length} review(s)</b>.`, "var(--accent-amber)");
+                showToast("All reviews checked, no new answers to harvest.");
+                return { success: false, count: 0, reviews: reviewUrlsToHarvest.length, subCode };
+            }
+        } catch (e) {
+            setLog(`Batch Harvester error: ${e.message}`, "var(--accent-pink)");
+            showToast("Batch harvest failed: " + e.message);
+            return { success: false, error: e.message };
+        } finally {
+            isHarvestingInProgress = false;
+        }
+    }
+
     async function executeGradesHarvester(statusCallback) {
         if (isHarvestingInProgress) {
             showToast("Answer collection is already running in background...", 2500);

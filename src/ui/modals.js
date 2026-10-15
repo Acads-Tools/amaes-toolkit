@@ -121,6 +121,14 @@
                                 <span>Next Question / Page</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">B</kbd></span>
+                                <span>Previous Question / Page</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">U</kbd></span>
+                                <span>Focus First Unanswered</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
                                 <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">[</kbd> / <kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">]</kbd></span>
                                 <span>Cycle Prev / Next Quiz or Exam</span>
                             </div>

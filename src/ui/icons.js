@@ -906,9 +906,12 @@
                 <div style="font-size: 11px; opacity: 0.75;">
                     Auto-Submit Mode: High-confidence quizzes execute hands-free with instant local answers.
                 </div>
-                <div style="display: flex; gap: 6px; align-items: center;">
-                    <button id="amaes-card-btn-highlight" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 3px 8px; border-radius: 4px;" title="Scan course page and highlight quizzes needing attention">
-                        Highlight Missing Quizzes
+                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                    <button id="amaes-card-btn-batch-harvest" class="btn btn-sm btn-outline-success" style="font-size: 11px; padding: 3px 8px; border-radius: 4px; color: #059669; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.06);" title="Scan and harvest all completed quiz reviews into the verified database in one go">
+                        Harvest All Reviews
+                    </button>
+                    <button id="amaes-card-btn-highlight" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 3px 8px; border-radius: 4px;" title="Scan course page and highlight quizzes needing attention (Press U)">
+                        Highlight Missing Quizzes (U)
                     </button>
                     <button id="amaes-card-btn-next-quiz" class="btn btn-sm btn-primary" style="font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #0f6cbf; border-color: #0f6cbf;" title="Cycle to next quiz in academic sequence (Press ])">
                         Next Quiz (Press ]) &#9658;
@@ -918,6 +921,29 @@
         `;
 
         // Bind Card Action Buttons
+        const btnBatchHarvest = card.querySelector('#amaes-card-btn-batch-harvest');
+        if (btnBatchHarvest) {
+            btnBatchHarvest.addEventListener('click', (e) => {
+                e.preventDefault();
+                btnBatchHarvest.disabled = true;
+                btnBatchHarvest.innerText = 'Harvesting Reviews...';
+                if (typeof batchHarvestCourseReviews === 'function') {
+                    batchHarvestCourseReviews(courseId, subjectCode, (curr, total, label) => {
+                        btnBatchHarvest.innerText = `Harvesting [${curr}/${total}]...`;
+                    }).then(() => {
+                        btnBatchHarvest.disabled = false;
+                        btnBatchHarvest.innerText = 'Harvest All Reviews';
+                    }).catch(() => {
+                        btnBatchHarvest.disabled = false;
+                        btnBatchHarvest.innerText = 'Harvest All Reviews';
+                    });
+                } else {
+                    btnBatchHarvest.disabled = false;
+                    btnBatchHarvest.innerText = 'Harvest All Reviews';
+                }
+            });
+        }
+
         const btnHighlight = card.querySelector('#amaes-card-btn-highlight');
         if (btnHighlight) {
             btnHighlight.addEventListener('click', (e) => {

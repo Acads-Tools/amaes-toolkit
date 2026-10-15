@@ -149,6 +149,40 @@
         return btn;
     }
 
+    // Helper to find the Previous Page button on Moodle Quiz Attempt page
+    function findQuizPrevButton() {
+        let btn = document.querySelector(
+            '#responseform .submitbtns input[name="previous"], ' +
+            '#responseform .submitbtns button[name="previous"], ' +
+            '#responseform .submitbtns input[value*="Previous page"], ' +
+            '#responseform .submitbtns button[value*="Previous page"], ' +
+            '#responseform .submitbtns input[value*="Previous"], ' +
+            '#responseform .submitbtns button[value*="Previous"], ' +
+            '.submitbtns input[name="previous"], ' +
+            '.submitbtns button[name="previous"], ' +
+            '.submitbtns input[value*="Previous page"], ' +
+            '.submitbtns button[value*="Previous page"], ' +
+            '.submitbtns input[value*="Previous"], ' +
+            '.submitbtns button[value*="Previous"], ' +
+            'input[name="previous"].mod_quiz-prev-nav, ' +
+            '#mod_quiz-prev-nav, ' +
+            '.mod_quiz-prev-nav'
+        );
+
+        if (!btn) {
+            const submits = document.querySelectorAll('#responseform input[type="submit"], #responseform button[type="submit"]');
+            for (const s of submits) {
+                const val = (s.value || s.innerText || '').toLowerCase();
+                if (val.includes('prev') || val.includes('back')) {
+                    btn = s;
+                    break;
+                }
+            }
+        }
+
+        return btn;
+    }
+
     // Active Question State & Visual Focus Tracking
     let userSelectedActiveQuestion = null;
     let userActiveLockUntil = 0;
@@ -348,6 +382,21 @@
             ? questions.slice(startIndex + 1).concat(questions.slice(0, startIndex))
             : questions;
         return ordered.find(que => !isQuestionAnswered(que)) || null;
+    }
+
+    function findPreviousQuestionOnCurrentPage(sourceQue) {
+        const questions = Array.from(document.querySelectorAll('.que'));
+        if (questions.length < 2) return null;
+        const currentIndex = sourceQue ? questions.indexOf(sourceQue) : -1;
+        if (currentIndex > 0) {
+            return questions[currentIndex - 1];
+        }
+        return null;
+    }
+
+    function findFirstUnansweredOnCurrentPage() {
+        const questions = Array.from(document.querySelectorAll('.que'));
+        return questions.find(que => !isQuestionAnswered(que)) || null;
     }
 
     function isConfirmedCandidate(item) {
@@ -4100,6 +4149,18 @@
                 }
             }
 
+            // Course page shortcut: 'U' highlights missing or unanswered quizzes
+            const isCoursePage = typeof window !== 'undefined' && window.location.pathname.includes('/course/view.php');
+            if (isCoursePage && (e.key === 'u' || e.key === 'U')) {
+                e.preventDefault();
+                if (active && typeof active.blur === 'function') active.blur();
+                if (typeof highlightMissingOrUnansweredQuizzes === 'function') {
+                    showToast("Scanning and highlighting missing quizzes... (U)");
+                    highlightMissingOrUnansweredQuizzes();
+                }
+                return;
+            }
+
             // Global Escape Handler: First press closes open Help/Contribute modal, subsequent press minimizes/toggles toolkit panel
             if (e.key === 'Escape' || e.key === 'Esc') {
                 const welcomeModal = document.getElementById('amaes-welcome-modal');
@@ -4205,13 +4266,31 @@
                 return;
             }
 
-            // Quiz Summary page shortcuts: N / Space / Enter to hasten countdown or submit
+            // Quiz Summary page shortcuts: N / Space / Enter to hasten countdown or submit; B to return to attempt
             if (checkIsQuizSummaryPage()) {
                 const key = e.key ? e.key.toUpperCase() : '';
                 if (key === 'N' || key === ' ' || key === 'ENTER') {
                     e.preventDefault();
                     if (active && typeof active.blur === 'function') active.blur();
                     hastenQuizSummaryAutoSubmit();
+                    return;
+                }
+                if (key === 'B') {
+                    e.preventDefault();
+                    if (active && typeof active.blur === 'function') active.blur();
+                    const returnBtn = document.querySelector(
+                        'form[action*="attempt.php"] input[type="submit"], ' +
+                        'form[action*="attempt.php"] button, ' +
+                        '.singlebutton a[href*="attempt.php"], ' +
+                        'a[href*="attempt.php"]'
+                    );
+                    if (returnBtn) {
+                        showToast("Returning to attempt... (B)");
+                        setLog("Keyboard shortcut triggered: <b>Return to attempt (B)</b>", "var(--accent-blue)");
+                        returnBtn.click();
+                    } else {
+                        showToast("No return to attempt button found.", 1800);
+                    }
                     return;
                 }
             }
@@ -4246,6 +4325,59 @@
             if (!checkIsQuizAttemptPage()) return;
 
             const key = e.key ? e.key.toUpperCase() : '';
+
+            // 0. Jump to First Unanswered Question: 'U'
+            if (key === 'U') {
+                e.preventDefault();
+                if (active && typeof active.blur === 'function') active.blur();
+                const unansweredQue = findFirstUnansweredOnCurrentPage();
+                if (unansweredQue) {
+                    setActiveQuestion(unansweredQue, true);
+                    unansweredQue.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    const firstInteractive = unansweredQue.querySelector('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])');
+                    if (firstInteractive && typeof firstInteractive.focus === 'function') {
+                        firstInteractive.focus();
+                    }
+                    unansweredQue.style.transition = 'box-shadow 0.3s ease, border-color 0.3s ease';
+                    unansweredQue.style.boxShadow = '0 0 0 3px rgba(15, 108, 191, 0.4)';
+                    setTimeout(() => {
+                        unansweredQue.style.boxShadow = '';
+                    }, 1500);
+                    const qData = extractQuestionData(unansweredQue);
+                    showToast(`Focused Unanswered Question #${qData ? qData.qNum : ''} (U)`);
+                    setLog(`Shortcut [U]: Focused unanswered <b>Question #${qData ? qData.qNum : ''}</b>`, "var(--accent-blue)");
+                } else {
+                    showToast("All questions on this page are answered! Press N to advance.", 2200);
+                }
+                return;
+            }
+
+            // Backward Navigation: 'B'
+            if (key === 'B') {
+                e.preventDefault();
+                if (active && typeof active.blur === 'function') active.blur();
+                const currentFocus = userSelectedActiveQuestion || getActiveViewportQuestion();
+                const prevOnPage = findPreviousQuestionOnCurrentPage(currentFocus);
+                if (prevOnPage) {
+                    setActiveQuestion(prevOnPage, true);
+                    prevOnPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    const qData = extractQuestionData(prevOnPage);
+                    showToast(`Back: Question #${qData ? qData.qNum : ''} (B)`, 1500);
+                    setLog(`Shortcut: Back to <b>Question #${qData ? qData.qNum : ''}</b>`, "var(--accent-blue)");
+                    return;
+                }
+
+                const prevBtn = findQuizPrevButton();
+                if (prevBtn) {
+                    showToast("Shortcut: Previous Page (B)");
+                    setLog("Keyboard shortcut triggered: <b>Previous Page (B)</b>", "var(--accent-blue)");
+                    prevBtn.click();
+                    return;
+                } else {
+                    showToast("Already on the first question/page (B)", 1500);
+                }
+                return;
+            }
 
             // 1. Next Question / Next Page / Submit Navigation: 'N' or 'Space' or 'Enter'
             if (key === 'N' || key === ' ' || key === 'ENTER') {

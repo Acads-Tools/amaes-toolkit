@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.12'), "Userscript header must specify v1.13.12");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.12";'), "Constant SCRIPT_VERSION must be v1.13.12");
+    assert.ok(script.includes('@version      1.13.13'), "Userscript header must specify v1.13.13");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.13";'), "Constant SCRIPT_VERSION must be v1.13.13");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -6640,6 +6640,44 @@ test("Summary Page Modal Submission, Short-Answer Auto-Fill & 100% Activity Auto
     // 4. Advanced Settings checkbox and events
     assert.ok(panelSrc.includes("id=\"chk-auto-mark-done-100\""), "panel.js must render Auto-Mark Activity Done on 100% Score checkbox");
     assert.ok(eventsSrc.includes("chkAutoMarkDone100"), "events.js must bind chkAutoMarkDone100 change event");
+});
+
+// --------------------------------------------------
+// 199. Focus Unanswered [U], Backward Navigation [B] & Batch Review Harvester (v1.13.13)
+// --------------------------------------------------
+test("Focus Unanswered [U], Backward Navigation [B] & Batch Review Harvester (v1.13.13)", () => {
+    const fs = require('fs');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const harvesterSrc = fs.readFileSync('src/sync/harvester.js', 'utf8');
+    const iconsSrc = fs.readFileSync('src/ui/icons.js', 'utf8');
+    const initSrc = fs.readFileSync('src/init.js', 'utf8');
+    const modalsSrc = fs.readFileSync('src/ui/modals.js', 'utf8');
+
+    // 1. Focus First Unanswered Question [U]
+    assert.ok(solverSrc.includes("function findFirstUnansweredOnCurrentPage()"), "solver.js must define findFirstUnansweredOnCurrentPage helper");
+    assert.ok(solverSrc.includes("key === 'U'") && solverSrc.includes("findFirstUnansweredOnCurrentPage()"), "solver.js must handle U key to focus unanswered question on attempt page");
+    assert.ok(solverSrc.includes("highlightMissingOrUnansweredQuizzes()") && solverSrc.includes("isCoursePage"), "solver.js must handle U key on course page to highlight missing quizzes");
+
+    // 2. Backward Navigation [B]
+    assert.ok(solverSrc.includes("function findQuizPrevButton()"), "solver.js must define findQuizPrevButton helper");
+    assert.ok(solverSrc.includes("function findPreviousQuestionOnCurrentPage("), "solver.js must define findPreviousQuestionOnCurrentPage helper");
+    assert.ok(solverSrc.includes("key === 'B'") && solverSrc.includes("findPreviousQuestionOnCurrentPage"), "solver.js must handle B key to navigate backward on attempt page");
+    assert.ok(solverSrc.includes("key === 'B'") && solverSrc.includes("Return to attempt"), "solver.js must handle B key on summary page to return to attempt");
+
+    // 3. Batch Review Harvester in harvester.js
+    assert.ok(harvesterSrc.includes("async function batchHarvestCourseReviews("), "harvester.js must define batchHarvestCourseReviews helper");
+    assert.ok(harvesterSrc.includes("reviewUrlsToHarvest"), "batchHarvestCourseReviews must discover completed review URLs");
+    assert.ok(harvesterSrc.includes("harvestFromReviewDOM"), "batchHarvestCourseReviews must harvest verified answers via harvestFromReviewDOM");
+    assert.ok(harvesterSrc.includes("mergeAnswersIntoCache(subCode, allQuestions, 'Batch-Course-Harvester')"), "batchHarvestCourseReviews must merge harvested answers into subject cache");
+
+    // 4. Course Confidence Card 1-Click Button & Auto-Harvest Integration
+    assert.ok(iconsSrc.includes("id=\"amaes-card-btn-batch-harvest\""), "icons.js must render Harvest All Reviews button on course card");
+    assert.ok(iconsSrc.includes("batchHarvestCourseReviews(courseId, subjectCode"), "icons.js must wire Harvest All Reviews button to batchHarvestCourseReviews");
+    assert.ok(initSrc.includes("batchHarvestCourseReviews(cInfo?.courseId, cInfo?.subjectCode)"), "init.js must call batchHarvestCourseReviews as default auto-harvest on course page");
+
+    // 5. Shortcuts Cheatsheet Documentation
+    assert.ok(modalsSrc.includes(">B</kbd>") && modalsSrc.includes("Previous Question / Page"), "modals.js must document B shortcut in cheatsheet");
+    assert.ok(modalsSrc.includes(">U</kbd>") && modalsSrc.includes("Focus First Unanswered"), "modals.js must document U shortcut in cheatsheet");
 });
 
 console.log("\n==================================================");

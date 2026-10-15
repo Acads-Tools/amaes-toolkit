@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.13.12
+// @version      1.13.13
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.13.12";
+    const SCRIPT_VERSION = "v1.13.13";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -2062,9 +2062,12 @@
                 <div style="font-size: 11px; opacity: 0.75;">
                     Auto-Submit Mode: High-confidence quizzes execute hands-free with instant local answers.
                 </div>
-                <div style="display: flex; gap: 6px; align-items: center;">
-                    <button id="amaes-card-btn-highlight" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 3px 8px; border-radius: 4px;" title="Scan course page and highlight quizzes needing attention">
-                        Highlight Missing Quizzes
+                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                    <button id="amaes-card-btn-batch-harvest" class="btn btn-sm btn-outline-success" style="font-size: 11px; padding: 3px 8px; border-radius: 4px; color: #059669; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.06);" title="Scan and harvest all completed quiz reviews into the verified database in one go">
+                        Harvest All Reviews
+                    </button>
+                    <button id="amaes-card-btn-highlight" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 3px 8px; border-radius: 4px;" title="Scan course page and highlight quizzes needing attention (Press U)">
+                        Highlight Missing Quizzes (U)
                     </button>
                     <button id="amaes-card-btn-next-quiz" class="btn btn-sm btn-primary" style="font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #0f6cbf; border-color: #0f6cbf;" title="Cycle to next quiz in academic sequence (Press ])">
                         Next Quiz (Press ]) &#9658;
@@ -2074,6 +2077,29 @@
         `;
 
         // Bind Card Action Buttons
+        const btnBatchHarvest = card.querySelector('#amaes-card-btn-batch-harvest');
+        if (btnBatchHarvest) {
+            btnBatchHarvest.addEventListener('click', (e) => {
+                e.preventDefault();
+                btnBatchHarvest.disabled = true;
+                btnBatchHarvest.innerText = 'Harvesting Reviews...';
+                if (typeof batchHarvestCourseReviews === 'function') {
+                    batchHarvestCourseReviews(courseId, subjectCode, (curr, total, label) => {
+                        btnBatchHarvest.innerText = `Harvesting [${curr}/${total}]...`;
+                    }).then(() => {
+                        btnBatchHarvest.disabled = false;
+                        btnBatchHarvest.innerText = 'Harvest All Reviews';
+                    }).catch(() => {
+                        btnBatchHarvest.disabled = false;
+                        btnBatchHarvest.innerText = 'Harvest All Reviews';
+                    });
+                } else {
+                    btnBatchHarvest.disabled = false;
+                    btnBatchHarvest.innerText = 'Harvest All Reviews';
+                }
+            });
+        }
+
         const btnHighlight = card.querySelector('#amaes-card-btn-highlight');
         if (btnHighlight) {
             btnHighlight.addEventListener('click', (e) => {
@@ -4213,6 +4239,40 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         return btn;
     }
 
+    // Helper to find the Previous Page button on Moodle Quiz Attempt page
+    function findQuizPrevButton() {
+        let btn = document.querySelector(
+            '#responseform .submitbtns input[name="previous"], ' +
+            '#responseform .submitbtns button[name="previous"], ' +
+            '#responseform .submitbtns input[value*="Previous page"], ' +
+            '#responseform .submitbtns button[value*="Previous page"], ' +
+            '#responseform .submitbtns input[value*="Previous"], ' +
+            '#responseform .submitbtns button[value*="Previous"], ' +
+            '.submitbtns input[name="previous"], ' +
+            '.submitbtns button[name="previous"], ' +
+            '.submitbtns input[value*="Previous page"], ' +
+            '.submitbtns button[value*="Previous page"], ' +
+            '.submitbtns input[value*="Previous"], ' +
+            '.submitbtns button[value*="Previous"], ' +
+            'input[name="previous"].mod_quiz-prev-nav, ' +
+            '#mod_quiz-prev-nav, ' +
+            '.mod_quiz-prev-nav'
+        );
+
+        if (!btn) {
+            const submits = document.querySelectorAll('#responseform input[type="submit"], #responseform button[type="submit"]');
+            for (const s of submits) {
+                const val = (s.value || s.innerText || '').toLowerCase();
+                if (val.includes('prev') || val.includes('back')) {
+                    btn = s;
+                    break;
+                }
+            }
+        }
+
+        return btn;
+    }
+
     // Active Question State & Visual Focus Tracking
     let userSelectedActiveQuestion = null;
     let userActiveLockUntil = 0;
@@ -4412,6 +4472,21 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             ? questions.slice(startIndex + 1).concat(questions.slice(0, startIndex))
             : questions;
         return ordered.find(que => !isQuestionAnswered(que)) || null;
+    }
+
+    function findPreviousQuestionOnCurrentPage(sourceQue) {
+        const questions = Array.from(document.querySelectorAll('.que'));
+        if (questions.length < 2) return null;
+        const currentIndex = sourceQue ? questions.indexOf(sourceQue) : -1;
+        if (currentIndex > 0) {
+            return questions[currentIndex - 1];
+        }
+        return null;
+    }
+
+    function findFirstUnansweredOnCurrentPage() {
+        const questions = Array.from(document.querySelectorAll('.que'));
+        return questions.find(que => !isQuestionAnswered(que)) || null;
     }
 
     function isConfirmedCandidate(item) {
@@ -8164,6 +8239,18 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 }
             }
 
+            // Course page shortcut: 'U' highlights missing or unanswered quizzes
+            const isCoursePage = typeof window !== 'undefined' && window.location.pathname.includes('/course/view.php');
+            if (isCoursePage && (e.key === 'u' || e.key === 'U')) {
+                e.preventDefault();
+                if (active && typeof active.blur === 'function') active.blur();
+                if (typeof highlightMissingOrUnansweredQuizzes === 'function') {
+                    showToast("Scanning and highlighting missing quizzes... (U)");
+                    highlightMissingOrUnansweredQuizzes();
+                }
+                return;
+            }
+
             // Global Escape Handler: First press closes open Help/Contribute modal, subsequent press minimizes/toggles toolkit panel
             if (e.key === 'Escape' || e.key === 'Esc') {
                 const welcomeModal = document.getElementById('amaes-welcome-modal');
@@ -8269,13 +8356,31 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 return;
             }
 
-            // Quiz Summary page shortcuts: N / Space / Enter to hasten countdown or submit
+            // Quiz Summary page shortcuts: N / Space / Enter to hasten countdown or submit; B to return to attempt
             if (checkIsQuizSummaryPage()) {
                 const key = e.key ? e.key.toUpperCase() : '';
                 if (key === 'N' || key === ' ' || key === 'ENTER') {
                     e.preventDefault();
                     if (active && typeof active.blur === 'function') active.blur();
                     hastenQuizSummaryAutoSubmit();
+                    return;
+                }
+                if (key === 'B') {
+                    e.preventDefault();
+                    if (active && typeof active.blur === 'function') active.blur();
+                    const returnBtn = document.querySelector(
+                        'form[action*="attempt.php"] input[type="submit"], ' +
+                        'form[action*="attempt.php"] button, ' +
+                        '.singlebutton a[href*="attempt.php"], ' +
+                        'a[href*="attempt.php"]'
+                    );
+                    if (returnBtn) {
+                        showToast("Returning to attempt... (B)");
+                        setLog("Keyboard shortcut triggered: <b>Return to attempt (B)</b>", "var(--accent-blue)");
+                        returnBtn.click();
+                    } else {
+                        showToast("No return to attempt button found.", 1800);
+                    }
                     return;
                 }
             }
@@ -8310,6 +8415,59 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             if (!checkIsQuizAttemptPage()) return;
 
             const key = e.key ? e.key.toUpperCase() : '';
+
+            // 0. Jump to First Unanswered Question: 'U'
+            if (key === 'U') {
+                e.preventDefault();
+                if (active && typeof active.blur === 'function') active.blur();
+                const unansweredQue = findFirstUnansweredOnCurrentPage();
+                if (unansweredQue) {
+                    setActiveQuestion(unansweredQue, true);
+                    unansweredQue.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    const firstInteractive = unansweredQue.querySelector('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])');
+                    if (firstInteractive && typeof firstInteractive.focus === 'function') {
+                        firstInteractive.focus();
+                    }
+                    unansweredQue.style.transition = 'box-shadow 0.3s ease, border-color 0.3s ease';
+                    unansweredQue.style.boxShadow = '0 0 0 3px rgba(15, 108, 191, 0.4)';
+                    setTimeout(() => {
+                        unansweredQue.style.boxShadow = '';
+                    }, 1500);
+                    const qData = extractQuestionData(unansweredQue);
+                    showToast(`Focused Unanswered Question #${qData ? qData.qNum : ''} (U)`);
+                    setLog(`Shortcut [U]: Focused unanswered <b>Question #${qData ? qData.qNum : ''}</b>`, "var(--accent-blue)");
+                } else {
+                    showToast("All questions on this page are answered! Press N to advance.", 2200);
+                }
+                return;
+            }
+
+            // Backward Navigation: 'B'
+            if (key === 'B') {
+                e.preventDefault();
+                if (active && typeof active.blur === 'function') active.blur();
+                const currentFocus = userSelectedActiveQuestion || getActiveViewportQuestion();
+                const prevOnPage = findPreviousQuestionOnCurrentPage(currentFocus);
+                if (prevOnPage) {
+                    setActiveQuestion(prevOnPage, true);
+                    prevOnPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    const qData = extractQuestionData(prevOnPage);
+                    showToast(`Back: Question #${qData ? qData.qNum : ''} (B)`, 1500);
+                    setLog(`Shortcut: Back to <b>Question #${qData ? qData.qNum : ''}</b>`, "var(--accent-blue)");
+                    return;
+                }
+
+                const prevBtn = findQuizPrevButton();
+                if (prevBtn) {
+                    showToast("Shortcut: Previous Page (B)");
+                    setLog("Keyboard shortcut triggered: <b>Previous Page (B)</b>", "var(--accent-blue)");
+                    prevBtn.click();
+                    return;
+                } else {
+                    showToast("Already on the first question/page (B)", 1500);
+                }
+                return;
+            }
 
             // 1. Next Question / Next Page / Submit Navigation: 'N' or 'Space' or 'Enter'
             if (key === 'N' || key === ' ' || key === 'ENTER') {
@@ -19503,6 +19661,168 @@ function setupAccountTransferUI() {
         return { success: false, count: 0, quizzes: completedQuizzes.length, subCode };
     }
 
+    async function batchHarvestCourseReviews(targetCourseId, targetSubCode, statusCallback) {
+        if (isHarvestingInProgress) {
+            showToast("Answer collection is already running in background...", 2500);
+            return { success: false, inProgress: true };
+        }
+        isHarvestingInProgress = true;
+
+        try {
+            const courseInfo = typeof detectCourseInfo === 'function' ? detectCourseInfo() : {};
+            const subCode = targetSubCode || courseInfo.subjectCode || 'GENERAL';
+            const courseId = targetCourseId || courseInfo.courseId || new URLSearchParams(window.location.search).get('id') || '';
+
+            setLog(`<b>Batch Harvester:</b> Discovering completed quiz reviews for <b>${escapeHtml(subCode)}</b>...`, "var(--accent-blue)");
+            showToast(`Batch Harvester: Scanning reviews for ${subCode}...`, 3000);
+
+            // 1. Gather all quiz links from course page DOM and/or grade report
+            const quizLinksMap = new Map();
+            document.querySelectorAll('a[href*="/mod/quiz/view.php"], a[href*="/mod/quiz/"]').forEach(a => {
+                const href = a.getAttribute('href') || a.href;
+                if (!href || href.includes('attempt.php')) return;
+                try {
+                    const fullUrl = new URL(href, window.location.origin).href;
+                    const title = (a.innerText || '').trim() || 'Quiz';
+                    if (!quizLinksMap.has(fullUrl)) quizLinksMap.set(fullUrl, title);
+                } catch (_) {}
+            });
+
+            // Fallback/enrichment: also scan Grade Report if available
+            let singleGradesUrl = null;
+            const gradesLink = document.querySelector('a[href*="/grade/report/user/index.php"]');
+            if (gradesLink && gradesLink.href) {
+                singleGradesUrl = gradesLink.href;
+            } else if (courseId) {
+                singleGradesUrl = `${window.location.origin}${getSemesterBasePath()}grade/report/user/index.php?id=${courseId}`;
+            }
+
+            if (singleGradesUrl) {
+                try {
+                    const gResp = await fetch(singleGradesUrl);
+                    if (gResp.ok) {
+                        const gHtml = await gResp.text();
+                        const gDoc = new DOMParser().parseFromString(gHtml, 'text/html');
+                        gDoc.querySelectorAll('a[href*="/mod/quiz/view.php"], a[href*="/mod/quiz/"]').forEach(a => {
+                            const href = a.getAttribute('href') || a.href;
+                            if (!href || href.includes('attempt.php')) return;
+                            try {
+                                const fullUrl = new URL(href, window.location.origin).href;
+                                const title = (a.innerText || '').trim() || 'Quiz';
+                                if (!quizLinksMap.has(fullUrl)) quizLinksMap.set(fullUrl, title);
+                            } catch (_) {}
+                        });
+                    }
+                } catch (_) {}
+            }
+
+            const quizList = Array.from(quizLinksMap.entries()).map(([url, title]) => ({ url, title }));
+            if (quizList.length === 0) {
+                showToast(`No quiz links found for ${subCode}.`);
+                setLog(`Batch Harvester: No quiz links found for <b>${escapeHtml(subCode)}</b>.`, "var(--accent-amber)");
+                return { success: false, count: 0, quizzes: 0 };
+            }
+
+            // 2. Discover review links for each quiz
+            const reviewUrlsToHarvest = [];
+            const seenReviewUrls = new Set();
+
+            for (let i = 0; i < quizList.length; i++) {
+                const qz = quizList[i];
+                if (statusCallback) statusCallback(i + 1, quizList.length, `Checking ${qz.title}`);
+
+                try {
+                    const qResp = await fetch(qz.url);
+                    if (!qResp.ok) continue;
+                    const qHtml = await qResp.text();
+                    const qDoc = new DOMParser().parseFromString(qHtml, 'text/html');
+
+                    qDoc.querySelectorAll('a[href*="review.php"], a[href*="/mod/quiz/review.php"]').forEach(rLink => {
+                        const raw = rLink.getAttribute('href') || rLink.href;
+                        if (!raw) return;
+                        try {
+                            const rUrl = new URL(raw, qz.url);
+                            rUrl.searchParams.set('showall', '1');
+                            const finalUrl = rUrl.href;
+                            if (!seenReviewUrls.has(finalUrl)) {
+                                seenReviewUrls.add(finalUrl);
+                                reviewUrlsToHarvest.push({ url: finalUrl, title: qz.title });
+                            }
+                        } catch (_) {}
+                    });
+                } catch (err) {
+                    console.warn(`Error inspecting quiz landing ${qz.url}:`, err);
+                }
+            }
+
+            if (reviewUrlsToHarvest.length === 0) {
+                showToast("No completed review attempts available for this course.");
+                setLog(`Batch Harvester: No completed review attempts available for <b>${escapeHtml(subCode)}</b>.`, "var(--accent-amber)");
+                return { success: false, count: 0, reviews: 0 };
+            }
+
+            setLog(`Batch Harvester: Found <b>${reviewUrlsToHarvest.length} review attempt(s)</b>. Extracting verified answers...`, "var(--accent-cyan)");
+            showToast(`Harvesting ${reviewUrlsToHarvest.length} review attempt(s)...`, 3000);
+
+            // 3. Fetch each review page and extract answers
+            let totalHarvested = 0;
+            const allQuestions = [];
+            const knownQuestionKeys = new Set();
+
+            for (let rIdx = 0; rIdx < reviewUrlsToHarvest.length; rIdx++) {
+                const rev = reviewUrlsToHarvest[rIdx];
+                if (statusCallback) statusCallback(rIdx + 1, reviewUrlsToHarvest.length, `Harvesting: ${rev.title}`);
+                setLog(`[${rIdx + 1}/${reviewUrlsToHarvest.length}] Harvesting <b>${escapeHtml(rev.title)}</b>...`, "var(--accent-cyan)");
+
+                try {
+                    const revResp = await fetch(rev.url);
+                    if (!revResp.ok) continue;
+                    const revHtml = await revResp.text();
+                    const revDoc = new DOMParser().parseFromString(revHtml, 'text/html');
+
+                    const res = harvestFromReviewDOM(revDoc, subCode, rev.title, courseInfo.fullTitle || subCode);
+                    if (res.success && res.questions && res.questions.length > 0) {
+                        res.questions.forEach(q => {
+                            if (!q.qNorm) return;
+                            const qKey = getQuestionIdentity(q);
+                            if (knownQuestionKeys.has(qKey)) return;
+                            knownQuestionKeys.add(qKey);
+                            allQuestions.push(q);
+                            totalHarvested += q.ansRaw ? 1 : 0;
+                        });
+                    }
+                } catch (err) {
+                    console.warn(`Error harvesting review ${rev.url}:`, err);
+                }
+            }
+
+            if (allQuestions.length > 0) {
+                mergeAnswersIntoCache(subCode, allQuestions, 'Batch-Course-Harvester');
+                flushCommunityContributions(subCode, { source: 'batch_course_harvester' }).catch(() => {});
+                setLog(`Batch Harvest Complete! Saved <b>${totalHarvested} verified answers</b> from ${reviewUrlsToHarvest.length} review(s) into <b>${escapeHtml(subCode)}</b>.`, "var(--accent-green)");
+                showToast(`Harvest Complete: ${totalHarvested} verified answers saved!`, 4500);
+
+                if (typeof injectCourseConfidenceCard === 'function') {
+                    injectCourseConfidenceCard();
+                }
+                if (typeof syncAutoQuizUI === 'function') {
+                    syncAutoQuizUI();
+                }
+                return { success: true, count: totalHarvested, reviews: reviewUrlsToHarvest.length, subCode };
+            } else {
+                setLog(`Batch Harvester finished. No new verified answers found in <b>${reviewUrlsToHarvest.length} review(s)</b>.`, "var(--accent-amber)");
+                showToast("All reviews checked, no new answers to harvest.");
+                return { success: false, count: 0, reviews: reviewUrlsToHarvest.length, subCode };
+            }
+        } catch (e) {
+            setLog(`Batch Harvester error: ${e.message}`, "var(--accent-pink)");
+            showToast("Batch harvest failed: " + e.message);
+            return { success: false, error: e.message };
+        } finally {
+            isHarvestingInProgress = false;
+        }
+    }
+
     async function executeGradesHarvester(statusCallback) {
         if (isHarvestingInProgress) {
             showToast("Answer collection is already running in background...", 2500);
@@ -21124,6 +21444,14 @@ function setupAccountTransferUI() {
                             <div style="display: flex; align-items: center; gap: 6px;">
                                 <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">N</kbd> / <kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">Space</kbd></span>
                                 <span>Next Question / Page</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">B</kbd></span>
+                                <span>Previous Question / Page</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">U</kbd></span>
+                                <span>Focus First Unanswered</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 6px;">
                                 <span style="min-width: 60px;"><kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">[</kbd> / <kbd style="background: ${isLight ? '#f4f4f5' : '#27272a'}; padding: 1px 4px; border-radius: 3px; font-weight: 700; color: ${isLight ? '#18181b' : '#fff'}; font-family: monospace; border: 1px solid ${isLight ? '#e4e4e7' : '#3f3f46'};">]</kbd></span>
@@ -25415,8 +25743,13 @@ function setupAccountTransferUI() {
                     if (!sessionStorage.getItem(sessKey)) {
                         sessionStorage.setItem(sessKey, '1');
                         setTimeout(() => {
-                            setLog(`Auto-Harvest: Scanning past quizzes for <b>${courseKey}</b>...`, "var(--accent-blue)");
-                            executeGradesHarvester();
+                            if (isCoursePage && typeof batchHarvestCourseReviews === 'function') {
+                                setLog(`Auto-Harvest: Scanning all available reviews for <b>${courseKey}</b>...`, "var(--accent-blue)");
+                                batchHarvestCourseReviews(cInfo?.courseId, cInfo?.subjectCode);
+                            } else {
+                                setLog(`Auto-Harvest: Scanning past quizzes for <b>${courseKey}</b>...`, "var(--accent-blue)");
+                                executeGradesHarvester();
+                            }
                         }, 1800);
                     }
                 }
