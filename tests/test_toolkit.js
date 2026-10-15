@@ -2616,21 +2616,22 @@ test("Unanswered Question Reassurance: displays 'be the first to answer and shar
     const fs = require('fs');
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
-    // 1. Verify highlightQuizAnswers injects the reassurance badge on candidate 0
-    assert.ok(script.includes("amaes-unanswered-hint"), "Userscript must define amaes-unanswered-hint badge class");
+    // 1. Verify highlightQuizAnswers injects the reassurance focus banner on candidate 0
+    assert.ok(script.includes("amaes-unanswered-hint") || script.includes("amaes-new-question-focus-banner"), "Userscript must define unanswered focus banner");
     assert.ok(script.includes("No answer known to the system yet — <b>be the first to answer and share it!</b>"), "Must include motivating prompt to be the first to answer");
 
-    // 2. Verify blockage HUD includes explicit, low-cognitive-load steps and keyboard shortcuts
+    // 2. Verify blockage HUD includes plain-English guidance and action buttons for non-technical users
     assert.ok(script.includes("No saved answer yet"), "HUD must inform student that question is not yet in database");
-    assert.ok(script.includes("press <b>V</b> to paste"), "HUD must explicitly instruct user to press V to paste");
-    assert.ok(script.includes("press <b>N</b> to proceed"), "HUD must explicitly instruct user to press N to proceed");
+    assert.ok(script.includes("btn-blockage-ask-ai"), "HUD must provide 1-click Ask AI button");
+    assert.ok(script.includes("btn-blockage-stop"), "HUD must provide Stop/Resume Auto control");
     assert.ok(!script.includes("Auto-copied for AI (press <b>V</b> to paste), then review and click <b>Next page</b> or press <b>N</b> to proceed"), "Dense technical jargon run-on sentence must be eliminated");
 
-    // 3. Verify cleanDOMToAI strips the unanswered hint so AI prompt is clean
+    // 3. Verify cleanDOMToAI strips the focus banner so AI prompt is clean
     const aiCleanStart = script.indexOf("function cleanDOMToAI(");
     assert.ok(aiCleanStart !== -1, "cleanDOMToAI must exist");
     const aiCleanBlock = script.substring(aiCleanStart, aiCleanStart + 800);
     assert.ok(aiCleanBlock.includes(".amaes-unanswered-hint"), "cleanDOMToAI must strip .amaes-unanswered-hint");
+    assert.ok(aiCleanBlock.includes(".amaes-new-question-focus-banner"), "cleanDOMToAI must strip .amaes-new-question-focus-banner");
 });
 
 // --------------------------------------------------
@@ -2701,10 +2702,10 @@ test("Study-Guide Links & Opt-In Auto-Pick: links sources and keeps unverified f
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Warning amber/yellow styling for unanswered questions
-    const unansweredStart = script.indexOf("hint.className = 'amaes-unanswered-hint';");
+    const unansweredStart = script.indexOf("banner.className = 'amaes-new-question-focus-banner';");
     const unansweredSection = script.substring(unansweredStart, unansweredStart + 600);
-    assert.ok(unansweredSection.includes("#f59e0b"), "Unanswered hint must use warning amber border/accent");
-    assert.ok(unansweredSection.includes("rgba(245, 158, 11"), "Unanswered hint must use amber background styling");
+    assert.ok(unansweredSection.includes("#f59e0b"), "Unanswered banner must use warning amber border/accent");
+    assert.ok(unansweredSection.includes("rgba(245, 158, 11"), "Unanswered banner must use amber background styling");
 
     // 2. Clickable link to amauoed on verified badges and suggested headers
     assert.ok(script.includes("document.createElement(isStudyGuide && studyGuide.url ? 'a' : 'span')"), "Study-guide badges with a source URL must render as links");
@@ -2924,8 +2925,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.12.8'), "Userscript header must specify v1.12.8");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.12.8";'), "Constant SCRIPT_VERSION must be v1.12.8");
+    assert.ok(script.includes('@version      1.12.9'), "Userscript header must specify v1.12.9");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.12.9";'), "Constant SCRIPT_VERSION must be v1.12.9");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4136,11 +4137,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.12.8-blue.svg"), "README badge must show v1.12.8");
+    assert.ok(readme.includes("version-1.12.9-blue.svg"), "README badge must show v1.12.9");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.12.8<"), "Website must display v1.12.8 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.12.9<"), "Website must display v1.12.9 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -6171,6 +6172,39 @@ test("Zero Generic Emojis Policy, Simple 2-Step Setup Transfer & Exam Answer Hig
     assert.ok(script.includes("Highlighted all <b>${res.total}</b> answers!"), "Must report 100% matched answers cleanly");
     assert.ok(script.includes("have no saved answer in database)"), "Must report count of questions lacking saved answers");
     assert.ok(script.includes("No saved answers in database for this"), "Must report 0 matches with actionable Gemini advice");
+});
+
+test("Single Unified Unanswered Banner & Non-Technical Guidance (v1.12.9)", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Single card guarantee: focus banner and blockage HUD never co-exist or stack
+    const focusBannerFunc = script.slice(
+        script.indexOf("function renderNewQuestionFocusBanner("),
+        script.indexOf("function saveQuizAttemptSummary(")
+    );
+    assert.ok(focusBannerFunc.includes(".amaes-unanswered-hint, .amaes-unsure-help-chip, .amaes-ai-fallback-bar, .amaes-new-question-focus-banner, .amaes-blockage-hud"), "Focus banner cleans up any preexisting hints/HUDs");
+
+    const hudBlock = script.slice(
+        script.indexOf("if (!firstBlockedQue.querySelector('.amaes-blockage-hud'))"),
+        script.indexOf("const hud = document.createElement('div');", script.indexOf("if (!firstBlockedQue.querySelector('.amaes-blockage-hud'))"))
+    );
+    assert.ok(hudBlock.includes(".amaes-new-question-focus-banner"), "Blockage HUD cleans up preexisting focus banner to prevent stacking");
+    assert.ok(hudBlock.includes(".amaes-unsure-help-chip"), "Blockage HUD cleans up unsure help chip");
+
+    // 2. Elimination of keyboard jargon for non-tech users
+    assert.ok(!focusBannerFunc.includes("press N"), "Focus banner must eliminate keyboard shortcut instructions for non-tech students");
+    assert.ok(!focusBannerFunc.includes("press V"), "Focus banner must eliminate V keyboard shortcut demands");
+    assert.ok(focusBannerFunc.includes("Choose an answer below and click Next, or click <b>Ask AI</b> to get an answer."), "Focus banner must use clear, non-technical plain English steps");
+
+    // 3. Unified 1-click action buttons
+    assert.ok(focusBannerFunc.includes("btn-blockage-ask-ai") || focusBannerFunc.includes("amaes-btn-focus-ask-ai"), "Banner must include Ask AI action");
+    assert.ok(focusBannerFunc.includes("https://gemini.google.com"), "Banner must include direct link to Open Gemini");
+    assert.ok(focusBannerFunc.includes("amaes-btn-recopy-q"), "Banner must include Copy Again action");
+    assert.ok(focusBannerFunc.includes("amaes-btn-skip-q"), "Banner must include Next Question skip action");
+
+    // 4. Choice selection reactivity feedback
+    assert.ok(focusBannerFunc.includes("Answer selected!"), "Banner must provide instant visual feedback on answer selection");
 });
 
 

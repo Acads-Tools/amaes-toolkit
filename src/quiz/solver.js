@@ -430,7 +430,7 @@
 
     // Contextual in-question action chip guiding students when unsure or stuck
     function renderUnsureActionChip(que) {
-        if (!que || que.querySelector('.amaes-unsure-help-chip') || checkIsReviewPage()) return;
+        if (!que || que.querySelector('.amaes-unsure-help-chip') || que.querySelector('.amaes-blockage-hud') || que.querySelector('.amaes-new-question-focus-banner') || checkIsReviewPage()) return;
         const formulation = que.querySelector('.formulation, .content') || que;
         const chip = document.createElement('div');
         chip.className = 'amaes-unsure-help-chip';
@@ -504,10 +504,13 @@
         }
     }
 
-    // High-visibility focused banner explaining prompt copy & AI paste shortcuts for new questions
+    // High-visibility focused banner for unanswered questions: clear, non-technical guidance and 1-click actions
     function renderNewQuestionFocusBanner(que, qNum) {
-        if (!que || que.querySelector('.amaes-new-question-focus-banner') || checkIsReviewPage()) return;
+        if (!que || checkIsReviewPage()) return;
+        // Clean up any stale hints/chips on this question to guarantee a single banner
+        que.querySelectorAll('.amaes-unanswered-hint, .amaes-unsure-help-chip, .amaes-ai-fallback-bar, .amaes-new-question-focus-banner, .amaes-blockage-hud').forEach(el => el.remove());
         const formulation = que.querySelector('.formulation, .content') || que;
+
         const banner = document.createElement('div');
         banner.className = 'amaes-new-question-focus-banner';
         banner.style.cssText = `
@@ -517,33 +520,49 @@
             border: 1.5px solid #f59e0b;
             border-radius: 8px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.12);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1);
             box-sizing: border-box;
+            color: #78350f;
+            transition: all 0.2s ease;
         `;
         banner.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
                 <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="background: #f59e0b; color: #ffffff; padding: 2px 7px; border-radius: 4px; font-weight: 800; font-size: 10px; letter-spacing: 0.5px;">NEW QUESTION</span>
-                    <span style="font-weight: 700; color: #92400e; font-size: 12px;">Question #${qNum || ''} Copied to Clipboard!</span>
+                    <span style="background: #f59e0b; color: #ffffff; padding: 2px 7px; border-radius: 4px; font-weight: 800; font-size: 10px; letter-spacing: 0.5px;">NO SAVED ANSWER</span>
+                    <span style="font-weight: 700; color: #92400e; font-size: 12px;">Question #${qNum || ''}: No saved answer yet</span>
                 </div>
-                <span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Not in database yet</span>
+                <span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Question copied</span>
             </div>
-            <div style="font-size: 11.5px; color: #78350f; line-height: 1.45; margin-bottom: 8px;">
-                <b>Question is ready to paste!</b> Press <kbd style="background: rgba(0,0,0,0.08); padding: 1px 4px; border-radius: 3px; font-weight: 700; font-family: monospace;">Ctrl+V</kbd> in Google Gemini or ChatGPT to get the answer.<br>
-                Unsure? Pick a choice or press <kbd style="background: rgba(0,0,0,0.08); padding: 1px 4px; border-radius: 3px; font-weight: 700; font-family: monospace;">N</kbd> (or click Next) to skip.
+            <div class="amaes-focus-instruction" style="font-size: 11.5px; color: #78350f; line-height: 1.45; margin-bottom: 8px;">
+                <b>Question is ready to paste!</b> Choose an answer below and click Next, or click <b>Ask AI</b> to get an answer.
+                <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">No answer known to the system yet — <b>be the first to answer and share it!</b></div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <button id="btn-blockage-ask-ai" type="button" class="amaes-inline-btn amaes-btn-focus-ask-ai" style="
+                    display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;
+                " title="Ask Google Gemini AI to analyze and solve this question directly">${ICONS.gemini} <span>Ask AI</span></button>
                 <a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" style="
-                    display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; border-radius: 5px; font-size: 11px; font-weight: 700; text-decoration: none; cursor: pointer;
-                ">${ICONS.gemini} <span>Open Google Gemini</span></a>
+                    display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ffffff; color: #6b21a8; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none; cursor: pointer;
+                " title="Open Google Gemini in a new tab (question already copied)">${ICONS.external} <span>Open Gemini</span></a>
                 <button type="button" class="amaes-btn-recopy-q" style="
-                    display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #ffffff; color: #78350f; border: 1px solid #d97706; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer;
-                ">${ICONS.copy} <span>Copy Again</span></button>
+                    display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ffffff; color: #78350f; border: 1px solid #d97706; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
+                " title="Question text copied. Paste with Ctrl+V into AI or click Copy Again">${ICONS.copy} <span>Copy Again</span></button>
                 <button type="button" class="amaes-btn-skip-q" style="
-                    display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: auto;
-                "><span>Next Question (N) &rarr;</span></button>
+                    display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: auto;
+                "><span>Next Question &rarr;</span></button>
             </div>
         `;
+
+        const askAiBtn = banner.querySelector('#btn-blockage-ask-ai');
+        if (askAiBtn) {
+            askAiBtn.onclick = async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof manualSolveWithAi === 'function') {
+                    await manualSolveWithAi(que, askAiBtn);
+                }
+            };
+        }
 
         const recopyBtn = banner.querySelector('.amaes-btn-recopy-q');
         if (recopyBtn) {
@@ -555,7 +574,7 @@
                 } else if (navigator.clipboard && navigator.clipboard.writeText) {
                     navigator.clipboard.writeText(qText);
                 }
-                showToast("Question re-copied to clipboard! Press Ctrl+V in AI.", 2500);
+                showToast("Question re-copied to clipboard!", 2500);
             };
         }
 
@@ -571,6 +590,20 @@
                 }
             };
         }
+
+        // Choice selection visual feedback
+        const choiceInputs = que.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+        choiceInputs.forEach(input => {
+            input.addEventListener('change', () => {
+                const instr = banner.querySelector('.amaes-focus-instruction');
+                if (instr) {
+                    banner.style.borderColor = '#10b981';
+                    banner.style.background = '#f0fdf4';
+                    banner.style.color = '#065f46';
+                    instr.innerHTML = `<span style="color: #047857; font-weight: 700;">Answer selected!</span> <span style="color: #065f46;">Click <b>Next Question</b> when ready.</span>`;
+                }
+            }, { once: true });
+        });
 
         formulation.insertBefore(banner, formulation.firstChild);
     }
@@ -1675,14 +1708,16 @@
                 }
                 setLog(
                     `<b>Question #${qData ? qData.qNum : ''} Auto-Copied:</b> Prompt copied to clipboard. ` +
-                    `Paste from AI (press <b>V</b>) or select manually, then press <b>N</b> or click <b>Next page</b> to proceed.`,
+                    `Choose an answer and click <b>Next page</b>, or use <b>Ask AI</b> to get an answer.`,
                     "var(--accent-amber)"
                 );
 
                 if (!firstBlockedQue.querySelector('.amaes-blockage-hud')) {
                     // The solver HUD is the full unknown-answer notice. Remove
-                    // compact matcher hints and fallback bars so the same warning is not shown twice.
+                    // compact matcher hints, previous focus banners, and chips so no warning is shown twice.
                     firstBlockedQue.querySelectorAll('.amaes-unanswered-hint').forEach(hint => hint.remove());
+                    firstBlockedQue.querySelectorAll('.amaes-new-question-focus-banner').forEach(b => b.remove());
+                    firstBlockedQue.querySelectorAll('.amaes-unsure-help-chip').forEach(c => c.remove());
                     firstBlockedQue.querySelectorAll('.amaes-ai-fallback-bar').forEach(bar => bar.remove());
                     setQuestionAiTag(firstBlockedQue, false);
                     if (!firstBlockedQue.dataset.amaesInterventionAlertPlayed) {
@@ -1691,83 +1726,66 @@
                     }
 
                     const hud = document.createElement('div');
-                    hud.className = 'amaes-blockage-hud';
+                    hud.className = 'amaes-blockage-hud amaes-new-question-focus-banner';
                     hud.style.cssText = `
                         margin-bottom: 12px;
-                        padding: 8px 12px;
+                        padding: 10px 14px;
                         background: #fffbeb;
                         border: 1.5px solid #f59e0b;
                         border-radius: 8px;
                         font-size: 11.5px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        gap: 12px;
                         color: #78350f;
-                        box-shadow: 0 2px 5px rgba(245, 158, 11, 0.08);
+                        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1);
                         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                         line-height: 1.4;
                         box-sizing: border-box;
+                        transition: all 0.2s ease;
                     `;
 
                     const retryCount = Number(firstBlockedQue.dataset.amaesAiRetryCount) || 0;
                     hud.innerHTML = `
-                        <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 200px;">
-                            <span style="background: #f59e0b; color: #ffffff; padding: 2px 7px; border-radius: 4px; font-weight: 800; font-size: 10px; letter-spacing: 0.5px; flex-shrink: 0;">WAITING</span>
-                            <div style="font-size: 11.5px; line-height: 1.35;">
-                                <span style="font-weight: 700; color: #92400e;">Question #${qData ? qData.qNum : ''}:</span> No saved answer yet (Auto-copied) · <span style="color: #b45309;">Pick a choice (or press <b>V</b> to paste), then press <b>N</b> to proceed</span>
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="background: #f59e0b; color: #ffffff; padding: 2px 7px; border-radius: 4px; font-weight: 800; font-size: 10px; letter-spacing: 0.5px;">WAITING</span>
+                                <span style="font-weight: 700; color: #92400e; font-size: 12px;">Question #${qData ? qData.qNum : ''}: No saved answer yet</span>
                             </div>
+                            <span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Auto-quiz paused</span>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                        <div class="amaes-focus-instruction" style="font-size: 11.5px; color: #78350f; line-height: 1.45; margin-bottom: 8px;">
+                            <b>Question is ready to paste!</b> Choose an answer below and click Next, or click <b>Ask AI</b> to get an answer.
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                             <button id="btn-blockage-ask-ai" type="button" class="amaes-inline-btn" style="
-                                padding: 4px 10px;
-                                font-size: 11px;
-                                font-weight: 700;
-                                background: #f5f3ff;
-                                color: #7c3aed;
-                                border: 1px solid #c4b5fd;
-                                border-radius: 6px;
-                                cursor: pointer;
-                                display: inline-flex;
-                                align-items: center;
-                                gap: 4px;
-                                transition: all 0.15s ease;
+                                display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;
                             " title="Ask Google Gemini AI to analyze and solve this question directly">
                                 ${ICONS.gemini} <span>${firstBlockedQue.dataset.amaesAiAttempted ? 'Retry AI' : 'Ask AI'}</span>
                             </button>
                             ${retryCount >= 2 ? `
                             <button id="btn-blockage-config-ai" type="button" class="amaes-inline-btn" style="
-                                padding: 4px 10px;
-                                font-size: 11px;
-                                font-weight: 700;
-                                background: #ede9fe;
-                                color: #6d28d9;
-                                border: 1px solid #c4b5fd;
-                                border-radius: 6px;
-                                cursor: pointer;
-                                display: inline-flex;
-                                align-items: center;
-                                gap: 4px;
-                                transition: all 0.15s ease;
+                                display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;
                             " title="Add another free Google Gemini API key for higher rate limits">
                                 ${ICONS.gear} <span>Configure AI</span>
                             </button>
                             ` : ''}
                             <button id="btn-blockage-stop" type="button" class="amaes-inline-btn" style="
-                                padding: 4px 10px;
-                                font-size: 11px;
-                                font-weight: 700;
-                                background: ${autoQuizMode ? '#fee2e2' : '#dcfce7'};
-                                color: ${autoQuizMode ? '#b91c1c' : '#15803d'};
-                                border: 1px solid ${autoQuizMode ? '#f87171' : '#86efac'};
-                                border-radius: 6px;
-                                cursor: pointer;
-                                display: inline-flex;
-                                align-items: center;
-                                gap: 4px;
-                                transition: all 0.15s ease;
+                                display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: ${autoQuizMode ? '#fee2e2' : '#dcfce7'}; color: ${autoQuizMode ? '#b91c1c' : '#15803d'}; border: 1px solid ${autoQuizMode ? '#f87171' : '#86efac'}; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;
                             " title="${autoQuizMode ? 'Stop automation so you can answer manually without any script interference' : 'Resume Auto-Quiz'}">
                                 ${autoQuizMode ? ICONS.stop : ICONS.play} <span>${autoQuizMode ? 'Stop Auto' : 'Resume Auto'}</span>
+                            </button>
+                            <a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" style="
+                                display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ffffff; color: #6b21a8; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none; cursor: pointer;
+                            " title="Open Google Gemini in a new tab (question already copied)">
+                                ${ICONS.external} <span>Open Gemini</span>
+                            </a>
+                            <button type="button" class="amaes-btn-recopy-q" style="
+                                display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ffffff; color: #78350f; border: 1px solid #d97706; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
+                            " title="Question text copied. Paste with Ctrl+V into AI or click Copy Again">
+                                ${ICONS.copy} <span>Copy Again</span>
+                            </button>
+                            <button type="button" class="amaes-btn-skip-q" style="
+                                display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: auto;
+                            ">
+                                <span>Next Question &rarr;</span>
                             </button>
                         </div>
                     `;
@@ -1818,7 +1836,34 @@
                             toggleAutoQuizMode();
                         };
                     }
-                    renderUnsureActionChip(firstBlockedQue);
+
+                    const blockageRecopy = hud.querySelector('.amaes-btn-recopy-q');
+                    if (blockageRecopy) {
+                        blockageRecopy.onclick = (e) => {
+                            e.preventDefault();
+                            const qText = cleanDOMToAI(firstBlockedQue.querySelector('.qtext, .formulation') || firstBlockedQue);
+                            if (typeof GM_setClipboard === 'function') {
+                                GM_setClipboard(qText);
+                            } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                                navigator.clipboard.writeText(qText);
+                            }
+                            showToast("Question re-copied to clipboard!", 2500);
+                        };
+                    }
+
+                    const blockageSkip = hud.querySelector('.amaes-btn-skip-q');
+                    if (blockageSkip) {
+                        blockageSkip.onclick = (e) => {
+                            e.preventDefault();
+                            if (typeof triggerNextQuizPage === 'function') {
+                                triggerNextQuizPage();
+                            } else {
+                                const nextBtn = document.querySelector('.submitbtns input[value*="Next"], input[value*="Next page"], button[value*="Next"]');
+                                if (nextBtn) nextBtn.click();
+                            }
+                        };
+                    }
+
                     updateNextButtonIndicator();
                 }
 
@@ -1854,7 +1899,7 @@
                         } else if (allAnswered && isMultiQuestionPage) {
                             hintMsg = 'All questions answered! Review choices and click <b>Finish attempt</b> when ready.';
                         } else {
-                            hintMsg = 'Review your answer, then press <b>N</b> or click <b>Next page</b> below to proceed.';
+                            hintMsg = 'Review your answer, then click <b>Next page</b> below to proceed.';
                         }
 
                         hud.innerHTML = `
@@ -2232,7 +2277,7 @@
             if (checkIsQuizSummaryPage()) {
                 subtext.textContent = 'All questions answered and saved. Review your answers and submit when ready.';
             } else if (isPausedOnUnknown || isWaitingForUserAnswer || (checkIsQuizAttemptPage() && document.querySelector('.amaes-blockage-hud'))) {
-                subtext.textContent = 'Paused on unknown question. Answer or press N to continue.';
+                subtext.textContent = 'Paused on unknown question. Choose an answer to continue.';
             } else if (autoQuizMode) {
                 subtext.textContent = 'Auto-answering & advancing in background. Click to pause.';
             } else {
@@ -3338,7 +3383,7 @@
 
             // Clone qtext and remove input, select, textarea, drop zones, and badges so inline blanks match AMAUOED entries cleanly
             const qClone = qtextElem.cloneNode(true);
-            qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-unreviewed-history-note, .amaes-known-wrong-answer-warning, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-question-tag').forEach(el => el.remove());
+            qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-new-question-focus-banner, .amaes-unsure-help-chip, .amaes-unreviewed-history-note, .amaes-known-wrong-answer-warning, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-question-tag').forEach(el => el.remove());
             const moodleQRaw = qClone.innerText.trim();
             const moodleQNorm = normalizeText(moodleQRaw);
 
@@ -3470,34 +3515,11 @@
             }
 
             if (candidates.length === 0) {
-                if (checkIsQuizAttemptPage() && !que.querySelector('.amaes-unanswered-hint') && !que.querySelector('.amaes-unreviewed-history-note') && !que.querySelector('.amaes-blockage-hud')) {
+                if (checkIsQuizAttemptPage() && !que.querySelector('.amaes-new-question-focus-banner') && !que.querySelector('.amaes-unreviewed-history-note') && !que.querySelector('.amaes-blockage-hud')) {
                     que.classList.add('amaes-no-answer-que');
-                    const formulation = que.querySelector('.formulation, .content') || que;
-                    const hint = document.createElement('div');
-                    hint.className = 'amaes-unanswered-hint';
-                    hint.style.cssText = `
-                        display: inline-flex;
-                        align-items: center;
-                        gap: 6px;
-                        margin-bottom: 8px;
-                        padding: 4px 10px;
-                        background: rgba(245, 158, 11, 0.1);
-                        border: 1px solid rgba(245, 158, 11, 0.35);
-                        border-left: 3px solid #f59e0b;
-                        border-radius: 6px;
-                        font-size: 10.5px;
-                        color: #d97706;
-                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                    `;
-                    hint.innerHTML = `
-                        <span style="background: rgba(245, 158, 11, 0.22); color: #d97706; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 9px; letter-spacing: 0.5px;">NO SAVED ANSWER</span>
-                        <span>No answer known to the system yet — <b>be the first to answer and share it!</b></span>
-                    `;
-                    formulation.insertBefore(hint, formulation.firstChild);
                     const numElem = que.querySelector('.info .no, .qno');
                     const qNum = numElem ? numElem.innerText.replace(/[^0-9]/g, '') : '';
                     renderNewQuestionFocusBanner(que, qNum);
-                    renderUnsureActionChip(que);
                     updateNextButtonIndicator();
                 } else if (checkIsQuizAttemptPage()) {
                     que.classList.add('amaes-no-answer-que');
@@ -4957,34 +4979,11 @@
             }
 
             if (!foundMatchForQuestion) {
-                if (checkIsQuizAttemptPage() && !que.querySelector('.amaes-unanswered-hint') && !que.querySelector('.amaes-blockage-hud')) {
+                if (checkIsQuizAttemptPage() && !que.querySelector('.amaes-new-question-focus-banner') && !que.querySelector('.amaes-blockage-hud')) {
                     que.classList.add('amaes-no-answer-que');
-                    const formulation = que.querySelector('.formulation, .content') || que;
-                    const hint = document.createElement('div');
-                    hint.className = 'amaes-unanswered-hint';
-                    hint.style.cssText = `
-                        display: inline-flex;
-                        align-items: center;
-                        gap: 6px;
-                        margin-bottom: 8px;
-                        padding: 4px 10px;
-                        background: rgba(245, 158, 11, 0.1);
-                        border: 1px solid rgba(245, 158, 11, 0.35);
-                        border-left: 3px solid #f59e0b;
-                        border-radius: 6px;
-                        font-size: 10.5px;
-                        color: #d97706;
-                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                    `;
-                    hint.innerHTML = `
-                        <span style="background: rgba(245, 158, 11, 0.22); color: #d97706; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 9px; letter-spacing: 0.5px;">NO SAVED ANSWER</span>
-                        <span>No answer known to the system yet — <b>be the first to answer and share it!</b></span>
-                    `;
-                    formulation.insertBefore(hint, formulation.firstChild);
                     const numElem = que.querySelector('.info .no, .qno');
                     const qNum = numElem ? numElem.innerText.replace(/[^0-9]/g, '') : '';
                     renderNewQuestionFocusBanner(que, qNum);
-                    renderUnsureActionChip(que);
                     updateNextButtonIndicator();
                 } else if (checkIsQuizAttemptPage()) {
                     que.classList.add('amaes-no-answer-que');
