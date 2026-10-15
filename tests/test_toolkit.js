@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.9'), "Userscript header must specify v1.13.9");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.9";'), "Constant SCRIPT_VERSION must be v1.13.9");
+    assert.ok(script.includes('@version      1.13.10'), "Userscript header must specify v1.13.10");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.10";'), "Constant SCRIPT_VERSION must be v1.13.10");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -6535,6 +6535,40 @@ test("Quiz Bottom Cycle Navigation, Course Confidence Intelligence & Auto-Close 
     assert.ok(initSrc.includes("injectQuizBottomNavigation()"), "init.js must call injectQuizBottomNavigation on startup");
     assert.ok(initSrc.includes("autoCloseCourseIndexDrawer()"), "init.js must call autoCloseCourseIndexDrawer on startup");
     assert.ok(initSrc.includes("injectCourseConfidenceCard()"), "init.js must call injectCourseConfidenceCard on startup");
+});
+
+// --------------------------------------------------
+// 196. Sequential Activity Link Resolver & Failsafe Navigation (v1.13.10)
+// --------------------------------------------------
+test("Sequential Activity Link Resolver & Failsafe Navigation (v1.13.10)", () => {
+    const fs = require('fs');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const detectorSrc = fs.readFileSync('src/moodle/detector.js', 'utf8');
+
+    // 1. Failsafe Activity Link Resolver
+    assert.ok(solverSrc.includes("function resolveActivityLink("), "solver.js must define resolveActivityLink helper");
+    assert.ok(solverSrc.includes("a#next-activity-link"), "resolveActivityLink must resolve direct anchor #next-activity-link");
+    assert.ok(solverSrc.includes("a#prev-activity-link"), "resolveActivityLink must resolve direct anchor #prev-activity-link");
+    assert.ok(solverSrc.includes("fa-arrow-right"), "resolveActivityLink must support semantic arrow fallback matching");
+
+    // 2. Clickable Pill Buttons & Non-Disabled Controls
+    assert.ok(solverSrc.includes("id=\"amaes-pill-prev\""), "injectQuizBottomNavigation must render clickable [ Prev pill button");
+    assert.ok(solverSrc.includes("id=\"amaes-pill-next\""), "injectQuizBottomNavigation must render clickable Next ] pill button");
+    assert.ok(solverSrc.includes("const prevDisabled = list.length > 0 && !prevQuiz;"), "Bottom buttons must not disable when list is empty");
+    assert.ok(solverSrc.includes("const nextDisabled = list.length > 0 && !nextQuiz;"), "Bottom buttons must not disable when list is empty");
+
+    // 3. Remote Sequence Population Fallback in cycleQuizOrExam
+    assert.ok(solverSrc.includes("Resolving course quizzes sequence..."), "cycleQuizOrExam must display resolving toast on cold-start empty list");
+    assert.ok(solverSrc.includes("populateCourseQuizzesFromRemote(courseId)"), "cycleQuizOrExam must trigger remote population when list is empty");
+    assert.ok(solverSrc.includes("cycleQuizOrExam(direction, opts)"), "cycleQuizOrExam must recurse to navigate immediately upon remote resolution");
+
+    // 4. Keyboard Code Event Compatibility
+    assert.ok(solverSrc.includes("e.code === 'BracketRight'"), "Keyboard listener must support BracketRight event code");
+    assert.ok(solverSrc.includes("e.code === 'BracketLeft'"), "Keyboard listener must support BracketLeft event code");
+
+    // 5. Robust Course ID Detection
+    assert.ok(detectorSrc.includes(".breadcrumb a[href*=\"/course/view.php\"]"), "detectCourseInfo must inspect breadcrumbs for courseId");
+    assert.ok(detectorSrc.includes("amaes_last_active_course_id"), "detectCourseInfo must persist courseId across page hops");
 });
 
 console.log("\n==================================================");

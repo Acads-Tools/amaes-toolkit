@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.13.9
+// @version      1.13.10
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.13.9";
+    const SCRIPT_VERSION = "v1.13.10";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -3009,17 +3009,27 @@
             courseId = new URLSearchParams(window.location.search).get('id') || '';
         }
         if (!courseId) {
-            const courseBreadcrumb = document.querySelector('a[href*="/course/view.php?id="]');
-            if (courseBreadcrumb && courseBreadcrumb.href) {
-                const m = courseBreadcrumb.href.match(/[?&]id=(\d+)/);
-                if (m) courseId = m[1];
-            }
-        }
-        if (!courseId) {
-            const gradeLink = document.querySelector('a[href*="/grade/report/user/index.php?id="]');
-            if (gradeLink && gradeLink.href) {
-                const m = gradeLink.href.match(/[?&]id=(\d+)/);
-                if (m) courseId = m[1];
+            const courseSelectors = [
+                'ol.breadcrumb a[href*="/course/view.php"]',
+                '.breadcrumb a[href*="/course/view.php"]',
+                '#page-navbar a[href*="/course/view.php"]',
+                'a[data-key="coursehome"]',
+                'li[data-key="coursehome"] a',
+                '.secondary-navigation a[href*="/course/view.php"]',
+                '#courseindex a[href*="/course/view.php"]',
+                '[data-region="courseindex"] a[href*="/course/view.php"]',
+                'a[href*="/course/view.php?id="]',
+                'a[href*="/grade/report/user/index.php?id="]'
+            ];
+            for (const sel of courseSelectors) {
+                const el = document.querySelector(sel);
+                if (el && el.href) {
+                    const m = el.href.match(/[?&]id=(\d+)/);
+                    if (m && m[1]) {
+                        courseId = m[1];
+                        break;
+                    }
+                }
             }
         }
         if (!courseId) {
@@ -3027,6 +3037,17 @@
             if (bodyMatch && bodyMatch[1] !== '1') {
                 courseId = bodyMatch[1];
             }
+        }
+        if (!courseId) {
+            try {
+                courseId = sessionStorage.getItem('amaes_current_course_id') || localStorage.getItem('amaes_last_active_course_id') || '';
+            } catch (_) {}
+        }
+        if (courseId) {
+            try {
+                sessionStorage.setItem('amaes_current_course_id', courseId);
+                localStorage.setItem('amaes_last_active_course_id', courseId);
+            } catch (_) {}
         }
 
         const assessmentOrigin = detectAssessmentOrigin();
@@ -7265,26 +7286,49 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         const courseInfo = typeof detectCourseInfo === 'function' ? detectCourseInfo() : {};
         const courseId = courseInfo && courseInfo.courseId ? courseInfo.courseId : '';
 
-        // 1. From Moodle 4 Course Index Drawer (#courseindex / [data-region="courseindex"])
-        // Available on ALL course, quiz, and module pages in Moodle 4
-        const drawerLinks = Array.from(document.querySelectorAll(
-            '#courseindex a[href*="/mod/quiz/"], .courseindex a[href*="/mod/quiz/"], [data-region="courseindex"] a[href*="/mod/quiz/"], #theme_boost-drawers-courseindex a[href*="/mod/quiz/"], .drawer-left a[href*="/mod/quiz/"]'
-        ));
+        // 1. From Moodle 4 Course Index Drawer or Sidebar Nav
+        const drawerSelectors = [
+            '#courseindex a[href*="/mod/quiz/"]',
+            '.courseindex a[href*="/mod/quiz/"]',
+            '[data-region="courseindex"] a[href*="/mod/quiz/"]',
+            '#theme_boost-drawers-courseindex a[href*="/mod/quiz/"]',
+            '.drawer-left a[href*="/mod/quiz/"]',
+            '#courseindex a',
+            '.courseindex a',
+            '[data-region="courseindex"] a',
+            '#theme_boost-drawers-courseindex a',
+            '.drawer-left a',
+            '.drawercontent a',
+            '#nav-drawer a',
+            '.block_navigation a',
+            'aside a'
+        ];
+        const drawerLinks = Array.from(document.querySelectorAll(drawerSelectors.join(', ')));
         if (drawerLinks.length > 0) {
             const list = [];
             const seen = new Set();
             drawerLinks.forEach(link => {
-                const href = link.href || link.getAttribute('href') || '';
-                const mId = href.match(/[?&]id=(\d+)/);
+                const href = link.getAttribute('href') || link.href || '';
+                if (!href || href === '#' || href.startsWith('javascript:')) return;
+                const titleElem = link.querySelector('.courseindex-name, .text-truncate, .instancename, .activityname') || link;
+                const rawTitle = (titleElem ? (titleElem.innerText || titleElem.textContent) : (link.innerText || link.textContent) || '').trim();
+                const isQuizLink = href.includes('/mod/quiz/') ||
+                    (/\b(?:quiz|exam)\b/i.test(rawTitle) && href.includes('view.php?id='));
+                if (!isQuizLink) return;
+
+                let fullHref = href;
+                try {
+                    fullHref = new URL(href, window.location.origin).href;
+                } catch (_) {}
+
+                const mId = fullHref.match(/[?&](?:id|cmid)=(\d+)/);
                 const cmid = mId ? mId[1] : null;
-                const key = cmid || href;
+                const key = cmid || fullHref;
                 if (!seen.has(key)) {
                     seen.add(key);
-                    const titleElem = link.querySelector('.courseindex-name, .text-truncate') || link;
-                    const rawTitle = titleElem ? titleElem.innerText.trim() : link.innerText.trim();
-                    const cleanTitle = rawTitle.replace(/\s*Quiz\s*$/i, '').trim() || rawTitle;
+                    const cleanTitle = rawTitle.replace(/\(Press\s*[\[\]]\)/gi, '').replace(/\s*Quiz\s*$/i, '').trim() || rawTitle;
                     list.push({
-                        url: href,
+                        url: fullHref,
                         title: cleanTitle,
                         cmid: cmid
                     });
@@ -7296,6 +7340,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         localStorage.setItem(`amaes_course_quizzes_${courseId}`, JSON.stringify(list));
                     } catch (_) {}
                 }
+                try {
+                    localStorage.setItem('amaes_latest_course_quizzes', JSON.stringify(list));
+                } catch (_) {}
                 return list;
             }
         }
@@ -7306,19 +7353,31 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 'li.activity, .activity-item, .course-section .activity, div[data-region="activity-card"]'
             ));
             const list = [];
+            const seen = new Set();
             activities.forEach(el => {
                 const link = el.querySelector('a[href*="/mod/quiz/view.php?id="], a[href*="/mod/quiz/"]');
                 const isQuiz = (typeof classifyActivity === 'function' && classifyActivity(el).type === 'quiz') || Boolean(link);
-                if (isQuiz && link && link.href) {
-                    const mId = link.href.match(/[?&]id=(\d+)/);
-                    const titleElem = el.querySelector('.instancename, .activityname, a.aal_link, .activity-title');
-                    const rawTitle = titleElem ? titleElem.innerText.trim() : (link.innerText.trim() || el.innerText.split('\n')[0]);
-                    const cleanTitle = rawTitle.replace(/\s*Quiz\s*$/i, '').trim() || rawTitle;
-                    list.push({
-                        url: link.href,
-                        title: cleanTitle,
-                        cmid: mId ? mId[1] : null
-                    });
+                if (isQuiz && link) {
+                    const href = link.getAttribute('href') || link.href || '';
+                    if (!href) return;
+                    let fullHref = href;
+                    try {
+                        fullHref = new URL(href, window.location.origin).href;
+                    } catch (_) {}
+                    const mId = fullHref.match(/[?&]id=(\d+)/);
+                    const cmid = mId ? mId[1] : null;
+                    const key = cmid || fullHref;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        const titleElem = el.querySelector('.instancename, .activityname, a.aal_link, .activity-title');
+                        const rawTitle = titleElem ? (titleElem.innerText || titleElem.textContent).trim() : (link.innerText.trim() || el.innerText.split('\n')[0]);
+                        const cleanTitle = rawTitle.replace(/\(Press\s*[\[\]]\)/gi, '').replace(/\s*Quiz\s*$/i, '').trim() || rawTitle;
+                        list.push({
+                            url: fullHref,
+                            title: cleanTitle,
+                            cmid: cmid
+                        });
+                    }
                 }
             });
             if (list.length > 0) {
@@ -7327,6 +7386,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         localStorage.setItem(`amaes_course_quizzes_${courseId}`, JSON.stringify(list));
                     } catch (_) {}
                 }
+                try {
+                    localStorage.setItem('amaes_latest_course_quizzes', JSON.stringify(list));
+                } catch (_) {}
                 return list;
             }
         }
@@ -7339,6 +7401,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     localStorage.setItem(`amaes_course_quizzes_${courseId}`, JSON.stringify(selectItems));
                 } catch (_) {}
             }
+            try {
+                localStorage.setItem('amaes_latest_course_quizzes', JSON.stringify(selectItems));
+            } catch (_) {}
             return selectItems;
         }
 
@@ -7346,9 +7411,20 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         if (courseId) {
             try {
                 const cached = localStorage.getItem(`amaes_course_quizzes_${courseId}`);
-                if (cached) return JSON.parse(cached);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+                }
             } catch (_) {}
         }
+        try {
+            const cachedLatest = localStorage.getItem('amaes_latest_course_quizzes');
+            if (cachedLatest) {
+                const parsed = JSON.parse(cachedLatest);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch (_) {}
+
         return [];
     }
 
@@ -7362,26 +7438,37 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             const html = await resp.text();
             const doc = new DOMParser().parseFromString(html, 'text/html');
             const drawerLinks = Array.from(doc.querySelectorAll(
-                '#courseindex a[href*="/mod/quiz/"], .courseindex a[href*="/mod/quiz/"], [data-region="courseindex"] a[href*="/mod/quiz/"], #theme_boost-drawers-courseindex a[href*="/mod/quiz/"], li.activity a[href*="/mod/quiz/"], .activity-item a[href*="/mod/quiz/"]'
+                'a[href*="/mod/quiz/view.php"], a[href*="/mod/quiz/"], .modtype_quiz a, li.activity.quiz a, #courseindex a, .courseindex a, [data-region="courseindex"] a, #theme_boost-drawers-courseindex a, li.activity a, .activity-item a'
             ));
             const list = [];
             const seen = new Set();
             drawerLinks.forEach(link => {
                 const href = link.getAttribute('href') || link.href || '';
-                const mId = href.match(/[?&]id=(\d+)/);
+                if (!href || href === '#' || href.startsWith('javascript:')) return;
+                const titleElem = link.querySelector('.courseindex-name, .text-truncate, .instancename, .activityname') || link;
+                const rawTitle = (titleElem ? (titleElem.innerText || titleElem.textContent) : (link.innerText || link.textContent) || '').trim();
+                const isQuizLink = href.includes('/mod/quiz/') ||
+                    (/\b(?:quiz|exam)\b/i.test(rawTitle) && href.includes('view.php?id='));
+                if (!isQuizLink) return;
+
+                let fullHref = href;
+                try {
+                    fullHref = new URL(href, window.location.origin).href;
+                } catch (_) {}
+
+                const mId = fullHref.match(/[?&](?:id|cmid)=(\d+)/);
                 const cmid = mId ? mId[1] : null;
-                const key = cmid || href;
+                const key = cmid || fullHref;
                 if (!seen.has(key)) {
                     seen.add(key);
-                    const titleElem = link.querySelector('.courseindex-name, .text-truncate, .instancename, .activityname') || link;
-                    const rawTitle = titleElem ? titleElem.innerText.trim() : link.innerText.trim();
-                    const cleanTitle = rawTitle.replace(/\s*Quiz\s*$/i, '').trim() || rawTitle;
-                    list.push({ url: href, title: cleanTitle, cmid });
+                    const cleanTitle = rawTitle.replace(/\(Press\s*[\[\]]\)/gi, '').replace(/\s*Quiz\s*$/i, '').trim() || rawTitle;
+                    list.push({ url: fullHref, title: cleanTitle, cmid });
                 }
             });
             if (list.length > 0) {
                 try {
                     localStorage.setItem(`amaes_course_quizzes_${courseId}`, JSON.stringify(list));
+                    localStorage.setItem('amaes_latest_course_quizzes', JSON.stringify(list));
                 } catch (_) {}
                 if (typeof injectQuizBottomNavigation === 'function') {
                     injectQuizBottomNavigation();
@@ -7403,37 +7490,109 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         return '';
     }
 
+    // Helper to resolve native Moodle activity navigation link elements (handles both <a> with ID and container with <a>)
+    function resolveActivityLink(direction = 'next') {
+        if (typeof document === 'undefined') return null;
+        const isNext = direction === 'next';
+        const selectors = isNext ? [
+            'a#next-activity-link',
+            '#next-activity-link',
+            '#next-activity-link a',
+            '.activity-navigation [data-region="next-activity"] a',
+            '.activity-navigation [data-region="next-activity"]',
+            '.activity-navigation .pull-right a',
+            '.activity-navigation .float-right a',
+            '.activity-navigation .float-end a',
+            '.activity-navigation .pull-right',
+            '.activity-navigation .float-right',
+            '.activity-navigation .float-end',
+            'a.next-activity-link',
+            '.next-activity a',
+            '.next-activity',
+            'a[title*="Next activity" i]',
+            'a[aria-label*="Next activity" i]'
+        ] : [
+            'a#prev-activity-link',
+            '#prev-activity-link',
+            '#prev-activity-link a',
+            '.activity-navigation [data-region="prev-activity"] a',
+            '.activity-navigation [data-region="prev-activity"]',
+            '.activity-navigation .pull-left a',
+            '.activity-navigation .float-left a',
+            '.activity-navigation .float-start a',
+            '.activity-navigation .pull-left',
+            '.activity-navigation .float-left',
+            '.activity-navigation .float-start',
+            'a.prev-activity-link',
+            '.prev-activity a',
+            '.prev-activity',
+            'a[title*="Previous activity" i]',
+            'a[aria-label*="Previous activity" i]'
+        ];
+
+        for (const sel of selectors) {
+            try {
+                const el = document.querySelector(sel);
+                if (!el) continue;
+                if (el.tagName === 'A' && el.href) return el;
+                const inner = el.querySelector('a[href]');
+                if (inner && inner.href) return inner;
+            } catch (_) {}
+        }
+
+        // Semantic fallback: scan all anchor tags inside .activity-navigation
+        const navContainer = document.querySelector('.activity-navigation');
+        if (navContainer && !navContainer.classList.contains('amaes-quiz-bottom-nav')) {
+            const allAnchors = Array.from(navContainer.querySelectorAll('a[href]'));
+            if (allAnchors.length > 0) {
+                if (isNext) {
+                    const match = allAnchors.find(a => {
+                        const txt = (a.innerText || a.textContent || '').trim();
+                        const html = a.innerHTML || '';
+                        return /rarrow|fa-arrow-right|fa-chevron-right|[►▶>]|next/i.test(html + ' ' + txt);
+                    }) || (allAnchors.length > 1 ? allAnchors[allAnchors.length - 1] : (allAnchors[0].id.includes('next') ? allAnchors[0] : null));
+                    if (match && match.href) return match;
+                } else {
+                    const match = allAnchors.find(a => {
+                        const txt = (a.innerText || a.textContent || '').trim();
+                        const html = a.innerHTML || '';
+                        return /larrow|fa-arrow-left|fa-chevron-left|[◄◀<]|prev/i.test(html + ' ' + txt);
+                    }) || (allAnchors.length > 1 ? allAnchors[0] : (allAnchors[0].id.includes('prev') ? allAnchors[0] : null));
+                    if (match && match.href) return match;
+                }
+            }
+        }
+
+        return null;
+    }
+
     // Decorates native Moodle .activity-navigation buttons (#next-activity-link a / #prev-activity-link a)
     function decorateNativeActivityNavigation() {
         if (typeof document === 'undefined') return;
 
         // Next activity link: decorate with (Press ])
-        const nextLink = document.querySelector('#next-activity-link a, .activity-navigation .pull-right a, a[title*="Next activity"], .next-activity a');
-        if (nextLink) {
-            if (!nextLink.dataset.amaesDecorated) {
-                nextLink.dataset.amaesDecorated = 'true';
-                const rarrow = nextLink.querySelector('.rarrow, .icon');
-                const badge = '<span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; margin: 0 4px; font-weight: 600;">(Press ])</span>';
-                if (rarrow) {
-                    rarrow.insertAdjacentHTML('beforebegin', badge);
-                } else {
-                    nextLink.insertAdjacentHTML('beforeend', ' ' + badge);
-                }
+        const nextLink = resolveActivityLink('next');
+        if (nextLink && !nextLink.dataset.amaesDecorated) {
+            nextLink.dataset.amaesDecorated = 'true';
+            const rarrow = nextLink.querySelector('.rarrow, .icon, i, [aria-hidden="true"]');
+            const badge = '<span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; margin: 0 4px; font-weight: 600;">(Press ])</span>';
+            if (rarrow) {
+                rarrow.insertAdjacentHTML('beforebegin', badge);
+            } else {
+                nextLink.insertAdjacentHTML('beforeend', ' ' + badge);
             }
         }
 
         // Previous activity link: decorate with (Press [)
-        const prevLink = document.querySelector('#prev-activity-link a, .activity-navigation .pull-left a, a[title*="Previous activity"], .prev-activity a');
-        if (prevLink) {
-            if (!prevLink.dataset.amaesDecorated) {
-                prevLink.dataset.amaesDecorated = 'true';
-                const larrow = prevLink.querySelector('.larrow, .icon');
-                const badge = '<span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; margin: 0 4px; font-weight: 600;">(Press [)</span>';
-                if (larrow) {
-                    larrow.insertAdjacentHTML('afterend', badge);
-                } else {
-                    prevLink.insertAdjacentHTML('afterbegin', badge + ' ');
-                }
+        const prevLink = resolveActivityLink('prev');
+        if (prevLink && !prevLink.dataset.amaesDecorated) {
+            prevLink.dataset.amaesDecorated = 'true';
+            const larrow = prevLink.querySelector('.larrow, .icon, i, [aria-hidden="true"]');
+            const badge = '<span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; margin: 0 4px; font-weight: 600;">(Press [)</span>';
+            if (larrow) {
+                larrow.insertAdjacentHTML('afterend', badge);
+            } else {
+                prevLink.insertAdjacentHTML('afterbegin', badge + ' ');
             }
         }
     }
@@ -7448,9 +7607,10 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                            (typeof window !== 'undefined' && window.location.pathname.includes('/mod/quiz/view.php'));
         if (!isQuizPage) return;
 
-        // If native Moodle .activity-navigation exists (e.g. on exam portal), decorate it and avoid duplicate bar
-        const nativeNav = document.querySelector('.activity-navigation, #next-activity-link, #prev-activity-link');
-        if (nativeNav && !nativeNav.classList.contains('amaes-quiz-bottom-nav')) {
+        // If native Moodle .activity-navigation exists with valid next or prev links (e.g. on exam portal), decorate it and avoid duplicate bar
+        const hasNativeNext = Boolean(resolveActivityLink('next'));
+        const hasNativePrev = Boolean(resolveActivityLink('prev'));
+        if (hasNativeNext || hasNativePrev) {
             decorateNativeActivityNavigation();
             return;
         }
@@ -7551,11 +7711,11 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             populateCourseQuizzesFromRemote(courseId);
         }
 
-        const prevDisabled = !prevQuiz;
-        const nextDisabled = !nextQuiz;
+        const prevDisabled = list.length > 0 && !prevQuiz;
+        const nextDisabled = list.length > 0 && !nextQuiz;
 
-        const prevLabel = prevQuiz ? prevQuiz.title : 'First Quiz';
-        const nextLabel = nextQuiz ? nextQuiz.title : (skipPassed && list.length > 0 ? 'All Quizzes Passed' : 'Last Quiz');
+        const prevLabel = prevQuiz ? prevQuiz.title : (list.length > 0 ? 'First Quiz' : 'Previous Activity');
+        const nextLabel = nextQuiz ? nextQuiz.title : (list.length > 0 ? (skipPassed ? 'All Quizzes Passed' : 'Last Quiz') : 'Next Activity');
 
         // Build Jump Menu Options
         let jumpOptions = '<option value="">Jump to quiz...</option>';
@@ -7573,7 +7733,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
         navContainer.innerHTML = `
             <div id="amaes-prev-quiz-container" style="flex: 1; min-width: 140px; text-align: left;">
-                <button id="amaes-btn-prev-quiz" class="btn btn-secondary amaes-cycle-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: ${prevDisabled ? 'not-allowed' : 'pointer'}; opacity: ${prevDisabled ? '0.45' : '1'}; transition: all 0.2s ease;" ${prevDisabled ? 'disabled' : ''} title="${prevQuiz ? 'Previous Quiz: ' + prevLabel + ' (Press [)' : 'First Quiz'}">
+                <button id="amaes-btn-prev-quiz" class="btn btn-secondary amaes-cycle-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: ${prevDisabled ? 'not-allowed' : 'pointer'}; opacity: ${prevDisabled ? '0.45' : '1'}; transition: all 0.2s ease;" ${prevDisabled ? 'disabled' : ''} title="${prevQuiz ? 'Previous Quiz: ' + prevLabel + ' (Press [)' : 'Previous Activity (Press [)'}">
                     <span>&#9668;</span>
                     <span class="amaes-cycle-title" style="max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(prevLabel)}</span>
                     <span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; font-weight: 500;">(Press [)</span>
@@ -7585,11 +7745,15 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         ${jumpOptions}
                     </select>
                 ` : `
-                    <span style="font-size: 12px; opacity: 0.65; font-weight: 500;">Cycle Quizzes: [ Prev | ] Next</span>
+                    <div style="display: inline-flex; align-items: center; gap: 8px;">
+                        <button id="amaes-pill-prev" class="btn btn-sm btn-outline-secondary" style="font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer;" title="Previous activity (Press [)">[ Prev</button>
+                        <span style="font-size: 12px; opacity: 0.65; font-weight: 500;">Cycle Quizzes</span>
+                        <button id="amaes-pill-next" class="btn btn-sm btn-outline-primary" style="font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer;" title="Next activity (Press ])">Next ]</button>
+                    </div>
                 `}
             </div>
             <div id="amaes-next-quiz-container" style="flex: 1; min-width: 140px; text-align: right;">
-                <button id="amaes-btn-next-quiz" class="btn btn-primary amaes-cycle-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: ${nextDisabled ? 'not-allowed' : 'pointer'}; opacity: ${nextDisabled ? '0.45' : '1'}; transition: all 0.2s ease; background: #0f6cbf; border-color: #0f6cbf; color: #fff;" ${nextDisabled ? 'disabled' : ''} title="${nextQuiz ? 'Next Quiz: ' + nextLabel + ' (Press ])' : (skipPassed && list.length > 0 ? 'All subsequent quizzes passed (≥80%)' : 'Last Quiz')}">
+                <button id="amaes-btn-next-quiz" class="btn btn-primary amaes-cycle-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: ${nextDisabled ? 'not-allowed' : 'pointer'}; opacity: ${nextDisabled ? '0.45' : '1'}; transition: all 0.2s ease; background: #0f6cbf; border-color: #0f6cbf; color: #fff;" ${nextDisabled ? 'disabled' : ''} title="${nextQuiz ? 'Next Quiz: ' + nextLabel + ' (Press ])' : (skipPassed && list.length > 0 ? 'All subsequent quizzes passed (≥80%)' : 'Next Activity (Press ])')}">
                     <span class="amaes-cycle-title" style="max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(nextLabel)}</span>
                     <span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; font-weight: 500;">(Press ])</span>
                     <span>&#9658;</span>
@@ -7608,6 +7772,22 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         const btnNext = navContainer.querySelector('#amaes-btn-next-quiz');
         if (btnNext && !nextDisabled) {
             btnNext.addEventListener('click', (e) => {
+                e.preventDefault();
+                cycleToNextQuizOrExam();
+            });
+        }
+
+        const pillPrev = navContainer.querySelector('#amaes-pill-prev');
+        if (pillPrev) {
+            pillPrev.addEventListener('click', (e) => {
+                e.preventDefault();
+                cycleToPrevQuizOrExam();
+            });
+        }
+
+        const pillNext = navContainer.querySelector('#amaes-pill-next');
+        if (pillNext) {
+            pillNext.addEventListener('click', (e) => {
                 e.preventDefault();
                 cycleToNextQuizOrExam();
             });
@@ -7632,35 +7812,25 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         // 1. Strict Page Guard: Must ONLY operate on Moodle quiz, course, or exam pages
         const isExamHost = (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam) ||
             (typeof window !== 'undefined' && window.location.hostname.includes('exam'));
-        const isAcademicPage = checkIsCoursePage() ||
-            checkIsQuizPage() ||
+        const isAcademicPage = (typeof checkIsCoursePage === 'function' && checkIsCoursePage()) ||
+            (typeof checkIsQuizPage === 'function' && checkIsQuizPage()) ||
+            (typeof checkIsQuizViewPage === 'function' && checkIsQuizViewPage()) ||
+            (typeof checkIsReviewPage === 'function' && checkIsReviewPage()) ||
+            (typeof checkIsQuizSummaryPage === 'function' && checkIsQuizSummaryPage()) ||
+            (typeof checkIsQuizAttemptPage === 'function' && checkIsQuizAttemptPage()) ||
             isExamHost;
 
         if (!isAcademicPage) return false;
 
-        // 2. Exam Portal Adaptation: semestralexam.amaes.com
-        // On exams, Moodle already provides sequential navigation links (#next-activity-link a / #prev-activity-link a)
-        // Skip settings are strictly bypassed on exams as exams are not repeatable quizzes
-        if (isExamHost) {
-            if (direction === 'next') {
-                const nextLink = document.querySelector('#next-activity-link a, .activity-navigation .pull-right a, a[title*="Next activity"], .next-activity a');
-                if (nextLink && nextLink.href) {
-                    const title = (nextLink.innerText || 'Next Exam').replace(/\(Press \]\)/g, '').replace(/[►▶]/g, '').trim();
-                    showToast(`Advancing to next exam: ${title}`, 2000);
-                    setLog(`<b>Exam Navigation:</b> Cycling to <b>${title}</b> via <b>]</b>.`, "var(--accent-blue)");
-                    window.location.href = nextLink.href;
-                    return true;
-                }
-            } else {
-                const prevLink = document.querySelector('#prev-activity-link a, .activity-navigation .pull-left a, a[title*="Previous activity"], .prev-activity a');
-                if (prevLink && prevLink.href) {
-                    const title = (prevLink.innerText || 'Previous Exam').replace(/\(Press \[\)/g, '').replace(/[◄◀]/g, '').trim();
-                    showToast(`Returning to previous exam: ${title}`, 2000);
-                    setLog(`<b>Exam Navigation:</b> Cycling to <b>${title}</b> via <b>[</b>.`, "var(--accent-blue)");
-                    window.location.href = prevLink.href;
-                    return true;
-                }
-            }
+        // 2. Resolve Native Activity Links (Exam Portal or standard Moodle .activity-navigation)
+        const nativeTarget = resolveActivityLink(direction);
+        if (isExamHost && nativeTarget && nativeTarget.href) {
+            const rawTitle = nativeTarget.innerText || nativeTarget.textContent || (direction === 'next' ? 'Next Activity' : 'Previous Activity');
+            const title = rawTitle.replace(/\(Press\s*[\[\]]\)/gi, '').replace(/[►▶◄◀]/g, '').trim();
+            showToast(`${direction === 'next' ? 'Advancing to' : 'Returning to'}: ${title}`, 2000);
+            setLog(`<b>Exam Navigation:</b> Cycling to <b>${title}</b> via <b>[${direction === 'next' ? ']' : '['}]</b>.`, "var(--accent-blue)");
+            window.location.href = nativeTarget.href;
+            return true;
         }
 
         // 3. Quiz Portal Sequential Navigation
@@ -7670,8 +7840,38 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 : (typeof localStorage !== 'undefined' && localStorage.getItem('amaes_skip_passed_quizzes') === 'true')
         );
 
-        const list = getCourseQuizzesList();
+        let list = getCourseQuizzesList();
         const currentCmid = getCurrentQuizCmid();
+        const courseInfo = typeof detectCourseInfo === 'function' ? detectCourseInfo() : {};
+        const courseId = courseInfo && courseInfo.courseId ? courseInfo.courseId : '';
+
+        // If list is empty, try native activity links or asynchronous remote populate and immediate recursion
+        if (list.length === 0) {
+            if (nativeTarget && nativeTarget.href) {
+                const title = (nativeTarget.innerText || nativeTarget.textContent || (direction === 'next' ? 'Next Activity' : 'Previous Activity'))
+                    .replace(/\(Press\s*[\[\]]\)/gi, '').replace(/[►▶◄◀]/g, '').trim();
+                showToast(`Navigating to: ${title}`, 2000);
+                window.location.href = nativeTarget.href;
+                return true;
+            }
+
+            if (courseId) {
+                showToast("Resolving course quizzes sequence...", 2000);
+                populateCourseQuizzesFromRemote(courseId).then(remoteList => {
+                    if (remoteList && remoteList.length > 0) {
+                        cycleQuizOrExam(direction, opts);
+                    } else {
+                        showToast("No quizzes found in course navigation.", 2500);
+                    }
+                }).catch(() => {
+                    showToast("Unable to resolve course quizzes.", 2500);
+                });
+                return true;
+            } else {
+                showToast("Please visit course home page once to map all quizzes.", 3000);
+                return false;
+            }
+        }
 
         // Determine current index in list
         let currentIndex = -1;
@@ -7688,15 +7888,11 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             if (skipPassed) {
                 if (typeof window !== 'undefined' && window.__amaesCourseGradesCache) {
                     gradesMap = window.__amaesCourseGradesCache;
-                } else {
-                    const courseInfo = typeof detectCourseInfo === 'function' ? detectCourseInfo() : {};
-                    const courseId = courseInfo && courseInfo.courseId ? courseInfo.courseId : '';
-                    if (courseId) {
-                        try {
-                            const cachedGrades = localStorage.getItem(`amaes_course_grades_cache_${courseId}`);
-                            if (cachedGrades) gradesMap = JSON.parse(cachedGrades);
-                        } catch (_) {}
-                    }
+                } else if (courseId) {
+                    try {
+                        const cachedGrades = localStorage.getItem(`amaes_course_grades_cache_${courseId}`);
+                        if (cachedGrades) gradesMap = JSON.parse(cachedGrades);
+                    } catch (_) {}
                 }
             }
 
@@ -7743,19 +7939,10 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             }
         }
 
-        // 4. Fallback: If no list found, attempt native #next-activity-link / #prev-activity-link
-        if (direction === 'next') {
-            const nextLink = document.querySelector('#next-activity-link a, .activity-navigation .pull-right a, .next-activity a');
-            if (nextLink && nextLink.href) {
-                window.location.href = nextLink.href;
-                return true;
-            }
-        } else {
-            const prevLink = document.querySelector('#prev-activity-link a, .activity-navigation .pull-left a, .prev-activity a');
-            if (prevLink && prevLink.href) {
-                window.location.href = prevLink.href;
-                return true;
-            }
+        // 4. Fallback: Native link
+        if (nativeTarget && nativeTarget.href) {
+            window.location.href = nativeTarget.href;
+            return true;
         }
 
         return false;
@@ -7907,17 +8094,23 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             }
 
             // Quiz & Exam Sequential Navigation Shortcuts: ']' (Next) and '[' (Previous)
-            if (e.key === ']' || e.key === '[') {
+            if (e.key === ']' || e.key === '[' || e.code === 'BracketRight' || e.code === 'BracketLeft') {
+                const isBracketNext = e.key === ']' || e.code === 'BracketRight';
+                const isBracketPrev = e.key === '[' || e.code === 'BracketLeft';
                 const isExamHost = (typeof detectAssessmentOrigin === 'function' && detectAssessmentOrigin().isExam) ||
                     (typeof window !== 'undefined' && window.location.hostname.includes('exam'));
-                const isAcademicPage = checkIsCoursePage() ||
-                    checkIsQuizPage() ||
+                const isAcademicPage = (typeof checkIsCoursePage === 'function' && checkIsCoursePage()) ||
+                    (typeof checkIsQuizPage === 'function' && checkIsQuizPage()) ||
+                    (typeof checkIsQuizViewPage === 'function' && checkIsQuizViewPage()) ||
+                    (typeof checkIsReviewPage === 'function' && checkIsReviewPage()) ||
+                    (typeof checkIsQuizSummaryPage === 'function' && checkIsQuizSummaryPage()) ||
+                    (typeof checkIsQuizAttemptPage === 'function' && checkIsQuizAttemptPage()) ||
                     isExamHost;
 
                 if (isAcademicPage && !e.ctrlKey && !e.altKey && !e.metaKey) {
                     e.preventDefault();
                     if (active && typeof active.blur === 'function') active.blur();
-                    if (e.key === ']') {
+                    if (isBracketNext) {
                         cycleToNextQuizOrExam();
                     } else {
                         cycleToPrevQuizOrExam();

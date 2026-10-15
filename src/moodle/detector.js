@@ -192,17 +192,27 @@
             courseId = new URLSearchParams(window.location.search).get('id') || '';
         }
         if (!courseId) {
-            const courseBreadcrumb = document.querySelector('a[href*="/course/view.php?id="]');
-            if (courseBreadcrumb && courseBreadcrumb.href) {
-                const m = courseBreadcrumb.href.match(/[?&]id=(\d+)/);
-                if (m) courseId = m[1];
-            }
-        }
-        if (!courseId) {
-            const gradeLink = document.querySelector('a[href*="/grade/report/user/index.php?id="]');
-            if (gradeLink && gradeLink.href) {
-                const m = gradeLink.href.match(/[?&]id=(\d+)/);
-                if (m) courseId = m[1];
+            const courseSelectors = [
+                'ol.breadcrumb a[href*="/course/view.php"]',
+                '.breadcrumb a[href*="/course/view.php"]',
+                '#page-navbar a[href*="/course/view.php"]',
+                'a[data-key="coursehome"]',
+                'li[data-key="coursehome"] a',
+                '.secondary-navigation a[href*="/course/view.php"]',
+                '#courseindex a[href*="/course/view.php"]',
+                '[data-region="courseindex"] a[href*="/course/view.php"]',
+                'a[href*="/course/view.php?id="]',
+                'a[href*="/grade/report/user/index.php?id="]'
+            ];
+            for (const sel of courseSelectors) {
+                const el = document.querySelector(sel);
+                if (el && el.href) {
+                    const m = el.href.match(/[?&]id=(\d+)/);
+                    if (m && m[1]) {
+                        courseId = m[1];
+                        break;
+                    }
+                }
             }
         }
         if (!courseId) {
@@ -210,6 +220,17 @@
             if (bodyMatch && bodyMatch[1] !== '1') {
                 courseId = bodyMatch[1];
             }
+        }
+        if (!courseId) {
+            try {
+                courseId = sessionStorage.getItem('amaes_current_course_id') || localStorage.getItem('amaes_last_active_course_id') || '';
+            } catch (_) {}
+        }
+        if (courseId) {
+            try {
+                sessionStorage.setItem('amaes_current_course_id', courseId);
+                localStorage.setItem('amaes_last_active_course_id', courseId);
+            } catch (_) {}
         }
 
         const assessmentOrigin = detectAssessmentOrigin();
