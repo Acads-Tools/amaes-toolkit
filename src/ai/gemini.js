@@ -1475,28 +1475,10 @@
                     return;
                 }
 
-                // If bulk matching output was refused or unparseable, fall back to solving row-by-row
-                setLog(`[AI Matching Fallback] Bulk AI response unconfirmed; analyzing matching items row-by-row...`, "var(--accent-purple)");
-                let solvedCount = 0;
-                for (let i = 0; i < matchingRows.length; i++) {
-                    const mRow = matchingRows[i];
-                    const opt = await solveMatchingRowWithAi({
-                        que,
-                        row: mRow.row,
-                        selectInput: mRow.select,
-                        subQText: mRow.prompt,
-                        autoApply: false
-                    });
-                    if (opt) solvedCount++;
-                }
-                if (solvedCount > 0) {
-                    showToast(`Gemini suggested ${solvedCount} matching answers row-by-row; review before continuing.`, 3500);
-                    if (typeof onSuccess === 'function') {
-                        await onSuccess({ choiceText: `Solved ${solvedCount} rows`, matchingRows });
-                    }
-                    return;
-                }
-                const mismatchReason = "AI could not match these items. Use the inline AI button on each row to solve individually.";
+                // If bulk matching output was unconfirmed or unparseable, do not blast 10 sequential API calls
+                // which crashes into the 15 RPM rate limit. Prompt user to use per-row AI buttons on demand.
+                setLog(`[AI Matching] Bulk AI parsing unconfirmed. Use '+ AI' beside each dropdown to solve on-demand.`, "var(--accent-purple)");
+                const mismatchReason = "Bulk AI could not resolve all matching rows. Click '+ AI' beside each dropdown to solve individually without rate limits.";
                 showAiFallbackBar(que, qData, promptText, async () => {
                     await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered });
                 }, { reason: mismatchReason, isAuthError: false });
@@ -1781,32 +1763,11 @@
         const courseCode = courseInfo.subjectCode || '';
 
         if (qData.questionType === 'match') {
-            const matchingRows = getMatchingAiRows(que);
-            if (matchingRows.length > 0) {
-                if (cardAiBtn) cardAiBtn.innerHTML = `<span>AI solving rows...</span>`;
-                let solvedCount = 0;
-                for (let i = 0; i < matchingRows.length; i++) {
-                    const mRow = matchingRows[i];
-                    if (cardAiBtn) cardAiBtn.innerHTML = `<span>AI item ${i + 1}/${matchingRows.length}...</span>`;
-                    const opt = await solveMatchingRowWithAi({
-                        que,
-                        row: mRow.row,
-                        selectInput: mRow.select,
-                        subQText: mRow.prompt,
-                        autoApply: false
-                    });
-                    if (opt) solvedCount++;
-                }
-                que.querySelectorAll('.amaes-blockage-hud, .amaes-ai-fallback-bar, .amaes-unanswered-hint').forEach(el => el.remove());
-                que.style.outline = '2px solid rgba(139, 92, 246, 0.7)';
-                que.style.borderRadius = '8px';
-                setQuestionAiTag(que, true);
-                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
-                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
-                showToast(`Gemini suggested ${solvedCount} of ${matchingRows.length} matching rows. Review suggestions!`, 3500);
-                setLog(`[AI Matching] Gemini suggested <b>${solvedCount} of ${matchingRows.length}</b> matching items.`, "var(--accent-purple)");
-                return;
-            }
+            if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini} <span>Built-in AI</span>`;
+            if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini} <span>Built-in AI</span>`;
+            showToast("Matching questions: click '+ AI' beside each dropdown to solve on-demand without rate limits.", 4000);
+            setLog("[AI Matching] Use the dedicated '+ AI' button beside each dropdown to avoid rate-limit exhaustion.", "var(--accent-purple)");
+            return;
         }
 
         const promptText = buildGeminiCompactPrompt(qData, courseCode, que);

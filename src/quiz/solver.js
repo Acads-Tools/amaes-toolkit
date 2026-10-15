@@ -525,16 +525,24 @@
             color: #78350f;
             transition: all 0.2s ease;
         `;
+        const isMatchBanner = que && ((typeof identifyQuestionType === 'function' && identifyQuestionType(que) === 'match') ||
+            que.classList.contains('match') ||
+            que.classList.contains('qtype_match') ||
+            que.querySelectorAll('select').length > 1);
+
         banner.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <span style="background: #f59e0b; color: #ffffff; padding: 2px 7px; border-radius: 4px; font-weight: 800; font-size: 10px; letter-spacing: 0.5px;">NO SAVED ANSWER</span>
                     <span style="font-weight: 700; color: #92400e; font-size: 12px;">Question #${qNum || ''}: No saved answer yet</span>
                 </div>
-                <span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Question copied</span>
+                ${isMatchBanner ? '' : '<span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Question copied</span>'}
             </div>
             <div class="amaes-focus-instruction" style="font-size: 11.5px; color: #78350f; line-height: 1.45; margin-bottom: 8px;">
-                <b>Question copied to clipboard!</b> Pick an answer below or click <b>Next Question</b>, or use the AI tools at the side or bottom.
+                ${isMatchBanner ?
+                    '<b>No saved answers for these matching items yet.</b> Select the matching choices below, or consult Web AI tools above.' :
+                    '<b>Question copied to clipboard!</b> Pick an answer below or click <b>Next Question</b>, or use the AI tools at the side or bottom.'
+                }
                 <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">No answer known to the system yet — <b>be the first to answer and share it!</b></div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
@@ -1710,6 +1718,13 @@
                         transition: all 0.2s ease;
                     `;
 
+                    const isMatchBlocked = Boolean(firstBlockedQue && (
+                        (typeof identifyQuestionType === 'function' && identifyQuestionType(firstBlockedQue) === 'match') ||
+                        firstBlockedQue.classList.contains('match') ||
+                        firstBlockedQue.classList.contains('qtype_match') ||
+                        firstBlockedQue.querySelectorAll('select').length > 1
+                    ));
+
                     const retryCount = Number(firstBlockedQue.dataset.amaesAiRetryCount) || 0;
                     hud.innerHTML = `
                         <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
@@ -1720,7 +1735,10 @@
                             <span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Auto-quiz paused</span>
                         </div>
                         <div class="amaes-focus-instruction" style="font-size: 11.5px; color: #78350f; line-height: 1.45; margin-bottom: 8px;">
-                            <b>Question copied to clipboard!</b> Pick an answer below or click <b>Next Question</b>, or use the AI tools at the side or bottom.
+                            ${isMatchBlocked ?
+                                '<b>No saved answers for these matching items yet.</b> Select the matching choices below, or consult Web AI tools above.' :
+                                '<b>Question copied to clipboard!</b> Pick an answer below or click <b>Next Question</b>, or use the AI tools at the side or bottom.'
+                            }
                         </div>
                         <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                             <button id="btn-blockage-stop" type="button" class="amaes-inline-btn" style="
@@ -2672,6 +2690,16 @@
                 return;
             }
 
+            const isMultiMatching = (typeof identifyQuestionType === 'function' && identifyQuestionType(targetQue) === 'match') ||
+                targetQue.classList.contains('match') ||
+                targetQue.classList.contains('qtype_match') ||
+                targetQue.querySelectorAll('select').length > 1;
+
+            if (isMultiMatching) {
+                showToast("Matching questions use row dropdowns. Pick options directly or use AI beside each row.", 3500);
+                return;
+            }
+
             const cleanText = text.trim();
             const inputElements = Array.from(targetQue.querySelectorAll('.answer input[type="radio"], .answer input[type="checkbox"]'));
             if (inputElements.length === 0) {
@@ -3389,50 +3417,9 @@
             const qtextElem = que.querySelector('.qtext, .formulation .qtext');
             if (!qtextElem) return;
 
-            if (checkIsQuizAttemptPage() && identifyQuestionType(que) === 'match') {
-                const matchingData = extractQuestionData(que);
-                if (matchingData && isEligibleForAiSolver(que, matchingData)) {
-                    const formulation = que.querySelector('.formulation, .content') || que;
-                    let aiButton = que.querySelector('.amaes-ai-matching-run-btn');
-                    if (!aiButton) {
-                        aiButton = document.createElement('button');
-                        aiButton.type = 'button';
-                        aiButton.className = 'amaes-ai-matching-run-btn';
-                        aiButton.textContent = 'Ask Gemini about these matches';
-                        aiButton.style.cssText = 'margin: 6px 0; padding: 6px 10px; border: 1px solid #c084fc; border-radius: 5px; background: #faf5ff; color: #7e22ce; font-size: 11px; font-weight: 700; cursor: pointer;';
-                        aiButton.title = 'Get unverified, row-by-row suggestions without changing your current selections';
-                        aiButton.addEventListener('click', async event => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            aiButton.disabled = true;
-                            aiButton.textContent = 'Gemini is analyzing each row...';
-                            const courseCode = detectCourseInfo().subjectCode || '';
-                            try {
-                                await handleGeminiQuestionInference({
-                                    que,
-                                    qData: matchingData,
-                                    promptText: buildGeminiCompactPrompt(matchingData, courseCode, que),
-                                    allowAnswered: true,
-                                    onSuccess: () => {
-                                        aiButton.disabled = false;
-                                        aiButton.textContent = 'Ask Gemini again';
-                                    },
-                                    onFallback: () => {
-                                        aiButton.disabled = false;
-                                        aiButton.textContent = 'Retry Gemini matching suggestions';
-                                    }
-                                });
-                            } catch (error) {
-                                aiButton.disabled = false;
-                                aiButton.textContent = 'Retry Gemini matching suggestions';
-                                setLog(`Gemini matching request failed: ${error.message}`, 'var(--accent-amber)');
-                                showToast('Gemini could not analyze this matching question. Check the AI status above.', 3500);
-                            }
-                        });
-                        formulation.insertBefore(aiButton, formulation.firstChild);
-                    }
-                }
-            }
+            // Redundant whole-card matching action button (.amaes-ai-matching-run-btn) is cleaned up
+            // in favor of individual row '+ AI' buttons (allowAnswered: true) to eliminate button clutter and 15 RPM rate limit exhaustion.
+            que.querySelectorAll('.amaes-ai-matching-run-btn').forEach(el => el.remove());
 
             // Clone qtext and remove input, select, textarea, drop zones, and badges so inline blanks match AMAUOED entries cleanly
             const qClone = qtextElem.cloneNode(true);

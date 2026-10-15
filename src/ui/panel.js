@@ -1024,20 +1024,30 @@
                 }
 
                 .amaes-card-btn-container {
-                    display: flex !important;
-                    flex-direction: column !important;
-                    gap: 4px !important;
-                    margin-top: 6px !important;
-                    width: 100% !important;
-                    box-sizing: border-box !important;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    margin-top: 6px;
+                    width: 100%;
+                    box-sizing: border-box;
                 }
 
                 .amaes-card-ai-actions {
-                    display: flex !important;
-                    flex-direction: column !important;
-                    gap: 4px !important;
-                    width: 100% !important;
-                    box-sizing: border-box !important;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+
+                /* Completely hide side buttons and redundant whole-card AI on matching/composite questions */
+                .que.match .amaes-card-btn-container,
+                .que.qtype_match .amaes-card-btn-container,
+                .que[data-composite="true"] .amaes-card-btn-container,
+                .que.match .amaes-ai-matching-run-btn,
+                .que.qtype_match .amaes-ai-matching-run-btn,
+                .que[data-composite="true"] .amaes-ai-matching-run-btn {
+                    display: none !important;
                 }
 
                 .amaes-copy-ai-card-btn {
@@ -1778,6 +1788,11 @@
                     .que .info {
                         padding-bottom: 2px !important;
                         margin-bottom: 4px !important;
+                    }
+                    .que.match .amaes-card-btn-container,
+                    .que.qtype_match .amaes-card-btn-container,
+                    .que[data-composite="true"] .amaes-card-btn-container {
+                        display: none !important;
                     }
                     .amaes-card-btn-container {
                         display: flex !important;

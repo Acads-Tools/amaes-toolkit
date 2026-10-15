@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.4'), "Userscript header must specify v1.13.4");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.4";'), "Constant SCRIPT_VERSION must be v1.13.4");
+    assert.ok(script.includes('@version      1.13.5'), "Userscript header must specify v1.13.5");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.5";'), "Constant SCRIPT_VERSION must be v1.13.5");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4138,11 +4138,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.13.4-blue.svg"), "README badge must show v1.13.4");
+    assert.ok(readme.includes("version-1.13.5-blue.svg"), "README badge must show v1.13.5");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.13.4<"), "Website must display v1.13.4 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.13.5<"), "Website must display v1.13.5 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -6330,6 +6330,37 @@ test("Stacking Toast Notifications & Matching Prompt Accessibility Sanitization 
     assert.ok(diagSrc.includes("rootNode.matches('script, style, noscript, .accesshide, .sr-only')"), "cleanDOMToAI must ignore root accessibility labels");
     assert.ok(diagSrc.includes("isMatchQuestion = Boolean("), "extractQuestionData must identify matching questions before choice extraction");
     assert.ok(diagSrc.includes("if (!isMatchQuestion) {\n            let choiceRows ="), "extractQuestionData must not populate radio/checkbox choices from matching rows");
+});
+
+// --------------------------------------------------
+// 191. Declutter Matching Questions, Suppress Sidebar & Prevent AI Rate Limit Loops (v1.13.5)
+// --------------------------------------------------
+test("Declutter Matching Questions, Suppress Sidebar & Prevent AI Rate Limit Loops (v1.13.5)", () => {
+    const fs = require('fs');
+    const promptsSrc = fs.readFileSync('src/ai/prompts.js', 'utf8');
+    const panelSrc = fs.readFileSync('src/ui/panel.js', 'utf8');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const geminiSrc = fs.readFileSync('src/ai/gemini.js', 'utf8');
+
+    // 1. Sidebar copy/paste buttons suppressed on composite/matching questions
+    assert.ok(promptsSrc.includes("if (isCompositeQuestion) {\n                que.dataset.composite = 'true';"), "prompts.js must suppress sidebar action injection on composite questions");
+    assert.ok(panelSrc.includes(".que.match .amaes-card-btn-container,"), "panel.js CSS must forcefully hide card btn container on matching questions");
+    assert.ok(panelSrc.includes('.que[data-composite="true"] .amaes-card-btn-container'), "panel.js CSS must hide card btn container on composite questions");
+
+    // 2. Redundant whole-card matching action button removed
+    assert.ok(solverSrc.includes("que.querySelectorAll('.amaes-ai-matching-run-btn').forEach(el => el.remove());"), "solver.js must remove redundant .amaes-ai-matching-run-btn");
+
+    // 3. Auto-copy and V paste bypass on composite/matching questions
+    assert.ok(promptsSrc.includes("Composite or matching question present; suppressing auto-copy."), "triggerAutoCopyForAI must suppress auto-copy on composite questions");
+    assert.ok(solverSrc.includes("const isMultiMatching ="), "autoSelectFromAiClipboard must guard against pasting to matching questions");
+
+    // 4. Rate-limit protection: stop automated 10-row loops
+    assert.ok(!geminiSrc.includes("for (let i = 0; i < matchingRows.length; i++)"), "gemini.js must eliminate 10-row automated matching loops");
+    assert.ok(geminiSrc.includes("Click '+ AI' beside each dropdown to solve individually without rate limits."), "gemini.js must guide users to on-demand per-row AI");
+
+    // 5. Blockage banner text sanitization
+    assert.ok(solverSrc.includes("isMatchBanner"), "solver.js banner 1 must sanitize question-copied text for matching questions");
+    assert.ok(solverSrc.includes("isMatchBlocked"), "solver.js blockage HUD must sanitize question-copied text for matching questions");
 });
 
 console.log("\n==================================================");

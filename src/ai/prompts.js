@@ -402,6 +402,20 @@
             // ==============================================================
             // 1. LEFT SIDE: Core Toolkit & Built-in AI (.info below Flag)
             // ==============================================================
+            const isCompositeQuestion = que.querySelectorAll('select').length > 1 ||
+                que.querySelectorAll('.answer table tr select, .answer tr select, .answer select').length > 1 ||
+                que.querySelectorAll('input[type="text"]').length > 1 ||
+                que.classList.contains('match') ||
+                que.classList.contains('qtype_match') ||
+                (typeof identifyQuestionType === 'function' && identifyQuestionType(que) === 'match');
+
+            if (isCompositeQuestion) {
+                que.dataset.composite = 'true';
+                const existingContainer = que.querySelector('.amaes-card-btn-container');
+                if (existingContainer) existingContainer.style.display = 'none';
+                return;
+            }
+
             if (!que.querySelector('.amaes-card-btn-container')) {
                 const btnContainer = document.createElement('div');
                 btnContainer.className = 'amaes-card-btn-container';
@@ -418,11 +432,6 @@
                 aiActions.className = 'amaes-card-ai-actions';
                 aiActions.style.cssText = 'display: flex; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;';
 
-                // On composite questions (e.g. matching questions with multiple dropdown rows or inputs),
-                // hide whole-card AI actions to avoid clutter and confusion since each row has its own dedicated '+ AI' button.
-                const isCompositeQuestion = que.querySelectorAll('select').length > 1 ||
-                    que.querySelectorAll('.answer table tr select, .answer tr select').length > 0 ||
-                    que.querySelectorAll('input[type="text"]').length > 1;
                 if (isCompositeQuestion) {
                     aiActions.style.display = 'none';
                 }
@@ -794,6 +803,19 @@
 
         if (!hasUnansweredUnknown) {
             logDebug("All questions known in DB, suppressing auto-copy.");
+            return;
+        }
+
+        // Suppress auto-copy on composite or matching questions to prevent clipboard pollution
+        const hasCompositeOrMatch = Array.from(queElements).some(q =>
+            (typeof identifyQuestionType === 'function' && identifyQuestionType(q) === 'match') ||
+            q.classList.contains('match') ||
+            q.classList.contains('qtype_match') ||
+            q.querySelectorAll('select').length > 1 ||
+            q.querySelectorAll('input[type="text"]').length > 1
+        );
+        if (hasCompositeOrMatch) {
+            logDebug("Composite or matching question present; suppressing auto-copy.");
             return;
         }
 

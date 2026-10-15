@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.13.4
+// @version      1.13.5
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.13.4";
+    const SCRIPT_VERSION = "v1.13.5";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -4133,16 +4133,24 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             color: #78350f;
             transition: all 0.2s ease;
         `;
+        const isMatchBanner = que && ((typeof identifyQuestionType === 'function' && identifyQuestionType(que) === 'match') ||
+            que.classList.contains('match') ||
+            que.classList.contains('qtype_match') ||
+            que.querySelectorAll('select').length > 1);
+
         banner.innerHTML = `
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <span style="background: #f59e0b; color: #ffffff; padding: 2px 7px; border-radius: 4px; font-weight: 800; font-size: 10px; letter-spacing: 0.5px;">NO SAVED ANSWER</span>
                     <span style="font-weight: 700; color: #92400e; font-size: 12px;">Question #${qNum || ''}: No saved answer yet</span>
                 </div>
-                <span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Question copied</span>
+                ${isMatchBanner ? '' : '<span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Question copied</span>'}
             </div>
             <div class="amaes-focus-instruction" style="font-size: 11.5px; color: #78350f; line-height: 1.45; margin-bottom: 8px;">
-                <b>Question copied to clipboard!</b> Pick an answer below or click <b>Next Question</b>, or use the AI tools at the side or bottom.
+                ${isMatchBanner ?
+                    '<b>No saved answers for these matching items yet.</b> Select the matching choices below, or consult Web AI tools above.' :
+                    '<b>Question copied to clipboard!</b> Pick an answer below or click <b>Next Question</b>, or use the AI tools at the side or bottom.'
+                }
                 <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">No answer known to the system yet — <b>be the first to answer and share it!</b></div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
@@ -5318,6 +5326,13 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         transition: all 0.2s ease;
                     `;
 
+                    const isMatchBlocked = Boolean(firstBlockedQue && (
+                        (typeof identifyQuestionType === 'function' && identifyQuestionType(firstBlockedQue) === 'match') ||
+                        firstBlockedQue.classList.contains('match') ||
+                        firstBlockedQue.classList.contains('qtype_match') ||
+                        firstBlockedQue.querySelectorAll('select').length > 1
+                    ));
+
                     const retryCount = Number(firstBlockedQue.dataset.amaesAiRetryCount) || 0;
                     hud.innerHTML = `
                         <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
@@ -5328,7 +5343,10 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             <span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Auto-quiz paused</span>
                         </div>
                         <div class="amaes-focus-instruction" style="font-size: 11.5px; color: #78350f; line-height: 1.45; margin-bottom: 8px;">
-                            <b>Question copied to clipboard!</b> Pick an answer below or click <b>Next Question</b>, or use the AI tools at the side or bottom.
+                            ${isMatchBlocked ?
+                                '<b>No saved answers for these matching items yet.</b> Select the matching choices below, or consult Web AI tools above.' :
+                                '<b>Question copied to clipboard!</b> Pick an answer below or click <b>Next Question</b>, or use the AI tools at the side or bottom.'
+                            }
                         </div>
                         <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                             <button id="btn-blockage-stop" type="button" class="amaes-inline-btn" style="
@@ -6280,6 +6298,16 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 return;
             }
 
+            const isMultiMatching = (typeof identifyQuestionType === 'function' && identifyQuestionType(targetQue) === 'match') ||
+                targetQue.classList.contains('match') ||
+                targetQue.classList.contains('qtype_match') ||
+                targetQue.querySelectorAll('select').length > 1;
+
+            if (isMultiMatching) {
+                showToast("Matching questions use row dropdowns. Pick options directly or use AI beside each row.", 3500);
+                return;
+            }
+
             const cleanText = text.trim();
             const inputElements = Array.from(targetQue.querySelectorAll('.answer input[type="radio"], .answer input[type="checkbox"]'));
             if (inputElements.length === 0) {
@@ -6997,50 +7025,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             const qtextElem = que.querySelector('.qtext, .formulation .qtext');
             if (!qtextElem) return;
 
-            if (checkIsQuizAttemptPage() && identifyQuestionType(que) === 'match') {
-                const matchingData = extractQuestionData(que);
-                if (matchingData && isEligibleForAiSolver(que, matchingData)) {
-                    const formulation = que.querySelector('.formulation, .content') || que;
-                    let aiButton = que.querySelector('.amaes-ai-matching-run-btn');
-                    if (!aiButton) {
-                        aiButton = document.createElement('button');
-                        aiButton.type = 'button';
-                        aiButton.className = 'amaes-ai-matching-run-btn';
-                        aiButton.textContent = 'Ask Gemini about these matches';
-                        aiButton.style.cssText = 'margin: 6px 0; padding: 6px 10px; border: 1px solid #c084fc; border-radius: 5px; background: #faf5ff; color: #7e22ce; font-size: 11px; font-weight: 700; cursor: pointer;';
-                        aiButton.title = 'Get unverified, row-by-row suggestions without changing your current selections';
-                        aiButton.addEventListener('click', async event => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            aiButton.disabled = true;
-                            aiButton.textContent = 'Gemini is analyzing each row...';
-                            const courseCode = detectCourseInfo().subjectCode || '';
-                            try {
-                                await handleGeminiQuestionInference({
-                                    que,
-                                    qData: matchingData,
-                                    promptText: buildGeminiCompactPrompt(matchingData, courseCode, que),
-                                    allowAnswered: true,
-                                    onSuccess: () => {
-                                        aiButton.disabled = false;
-                                        aiButton.textContent = 'Ask Gemini again';
-                                    },
-                                    onFallback: () => {
-                                        aiButton.disabled = false;
-                                        aiButton.textContent = 'Retry Gemini matching suggestions';
-                                    }
-                                });
-                            } catch (error) {
-                                aiButton.disabled = false;
-                                aiButton.textContent = 'Retry Gemini matching suggestions';
-                                setLog(`Gemini matching request failed: ${error.message}`, 'var(--accent-amber)');
-                                showToast('Gemini could not analyze this matching question. Check the AI status above.', 3500);
-                            }
-                        });
-                        formulation.insertBefore(aiButton, formulation.firstChild);
-                    }
-                }
-            }
+            // Redundant whole-card matching action button (.amaes-ai-matching-run-btn) is cleaned up
+            // in favor of individual row '+ AI' buttons (allowAnswered: true) to eliminate button clutter and 15 RPM rate limit exhaustion.
+            que.querySelectorAll('.amaes-ai-matching-run-btn').forEach(el => el.remove());
 
             // Clone qtext and remove input, select, textarea, drop zones, and badges so inline blanks match AMAUOED entries cleanly
             const qClone = qtextElem.cloneNode(true);
@@ -12804,6 +12791,20 @@ function setupAccountTransferUI() {
             // ==============================================================
             // 1. LEFT SIDE: Core Toolkit & Built-in AI (.info below Flag)
             // ==============================================================
+            const isCompositeQuestion = que.querySelectorAll('select').length > 1 ||
+                que.querySelectorAll('.answer table tr select, .answer tr select, .answer select').length > 1 ||
+                que.querySelectorAll('input[type="text"]').length > 1 ||
+                que.classList.contains('match') ||
+                que.classList.contains('qtype_match') ||
+                (typeof identifyQuestionType === 'function' && identifyQuestionType(que) === 'match');
+
+            if (isCompositeQuestion) {
+                que.dataset.composite = 'true';
+                const existingContainer = que.querySelector('.amaes-card-btn-container');
+                if (existingContainer) existingContainer.style.display = 'none';
+                return;
+            }
+
             if (!que.querySelector('.amaes-card-btn-container')) {
                 const btnContainer = document.createElement('div');
                 btnContainer.className = 'amaes-card-btn-container';
@@ -12820,11 +12821,6 @@ function setupAccountTransferUI() {
                 aiActions.className = 'amaes-card-ai-actions';
                 aiActions.style.cssText = 'display: flex; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;';
 
-                // On composite questions (e.g. matching questions with multiple dropdown rows or inputs),
-                // hide whole-card AI actions to avoid clutter and confusion since each row has its own dedicated '+ AI' button.
-                const isCompositeQuestion = que.querySelectorAll('select').length > 1 ||
-                    que.querySelectorAll('.answer table tr select, .answer tr select').length > 0 ||
-                    que.querySelectorAll('input[type="text"]').length > 1;
                 if (isCompositeQuestion) {
                     aiActions.style.display = 'none';
                 }
@@ -13196,6 +13192,19 @@ function setupAccountTransferUI() {
 
         if (!hasUnansweredUnknown) {
             logDebug("All questions known in DB, suppressing auto-copy.");
+            return;
+        }
+
+        // Suppress auto-copy on composite or matching questions to prevent clipboard pollution
+        const hasCompositeOrMatch = Array.from(queElements).some(q =>
+            (typeof identifyQuestionType === 'function' && identifyQuestionType(q) === 'match') ||
+            q.classList.contains('match') ||
+            q.classList.contains('qtype_match') ||
+            q.querySelectorAll('select').length > 1 ||
+            q.querySelectorAll('input[type="text"]').length > 1
+        );
+        if (hasCompositeOrMatch) {
+            logDebug("Composite or matching question present; suppressing auto-copy.");
             return;
         }
 
@@ -15190,28 +15199,10 @@ function setupAccountTransferUI() {
                     return;
                 }
 
-                // If bulk matching output was refused or unparseable, fall back to solving row-by-row
-                setLog(`[AI Matching Fallback] Bulk AI response unconfirmed; analyzing matching items row-by-row...`, "var(--accent-purple)");
-                let solvedCount = 0;
-                for (let i = 0; i < matchingRows.length; i++) {
-                    const mRow = matchingRows[i];
-                    const opt = await solveMatchingRowWithAi({
-                        que,
-                        row: mRow.row,
-                        selectInput: mRow.select,
-                        subQText: mRow.prompt,
-                        autoApply: false
-                    });
-                    if (opt) solvedCount++;
-                }
-                if (solvedCount > 0) {
-                    showToast(`Gemini suggested ${solvedCount} matching answers row-by-row; review before continuing.`, 3500);
-                    if (typeof onSuccess === 'function') {
-                        await onSuccess({ choiceText: `Solved ${solvedCount} rows`, matchingRows });
-                    }
-                    return;
-                }
-                const mismatchReason = "AI could not match these items. Use the inline AI button on each row to solve individually.";
+                // If bulk matching output was unconfirmed or unparseable, do not blast 10 sequential API calls
+                // which crashes into the 15 RPM rate limit. Prompt user to use per-row AI buttons on demand.
+                setLog(`[AI Matching] Bulk AI parsing unconfirmed. Use '+ AI' beside each dropdown to solve on-demand.`, "var(--accent-purple)");
+                const mismatchReason = "Bulk AI could not resolve all matching rows. Click '+ AI' beside each dropdown to solve individually without rate limits.";
                 showAiFallbackBar(que, qData, promptText, async () => {
                     await handleGeminiQuestionInference({ que, qData, promptText, onSuccess, onFallback, allowAnswered });
                 }, { reason: mismatchReason, isAuthError: false });
@@ -15496,32 +15487,11 @@ function setupAccountTransferUI() {
         const courseCode = courseInfo.subjectCode || '';
 
         if (qData.questionType === 'match') {
-            const matchingRows = getMatchingAiRows(que);
-            if (matchingRows.length > 0) {
-                if (cardAiBtn) cardAiBtn.innerHTML = `<span>AI solving rows...</span>`;
-                let solvedCount = 0;
-                for (let i = 0; i < matchingRows.length; i++) {
-                    const mRow = matchingRows[i];
-                    if (cardAiBtn) cardAiBtn.innerHTML = `<span>AI item ${i + 1}/${matchingRows.length}...</span>`;
-                    const opt = await solveMatchingRowWithAi({
-                        que,
-                        row: mRow.row,
-                        selectInput: mRow.select,
-                        subQText: mRow.prompt,
-                        autoApply: false
-                    });
-                    if (opt) solvedCount++;
-                }
-                que.querySelectorAll('.amaes-blockage-hud, .amaes-ai-fallback-bar, .amaes-unanswered-hint').forEach(el => el.remove());
-                que.style.outline = '2px solid rgba(139, 92, 246, 0.7)';
-                que.style.borderRadius = '8px';
-                setQuestionAiTag(que, true);
-                if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
-                if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
-                showToast(`Gemini suggested ${solvedCount} of ${matchingRows.length} matching rows. Review suggestions!`, 3500);
-                setLog(`[AI Matching] Gemini suggested <b>${solvedCount} of ${matchingRows.length}</b> matching items.`, "var(--accent-purple)");
-                return;
-            }
+            if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini} <span>Built-in AI</span>`;
+            if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini} <span>Built-in AI</span>`;
+            showToast("Matching questions: click '+ AI' beside each dropdown to solve on-demand without rate limits.", 4000);
+            setLog("[AI Matching] Use the dedicated '+ AI' button beside each dropdown to avoid rate-limit exhaustion.", "var(--accent-purple)");
+            return;
         }
 
         const promptText = buildGeminiCompactPrompt(qData, courseCode, que);
@@ -20783,20 +20753,30 @@ function setupAccountTransferUI() {
                 }
 
                 .amaes-card-btn-container {
-                    display: flex !important;
-                    flex-direction: column !important;
-                    gap: 4px !important;
-                    margin-top: 6px !important;
-                    width: 100% !important;
-                    box-sizing: border-box !important;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    margin-top: 6px;
+                    width: 100%;
+                    box-sizing: border-box;
                 }
 
                 .amaes-card-ai-actions {
-                    display: flex !important;
-                    flex-direction: column !important;
-                    gap: 4px !important;
-                    width: 100% !important;
-                    box-sizing: border-box !important;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+
+                /* Completely hide side buttons and redundant whole-card AI on matching/composite questions */
+                .que.match .amaes-card-btn-container,
+                .que.qtype_match .amaes-card-btn-container,
+                .que[data-composite="true"] .amaes-card-btn-container,
+                .que.match .amaes-ai-matching-run-btn,
+                .que.qtype_match .amaes-ai-matching-run-btn,
+                .que[data-composite="true"] .amaes-ai-matching-run-btn {
+                    display: none !important;
                 }
 
                 .amaes-copy-ai-card-btn {
@@ -21537,6 +21517,11 @@ function setupAccountTransferUI() {
                     .que .info {
                         padding-bottom: 2px !important;
                         margin-bottom: 4px !important;
+                    }
+                    .que.match .amaes-card-btn-container,
+                    .que.qtype_match .amaes-card-btn-container,
+                    .que[data-composite="true"] .amaes-card-btn-container {
+                        display: none !important;
                     }
                     .amaes-card-btn-container {
                         display: flex !important;
