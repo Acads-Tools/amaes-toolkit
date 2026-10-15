@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.3'), "Userscript header must specify v1.13.3");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.3";'), "Constant SCRIPT_VERSION must be v1.13.3");
+    assert.ok(script.includes('@version      1.13.4'), "Userscript header must specify v1.13.4");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.4";'), "Constant SCRIPT_VERSION must be v1.13.4");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4138,11 +4138,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.13.3-blue.svg"), "README badge must show v1.13.3");
+    assert.ok(readme.includes("version-1.13.4-blue.svg"), "README badge must show v1.13.4");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.13.3<"), "Website must display v1.13.3 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.13.4<"), "Website must display v1.13.4 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -6310,6 +6310,26 @@ test("Composite Matching Question UI Hygiene, Configurable Summary Leeway Delay 
     assert.ok(harvesterSrc.includes("if (q.questionType === 'match' && ansText.includes(',')) return false;"), "harvester.js queueCommunityContribution must reject joined match answers");
     assert.ok(solverSrc.includes("selectInputs.length === 1"), "solver.js syncCurrentPageSelectionsToEvidence must only record single select answers");
     assert.ok(solverSrc.includes("!isCompositeOrMatching && !hasAnyVerifiedCandidate && prevAnsText"), "solver.js must suppress unreviewed history banner on composite/matching questions");
+});
+
+// --------------------------------------------------
+// 190. Stacking Toast Notifications & Matching Prompt Accessibility Sanitization (v1.13.4)
+// --------------------------------------------------
+test("Stacking Toast Notifications & Matching Prompt Accessibility Sanitization (v1.13.4)", () => {
+    const fs = require('fs');
+    const diagSrc = fs.readFileSync('src/dev/diagnostics.js', 'utf8');
+
+    // 1. Multi-node stacking toast container
+    assert.ok(diagSrc.includes("className = 'amaes-toast-item'"), "showToast must instantiate distinct .amaes-toast-item nodes");
+    assert.ok(diagSrc.includes("flex-direction: column;"), "showToast container must format as flex column for stacking");
+    assert.ok(diagSrc.includes("clearTimeout(duplicate._timer);"), "showToast must deduplicate and refresh existing timers on identical messages");
+    assert.ok(diagSrc.includes("existingToasts.length >= 5"), "showToast must cap stack to prevent covering the screen");
+    assert.ok(diagSrc.includes("toastItem.onclick = () => dismissToast(toastItem);"), "showToast must support early dismiss on click");
+
+    // 2. Matching Prompt Sanitization (eliminating .accesshide 'Answer 1 Question 1' pollution)
+    assert.ok(diagSrc.includes("rootNode.matches('script, style, noscript, .accesshide, .sr-only')"), "cleanDOMToAI must ignore root accessibility labels");
+    assert.ok(diagSrc.includes("isMatchQuestion = Boolean("), "extractQuestionData must identify matching questions before choice extraction");
+    assert.ok(diagSrc.includes("if (!isMatchQuestion) {\n            let choiceRows ="), "extractQuestionData must not populate radio/checkbox choices from matching rows");
 });
 
 console.log("\n==================================================");

@@ -89,45 +89,92 @@
         });
     }
 
-    // Floating Non-intrusive Toast Notification
+    // Floating Non-intrusive Stacking Toast Notifications
     function showToast(message, duration = 2400) {
-        let toast = document.getElementById('amaes-toast-notification');
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.id = 'amaes-toast-notification';
-            toast.style.cssText = `
+        if (!message) return;
+
+        let container = document.getElementById('amaes-toast-notification');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'amaes-toast-notification';
+            container.style.cssText = `
                 position: fixed;
                 top: 20px;
                 right: 20px;
                 z-index: 10000000;
-                background: rgba(15, 23, 42, 0.94);
-                backdrop-filter: blur(8px);
-                color: #f8fafc;
-                border: 1px solid #334155;
-                padding: 8px 14px;
-                border-radius: 8px;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                font-size: 11.5px;
-                font-weight: 600;
-                box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);
                 display: flex;
-                align-items: center;
-                gap: 7px;
-                opacity: 0;
-                transform: translateY(-8px);
-                transition: opacity 0.25s ease, transform 0.25s ease;
+                flex-direction: column;
+                gap: 8px;
+                max-width: 420px;
                 pointer-events: none;
             `;
-            document.body.appendChild(toast);
+            document.body.appendChild(container);
         }
-        toast.innerHTML = `${ICONS.sparkles} <span>${message}</span>`;
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateY(0)';
-        clearTimeout(toast._timer);
-        toast._timer = setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateY(-8px)';
-        }, duration);
+
+        // Anti-spam guard: if identical notification is already visible, refresh its timer
+        const existingToasts = Array.from(container.querySelectorAll('.amaes-toast-item:not([data-leaving="true"])'));
+        const duplicate = existingToasts.find(t => t.dataset.toastMessage === message);
+        if (duplicate) {
+            clearTimeout(duplicate._timer);
+            duplicate._timer = setTimeout(() => dismissToast(duplicate), duration);
+            duplicate.style.borderColor = 'var(--accent-purple, #a855f7)';
+            setTimeout(() => { duplicate.style.borderColor = '#334155'; }, 300);
+            return;
+        }
+
+        function dismissToast(el) {
+            if (!el || el.dataset.leaving === 'true') return;
+            el.dataset.leaving = 'true';
+            clearTimeout(el._timer);
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-8px)';
+            setTimeout(() => el.remove(), 250);
+        }
+
+        // Stack limit guard: max 5 active toasts
+        if (existingToasts.length >= 5) {
+            dismissToast(existingToasts[0]);
+        }
+
+        const toastItem = document.createElement('div');
+        toastItem.className = 'amaes-toast-item';
+        toastItem.dataset.toastMessage = message;
+        toastItem.style.cssText = `
+            background: rgba(15, 23, 42, 0.94);
+            backdrop-filter: blur(8px);
+            color: #f8fafc;
+            border: 1px solid #334155;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 11.5px;
+            font-weight: 600;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: opacity 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+            pointer-events: auto;
+            cursor: pointer;
+            user-select: none;
+        `;
+        toastItem.title = 'Click to dismiss';
+        toastItem.innerHTML = `${ICONS.sparkles} <span style="line-height: 1.4;">${message}</span>`;
+        container.appendChild(toastItem);
+
+        // Animate in on next frame
+        requestAnimationFrame(() => {
+            toastItem.style.opacity = '1';
+            toastItem.style.transform = 'translateY(0)';
+        });
+
+        // Click to dismiss immediately
+        toastItem.onclick = () => dismissToast(toastItem);
+
+        // Independent timer per toast
+        toastItem._timer = setTimeout(() => dismissToast(toastItem), duration);
     }
 
     let capabilityTipsInterval = null;
@@ -173,6 +220,7 @@
     // Converts DOM tree to clean formatted text preserving Superscripts, Subscripts, Math, Truth Tables, and Images
     function cleanDOMToAI(rootNode) {
         if (!rootNode) return '';
+        if (rootNode.matches && rootNode.matches('script, style, noscript, .accesshide, .sr-only')) return '';
         const clone = rootNode.cloneNode(true);
 
         // Strip non-content scripts, toolkit buttons, injected UI badges & Moodle feedback icons/accessibility text
@@ -1279,50 +1327,58 @@
 
         // 3. Choices / Answers
         const choices = [];
-        let choiceRows = que.querySelectorAll('.answer > div, .answer div.r0, .answer div.r1, .answer li, .answer tr');
-        if (choiceRows.length === 0) {
-            choiceRows = que.querySelectorAll('.answer div.r0, .answer div.r1, .answer li, .answer tr');
-        }
-        if (choiceRows.length === 0) {
-            choiceRows = que.querySelectorAll('.answer label');
-        }
+        const isMatchQuestion = Boolean(
+            que.classList.contains('match') ||
+            que.classList.contains('qtype_match') ||
+            que.querySelector('.answer table select, td.control select, .answer select')
+        );
 
-        if (choiceRows.length > 0) {
-            choiceRows.forEach((row, idx) => {
-                const label = row.querySelector('label') || row;
-                let choiceText = cleanDOMToAI(label);
-                // Collapse newlines inside single choice row to maintain clean multi-line choice sentences
-                choiceText = choiceText.replace(/\r?\n\s*/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!isMatchQuestion) {
+            let choiceRows = que.querySelectorAll('.answer > div, .answer div.r0, .answer div.r1, .answer li, .answer tr');
+            if (choiceRows.length === 0) {
+                choiceRows = que.querySelectorAll('.answer div.r0, .answer div.r1, .answer li, .answer tr');
+            }
+            if (choiceRows.length === 0) {
+                choiceRows = que.querySelectorAll('.answer label');
+            }
 
-                if (choiceText) {
-                    // Ensure each choice starts with a clean letter prefix (a., b., c., d.)
-                    const hasPrefix = /^[a-zA-Z0-9][.)]\s*/.test(choiceText);
-                    if (!hasPrefix && choiceRows.length > 1) {
-                        const letter = String.fromCharCode(97 + idx);
-                        choiceText = `${letter}. ${choiceText}`;
-                    }
-                    choices.push(choiceText);
-                }
-            });
-        }
-
-        // Direct input element fallback if wrapper elements weren't caught
-        if (choices.length === 0) {
-            const choiceInputs = que.querySelectorAll('.answer input[type="radio"], .answer input[type="checkbox"]');
-            if (choiceInputs.length > 0) {
-                choiceInputs.forEach((inp, idx) => {
-                    const label = (inp.labels && inp.labels[0]) || inp.closest('label, div.r0, div.r1, tr, li, div') || inp.parentElement;
+            if (choiceRows.length > 0) {
+                choiceRows.forEach((row, idx) => {
+                    const label = row.querySelector('label') || row;
                     let choiceText = cleanDOMToAI(label);
+                    // Collapse newlines inside single choice row to maintain clean multi-line choice sentences
                     choiceText = choiceText.replace(/\r?\n\s*/g, ' ').replace(/\s+/g, ' ').trim();
+
                     if (choiceText) {
+                        // Ensure each choice starts with a clean letter prefix (a., b., c., d.)
                         const hasPrefix = /^[a-zA-Z0-9][.)]\s*/.test(choiceText);
-                        if (!hasPrefix && choiceInputs.length > 1) {
+                        if (!hasPrefix && choiceRows.length > 1) {
                             const letter = String.fromCharCode(97 + idx);
                             choiceText = `${letter}. ${choiceText}`;
                         }
                         choices.push(choiceText);
                     }
                 });
+            }
+
+            // Direct input element fallback if wrapper elements weren't caught
+            if (choices.length === 0) {
+                const choiceInputs = que.querySelectorAll('.answer input[type="radio"], .answer input[type="checkbox"]');
+                if (choiceInputs.length > 0) {
+                    choiceInputs.forEach((inp, idx) => {
+                        const label = (inp.labels && inp.labels[0]) || inp.closest('label, div.r0, div.r1, tr, li, div') || inp.parentElement;
+                        let choiceText = cleanDOMToAI(label);
+                        choiceText = choiceText.replace(/\r?\n\s*/g, ' ').replace(/\s+/g, ' ').trim();
+                        if (choiceText) {
+                            const hasPrefix = /^[a-zA-Z0-9][.)]\s*/.test(choiceText);
+                            if (!hasPrefix && choiceInputs.length > 1) {
+                                const letter = String.fromCharCode(97 + idx);
+                                choiceText = `${letter}. ${choiceText}`;
+                            }
+                            choices.push(choiceText);
+                        }
+                    });
+                }
             }
         }
 
@@ -1334,11 +1390,11 @@
         const isShortAnswer = Boolean(textInput && choices.length === 0 && !isEssay);
 
         // 5. Matching type check
-        const matchRows = que.querySelectorAll('.answer table tr, .answer tr');
+        const matchRows = que.querySelectorAll('.answer table tr, .answer tr, .answer .r0, .answer .r1, .answer [class*="r"], .answer > div, .answer li');
         const matchPairs = [];
         if (matchRows.length > 0 && choices.length === 0) {
             matchRows.forEach(tr => {
-                const textCol = tr.querySelector('td.text, td:first-child');
+                const textCol = tr.querySelector('td.text, td:first-child, .text, [class*="text"]');
                 const selectCol = tr.querySelector('td.control select, select');
                 if (textCol && selectCol) {
                     const subQ = cleanDOMToAI(textCol);
