@@ -1848,30 +1848,89 @@
         }
     }
 
+    function triggerClick(el) {
+        if (!el) return;
+        try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
+        try { el.focus(); } catch (_) {}
+        try { el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window })); } catch (_) {}
+        try { el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window })); } catch (_) {}
+        try { el.click(); } catch (_) {}
+    }
+
     function findQuizSummarySubmitButton() {
         const candidates = document.querySelectorAll(
-            '.btn-finishattempt, input[value*="Submit all and finish"], button[type="submit"][name="finishattempt"], button[name="submitallandfinish"], input[name="submitallandfinish"]'
+            '.btn-finishattempt button, .btn-finishattempt input[type="submit"], .btn-finishattempt input[type="button"], ' +
+            'button.btn-finishattempt, input.btn-finishattempt, ' +
+            'form[action*="processattempt.php"] button, form[action*="processattempt.php"] input[type="submit"], ' +
+            '.submitbtns button, .submitbtns input[type="submit"], ' +
+            '.quizsummarybtns button, .quizsummarybtns input[type="submit"], ' +
+            '.btn-finishattempt, input[value*="Submit all and finish"], ' +
+            'button[type="submit"][name="finishattempt"], button[name="submitallandfinish"], ' +
+            'input[name="submitallandfinish"], button[type="submit"], button'
         );
-        return Array.from(candidates).find(button => {
-            if (button.disabled) return false;
-            const label = `${button.value || ''} ${button.innerText || button.textContent || ''}`.trim();
-            return /submit all and finish|finish attempt/i.test(label) ||
-                /finishattempt|submitallandfinish/i.test(button.name || '');
-        }) || null;
+        for (const candidate of candidates) {
+            if (!candidate || candidate.disabled) continue;
+
+            // Resolve to the real button/input element if candidate is a container (div/form)
+            const btn = (candidate.tagName === 'BUTTON' || (candidate.tagName === 'INPUT' && (candidate.type === 'submit' || candidate.type === 'button')))
+                ? candidate
+                : candidate.querySelector('button, input[type="submit"], input[type="button"]');
+
+            if (!btn || btn.disabled) continue;
+
+            const label = `${btn.value || ''} ${btn.innerText || btn.textContent || ''}`.trim();
+            const name = btn.name || '';
+            const action = (btn.form && btn.form.action) || '';
+
+            // Guard against "Return to attempt", "Cancel", "Back"
+            if (/cancel|return|back|continue to attempt/i.test(label)) continue;
+
+            if (/submit all and finish|finish attempt/i.test(label) ||
+                /finishattempt|submitallandfinish/i.test(name) ||
+                (action.includes('processattempt.php') && /submit|finish/i.test(label))) {
+                return btn;
+            }
+        }
+        return null;
     }
 
     function findQuizSubmitConfirmationButton() {
-        const dialogs = document.querySelectorAll('.moodle-dialogue, .modal, [role="dialog"], .yui3-panel, .modal-dialog, .moodle-has-zindex');
+        const dialogs = document.querySelectorAll(
+            '.modal.show, .modal.in, .modal:not([aria-hidden="true"]), ' +
+            'div[data-region="modal"], div[data-region="modal-container"], ' +
+            '.moodle-dialogue:not(.yui3-panel-hidden), .moodle-dialogue-focused, .confirmation-dialogue, ' +
+            '.yui3-panel:not(.yui3-panel-hidden), [role="dialog"]:not([aria-hidden="true"]), ' +
+            '.moodle-dialogue, .modal, [role="dialog"], .yui3-panel, .modal-dialog, .moodle-has-zindex'
+        );
         for (const dialog of dialogs) {
             const buttons = dialog.querySelectorAll('button, input[type="submit"], input[type="button"], .btn-primary, button[data-action="save"]');
-            const confirmation = Array.from(buttons).find(button => {
-                if (button.disabled) return false;
+            for (const button of buttons) {
+                if (!button || button.disabled) continue;
+
+                // Priority 1: Moodle modal save action
+                if (button.getAttribute('data-action') === 'save') return button;
+
                 const label = `${button.value || ''} ${button.innerText || button.textContent || ''}`.trim();
-                return /submit all and finish|submit attempt|^submit$|^finish$/i.test(label) &&
-                    !/cancel|do not submit/i.test(label);
-            });
-            if (confirmation) return confirmation;
+                if (/cancel|do not submit|close|dismiss/i.test(label)) continue;
+
+                if (/submit all and finish|submit attempt|^submit$|^finish$/i.test(label)) {
+                    return button;
+                }
+            }
         }
+
+        // Direct fallback: check document for modal-footer or confirmation primary buttons
+        const directButtons = document.querySelectorAll(
+            '.modal-footer button[data-action="save"], .modal-footer .btn-primary, ' +
+            '.confirmation-buttons .btn-primary, .confirmation-buttons input, ' +
+            '[data-region="modal"] button[data-action="save"], [data-region="modal"] .btn-primary'
+        );
+        for (const b of directButtons) {
+            if (!b || b.disabled) continue;
+            const label = `${b.value || ''} ${b.innerText || b.textContent || ''}`.trim();
+            if (!/cancel|close|dismiss/i.test(label)) return b;
+        }
+
         return null;
     }
 
@@ -1899,6 +1958,7 @@
                 target.focus({ preventScroll: true });
                 target.style.outline = '4px solid #f59e0b';
                 target.style.boxShadow = '0 0 0 6px rgba(245, 158, 11, 0.25)';
+                triggerClick(target);
             });
             notice.append(messageNode, action);
         }
@@ -2031,7 +2091,14 @@
             `;
             readyBanner.querySelector('#amaes-btn-quick-submit').onclick = () => {
                 const sBtn = findQuizSummarySubmitButton();
-                if (sBtn) sBtn.click();
+                if (sBtn) {
+                    const fallbackNotice = document.getElementById('amaes-auto-submit-fallback');
+                    if (fallbackNotice) fallbackNotice.remove();
+                    summaryAutoSubmitAttempted = false;
+                    clearTimeout(summaryAutoSubmitTimer);
+                    summaryAutoSubmitTimer = null;
+                    handleQuizSummaryAutoSubmit();
+                }
             };
             const mainArea = document.querySelector('#region-main, main, [role="main"]') || document.body;
             mainArea.prepend(readyBanner);
@@ -2092,14 +2159,16 @@
                     return;
                 }
                 summaryAutoSubmitAttempted = true;
-                currentSubmitBtn.click();
+                triggerClick(currentSubmitBtn);
+                const submitStartTime = Date.now();
+                let formSubmittedDirectly = false;
                 const confirmUntil = Date.now() + 5_000;
                 const confirmSubmission = () => {
                     if (!checkIsQuizSummaryPage()) return;
                     const confirmationButton = findQuizSubmitConfirmationButton();
                     if (confirmationButton) {
-                        confirmationButton.click();
-                        const confirmUntil = Date.now() + 5_000;
+                        triggerClick(confirmationButton);
+                        const confirmUntil = Date.now() + 10_000;
                         const verifySubmission = () => {
                             if (!checkIsQuizSummaryPage()) return;
                             if (Date.now() < confirmUntil) {
@@ -2119,6 +2188,25 @@
                         summaryAutoSubmitTimer = setTimeout(verifySubmission, 150);
                         return;
                     }
+
+                    // Direct form submission fallback after 2.5s if no confirmation modal appeared:
+                    if (!formSubmittedDirectly && Date.now() - submitStartTime > 2500) {
+                        const parentForm = currentSubmitBtn.form || currentSubmitBtn.closest('form');
+                        if (parentForm && parentForm.action && parentForm.action.includes('processattempt.php')) {
+                            formSubmittedDirectly = true;
+                            setLog("<b>Auto-Submit:</b> Submitting Moodle attempt form directly...", "var(--accent-green)");
+                            try {
+                                if (parentForm.requestSubmit) {
+                                    parentForm.requestSubmit(currentSubmitBtn);
+                                } else {
+                                    parentForm.submit();
+                                }
+                            } catch (_) {
+                                try { parentForm.submit(); } catch (_) {}
+                            }
+                        }
+                    }
+
                     if (Date.now() < confirmUntil) {
                         summaryAutoSubmitTimer = setTimeout(confirmSubmission, 150);
                         return;

@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.0'), "Userscript header must specify v1.13.0");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.0";'), "Constant SCRIPT_VERSION must be v1.13.0");
+    assert.ok(script.includes('@version      1.13.1'), "Userscript header must specify v1.13.1");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.1";'), "Constant SCRIPT_VERSION must be v1.13.1");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4138,11 +4138,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.13.0-blue.svg"), "README badge must show v1.13.0");
+    assert.ok(readme.includes("version-1.13.1-blue.svg"), "README badge must show v1.13.1");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.13.0<"), "Website must display v1.13.0 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.13.1<"), "Website must display v1.13.1 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
