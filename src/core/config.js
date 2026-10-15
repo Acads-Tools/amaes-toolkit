@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.12.1";
+    const SCRIPT_VERSION = "v1.12.6";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -315,6 +315,9 @@
 
     function getSemesterCoursesUrl() {
         const origin = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : 'https://semestral.amaes.com';
+        if (origin.includes('semestralexam.amaes.com')) {
+            return `${origin}${getSemesterBasePath()}`;
+        }
         return `${origin}${getSemesterBasePath()}my/courses.php`;
     }
 

@@ -1076,6 +1076,7 @@
 
         // If on quiz attempt page, the unified runAutoQuizSolver handles highlighting, auto-picking & auto-next.
         // Never highlight over graded review pages.
+        const cachedQuestions = subCode ? getCachedAnswers(subCode) : null;
         if (autoHighlightQuiz && isQuiz && cachedQuestions && !checkIsQuizAttemptPage() && !checkIsReviewPage()) {
             setTimeout(() => {
                 const res = highlightQuizAnswers(cachedQuestions, false);

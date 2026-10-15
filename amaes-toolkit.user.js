@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.12.1
+// @version      1.12.6
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.12.1";
+    const SCRIPT_VERSION = "v1.12.6";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -349,6 +349,9 @@
 
     function getSemesterCoursesUrl() {
         const origin = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : 'https://semestral.amaes.com';
+        if (origin.includes('semestralexam.amaes.com')) {
+            return `${origin}${getSemesterBasePath()}`;
+        }
         return `${origin}${getSemesterBasePath()}my/courses.php`;
     }
 
@@ -22486,6 +22489,7 @@ function setupAccountTransferUI() {
 
         // If on quiz attempt page, the unified runAutoQuizSolver handles highlighting, auto-picking & auto-next.
         // Never highlight over graded review pages.
+        const cachedQuestions = subCode ? getCachedAnswers(subCode) : null;
         if (autoHighlightQuiz && isQuiz && cachedQuestions && !checkIsQuizAttemptPage() && !checkIsReviewPage()) {
             setTimeout(() => {
                 const res = highlightQuizAnswers(cachedQuestions, false);

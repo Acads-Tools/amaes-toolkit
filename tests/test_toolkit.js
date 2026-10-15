@@ -2924,8 +2924,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.12.1'), "Userscript header must specify v1.12.1");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.12.1";'), "Constant SCRIPT_VERSION must be v1.12.1");
+    assert.ok(script.includes('@version      1.12.6'), "Userscript header must specify v1.12.6");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.12.6";'), "Constant SCRIPT_VERSION must be v1.12.6");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4136,11 +4136,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.12.1-blue.svg"), "README badge must show v1.12.1");
+    assert.ok(readme.includes("version-1.12.6-blue.svg"), "README badge must show v1.12.6");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.12.1<"), "Website must display v1.12.1 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.12.6<"), "Website must display v1.12.6 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -5970,6 +5970,180 @@ test("Auto-Harvest Reviewability Detection, Locked Exam Skip Protection & Exam P
     assert.ok(script.includes("Exams (≥80%)"), "Single auto-mark button must adapt text for exams");
     assert.ok(script.includes("Highlight All Exams"), "Highlighter must adapt text for exams on exam portal");
     assert.ok(script.includes("Lectures are not hosted on the Exam Portal"), "runBatch must block lecture batching on exam portals");
+});
+
+test("Panel Initialization & Quiz Attempt Safe Runtime Execution (v1.12.6)", () => {
+    const fs = require('fs');
+    const vm = require('vm');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Static declaration integrity
+    assert.ok(
+        script.includes("const cachedQuestions = subCode ? getCachedAnswers(subCode) : null;"),
+        "cachedQuestions must be declared before autoHighlightQuiz check to prevent ReferenceError"
+    );
+    assert.ok(
+        script.includes("if (origin.includes('semestralexam.amaes.com'))"),
+        "getSemesterCoursesUrl must check for semestralexam.amaes.com origin"
+    );
+
+    // 2. Exam portal home URL evaluation
+    const evalCoursesUrl = (hostname, path) => {
+        const origin = `https://${hostname}`;
+        const getSemesterBasePath = () => {
+            const m = path.match(/^\/(\d{3,5})\//);
+            return m ? `/${m[1]}/` : '/';
+        };
+        if (origin.includes('semestralexam.amaes.com')) {
+            return `${origin}${getSemesterBasePath()}`;
+        }
+        return `${origin}${getSemesterBasePath()}my/courses.php`;
+    };
+    assert.strictEqual(
+        evalCoursesUrl('semestralexam.amaes.com', '/2612/mod/quiz/attempt.php'),
+        'https://semestralexam.amaes.com/2612/',
+        'Exam portal home button must link to root semester path /2612/'
+    );
+    assert.strictEqual(
+        evalCoursesUrl('semestral.amaes.com', '/2612/mod/quiz/attempt.php'),
+        'https://semestral.amaes.com/2612/my/courses.php',
+        'Standard portal home button must link to my/courses.php'
+    );
+
+    // 3. Dynamic VM Runtime Simulation on Quiz Attempt Page
+    const domListeners = {};
+    const elements = {};
+    function createMockElement(id, tag = 'div') {
+        const el = {
+            id,
+            tagName: tag.toUpperCase(),
+            classList: {
+                add: () => {},
+                remove: () => {},
+                contains: () => false,
+                toggle: () => {}
+            },
+            style: {},
+            setAttribute: () => {},
+            getAttribute: () => null,
+            appendChild: (child) => {
+                if (child && child.id) elements[child.id] = child;
+                return child;
+            },
+            querySelector: () => null,
+            querySelectorAll: () => [],
+            addEventListener: (ev, fn) => {
+                domListeners[ev] = domListeners[ev] || [];
+                domListeners[ev].push(fn);
+            },
+            removeEventListener: () => {},
+            remove: () => {},
+            focus: () => {},
+            scrollIntoView: () => {},
+            click: function() { if (this.onclick) this.onclick(); }
+        };
+        if (id) elements[id] = el;
+        return el;
+    }
+
+    const docElement = createMockElement('html');
+    docElement.clientWidth = 1280;
+
+    const mockDoc = {
+        getElementById: (id) => elements[id] || null,
+        querySelector: (sel) => {
+            if (sel.includes('que')) return createMockElement('q1');
+            return null;
+        },
+        querySelectorAll: () => [],
+        createElement: (tag) => createMockElement(null, tag),
+        body: createMockElement('body'),
+        head: createMockElement('head'),
+        documentElement: docElement,
+        addEventListener: (ev, fn) => {
+            domListeners[ev] = domListeners[ev] || [];
+            domListeners[ev].push(fn);
+        }
+    };
+
+    const mockWindow = {
+        innerWidth: 1280,
+        innerHeight: 800,
+        location: {
+            origin: 'https://semestral.amaes.com',
+            pathname: '/2612/mod/quiz/attempt.php',
+            search: '?attempt=123&cmid=456',
+            href: 'https://semestral.amaes.com/2612/mod/quiz/attempt.php?attempt=123&cmid=456',
+            hostname: 'semestral.amaes.com'
+        },
+        document: mockDoc,
+        localStorage: {
+            getItem: (k) => (k === 'amaes_terms_acknowledged' ? 'true' : null),
+            setItem: () => {},
+            removeItem: () => {}
+        },
+        sessionStorage: {
+            getItem: () => null,
+            setItem: () => {},
+            removeItem: () => {}
+        },
+        requestAnimationFrame: () => 1,
+        cancelAnimationFrame: () => {},
+        setTimeout: () => 1,
+        clearTimeout: () => {},
+        setInterval: () => 1,
+        clearInterval: () => {},
+        addEventListener: (ev, fn) => {
+            domListeners[ev] = domListeners[ev] || [];
+            domListeners[ev].push(fn);
+        }
+    };
+
+    const sandbox = {
+        window: mockWindow,
+        document: mockDoc,
+        location: mockWindow.location,
+        localStorage: mockWindow.localStorage,
+        sessionStorage: mockWindow.sessionStorage,
+        console: { log: () => {}, warn: () => {}, error: () => {} },
+        setTimeout: mockWindow.setTimeout,
+        clearTimeout: mockWindow.clearTimeout,
+        setInterval: mockWindow.setInterval,
+        clearInterval: mockWindow.clearInterval,
+        requestAnimationFrame: mockWindow.requestAnimationFrame,
+        cancelAnimationFrame: mockWindow.cancelAnimationFrame,
+        MutationObserver: class { observe() {} disconnect() {} },
+        AbortController: global.AbortController,
+        URLSearchParams: global.URLSearchParams,
+        GM_setValue: () => {},
+        GM_getValue: (k, d) => d,
+        GM_addStyle: () => {},
+        GM_notification: () => {},
+        GM_setClipboard: () => {},
+        GM_xmlhttpRequest: () => {},
+        DOMParser: class {
+            parseFromString() { return mockDoc; }
+        }
+    };
+
+    const instrumented = script.replace(
+        "if (document.readyState === 'loading') {",
+        "window.__runCreatePanel = createPanel; if (document.readyState === 'loading') {"
+    );
+
+    const vmContext = vm.createContext(sandbox);
+    // Evaluating the script and createPanel must complete without throwing unhandled ReferenceErrors
+    let threw = false;
+    let errorMsg = '';
+    try {
+        vm.runInContext(instrumented, vmContext);
+        sandbox.window.__runCreatePanel();
+    } catch (err) {
+        threw = true;
+        errorMsg = err.message;
+    }
+    assert.strictEqual(threw, false, `Userscript threw on quiz attempt page initialization: ${errorMsg}`);
+    assert.ok(elements['amaes-toolkit-panel'], "amaes-toolkit-panel must be created without throwing");
 });
 
 
