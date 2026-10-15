@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.12.9
+// @version      1.13.0
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.12.9";
+    const SCRIPT_VERSION = "v1.13.0";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -4139,49 +4139,15 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 <span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Question copied</span>
             </div>
             <div class="amaes-focus-instruction" style="font-size: 11.5px; color: #78350f; line-height: 1.45; margin-bottom: 8px;">
-                <b>Question is ready to paste!</b> Choose an answer below and click Next, or click <b>Ask AI</b> to get an answer.
+                <b>Question copied to clipboard!</b> Pick an answer below or click <b>Next Question</b>, or use the AI tools at the side or bottom.
                 <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">No answer known to the system yet — <b>be the first to answer and share it!</b></div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                <button id="btn-blockage-ask-ai" type="button" class="amaes-inline-btn amaes-btn-focus-ask-ai" style="
-                    display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;
-                " title="Ask Google Gemini AI to analyze and solve this question directly">${ICONS.gemini} <span>Ask AI</span></button>
-                <a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" style="
-                    display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ffffff; color: #6b21a8; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none; cursor: pointer;
-                " title="Open Google Gemini in a new tab (question already copied)">${ICONS.external} <span>Open Gemini</span></a>
-                <button type="button" class="amaes-btn-recopy-q" style="
-                    display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ffffff; color: #78350f; border: 1px solid #d97706; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
-                " title="Question text copied. Paste with Ctrl+V into AI or click Copy Again">${ICONS.copy} <span>Copy Again</span></button>
                 <button type="button" class="amaes-btn-skip-q" style="
                     display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: auto;
                 "><span>Next Question &rarr;</span></button>
             </div>
         `;
-
-        const askAiBtn = banner.querySelector('#btn-blockage-ask-ai');
-        if (askAiBtn) {
-            askAiBtn.onclick = async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (typeof manualSolveWithAi === 'function') {
-                    await manualSolveWithAi(que, askAiBtn);
-                }
-            };
-        }
-
-        const recopyBtn = banner.querySelector('.amaes-btn-recopy-q');
-        if (recopyBtn) {
-            recopyBtn.onclick = (e) => {
-                e.preventDefault();
-                const qText = cleanDOMToAI(que.querySelector('.qtext, .formulation') || que);
-                if (typeof GM_setClipboard === 'function') {
-                    GM_setClipboard(qText);
-                } else if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(qText);
-                }
-                showToast("Question re-copied to clipboard!", 2500);
-            };
-        }
 
         const skipBtn = banner.querySelector('.amaes-btn-skip-q');
         if (skipBtn) {
@@ -5017,7 +4983,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         clearTimeout(autoNextTimer);
                         const navDelay = fastQuizMode ? 200 : (isFinish ? 1200 : 1000);
                         if (isFinish) {
-                            if (autoSubmitQuiz || fastQuizMode) {
+                            if (autoSubmitQuiz || fastQuizMode || autoQuizMode) {
                                 setLog(`<b>All Questions Answered!</b> Advancing to summary in ${(navDelay / 1000).toFixed(1)}s...`, "var(--accent-green)");
                                 showToast("Finishing attempt...", navDelay + 1000);
                                 autoNextTimer = setTimeout(() => {
@@ -5357,35 +5323,13 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                             <span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Auto-quiz paused</span>
                         </div>
                         <div class="amaes-focus-instruction" style="font-size: 11.5px; color: #78350f; line-height: 1.45; margin-bottom: 8px;">
-                            <b>Question is ready to paste!</b> Choose an answer below and click Next, or click <b>Ask AI</b> to get an answer.
+                            <b>Question copied to clipboard!</b> Pick an answer below or click <b>Next Question</b>, or use the AI tools at the side or bottom.
                         </div>
                         <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                            <button id="btn-blockage-ask-ai" type="button" class="amaes-inline-btn" style="
-                                display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;
-                            " title="Ask Google Gemini AI to analyze and solve this question directly">
-                                ${ICONS.gemini} <span>${firstBlockedQue.dataset.amaesAiAttempted ? 'Retry AI' : 'Ask AI'}</span>
-                            </button>
-                            ${retryCount >= 2 ? `
-                            <button id="btn-blockage-config-ai" type="button" class="amaes-inline-btn" style="
-                                display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;
-                            " title="Add another free Google Gemini API key for higher rate limits">
-                                ${ICONS.gear} <span>Configure AI</span>
-                            </button>
-                            ` : ''}
                             <button id="btn-blockage-stop" type="button" class="amaes-inline-btn" style="
                                 display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: ${autoQuizMode ? '#fee2e2' : '#dcfce7'}; color: ${autoQuizMode ? '#b91c1c' : '#15803d'}; border: 1px solid ${autoQuizMode ? '#f87171' : '#86efac'}; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;
                             " title="${autoQuizMode ? 'Stop automation so you can answer manually without any script interference' : 'Resume Auto-Quiz'}">
                                 ${autoQuizMode ? ICONS.stop : ICONS.play} <span>${autoQuizMode ? 'Stop Auto' : 'Resume Auto'}</span>
-                            </button>
-                            <a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" style="
-                                display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ffffff; color: #6b21a8; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none; cursor: pointer;
-                            " title="Open Google Gemini in a new tab (question already copied)">
-                                ${ICONS.external} <span>Open Gemini</span>
-                            </a>
-                            <button type="button" class="amaes-btn-recopy-q" style="
-                                display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ffffff; color: #78350f; border: 1px solid #d97706; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
-                            " title="Question text copied. Paste with Ctrl+V into AI or click Copy Again">
-                                ${ICONS.copy} <span>Copy Again</span>
                             </button>
                             <button type="button" class="amaes-btn-skip-q" style="
                                 display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: auto;
@@ -5398,61 +5342,12 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     const formulation = firstBlockedQue.querySelector('.formulation, .content') || firstBlockedQue;
                     formulation.insertBefore(hud, formulation.firstChild);
 
-                    const blockageAskAi = hud.querySelector('#btn-blockage-ask-ai');
-                    if (blockageAskAi) {
-                        blockageAskAi.onclick = async (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const currentRetries = (Number(firstBlockedQue.dataset.amaesAiRetryCount) || 0) + 1;
-                            firstBlockedQue.dataset.amaesAiRetryCount = String(currentRetries);
-                            if (currentRetries >= 2 && !hud.querySelector('#btn-blockage-config-ai')) {
-                                const configBtn = document.createElement('button');
-                                configBtn.id = 'btn-blockage-config-ai';
-                                configBtn.type = 'button';
-                                configBtn.className = 'amaes-inline-btn';
-                                configBtn.style.cssText = 'padding: 4px 10px; font-size: 11px; font-weight: 700; background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s ease;';
-                                configBtn.title = 'Add another free Google Gemini API key for higher rate limits';
-                                configBtn.innerHTML = `${ICONS.gear} <span>Configure AI</span>`;
-                                configBtn.onclick = (ev) => {
-                                    ev.preventDefault();
-                                    ev.stopPropagation();
-                                    showGeminiSetupModal("Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
-                                };
-                                blockageAskAi.parentNode.insertBefore(configBtn, blockageAskAi.nextSibling);
-                            }
-                            await manualSolveWithAi(firstBlockedQue, blockageAskAi);
-                        };
-                    }
-
-                    const blockageConfigAi = hud.querySelector('#btn-blockage-config-ai');
-                    if (blockageConfigAi) {
-                        blockageConfigAi.onclick = (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            showGeminiSetupModal("Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
-                        };
-                    }
-
                     const blockageStop = hud.querySelector('#btn-blockage-stop');
                     if (blockageStop) {
                         blockageStop.onclick = (e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             toggleAutoQuizMode();
-                        };
-                    }
-
-                    const blockageRecopy = hud.querySelector('.amaes-btn-recopy-q');
-                    if (blockageRecopy) {
-                        blockageRecopy.onclick = (e) => {
-                            e.preventDefault();
-                            const qText = cleanDOMToAI(firstBlockedQue.querySelector('.qtext, .formulation') || firstBlockedQue);
-                            if (typeof GM_setClipboard === 'function') {
-                                GM_setClipboard(qText);
-                            } else if (navigator.clipboard && navigator.clipboard.writeText) {
-                                navigator.clipboard.writeText(qText);
-                            }
-                            showToast("Question re-copied to clipboard!", 2500);
                         };
                     }
 
@@ -5571,13 +5466,13 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     }
 
     function findQuizSubmitConfirmationButton() {
-        const dialogs = document.querySelectorAll('.moodle-dialogue, .modal, [role="dialog"]');
+        const dialogs = document.querySelectorAll('.moodle-dialogue, .modal, [role="dialog"], .yui3-panel, .modal-dialog, .moodle-has-zindex');
         for (const dialog of dialogs) {
-            const buttons = dialog.querySelectorAll('button, input[type="submit"], input[type="button"]');
+            const buttons = dialog.querySelectorAll('button, input[type="submit"], input[type="button"], .btn-primary, button[data-action="save"]');
             const confirmation = Array.from(buttons).find(button => {
                 if (button.disabled) return false;
                 const label = `${button.value || ''} ${button.innerText || button.textContent || ''}`.trim();
-                return /submit all and finish|submit attempt|^submit$/i.test(label) &&
+                return /submit all and finish|submit attempt|^submit$|^finish$/i.test(label) &&
                     !/cancel|do not submit/i.test(label);
             });
             if (confirmation) return confirmation;
@@ -5721,7 +5616,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         // ALL QUESTIONS ANSWERED: Ready for submission!
         document.getElementById('amaes-summary-incomplete-banner')?.remove();
 
-        const shouldAutoSubmit = autoSubmitQuiz;
+        const shouldAutoSubmit = autoSubmitQuiz || autoQuizMode;
 
         // Render Ready Banner
         let readyBanner = document.getElementById('amaes-summary-ready-banner');
@@ -5778,7 +5673,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             }
         }
 
-        if (autoSubmitQuiz && !summaryAutoSubmitAttempted && !summaryAutoSubmitTimer) {
+        if ((autoSubmitQuiz || autoQuizMode) && !summaryAutoSubmitAttempted && !summaryAutoSubmitTimer) {
             if (!submitBtn) {
                 showQuizSubmitFallback(
                     'Auto-submit could not find Moodle’s “Submit all and finish” button. Locate Moodle’s submission control on this page and click it to finish.',
@@ -9531,6 +9426,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         } else if (isGrades) {
             const rows = Array.from(document.querySelectorAll('.user-grade tr, .generaltable tr, table.table tr, tr'));
             rows.forEach(r => {
+                if (r.classList.contains('coursetotal') || r.classList.contains('category') || r.classList.contains('categoryitem') || r.classList.contains('courseitem')) return;
+
                 const quizLink = r.querySelector('a[href*="/mod/quiz/"], a[href*="quiz"], a.gradeitemheader')
                               || r.querySelector('.column-itemname a, th a, td:first-child a');
                 if (!quizLink) return;
@@ -9538,9 +9435,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 const href = quizLink.getAttribute('href') || quizLink.href || '';
                 const rawTitle = quizLink.innerText.trim();
                 if (!rawTitle || (!href.includes('quiz') && !r.innerText.toLowerCase().includes('quiz'))) return;
-
-                const rowText = r.innerText || '';
-                if (rowText.includes('( Empty )') || rowText.includes('(Empty)')) return;
 
                 // Check grade
                 const gradeCell = r.querySelector('.column-grade, [headers*="grade"], td.grade');
@@ -10101,8 +9995,17 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             if (!window.location.pathname.includes('/login/')) return;
 
             if (pending.stage === 'attempted') {
+                try {
+                    const accounts = await getAccountSwitcherAccounts();
+                    const acc = accounts.find(saved => saved.id === pending.accountId);
+                    if (acc) {
+                        acc.lastLoginFailed = true;
+                        await saveAccountSwitcherAccounts(accounts);
+                    }
+                } catch (_) {}
                 await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY);
                 await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY);
+                accountSwitcherSetStatus('Login did not complete. Check the credentials and try again.', true);
                 return;
             }
 
@@ -10154,6 +10057,14 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                         await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY);
                         await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY);
                         accountSwitcherSetStatus('Login did not complete. Check the credentials and try again.', true);
+                        try {
+                            const currentAccounts = await getAccountSwitcherAccounts();
+                            const acc = currentAccounts.find(saved => saved.id === pending.accountId);
+                            if (acc) {
+                                acc.lastLoginFailed = true;
+                                await saveAccountSwitcherAccounts(currentAccounts);
+                            }
+                        } catch (_) {}
                     }
                 } catch (error) {
                     console.error(`[AMAES Account Switcher] Could not clear a failed login attempt: ${error.message || error}`);
@@ -10169,6 +10080,17 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             if (typeof GM_getValue !== 'function' || typeof GM_deleteValue !== 'function') return false;
             const pending = await getAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY, null);
             if (!pending || pending.stage !== 'attempted') return false;
+
+            if (pending.accountId) {
+                try {
+                    const accounts = await getAccountSwitcherAccounts();
+                    const acc = accounts.find(a => a.id === pending.accountId);
+                    if (acc && acc.lastLoginFailed) {
+                        delete acc.lastLoginFailed;
+                        await saveAccountSwitcherAccounts(accounts);
+                    }
+                } catch (_) {}
+            }
 
             await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY);
             const returnTarget = await getAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY, null);
@@ -10238,11 +10160,17 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     currentProfileName === normalizeAccountSwitcherIdentity(account.nickname) ||
                     currentProfileName === normalizeAccountSwitcherIdentity(account.username)
                 ));
-                status.textContent = isCurrentAccount ? 'Active' : 'Saved';
-                status.title = isCurrentAccount
-                    ? 'Matches the name shown in the current Moodle profile.'
-                    : 'Saved in this browser; not matched to the current Moodle profile name.';
-                status.style.cssText = `font-size: 9px; white-space: nowrap; color: ${isCurrentAccount ? 'var(--accent-green, #22c55e)' : 'var(--text-muted)'};`;
+                if (account.lastLoginFailed) {
+                    status.textContent = 'Login Failed';
+                    status.title = 'Last login attempt failed. Click Edit to update your password or username.';
+                    status.style.cssText = 'font-size: 8.5px; font-weight: 700; white-space: nowrap; color: #ef4444; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); padding: 1px 4px; border-radius: 3px;';
+                } else {
+                    status.textContent = isCurrentAccount ? 'Active' : 'Saved';
+                    status.title = isCurrentAccount
+                        ? 'Matches the name shown in the current Moodle profile.'
+                        : 'Saved in this browser; not matched to the current Moodle profile name.';
+                    status.style.cssText = `font-size: 9px; white-space: nowrap; color: ${isCurrentAccount ? 'var(--accent-green, #22c55e)' : 'var(--text-muted)'};`;
+                }
 
                 const editButton = document.createElement('button');
                 editButton.type = 'button';
@@ -10304,15 +10232,24 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 const nicknameInput = document.getElementById('amaes-account-switcher-nickname');
                 const username = usernameInput.value.trim();
                 const password = passwordInput.value;
-                const nickname = nicknameInput.value.trim();
-                if (!username || !password || !nickname) {
-                    accountSwitcherSetStatus('Enter a username, password, and nickname.', true);
+                const nickname = nicknameInput.value.trim() || username;
+                if (!username || !password) {
+                    accountSwitcherSetStatus('Enter a username and password.', true);
                     return;
                 }
 
                 try {
                     const wasEditing = Boolean(editingAccountId);
                     let accounts = await getAccountSwitcherAccounts();
+                    const isDuplicate = accounts.some(a =>
+                        a.id !== editingAccountId &&
+                        a.username.trim().toLowerCase() === username.toLowerCase()
+                    );
+                    if (isDuplicate) {
+                        accountSwitcherSetStatus(`An account with username "${username}" already exists.`, true);
+                        return;
+                    }
+
                     const id = editingAccountId || (crypto.randomUUID
                         ? crypto.randomUUID()
                         : `account-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -15408,48 +15345,46 @@ function setupAccountTransferUI() {
 
                         <!-- Dynamic Gemini key rows -->
                         <div id="amaes-gemini-key-rows" style="display: flex; flex-direction: column; gap: 6px;"></div>
+
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; padding-top: 6px; border-top: 1px solid var(--border-subtle, #334155);">
+                            <button id="amaes-gemini-btn-add-key" type="button" style="
+                                background: transparent;
+                                border: 1px dashed rgba(168,85,247,0.4);
+                                color: #a78bfa;
+                                border-radius: 5px;
+                                font-size: 10px;
+                                font-weight: 600;
+                                padding: 4px 10px;
+                                cursor: pointer;
+                            ">+ Add Backup Key</button>
+
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <span style="font-size: 10px; color: var(--text-muted, #94a3b8);">Plan:</span>
+                                <select id="amaes-gemini-plan-select" style="
+                                    background: var(--surface, #1e293b);
+                                    color: var(--text-primary, #f8fafc);
+                                    border: 1px solid var(--border, #334155);
+                                    padding: 2px 6px;
+                                    border-radius: 4px;
+                                    font-size: 10px;
+                                    cursor: pointer;
+                                ">
+                                    <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
+                                    <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="amaes-multikey-explain" style="padding: 6px 10px; background: rgba(124,58,237,0.1); border: 1px solid rgba(168,85,247,0.25); border-radius: 6px; font-size: 10px; color: #d8b4fe; line-height: 1.4;">
+                            <b style="color: #ffffff;">Higher Limits with Multiple Keys:</b> Add backup keys to automatically rotate between your keys and bypass rate limits.
+                        </div>
                     </div>
 
                     <!-- Collapsible Advanced Settings (Non-Tech Friendly) -->
                     <details style="padding: 0; margin: 0;">
                         <summary style="font-size: 11px; font-weight: 600; color: var(--text-muted, #94a3b8); cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
-                            <span>Advanced Settings (Backup Keys, Jev Classifier & Sharing)</span>
+                            <span>Advanced Settings (TypeSafe Jev Classifier & Sharing)</span>
                         </summary>
                         <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px; padding-left: 4px;">
-                            <!-- Backup Keys & Tier -->
-                            <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg, #0f172a); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
-                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-                                    <button id="amaes-gemini-btn-add-key" type="button" style="
-                                        background: transparent;
-                                        border: 1px dashed rgba(168,85,247,0.4);
-                                        color: #a78bfa;
-                                        border-radius: 5px;
-                                        font-size: 10px;
-                                        font-weight: 600;
-                                        padding: 4px 10px;
-                                        cursor: pointer;
-                                    ">+ Add Backup Key</button>
-
-                                    <div style="display: flex; align-items: center; gap: 5px;">
-                                        <span style="font-size: 10px; color: var(--text-muted, #94a3b8);">Plan:</span>
-                                        <select id="amaes-gemini-plan-select" style="
-                                            background: var(--surface, #1e293b);
-                                            color: var(--text-primary, #f8fafc);
-                                            border: 1px solid var(--border, #334155);
-                                            padding: 2px 6px;
-                                            border-radius: 4px;
-                                            font-size: 10px;
-                                            cursor: pointer;
-                                        ">
-                                            <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
-                                            <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div id="amaes-multikey-explain" style="padding: 6px 10px; background: rgba(124,58,237,0.1); border: 1px solid rgba(168,85,247,0.25); border-radius: 6px; font-size: 10px; color: #d8b4fe; line-height: 1.4;">
-                                    <b style="color: #ffffff;">Higher Limits with Multiple Keys:</b> Add backup keys to automatically rotate between your keys and bypass rate limits.
-                                </div>
-                            </div>
 
                             <!-- 2. TypeSafe Jev Decision Engine Card -->
                             <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg, #0f172a); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
@@ -15552,6 +15487,7 @@ function setupAccountTransferUI() {
                     <span style="font-size:9.5px; color:#a78bfa; min-width:90px; font-weight:600;">${KEY_LABELS[idx] || ('Key #' + (idx+1))}</span>
                     <input type="password" placeholder="AIzaSy..." value="${val.replace(/"/g, '&quot;')}" style="flex:1; background:var(--surface,#1e293b); color:#f8fafc; border:1px solid var(--border,#334155); padding:5px 8px; border-radius:5px; font-size:11px; outline:none; font-family:monospace;" />
                     <button type="button" class="amaes-key-paste-btn" style="background:var(--surface,#1e293b); border:1px solid var(--border,#334155); color:#a78bfa; border-radius:5px; padding:4px 8px; font-size:10px; cursor:pointer;">Paste</button>
+                    <button type="button" class="amaes-key-test-btn" style="background:rgba(124,58,237,0.15); border:1px solid rgba(168,85,247,0.35); color:#d8b4fe; border-radius:5px; padding:4px 8px; font-size:10px; font-weight:600; cursor:pointer;" title="Test this specific API key">Test</button>
                     ${idx > 0 ? `<button type="button" class="amaes-key-remove-btn" style="background:transparent; border:1px solid rgba(239,68,68,0.35); color:#f87171; border-radius:5px; padding:4px 8px; font-size:10px; cursor:pointer;" title="Remove key">Remove</button>` : ''}
                 `;
                 row.querySelector('.amaes-key-paste-btn').onclick = async () => {
@@ -15563,6 +15499,49 @@ function setupAccountTransferUI() {
                         } else { inp.focus(); inp.select(); }
                     } catch (_) { inp.focus(); }
                 };
+                const testBtn = row.querySelector('.amaes-key-test-btn');
+                if (testBtn) {
+                    testBtn.onclick = async () => {
+                        const inpVal = row.querySelector('input').value.trim();
+                        if (!inpVal) {
+                            showToast('Paste or type an API key first to test.', 2500);
+                            return;
+                        }
+                        testBtn.disabled = true;
+                        testBtn.textContent = 'Testing...';
+                        try {
+                            const res = await callGeminiApi({
+                                apiKey: inpVal,
+                                prompt: 'Ping',
+                                maxOutputTokens: 2
+                            });
+                            if (res && res.success) {
+                                testBtn.textContent = 'Valid';
+                                testBtn.style.background = 'rgba(16, 185, 129, 0.2)';
+                                testBtn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                                testBtn.style.color = '#34d399';
+                                showToast(`${KEY_LABELS[idx] || ('Key #' + (idx+1))} is valid!`);
+                            } else {
+                                testBtn.textContent = 'Failed';
+                                testBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+                                testBtn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                                testBtn.style.color = '#f87171';
+                                const errMsg = res?.error || 'Validation error';
+                                showToast(`Key error: ${errMsg.slice(0, 60)}`, 3500);
+                            }
+                        } catch (err) {
+                            testBtn.textContent = 'Failed';
+                            testBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+                            testBtn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                            testBtn.style.color = '#f87171';
+                            showToast(`Key error: ${(err.message || err).slice(0, 60)}`, 3500);
+                        } finally {
+                            setTimeout(() => {
+                                testBtn.disabled = false;
+                            }, 500);
+                        }
+                    };
+                }
                 const removeRowBtn = row.querySelector('.amaes-key-remove-btn');
                 if (removeRowBtn) {
                     removeRowBtn.onclick = () => {
@@ -19888,15 +19867,12 @@ function setupAccountTransferUI() {
                     <div id="mod-highlighter-card" class="amaes-card">
                         ${renderCardContent('mod-highlighter', ICONS.preview, 'Activity Highlighter', '', `
                             <div style="display: flex; gap: 4px;">
-                                ${renderToolBtn({ id: 'btn-hl-all', icon: '', text: isExamPortal ? 'Highlight All Exams' : 'Highlight All', style: 'flex: 2; font-weight: 600;' })}
-                                ${renderToolBtn({ id: 'btn-hl-clear', icon: ICONS.clear, text: 'Clear', style: 'flex: 1;' })}
+                                ${renderToolBtn({ id: 'btn-hl-missing-quizzes-course', icon: ICONS.target, text: isExamPortal ? 'Highlight Incomplete Exams (<80%)' : 'Highlight Incomplete Quizzes (<80%)', title: isExamPortal ? 'Highlight unanswered, unattempted, or missing exams (<80%)' : 'Highlight unanswered, unattempted, or missing quizzes (<80%)', style: 'width: 100%; font-weight: 700; padding: 6px; background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35);' })}
                             </div>
-                            ${!isExamPortal ? `
                             <div style="display: flex; gap: 4px; margin-top: 4px;">
-                                ${renderToolBtn({ id: 'btn-hl-lec', icon: ICONS.book, text: 'Lectures', title: 'Highlight Lectures & Lessons', style: 'flex: 1;' })}
-                                ${renderToolBtn({ id: 'btn-hl-vid', icon: ICONS.video, text: 'Videos', title: 'Highlight Video Lectures', style: 'flex: 1;' })}
+                                ${!isExamPortal ? renderToolBtn({ id: 'btn-hl-lec', icon: ICONS.book, text: 'Lectures', title: 'Highlight Lectures & Lessons', style: 'flex: 1;' }) : ''}
+                                ${renderToolBtn({ id: 'btn-hl-clear', icon: ICONS.clear, text: 'Clear', title: 'Clear all highlights', style: 'flex: 1;' })}
                             </div>
-                            ` : ''}
                         `)}
                     </div>
 
@@ -19975,76 +19951,78 @@ function setupAccountTransferUI() {
                 </div>
 
                 <!-- TAB PANE 4: Account Switcher -->
-                <div id="tab-pane-accounts" class="amaes-tab-pane" style="display: none; padding: 8px; flex-direction: column; gap: 7px;">
-                    <div id="amaes-account-switcher-card" class="amaes-card" style="padding: 8px; display: flex; flex-direction: column; gap: 7px;">
-                        <div style="font-size: 11px; font-weight: 700; color: var(--text-primary);">Account Switcher</div>
-                        <form id="amaes-account-switcher-form" style="display: flex; flex-direction: column; gap: 5px;">
-                            <input id="amaes-account-switcher-username" type="text" autocomplete="off" placeholder="Username / USN" aria-label="Username / USN" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
-                            <input id="amaes-account-switcher-password" type="password" autocomplete="new-password" placeholder="Password" aria-label="Password" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
-                            <input id="amaes-account-switcher-nickname" type="text" autocomplete="off" placeholder="Nickname / Display name" aria-label="Nickname / Display name" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
-                            <button id="amaes-account-switcher-submit" type="submit" class="amaes-btn amaes-btn-monotone" style="justify-content: center; padding: 6px; font-size: 10px;">Add account</button>
-                            <button id="amaes-account-switcher-cancel-edit" type="button" class="amaes-btn amaes-btn-outline" style="display: none; justify-content: center; padding: 6px; font-size: 10px;">Cancel edit</button>
-                        </form>
-                        <div id="amaes-account-switcher-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
-                        <div id="amaes-account-transfer" style="border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px; background: rgba(255, 255, 255, 0.02); display: flex; flex-direction: column; gap: 8px;">
-                            <div style="font-size: 11px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-                                <span style="display: inline-flex; align-items: center; color: var(--accent-blue);">${ICONS.share || ICONS.cloud}</span>
-                                <span>Transfer Setup to Another Device</span>
-                            </div>
-                            <div style="font-size: 9.5px; color: var(--text-secondary); line-height: 1.4;">
-                                Easily sync your saved Moodle accounts, Gemini AI keys, and settings to your other phone, laptop, or computer in two simple steps.
-                            </div>
+                <div id="tab-pane-accounts" class="amaes-tab-pane" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
+                    <div id="mod-accounts-switcher-card" class="amaes-card">
+                        ${renderCardContent('mod-accounts-switcher', ICONS.user, 'Account Switcher', '', `
+                            <form id="amaes-account-switcher-form" style="display: flex; flex-direction: column; gap: 5px;">
+                                <input id="amaes-account-switcher-username" type="text" autocomplete="off" placeholder="Username / USN" aria-label="Username / USN" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                                <input id="amaes-account-switcher-password" type="password" autocomplete="new-password" placeholder="Password" aria-label="Password" required style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                                <input id="amaes-account-switcher-nickname" type="text" autocomplete="off" placeholder="Nickname / Display name (optional)" aria-label="Nickname / Display name (optional)" style="background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 6px 7px; border-radius: 5px; font-size: 10px;" />
+                                <button id="amaes-account-switcher-submit" type="submit" class="amaes-btn amaes-btn-monotone" style="justify-content: center; padding: 6px; font-size: 10px;">Add account</button>
+                                <button id="amaes-account-switcher-cancel-edit" type="button" class="amaes-btn amaes-btn-outline" style="display: none; justify-content: center; padding: 6px; font-size: 10px;">Cancel edit</button>
+                            </form>
+                            <div id="amaes-account-switcher-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
+                            <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 9.5px; color: var(--text-secondary); cursor: pointer; margin-top: 2px;">
+                                <input id="amaes-account-switcher-return" type="checkbox" style="margin: 1px 0 0; cursor: pointer;" />
+                                <span>Return to current page after switch</span>
+                            </label>
+                            <div style="font-size: 9px; color: var(--text-muted); line-height: 1.4;">Accounts are saved only in your userscript manager on this device. They are not sent to the toolkit relay; your login details are entered only on Moodle.</div>
+                            <div id="amaes-account-switcher-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
+                        `)}
+                    </div>
 
-                            <!-- Step 1: Send from this device -->
-                            <div style="background: var(--bg); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
-                                <div style="font-size: 10px; font-weight: 700; color: var(--text-primary);">Step 1: Send Setup (This Device)</div>
-                                <div style="display: flex; flex-direction: column; gap: 3px;">
-                                    <label style="display: flex; gap: 6px; align-items: center; font-size: 9px; color: var(--text-secondary); cursor: pointer;">
-                                        <input id="amaes-transfer-include-accounts" type="checkbox" checked style="cursor: pointer; margin: 0;" />
-                                        <span>Saved Moodle Accounts & Logins</span>
-                                    </label>
-                                    <label style="display: flex; gap: 6px; align-items: center; font-size: 9px; color: var(--text-secondary); cursor: pointer;">
-                                        <input id="amaes-transfer-include-api-keys" type="checkbox" checked style="cursor: pointer; margin: 0;" />
-                                        <span>Personal Gemini API Keys</span>
-                                    </label>
-                                    <label style="display: flex; gap: 6px; align-items: center; font-size: 9px; color: var(--text-secondary); cursor: pointer;">
-                                        <input id="amaes-transfer-include-settings" type="checkbox" checked style="cursor: pointer; margin: 0;" />
-                                        <span>Toolkit Preferences & Themes</span>
-                                    </label>
-                                    <input id="amaes-transfer-secret-consent" type="checkbox" checked style="display: none;" />
+                    <div id="mod-accounts-transfer-card" class="amaes-card">
+                        ${renderCardContent('mod-accounts-transfer', ICONS.share || ICONS.cloud, 'Setup Transfer (Sync Devices)', '', `
+                            <div id="amaes-account-transfer" style="display: flex; flex-direction: column; gap: 8px;">
+                                <div style="font-size: 9.5px; color: var(--text-secondary); line-height: 1.4;">
+                                    Easily sync your saved Moodle accounts, Gemini AI keys, and settings to your other phone, laptop, or computer in two simple steps.
                                 </div>
-                                <button id="amaes-transfer-create" type="button" class="amaes-btn amaes-btn-monotone" style="justify-content: center; font-size: 9.5px; font-weight: 700; padding: 6px;">
-                                    Generate One-Time Transfer Code
-                                </button>
-                                <input id="amaes-transfer-code" type="text" readonly hidden aria-label="One-time transfer code" style="width: 100%; box-sizing: border-box; background: var(--surface, #1e293b); color: var(--text-primary); border: 1px solid var(--accent-blue, #3b82f6); padding: 6px 8px; border-radius: 4px; font-size: 10px; font-family: monospace; text-align: center;" />
-                                <button id="amaes-transfer-copy" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">
-                                    ${ICONS.copy} <span>Copy Code Again</span>
-                                </button>
-                            </div>
 
-                            <!-- Step 2: Receive on this device -->
-                            <div style="background: var(--bg); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
-                                <div style="font-size: 10px; font-weight: 700; color: var(--text-primary);">Step 2: Receive Setup (New Device)</div>
-                                <div style="font-size: 9px; color: var(--text-secondary);">
-                                    Paste the 43-character code generated from your other device:
+                                <!-- Step 1: Send from this device -->
+                                <div style="background: var(--bg); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
+                                    <div style="font-size: 10px; font-weight: 700; color: var(--text-primary);">Step 1: Send Setup (This Device)</div>
+                                    <div style="display: flex; flex-direction: column; gap: 3px;">
+                                        <label style="display: flex; gap: 6px; align-items: center; font-size: 9px; color: var(--text-secondary); cursor: pointer;">
+                                            <input id="amaes-transfer-include-accounts" type="checkbox" checked style="cursor: pointer; margin: 0;" />
+                                            <span>Saved Moodle Accounts & Logins</span>
+                                        </label>
+                                        <label style="display: flex; gap: 6px; align-items: center; font-size: 9px; color: var(--text-secondary); cursor: pointer;">
+                                            <input id="amaes-transfer-include-api-keys" type="checkbox" checked style="cursor: pointer; margin: 0;" />
+                                            <span>Personal Gemini API Keys</span>
+                                        </label>
+                                        <label style="display: flex; gap: 6px; align-items: center; font-size: 9px; color: var(--text-secondary); cursor: pointer;">
+                                            <input id="amaes-transfer-include-settings" type="checkbox" checked style="cursor: pointer; margin: 0;" />
+                                            <span>Toolkit Preferences & Themes</span>
+                                        </label>
+                                        <input id="amaes-transfer-secret-consent" type="checkbox" checked style="display: none;" />
+                                    </div>
+                                    <button id="amaes-transfer-create" type="button" class="amaes-btn amaes-btn-monotone" style="justify-content: center; font-size: 9.5px; font-weight: 700; padding: 6px;">
+                                        Generate One-Time Transfer Code
+                                    </button>
+                                    <input id="amaes-transfer-code" type="text" readonly hidden aria-label="One-time transfer code" style="width: 100%; box-sizing: border-box; background: var(--surface, #1e293b); color: var(--text-primary); border: 1px solid var(--accent-blue, #3b82f6); padding: 6px 8px; border-radius: 4px; font-size: 10px; font-family: monospace; text-align: center;" />
+                                    <button id="amaes-transfer-copy" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">
+                                        ${ICONS.copy} <span>Copy Code Again</span>
+                                    </button>
                                 </div>
-                                <div style="display: flex; gap: 4px; align-items: center;">
-                                    <input id="amaes-transfer-import-code" type="password" autocomplete="off" placeholder="Paste transfer code here..." aria-label="Transfer code" style="flex: 1; min-width: 0; background: var(--surface, #1e293b); color: var(--text-primary); border: 1px solid var(--border); padding: 5px 7px; border-radius: 4px; font-size: 9.5px; font-family: monospace;" />
-                                    <button id="amaes-transfer-import" type="button" class="amaes-btn amaes-btn-outline" style="width: auto; flex-shrink: 0; white-space: nowrap; justify-content: center; font-size: 9px; padding: 5px 9px;">Import Setup</button>
+
+                                <!-- Step 2: Receive on this device -->
+                                <div style="background: var(--bg); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
+                                    <div style="font-size: 10px; font-weight: 700; color: var(--text-primary);">Step 2: Receive Setup (New Device)</div>
+                                    <div style="font-size: 9px; color: var(--text-secondary);">
+                                        Paste the 43-character code generated from your other device:
+                                    </div>
+                                    <div style="display: flex; gap: 4px; align-items: center;">
+                                        <input id="amaes-transfer-import-code" type="password" autocomplete="off" placeholder="Paste transfer code here..." aria-label="Transfer code" style="flex: 1; min-width: 0; background: var(--surface, #1e293b); color: var(--text-primary); border: 1px solid var(--border); padding: 5px 7px; border-radius: 4px; font-size: 9.5px; font-family: monospace;" />
+                                        <button id="amaes-transfer-import" type="button" class="amaes-btn amaes-btn-outline" style="width: auto; flex-shrink: 0; white-space: nowrap; justify-content: center; font-size: 9px; padding: 5px 9px;">Import Setup</button>
+                                    </div>
+                                    <div id="amaes-transfer-preview" hidden role="status" style="font-size: 9px; color: var(--text-secondary); line-height: 1.4; padding: 5px 7px; background: rgba(59, 130, 246, 0.08); border-radius: 4px;"></div>
+                                    <button id="amaes-transfer-apply" type="button" class="amaes-btn amaes-btn-monotone" hidden style="justify-content: center; font-size: 9px; font-weight: 700; padding: 5px;">Confirm & Apply Setup</button>
+                                    <button id="amaes-transfer-discard" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Cancel</button>
                                 </div>
-                                <div id="amaes-transfer-preview" hidden role="status" style="font-size: 9px; color: var(--text-secondary); line-height: 1.4; padding: 5px 7px; background: rgba(59, 130, 246, 0.08); border-radius: 4px;"></div>
-                                <button id="amaes-transfer-apply" type="button" class="amaes-btn amaes-btn-monotone" hidden style="justify-content: center; font-size: 9px; font-weight: 700; padding: 5px;">Confirm & Apply Setup</button>
-                                <button id="amaes-transfer-discard" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Cancel</button>
+                                <div style="font-size: 8.5px; color: var(--text-muted); line-height: 1.3;">The code does not expire, but works once only. End-to-end encrypted; credentials are saved directly to this browser.</div>
+                                <div id="amaes-account-transfer-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary); min-height: 12px;"></div>
                             </div>
-                            <div style="font-size: 8.5px; color: var(--text-muted); line-height: 1.3;">The code does not expire, but works once only. End-to-end encrypted; credentials are saved directly to this browser.</div>
-                            <div id="amaes-account-transfer-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary); min-height: 12px;"></div>
-                        </div>
-                        <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 9.5px; color: var(--text-secondary); cursor: pointer;">
-                            <input id="amaes-account-switcher-return" type="checkbox" style="margin: 1px 0 0; cursor: pointer;" />
-                            <span>Return to current page after switch</span>
-                        </label>
-                        <div style="font-size: 9px; color: var(--text-muted); line-height: 1.4;">Accounts are saved only in your userscript manager on this device. They are not sent to the toolkit relay; your login details are entered only on Moodle.</div>
-                        <div id="amaes-account-switcher-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
+                        `)}
                     </div>
                 </div>
 
@@ -22454,10 +22432,21 @@ function setupAccountTransferUI() {
         setupPersistentAccordion('mod-highlighter-header', 'mod-highlighter-body', 'mod-highlighter-arrow', 'amaes_pref_mod_hl', false);
 
         const triggerHighlight = (cat, label) => {
+            const isGrades = typeof window !== 'undefined' && window.location.pathname.includes('/grade/report/user/index.php');
+            if (isGrades && cat !== 'quiz') {
+                showToast("Open a course page to highlight lecture items.");
+                setLog("<b>Notice:</b> Open a course subject page to highlight lecture items.", "var(--accent-amber)");
+                return;
+            }
             const res = highlightItems(cat);
             if (res.error) {
-                showToast("Open a course page first to highlight items.");
-                setLog("<b>Action Blocked:</b> Open a course subject first.", "var(--accent-pink)");
+                if (isGrades) {
+                    showToast("Open a course page to highlight lecture items.");
+                    setLog("<b>Notice:</b> Open a course subject page to highlight lecture items.", "var(--accent-amber)");
+                } else {
+                    showToast("Open a course page first to highlight items.");
+                    setLog("<b>Action Blocked:</b> Open a course subject first.", "var(--accent-pink)");
+                }
             } else if (res.count === 0) {
                 showToast(`No ${label} items found to highlight on this page.`);
                 setLog(`No ${label} items found on this page.`, "var(--accent-amber)");
@@ -22482,22 +22471,28 @@ function setupAccountTransferUI() {
             setLog("Cleared all highlights.", "var(--text-muted)");
         };
 
+        const handleMissingQuizzesClick = async () => {
+            showToast("Checking quiz grades and attempt statuses...", 1500);
+            const res = await highlightMissingOrUnansweredQuizzes();
+            if (res.count > 0) {
+                showToast(`Highlighted ${res.count} missing/re-attemptable quizzes!`);
+                setLog(`Found and highlighted <b>${res.count}</b> quizzes needing completion/re-attempt (<80%).`, "var(--accent-amber)");
+            } else if (res.message) {
+                showToast(res.message);
+                setLog(res.message, "var(--accent-green)");
+            } else {
+                showToast("All quizzes achieved passing grade (≥80%)! None pending.");
+                setLog("All quizzes achieved passing grade (≥80%). No pending or missing quizzes!", "var(--accent-green)");
+            }
+        };
+
         const btnHlMissingQuizzes = document.getElementById('btn-hl-missing-quizzes');
         if (btnHlMissingQuizzes) {
-            btnHlMissingQuizzes.onclick = async () => {
-                showToast("Checking quiz grades and attempt statuses...", 1500);
-                const res = await highlightMissingOrUnansweredQuizzes();
-                if (res.count > 0) {
-                    showToast(`Highlighted ${res.count} missing/re-attemptable quizzes!`);
-                    setLog(`Found and highlighted <b>${res.count}</b> quizzes needing completion/re-attempt (<80%).`, "var(--accent-amber)");
-                } else if (res.message) {
-                    showToast(res.message);
-                    setLog(res.message, "var(--accent-green)");
-                } else {
-                    showToast("All quizzes achieved passing grade (≥80%)! None pending.");
-                    setLog("All quizzes achieved passing grade (≥80%). No pending or missing quizzes!", "var(--accent-green)");
-                }
-            };
+            btnHlMissingQuizzes.onclick = handleMissingQuizzesClick;
+        }
+        const btnHlMissingQuizzesCourse = document.getElementById('btn-hl-missing-quizzes-course');
+        if (btnHlMissingQuizzesCourse) {
+            btnHlMissingQuizzesCourse.onclick = handleMissingQuizzesClick;
         }
 
         const btnTriggerHlAnswers = document.getElementById('btn-trigger-hl-answers');
@@ -22667,6 +22662,10 @@ function setupAccountTransferUI() {
 
         setupPersistentAccordion('sub-done-header', 'sub-done-body', 'sub-done-arrow', 'amaes_pref_sub_done', false);
         setupPersistentAccordion('sub-undo-header', 'sub-undo-body', 'sub-undo-arrow', 'amaes_pref_sub_undo', false);
+
+        // --- MODULE 5: Accounts Module Cards ---
+        setupPersistentAccordion('mod-accounts-switcher-header', 'mod-accounts-switcher-body', 'mod-accounts-switcher-arrow', 'amaes_pref_mod_accounts_switcher', true);
+        setupPersistentAccordion('mod-accounts-transfer-header', 'mod-accounts-transfer-body', 'mod-accounts-transfer-arrow', 'amaes_pref_mod_accounts_transfer', false);
 
         // Lock State & Terms Acceptance Management
         const lockOverlay = document.getElementById('amaes-panel-lock-overlay');
@@ -22969,8 +22968,14 @@ function setupAccountTransferUI() {
             }
 
             if (!checkIsCoursePage()) {
-                showToast("Open a course page first to use Activity Auto-Marker!");
-                setLog("<b>Action Blocked:</b> You are not on a course page. Open a course subject first.", "var(--accent-pink)");
+                const isGrades = typeof window !== 'undefined' && window.location.pathname.includes('/grade/report/user/index.php');
+                if (isGrades) {
+                    showToast("Open the Course page to mark lecture items as done.");
+                    setLog("<b>Notice:</b> Completion checkboxes only live on Course pages. Open the Course page to mark lectures as done.", "var(--accent-amber)");
+                } else {
+                    showToast("Open a course page first to use Activity Auto-Marker!");
+                    setLog("<b>Action Blocked:</b> You are not on a course page. Open a course subject first.", "var(--accent-pink)");
+                }
                 return;
             }
 

@@ -367,8 +367,17 @@
             if (!window.location.pathname.includes('/login/')) return;
 
             if (pending.stage === 'attempted') {
+                try {
+                    const accounts = await getAccountSwitcherAccounts();
+                    const acc = accounts.find(saved => saved.id === pending.accountId);
+                    if (acc) {
+                        acc.lastLoginFailed = true;
+                        await saveAccountSwitcherAccounts(accounts);
+                    }
+                } catch (_) {}
                 await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY);
                 await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY);
+                accountSwitcherSetStatus('Login did not complete. Check the credentials and try again.', true);
                 return;
             }
 
@@ -420,6 +429,14 @@
                         await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY);
                         await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY);
                         accountSwitcherSetStatus('Login did not complete. Check the credentials and try again.', true);
+                        try {
+                            const currentAccounts = await getAccountSwitcherAccounts();
+                            const acc = currentAccounts.find(saved => saved.id === pending.accountId);
+                            if (acc) {
+                                acc.lastLoginFailed = true;
+                                await saveAccountSwitcherAccounts(currentAccounts);
+                            }
+                        } catch (_) {}
                     }
                 } catch (error) {
                     console.error(`[AMAES Account Switcher] Could not clear a failed login attempt: ${error.message || error}`);
@@ -435,6 +452,17 @@
             if (typeof GM_getValue !== 'function' || typeof GM_deleteValue !== 'function') return false;
             const pending = await getAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY, null);
             if (!pending || pending.stage !== 'attempted') return false;
+
+            if (pending.accountId) {
+                try {
+                    const accounts = await getAccountSwitcherAccounts();
+                    const acc = accounts.find(a => a.id === pending.accountId);
+                    if (acc && acc.lastLoginFailed) {
+                        delete acc.lastLoginFailed;
+                        await saveAccountSwitcherAccounts(accounts);
+                    }
+                } catch (_) {}
+            }
 
             await deleteAccountSwitcherValue(ACCOUNT_SWITCHER_PENDING_KEY);
             const returnTarget = await getAccountSwitcherValue(ACCOUNT_SWITCHER_RETURN_KEY, null);
@@ -504,11 +532,17 @@
                     currentProfileName === normalizeAccountSwitcherIdentity(account.nickname) ||
                     currentProfileName === normalizeAccountSwitcherIdentity(account.username)
                 ));
-                status.textContent = isCurrentAccount ? 'Active' : 'Saved';
-                status.title = isCurrentAccount
-                    ? 'Matches the name shown in the current Moodle profile.'
-                    : 'Saved in this browser; not matched to the current Moodle profile name.';
-                status.style.cssText = `font-size: 9px; white-space: nowrap; color: ${isCurrentAccount ? 'var(--accent-green, #22c55e)' : 'var(--text-muted)'};`;
+                if (account.lastLoginFailed) {
+                    status.textContent = 'Login Failed';
+                    status.title = 'Last login attempt failed. Click Edit to update your password or username.';
+                    status.style.cssText = 'font-size: 8.5px; font-weight: 700; white-space: nowrap; color: #ef4444; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); padding: 1px 4px; border-radius: 3px;';
+                } else {
+                    status.textContent = isCurrentAccount ? 'Active' : 'Saved';
+                    status.title = isCurrentAccount
+                        ? 'Matches the name shown in the current Moodle profile.'
+                        : 'Saved in this browser; not matched to the current Moodle profile name.';
+                    status.style.cssText = `font-size: 9px; white-space: nowrap; color: ${isCurrentAccount ? 'var(--accent-green, #22c55e)' : 'var(--text-muted)'};`;
+                }
 
                 const editButton = document.createElement('button');
                 editButton.type = 'button';
@@ -570,15 +604,24 @@
                 const nicknameInput = document.getElementById('amaes-account-switcher-nickname');
                 const username = usernameInput.value.trim();
                 const password = passwordInput.value;
-                const nickname = nicknameInput.value.trim();
-                if (!username || !password || !nickname) {
-                    accountSwitcherSetStatus('Enter a username, password, and nickname.', true);
+                const nickname = nicknameInput.value.trim() || username;
+                if (!username || !password) {
+                    accountSwitcherSetStatus('Enter a username and password.', true);
                     return;
                 }
 
                 try {
                     const wasEditing = Boolean(editingAccountId);
                     let accounts = await getAccountSwitcherAccounts();
+                    const isDuplicate = accounts.some(a =>
+                        a.id !== editingAccountId &&
+                        a.username.trim().toLowerCase() === username.toLowerCase()
+                    );
+                    if (isDuplicate) {
+                        accountSwitcherSetStatus(`An account with username "${username}" already exists.`, true);
+                        return;
+                    }
+
                     const id = editingAccountId || (crypto.randomUUID
                         ? crypto.randomUUID()
                         : `account-${Date.now()}-${Math.random().toString(36).slice(2)}`);

@@ -534,49 +534,15 @@
                 <span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Question copied</span>
             </div>
             <div class="amaes-focus-instruction" style="font-size: 11.5px; color: #78350f; line-height: 1.45; margin-bottom: 8px;">
-                <b>Question is ready to paste!</b> Choose an answer below and click Next, or click <b>Ask AI</b> to get an answer.
+                <b>Question copied to clipboard!</b> Pick an answer below or click <b>Next Question</b>, or use the AI tools at the side or bottom.
                 <div style="font-size: 10.5px; color: #b45309; margin-top: 2px;">No answer known to the system yet — <b>be the first to answer and share it!</b></div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                <button id="btn-blockage-ask-ai" type="button" class="amaes-inline-btn amaes-btn-focus-ask-ai" style="
-                    display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;
-                " title="Ask Google Gemini AI to analyze and solve this question directly">${ICONS.gemini} <span>Ask AI</span></button>
-                <a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" style="
-                    display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ffffff; color: #6b21a8; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none; cursor: pointer;
-                " title="Open Google Gemini in a new tab (question already copied)">${ICONS.external} <span>Open Gemini</span></a>
-                <button type="button" class="amaes-btn-recopy-q" style="
-                    display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ffffff; color: #78350f; border: 1px solid #d97706; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
-                " title="Question text copied. Paste with Ctrl+V into AI or click Copy Again">${ICONS.copy} <span>Copy Again</span></button>
                 <button type="button" class="amaes-btn-skip-q" style="
                     display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: auto;
                 "><span>Next Question &rarr;</span></button>
             </div>
         `;
-
-        const askAiBtn = banner.querySelector('#btn-blockage-ask-ai');
-        if (askAiBtn) {
-            askAiBtn.onclick = async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (typeof manualSolveWithAi === 'function') {
-                    await manualSolveWithAi(que, askAiBtn);
-                }
-            };
-        }
-
-        const recopyBtn = banner.querySelector('.amaes-btn-recopy-q');
-        if (recopyBtn) {
-            recopyBtn.onclick = (e) => {
-                e.preventDefault();
-                const qText = cleanDOMToAI(que.querySelector('.qtext, .formulation') || que);
-                if (typeof GM_setClipboard === 'function') {
-                    GM_setClipboard(qText);
-                } else if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(qText);
-                }
-                showToast("Question re-copied to clipboard!", 2500);
-            };
-        }
 
         const skipBtn = banner.querySelector('.amaes-btn-skip-q');
         if (skipBtn) {
@@ -1412,7 +1378,7 @@
                         clearTimeout(autoNextTimer);
                         const navDelay = fastQuizMode ? 200 : (isFinish ? 1200 : 1000);
                         if (isFinish) {
-                            if (autoSubmitQuiz || fastQuizMode) {
+                            if (autoSubmitQuiz || fastQuizMode || autoQuizMode) {
                                 setLog(`<b>All Questions Answered!</b> Advancing to summary in ${(navDelay / 1000).toFixed(1)}s...`, "var(--accent-green)");
                                 showToast("Finishing attempt...", navDelay + 1000);
                                 autoNextTimer = setTimeout(() => {
@@ -1752,35 +1718,13 @@
                             <span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Auto-quiz paused</span>
                         </div>
                         <div class="amaes-focus-instruction" style="font-size: 11.5px; color: #78350f; line-height: 1.45; margin-bottom: 8px;">
-                            <b>Question is ready to paste!</b> Choose an answer below and click Next, or click <b>Ask AI</b> to get an answer.
+                            <b>Question copied to clipboard!</b> Pick an answer below or click <b>Next Question</b>, or use the AI tools at the side or bottom.
                         </div>
                         <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                            <button id="btn-blockage-ask-ai" type="button" class="amaes-inline-btn" style="
-                                display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;
-                            " title="Ask Google Gemini AI to analyze and solve this question directly">
-                                ${ICONS.gemini} <span>${firstBlockedQue.dataset.amaesAiAttempted ? 'Retry AI' : 'Ask AI'}</span>
-                            </button>
-                            ${retryCount >= 2 ? `
-                            <button id="btn-blockage-config-ai" type="button" class="amaes-inline-btn" style="
-                                display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;
-                            " title="Add another free Google Gemini API key for higher rate limits">
-                                ${ICONS.gear} <span>Configure AI</span>
-                            </button>
-                            ` : ''}
                             <button id="btn-blockage-stop" type="button" class="amaes-inline-btn" style="
                                 display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: ${autoQuizMode ? '#fee2e2' : '#dcfce7'}; color: ${autoQuizMode ? '#b91c1c' : '#15803d'}; border: 1px solid ${autoQuizMode ? '#f87171' : '#86efac'}; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer;
                             " title="${autoQuizMode ? 'Stop automation so you can answer manually without any script interference' : 'Resume Auto-Quiz'}">
                                 ${autoQuizMode ? ICONS.stop : ICONS.play} <span>${autoQuizMode ? 'Stop Auto' : 'Resume Auto'}</span>
-                            </button>
-                            <a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" style="
-                                display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ffffff; color: #6b21a8; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 11px; font-weight: 600; text-decoration: none; cursor: pointer;
-                            " title="Open Google Gemini in a new tab (question already copied)">
-                                ${ICONS.external} <span>Open Gemini</span>
-                            </a>
-                            <button type="button" class="amaes-btn-recopy-q" style="
-                                display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; background: #ffffff; color: #78350f; border: 1px solid #d97706; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
-                            " title="Question text copied. Paste with Ctrl+V into AI or click Copy Again">
-                                ${ICONS.copy} <span>Copy Again</span>
                             </button>
                             <button type="button" class="amaes-btn-skip-q" style="
                                 display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: auto;
@@ -1793,61 +1737,12 @@
                     const formulation = firstBlockedQue.querySelector('.formulation, .content') || firstBlockedQue;
                     formulation.insertBefore(hud, formulation.firstChild);
 
-                    const blockageAskAi = hud.querySelector('#btn-blockage-ask-ai');
-                    if (blockageAskAi) {
-                        blockageAskAi.onclick = async (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const currentRetries = (Number(firstBlockedQue.dataset.amaesAiRetryCount) || 0) + 1;
-                            firstBlockedQue.dataset.amaesAiRetryCount = String(currentRetries);
-                            if (currentRetries >= 2 && !hud.querySelector('#btn-blockage-config-ai')) {
-                                const configBtn = document.createElement('button');
-                                configBtn.id = 'btn-blockage-config-ai';
-                                configBtn.type = 'button';
-                                configBtn.className = 'amaes-inline-btn';
-                                configBtn.style.cssText = 'padding: 4px 10px; font-size: 11px; font-weight: 700; background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.15s ease;';
-                                configBtn.title = 'Add another free Google Gemini API key for higher rate limits';
-                                configBtn.innerHTML = `${ICONS.gear} <span>Configure AI</span>`;
-                                configBtn.onclick = (ev) => {
-                                    ev.preventDefault();
-                                    ev.stopPropagation();
-                                    showGeminiSetupModal("Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
-                                };
-                                blockageAskAi.parentNode.insertBefore(configBtn, blockageAskAi.nextSibling);
-                            }
-                            await manualSolveWithAi(firstBlockedQue, blockageAskAi);
-                        };
-                    }
-
-                    const blockageConfigAi = hud.querySelector('#btn-blockage-config-ai');
-                    if (blockageConfigAi) {
-                        blockageConfigAi.onclick = (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            showGeminiSetupModal("Rate limited or busy? Add another free Google Gemini API key below to increase your capacity and keep solving without waiting.");
-                        };
-                    }
-
                     const blockageStop = hud.querySelector('#btn-blockage-stop');
                     if (blockageStop) {
                         blockageStop.onclick = (e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             toggleAutoQuizMode();
-                        };
-                    }
-
-                    const blockageRecopy = hud.querySelector('.amaes-btn-recopy-q');
-                    if (blockageRecopy) {
-                        blockageRecopy.onclick = (e) => {
-                            e.preventDefault();
-                            const qText = cleanDOMToAI(firstBlockedQue.querySelector('.qtext, .formulation') || firstBlockedQue);
-                            if (typeof GM_setClipboard === 'function') {
-                                GM_setClipboard(qText);
-                            } else if (navigator.clipboard && navigator.clipboard.writeText) {
-                                navigator.clipboard.writeText(qText);
-                            }
-                            showToast("Question re-copied to clipboard!", 2500);
                         };
                     }
 
@@ -1966,13 +1861,13 @@
     }
 
     function findQuizSubmitConfirmationButton() {
-        const dialogs = document.querySelectorAll('.moodle-dialogue, .modal, [role="dialog"]');
+        const dialogs = document.querySelectorAll('.moodle-dialogue, .modal, [role="dialog"], .yui3-panel, .modal-dialog, .moodle-has-zindex');
         for (const dialog of dialogs) {
-            const buttons = dialog.querySelectorAll('button, input[type="submit"], input[type="button"]');
+            const buttons = dialog.querySelectorAll('button, input[type="submit"], input[type="button"], .btn-primary, button[data-action="save"]');
             const confirmation = Array.from(buttons).find(button => {
                 if (button.disabled) return false;
                 const label = `${button.value || ''} ${button.innerText || button.textContent || ''}`.trim();
-                return /submit all and finish|submit attempt|^submit$/i.test(label) &&
+                return /submit all and finish|submit attempt|^submit$|^finish$/i.test(label) &&
                     !/cancel|do not submit/i.test(label);
             });
             if (confirmation) return confirmation;
@@ -2116,7 +2011,7 @@
         // ALL QUESTIONS ANSWERED: Ready for submission!
         document.getElementById('amaes-summary-incomplete-banner')?.remove();
 
-        const shouldAutoSubmit = autoSubmitQuiz;
+        const shouldAutoSubmit = autoSubmitQuiz || autoQuizMode;
 
         // Render Ready Banner
         let readyBanner = document.getElementById('amaes-summary-ready-banner');
@@ -2173,7 +2068,7 @@
             }
         }
 
-        if (autoSubmitQuiz && !summaryAutoSubmitAttempted && !summaryAutoSubmitTimer) {
+        if ((autoSubmitQuiz || autoQuizMode) && !summaryAutoSubmitAttempted && !summaryAutoSubmitTimer) {
             if (!submitBtn) {
                 showQuizSubmitFallback(
                     'Auto-submit could not find Moodle’s “Submit all and finish” button. Locate Moodle’s submission control on this page and click it to finish.',

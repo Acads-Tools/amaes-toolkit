@@ -1950,48 +1950,46 @@
 
                         <!-- Dynamic Gemini key rows -->
                         <div id="amaes-gemini-key-rows" style="display: flex; flex-direction: column; gap: 6px;"></div>
+
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; padding-top: 6px; border-top: 1px solid var(--border-subtle, #334155);">
+                            <button id="amaes-gemini-btn-add-key" type="button" style="
+                                background: transparent;
+                                border: 1px dashed rgba(168,85,247,0.4);
+                                color: #a78bfa;
+                                border-radius: 5px;
+                                font-size: 10px;
+                                font-weight: 600;
+                                padding: 4px 10px;
+                                cursor: pointer;
+                            ">+ Add Backup Key</button>
+
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <span style="font-size: 10px; color: var(--text-muted, #94a3b8);">Plan:</span>
+                                <select id="amaes-gemini-plan-select" style="
+                                    background: var(--surface, #1e293b);
+                                    color: var(--text-primary, #f8fafc);
+                                    border: 1px solid var(--border, #334155);
+                                    padding: 2px 6px;
+                                    border-radius: 4px;
+                                    font-size: 10px;
+                                    cursor: pointer;
+                                ">
+                                    <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
+                                    <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="amaes-multikey-explain" style="padding: 6px 10px; background: rgba(124,58,237,0.1); border: 1px solid rgba(168,85,247,0.25); border-radius: 6px; font-size: 10px; color: #d8b4fe; line-height: 1.4;">
+                            <b style="color: #ffffff;">Higher Limits with Multiple Keys:</b> Add backup keys to automatically rotate between your keys and bypass rate limits.
+                        </div>
                     </div>
 
                     <!-- Collapsible Advanced Settings (Non-Tech Friendly) -->
                     <details style="padding: 0; margin: 0;">
                         <summary style="font-size: 11px; font-weight: 600; color: var(--text-muted, #94a3b8); cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
-                            <span>Advanced Settings (Backup Keys, Jev Classifier & Sharing)</span>
+                            <span>Advanced Settings (TypeSafe Jev Classifier & Sharing)</span>
                         </summary>
                         <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px; padding-left: 4px;">
-                            <!-- Backup Keys & Tier -->
-                            <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg, #0f172a); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
-                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-                                    <button id="amaes-gemini-btn-add-key" type="button" style="
-                                        background: transparent;
-                                        border: 1px dashed rgba(168,85,247,0.4);
-                                        color: #a78bfa;
-                                        border-radius: 5px;
-                                        font-size: 10px;
-                                        font-weight: 600;
-                                        padding: 4px 10px;
-                                        cursor: pointer;
-                                    ">+ Add Backup Key</button>
-
-                                    <div style="display: flex; align-items: center; gap: 5px;">
-                                        <span style="font-size: 10px; color: var(--text-muted, #94a3b8);">Plan:</span>
-                                        <select id="amaes-gemini-plan-select" style="
-                                            background: var(--surface, #1e293b);
-                                            color: var(--text-primary, #f8fafc);
-                                            border: 1px solid var(--border, #334155);
-                                            padding: 2px 6px;
-                                            border-radius: 4px;
-                                            font-size: 10px;
-                                            cursor: pointer;
-                                        ">
-                                            <option value="free" ${getAiPlanTier() === 'free' ? 'selected' : ''}>Free plan</option>
-                                            <option value="paid" ${getAiPlanTier() === 'paid' ? 'selected' : ''}>Paid plan</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div id="amaes-multikey-explain" style="padding: 6px 10px; background: rgba(124,58,237,0.1); border: 1px solid rgba(168,85,247,0.25); border-radius: 6px; font-size: 10px; color: #d8b4fe; line-height: 1.4;">
-                                    <b style="color: #ffffff;">Higher Limits with Multiple Keys:</b> Add backup keys to automatically rotate between your keys and bypass rate limits.
-                                </div>
-                            </div>
 
                             <!-- 2. TypeSafe Jev Decision Engine Card -->
                             <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg, #0f172a); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle, #334155);">
@@ -2094,6 +2092,7 @@
                     <span style="font-size:9.5px; color:#a78bfa; min-width:90px; font-weight:600;">${KEY_LABELS[idx] || ('Key #' + (idx+1))}</span>
                     <input type="password" placeholder="AIzaSy..." value="${val.replace(/"/g, '&quot;')}" style="flex:1; background:var(--surface,#1e293b); color:#f8fafc; border:1px solid var(--border,#334155); padding:5px 8px; border-radius:5px; font-size:11px; outline:none; font-family:monospace;" />
                     <button type="button" class="amaes-key-paste-btn" style="background:var(--surface,#1e293b); border:1px solid var(--border,#334155); color:#a78bfa; border-radius:5px; padding:4px 8px; font-size:10px; cursor:pointer;">Paste</button>
+                    <button type="button" class="amaes-key-test-btn" style="background:rgba(124,58,237,0.15); border:1px solid rgba(168,85,247,0.35); color:#d8b4fe; border-radius:5px; padding:4px 8px; font-size:10px; font-weight:600; cursor:pointer;" title="Test this specific API key">Test</button>
                     ${idx > 0 ? `<button type="button" class="amaes-key-remove-btn" style="background:transparent; border:1px solid rgba(239,68,68,0.35); color:#f87171; border-radius:5px; padding:4px 8px; font-size:10px; cursor:pointer;" title="Remove key">Remove</button>` : ''}
                 `;
                 row.querySelector('.amaes-key-paste-btn').onclick = async () => {
@@ -2105,6 +2104,49 @@
                         } else { inp.focus(); inp.select(); }
                     } catch (_) { inp.focus(); }
                 };
+                const testBtn = row.querySelector('.amaes-key-test-btn');
+                if (testBtn) {
+                    testBtn.onclick = async () => {
+                        const inpVal = row.querySelector('input').value.trim();
+                        if (!inpVal) {
+                            showToast('Paste or type an API key first to test.', 2500);
+                            return;
+                        }
+                        testBtn.disabled = true;
+                        testBtn.textContent = 'Testing...';
+                        try {
+                            const res = await callGeminiApi({
+                                apiKey: inpVal,
+                                prompt: 'Ping',
+                                maxOutputTokens: 2
+                            });
+                            if (res && res.success) {
+                                testBtn.textContent = 'Valid';
+                                testBtn.style.background = 'rgba(16, 185, 129, 0.2)';
+                                testBtn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                                testBtn.style.color = '#34d399';
+                                showToast(`${KEY_LABELS[idx] || ('Key #' + (idx+1))} is valid!`);
+                            } else {
+                                testBtn.textContent = 'Failed';
+                                testBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+                                testBtn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                                testBtn.style.color = '#f87171';
+                                const errMsg = res?.error || 'Validation error';
+                                showToast(`Key error: ${errMsg.slice(0, 60)}`, 3500);
+                            }
+                        } catch (err) {
+                            testBtn.textContent = 'Failed';
+                            testBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+                            testBtn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                            testBtn.style.color = '#f87171';
+                            showToast(`Key error: ${(err.message || err).slice(0, 60)}`, 3500);
+                        } finally {
+                            setTimeout(() => {
+                                testBtn.disabled = false;
+                            }, 500);
+                        }
+                    };
+                }
                 const removeRowBtn = row.querySelector('.amaes-key-remove-btn');
                 if (removeRowBtn) {
                     removeRowBtn.onclick = () => {

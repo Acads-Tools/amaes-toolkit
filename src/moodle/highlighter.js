@@ -924,6 +924,8 @@
         } else if (isGrades) {
             const rows = Array.from(document.querySelectorAll('.user-grade tr, .generaltable tr, table.table tr, tr'));
             rows.forEach(r => {
+                if (r.classList.contains('coursetotal') || r.classList.contains('category') || r.classList.contains('categoryitem') || r.classList.contains('courseitem')) return;
+
                 const quizLink = r.querySelector('a[href*="/mod/quiz/"], a[href*="quiz"], a.gradeitemheader')
                               || r.querySelector('.column-itemname a, th a, td:first-child a');
                 if (!quizLink) return;
@@ -931,9 +933,6 @@
                 const href = quizLink.getAttribute('href') || quizLink.href || '';
                 const rawTitle = quizLink.innerText.trim();
                 if (!rawTitle || (!href.includes('quiz') && !r.innerText.toLowerCase().includes('quiz'))) return;
-
-                const rowText = r.innerText || '';
-                if (rowText.includes('( Empty )') || rowText.includes('(Empty)')) return;
 
                 // Check grade
                 const gradeCell = r.querySelector('.column-grade, [headers*="grade"], td.grade');

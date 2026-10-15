@@ -1088,10 +1088,21 @@
         setupPersistentAccordion('mod-highlighter-header', 'mod-highlighter-body', 'mod-highlighter-arrow', 'amaes_pref_mod_hl', false);
 
         const triggerHighlight = (cat, label) => {
+            const isGrades = typeof window !== 'undefined' && window.location.pathname.includes('/grade/report/user/index.php');
+            if (isGrades && cat !== 'quiz') {
+                showToast("Open a course page to highlight lecture items.");
+                setLog("<b>Notice:</b> Open a course subject page to highlight lecture items.", "var(--accent-amber)");
+                return;
+            }
             const res = highlightItems(cat);
             if (res.error) {
-                showToast("Open a course page first to highlight items.");
-                setLog("<b>Action Blocked:</b> Open a course subject first.", "var(--accent-pink)");
+                if (isGrades) {
+                    showToast("Open a course page to highlight lecture items.");
+                    setLog("<b>Notice:</b> Open a course subject page to highlight lecture items.", "var(--accent-amber)");
+                } else {
+                    showToast("Open a course page first to highlight items.");
+                    setLog("<b>Action Blocked:</b> Open a course subject first.", "var(--accent-pink)");
+                }
             } else if (res.count === 0) {
                 showToast(`No ${label} items found to highlight on this page.`);
                 setLog(`No ${label} items found on this page.`, "var(--accent-amber)");
@@ -1116,22 +1127,28 @@
             setLog("Cleared all highlights.", "var(--text-muted)");
         };
 
+        const handleMissingQuizzesClick = async () => {
+            showToast("Checking quiz grades and attempt statuses...", 1500);
+            const res = await highlightMissingOrUnansweredQuizzes();
+            if (res.count > 0) {
+                showToast(`Highlighted ${res.count} missing/re-attemptable quizzes!`);
+                setLog(`Found and highlighted <b>${res.count}</b> quizzes needing completion/re-attempt (<80%).`, "var(--accent-amber)");
+            } else if (res.message) {
+                showToast(res.message);
+                setLog(res.message, "var(--accent-green)");
+            } else {
+                showToast("All quizzes achieved passing grade (≥80%)! None pending.");
+                setLog("All quizzes achieved passing grade (≥80%). No pending or missing quizzes!", "var(--accent-green)");
+            }
+        };
+
         const btnHlMissingQuizzes = document.getElementById('btn-hl-missing-quizzes');
         if (btnHlMissingQuizzes) {
-            btnHlMissingQuizzes.onclick = async () => {
-                showToast("Checking quiz grades and attempt statuses...", 1500);
-                const res = await highlightMissingOrUnansweredQuizzes();
-                if (res.count > 0) {
-                    showToast(`Highlighted ${res.count} missing/re-attemptable quizzes!`);
-                    setLog(`Found and highlighted <b>${res.count}</b> quizzes needing completion/re-attempt (<80%).`, "var(--accent-amber)");
-                } else if (res.message) {
-                    showToast(res.message);
-                    setLog(res.message, "var(--accent-green)");
-                } else {
-                    showToast("All quizzes achieved passing grade (≥80%)! None pending.");
-                    setLog("All quizzes achieved passing grade (≥80%). No pending or missing quizzes!", "var(--accent-green)");
-                }
-            };
+            btnHlMissingQuizzes.onclick = handleMissingQuizzesClick;
+        }
+        const btnHlMissingQuizzesCourse = document.getElementById('btn-hl-missing-quizzes-course');
+        if (btnHlMissingQuizzesCourse) {
+            btnHlMissingQuizzesCourse.onclick = handleMissingQuizzesClick;
         }
 
         const btnTriggerHlAnswers = document.getElementById('btn-trigger-hl-answers');
@@ -1301,6 +1318,10 @@
 
         setupPersistentAccordion('sub-done-header', 'sub-done-body', 'sub-done-arrow', 'amaes_pref_sub_done', false);
         setupPersistentAccordion('sub-undo-header', 'sub-undo-body', 'sub-undo-arrow', 'amaes_pref_sub_undo', false);
+
+        // --- MODULE 5: Accounts Module Cards ---
+        setupPersistentAccordion('mod-accounts-switcher-header', 'mod-accounts-switcher-body', 'mod-accounts-switcher-arrow', 'amaes_pref_mod_accounts_switcher', true);
+        setupPersistentAccordion('mod-accounts-transfer-header', 'mod-accounts-transfer-body', 'mod-accounts-transfer-arrow', 'amaes_pref_mod_accounts_transfer', false);
 
         // Lock State & Terms Acceptance Management
         const lockOverlay = document.getElementById('amaes-panel-lock-overlay');
@@ -1603,8 +1624,14 @@
             }
 
             if (!checkIsCoursePage()) {
-                showToast("Open a course page first to use Activity Auto-Marker!");
-                setLog("<b>Action Blocked:</b> You are not on a course page. Open a course subject first.", "var(--accent-pink)");
+                const isGrades = typeof window !== 'undefined' && window.location.pathname.includes('/grade/report/user/index.php');
+                if (isGrades) {
+                    showToast("Open the Course page to mark lecture items as done.");
+                    setLog("<b>Notice:</b> Completion checkboxes only live on Course pages. Open the Course page to mark lectures as done.", "var(--accent-amber)");
+                } else {
+                    showToast("Open a course page first to use Activity Auto-Marker!");
+                    setLog("<b>Action Blocked:</b> You are not on a course page. Open a course subject first.", "var(--accent-pink)");
+                }
                 return;
             }
 

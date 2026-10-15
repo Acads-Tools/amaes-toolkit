@@ -2622,7 +2622,8 @@ test("Unanswered Question Reassurance: displays 'be the first to answer and shar
 
     // 2. Verify blockage HUD includes plain-English guidance and action buttons for non-technical users
     assert.ok(script.includes("No saved answer yet"), "HUD must inform student that question is not yet in database");
-    assert.ok(script.includes("btn-blockage-ask-ai"), "HUD must provide 1-click Ask AI button");
+    assert.ok(script.includes("amaes-ask-ai-card-btn"), "Question card must provide 1-click Ask AI button without duplicate top HUD clutter");
+    assert.ok(!script.includes("id=\"btn-blockage-ask-ai\""), "Top blockage HUD must not duplicate Ask AI button found in card sidebar");
     assert.ok(script.includes("btn-blockage-stop"), "HUD must provide Stop/Resume Auto control");
     assert.ok(!script.includes("Auto-copied for AI (press <b>V</b> to paste), then review and click <b>Next page</b> or press <b>N</b> to proceed"), "Dense technical jargon run-on sentence must be eliminated");
 
@@ -2925,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.12.9'), "Userscript header must specify v1.12.9");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.12.9";'), "Constant SCRIPT_VERSION must be v1.12.9");
+    assert.ok(script.includes('@version      1.13.0'), "Userscript header must specify v1.13.0");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.0";'), "Constant SCRIPT_VERSION must be v1.13.0");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4137,11 +4138,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.12.9-blue.svg"), "README badge must show v1.12.9");
+    assert.ok(readme.includes("version-1.13.0-blue.svg"), "README badge must show v1.13.0");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.12.9<"), "Website must display v1.12.9 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.13.0<"), "Website must display v1.13.0 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -4609,9 +4610,9 @@ test("Audio Notifications & On-Demand AI Manual Retry on Unknown / Short-Answer 
     assert.ok(script.includes("amaes-ask-ai-card-btn"), "Question card toolbar must include amaes-ask-ai-card-btn");
     assert.ok(script.includes("manualSolveWithAi(que, btnAskAi)"), "Card Ask AI button must invoke manualSolveWithAi");
 
-    // 4. On-Demand "Ask AI" / "Retry AI" in Blockage HUD
-    assert.ok(script.includes("id=\"btn-blockage-ask-ai\""), "Blockage HUD must include btn-blockage-ask-ai button");
-    assert.ok(script.includes("manualSolveWithAi(firstBlockedQue, blockageAskAi)"), "Blockage HUD button must invoke manualSolveWithAi");
+    // 4. Streamlined Blockage HUD without redundant AI duplicates
+    assert.ok(!script.includes("id=\"btn-blockage-ask-ai\""), "Blockage HUD must eliminate duplicate Ask AI button since question card toolbar already provides it");
+    assert.ok(script.includes("id=\"btn-blockage-stop\""), "Blockage HUD must provide Stop/Resume Auto control");
 
     // 5. Short-Answer / Fill-in-the-Blank prompt and inference support
     assert.ok(script.includes("[Fill-in-the-Blank / Short Answer]"), "buildGeminiCompactPrompt must construct short-answer prompt");
@@ -5107,8 +5108,8 @@ test("Question HUD & AI Retry Redundancy Elimination: verifies single-banner gua
 
     // 3. Retry tracking and Configure AI button on 2+ retries
     assert.ok(script.includes("amaesAiRetryCount"), "Must track AI retry count on question dataset");
-    assert.ok(script.includes("btn-blockage-config-ai"), "Must provide Configure AI button in blockage HUD on multiple retries");
     assert.ok(script.includes("showConfig = isAuthError || retryCount >= 2;"), "Fallback bar must offer Configure AI on 2+ retries");
+    assert.ok(!script.includes("id=\"btn-blockage-config-ai\""), "Blockage HUD must not duplicate Configure AI button");
 
     // 4. Simplified multi-key configuration explanation
     assert.ok(script.includes("Higher Limits with Multiple Keys"), "Setup modal must explain higher limits with multiple keys simply");
@@ -5162,7 +5163,7 @@ test("Activity Auto-View & Quiz Summary Auto-Submit with Completion Sound (v1.9.
     assert.ok(script.includes('id="chk-auto-submit-quiz"'), "Panel markup must render chk-auto-submit-quiz checkbox under Advanced Settings");
     assert.ok(script.includes("localStorage.getItem('amaes_auto_submit_quiz') === 'true'"), "autoSubmitQuiz state must be read from localStorage");
     assert.ok(script.includes("localStorage.setItem('amaes_auto_submit_quiz', autoSubmitQuiz)"), "Checkbox toggle must persist to localStorage");
-    assert.ok(script.includes("if (autoSubmitQuiz && !summaryAutoSubmitAttempted && !summaryAutoSubmitTimer)"), "handleQuizSummaryAutoSubmit must guard auto-submit execution with autoSubmitQuiz");
+    assert.ok(script.includes("if ((autoSubmitQuiz || autoQuizMode) && !summaryAutoSubmitAttempted && !summaryAutoSubmitTimer)"), "handleQuizSummaryAutoSubmit must guard auto-submit execution with autoSubmitQuiz or autoQuizMode");
     assert.ok(script.includes(".btn-finishattempt, input[value*=\"Submit all and finish\"]"), "handleQuizSummaryAutoSubmit must locate summary submit button");
     assert.ok(script.includes("function findQuizSubmitConfirmationButton()"), "Auto-submit must explicitly locate Moodle's scoped confirmation control");
     assert.ok(script.includes("const confirmUntil = Date.now() + 5_000"), "Auto-submit must wait for Moodle's delayed confirmation dialog");
@@ -5450,7 +5451,7 @@ test("Account Switcher: stores credentials in userscript-local storage and safel
     assert.ok(!script.includes('amaes-account-switcher-passphrase') && !script.includes('Encrypt existing accounts'), "Account Switcher must not expose encryption or passphrase controls");
     assert.ok(script.includes('id="amaes-account-switcher-cancel-edit"'), "Account Switcher must let users cancel an edit");
     assert.ok(script.includes('placeholder="Username / USN"') && script.includes('aria-label="Username / USN"'), "Login identifier field must clarify that usernames and USNs are accepted");
-    assert.ok(script.includes('placeholder="Nickname / Display name"') && script.includes('aria-label="Nickname / Display name"'), "Nickname field must clarify it is a display label");
+    assert.ok(script.includes('placeholder="Nickname / Display name (optional)"') && script.includes('aria-label="Nickname / Display name (optional)"'), "Nickname field must clarify it is an optional display label");
     assert.ok(script.includes('Return to current page after switch'), "Return-page checkbox must have the requested label");
     assert.ok(source.includes("'#username, input[name=\"username\"") && source.includes("'#password, input[name=\"password\""), "Automation must target Moodle's username and password fields");
     assert.ok(source.includes("grid-template-columns: minmax(0, 1fr) auto auto auto;"), "Saved-account rows must reserve a flexible nickname column and compact action columns");
@@ -5927,8 +5928,8 @@ test("Cross-Domain Storage Bridge, Quiz Summary Smart Evaluator, Calm Study Guid
     assert.ok(script.includes("function updateNextButtonIndicator()"), "Must define updateNextButtonIndicator helper");
     assert.ok(script.includes("amaes-next-btn-beacon"), "Next button indicator must display beacon");
     assert.ok(script.includes("function renderNewQuestionFocusBanner("), "Must define renderNewQuestionFocusBanner helper");
-    assert.ok(script.includes("Question is ready to paste!"), "Floating focus banner must announce copied state");
-    assert.ok(script.includes("Ctrl+V"), "Focus banner must mention Ctrl+V shortcut for pasting into AI chatbots");
+    assert.ok(script.includes("Question copied to clipboard!"), "Floating focus banner must announce copied state");
+    assert.ok(script.includes("Pick an answer below or click <b>Next Question</b>"), "Focus banner must provide clear plain-English guidance");
 
     // 4. Calm Study Guide & Jenny Highlighting
     assert.ok(script.includes("var(--accent-sky, #0284c7)"), "Study guide choices must use calm sky-cyan differentiation");
@@ -5938,7 +5939,7 @@ test("Cross-Domain Storage Bridge, Quiz Summary Smart Evaluator, Calm Study Guid
     assert.ok(script.includes("Get Free Key"), "AI setup modal must provide 1-click link to get free API key");
     assert.ok(script.includes("amaes-gemini-key-rows"), "AI setup modal must render key inputs");
     assert.ok(script.includes("Save & Activate AI") && script.includes("amaes-gemini-btn-test-save"), "AI setup modal must provide test and save action");
-    assert.ok(script.includes("<details") && script.includes("Advanced Settings (Backup Keys, Jev Classifier & Sharing)"), "AI setup modal must collapse advanced settings in <details>");
+    assert.ok(script.includes("<details") && script.includes("Advanced Settings (TypeSafe Jev Classifier & Sharing)"), "AI setup modal must collapse advanced settings in <details>");
 });
 
 test("Auto-Harvest Reviewability Detection, Locked Exam Skip Protection & Exam Portal Tools Adaptation (v1.12.1)", () => {
@@ -5968,7 +5969,7 @@ test("Auto-Harvest Reviewability Detection, Locked Exam Skip Protection & Exam P
     assert.ok(script.includes("Only exam assessments are hosted here"), "Banner must explain exam portal scope");
     assert.ok(script.includes("Auto-Mark Passed Exams (≥80%)"), "Auto-mark button must adapt text for exam portal");
     assert.ok(script.includes("Exams (≥80%)"), "Single auto-mark button must adapt text for exams");
-    assert.ok(script.includes("Highlight All Exams"), "Highlighter must adapt text for exams on exam portal");
+    assert.ok(script.includes("Highlight Incomplete Exams (<80%)"), "Highlighter must adapt text for exams on exam portal");
     assert.ok(script.includes("Lectures are not hosted on the Exam Portal"), "runBatch must block lecture batching on exam portals");
 });
 
@@ -6195,16 +6196,54 @@ test("Single Unified Unanswered Banner & Non-Technical Guidance (v1.12.9)", () =
     // 2. Elimination of keyboard jargon for non-tech users
     assert.ok(!focusBannerFunc.includes("press N"), "Focus banner must eliminate keyboard shortcut instructions for non-tech students");
     assert.ok(!focusBannerFunc.includes("press V"), "Focus banner must eliminate V keyboard shortcut demands");
-    assert.ok(focusBannerFunc.includes("Choose an answer below and click Next, or click <b>Ask AI</b> to get an answer."), "Focus banner must use clear, non-technical plain English steps");
+    assert.ok(focusBannerFunc.includes("Question copied to clipboard!"), "Focus banner must announce copied state");
+    assert.ok(focusBannerFunc.includes("Pick an answer below or click <b>Next Question</b>, or use the AI tools at the side or bottom."), "Focus banner must use clear, non-technical plain English steps");
 
-    // 3. Unified 1-click action buttons
-    assert.ok(focusBannerFunc.includes("btn-blockage-ask-ai") || focusBannerFunc.includes("amaes-btn-focus-ask-ai"), "Banner must include Ask AI action");
-    assert.ok(focusBannerFunc.includes("https://gemini.google.com"), "Banner must include direct link to Open Gemini");
-    assert.ok(focusBannerFunc.includes("amaes-btn-recopy-q"), "Banner must include Copy Again action");
+    // 3. Elimination of redundant top buttons (sidebar and bottom external launchers already provide them)
+    assert.ok(!focusBannerFunc.includes("amaes-btn-focus-ask-ai") && !focusBannerFunc.includes("btn-blockage-ask-ai"), "Banner must eliminate duplicate Ask AI button");
+    assert.ok(!focusBannerFunc.includes("https://gemini.google.com"), "Banner must eliminate duplicate Open Gemini button");
+    assert.ok(!focusBannerFunc.includes("amaes-btn-recopy-q"), "Banner must eliminate duplicate Copy Again button");
     assert.ok(focusBannerFunc.includes("amaes-btn-skip-q"), "Banner must include Next Question skip action");
 
     // 4. Choice selection reactivity feedback
     assert.ok(focusBannerFunc.includes("Answer selected!"), "Banner must provide instant visual feedback on answer selection");
+});
+
+// --------------------------------------------------
+// 187. Simplified Course Tools, Per-Key Testing, Un-nested Accounts, Duplicate Prevention & Quiz Auto-Submit (v1.13.0)
+// --------------------------------------------------
+test("Simplified Course Tools, Per-Key Testing, Un-nested Accounts, Duplicate Prevention & Quiz Auto-Submit (v1.13.0)", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    const panelSrc = fs.readFileSync('src/ui/panel.js', 'utf8');
+    const accountSrc = fs.readFileSync('src/moodle/account-switcher.js', 'utf8');
+    const geminiSrc = fs.readFileSync('src/ai/gemini.js', 'utf8');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const highlighterSrc = fs.readFileSync('src/moodle/highlighter.js', 'utf8');
+
+    // 1. Simplified Course Tools & Unattempted Quiz Highlighting
+    assert.ok(panelSrc.includes('btn-hl-missing-quizzes-course'), "Panel must provide btn-hl-missing-quizzes-course button");
+    assert.ok(panelSrc.includes("Highlight Incomplete Quizzes (<80%)"), "Course Tools must offer Highlight Incomplete Quizzes (<80%)");
+    assert.ok(!panelSrc.includes("Highlight All") && !panelSrc.includes("btn-highlight-all"), "Course Tools must not include redundant Highlight All button");
+    assert.ok(!highlighterSrc.includes("if (rowText.includes('( Empty )')) return;"), "Missing quiz highlighter must not skip unattempted empty quizzes");
+
+    // 2. AI Setup: Direct Backup Key Addition & Per-Key Testing
+    assert.ok(geminiSrc.includes("amaes-key-test-btn"), "AI Setup must provide individual test buttons for each key");
+    assert.ok(geminiSrc.includes("amaes-gemini-btn-add-key") && geminiSrc.includes("+ Add Backup Key"), "AI Setup must provide direct backup key addition in primary card");
+    assert.ok(script.includes("amaes-key-test-btn"), "Built userscript must include per-key test handlers");
+
+    // 3. Accounts Tab: Un-nested Collapsible Cards, Optional Nicknames & Duplicate Detection
+    assert.ok(panelSrc.includes("mod-accounts-switcher") && panelSrc.includes("mod-accounts-transfer"), "Accounts tab must provide separate modular cards for Switcher and Transfer");
+    assert.ok(accountSrc.includes("const isDuplicate = accounts.some"), "Account switcher must check for duplicate usernames");
+    assert.ok(accountSrc.includes("already exists"), "Account switcher must reject duplicate usernames");
+    assert.ok(accountSrc.includes("nicknameInput.value.trim() || username"), "Account nickname must default to username if omitted");
+    assert.ok(accountSrc.includes("account.lastLoginFailed"), "Account switcher must track failed logins");
+    assert.ok(accountSrc.includes("Login Failed"), "Account row must render visible Login Failed badge on authentication error");
+
+    // 4. Reliable Quiz Auto-Submit Execution
+    assert.ok(solverSrc.includes("if (autoSubmitQuiz || fastQuizMode || autoQuizMode)"), "Last question navigation must advance directly to summary in autoQuizMode");
+    assert.ok(solverSrc.includes("if ((autoSubmitQuiz || autoQuizMode) && !summaryAutoSubmitAttempted"), "Quiz summary must auto-submit when autoQuizMode is enabled");
+    assert.ok(solverSrc.includes(".yui3-panel, .modal-dialog, .moodle-has-zindex"), "findQuizSubmitConfirmationButton must detect Moodle modal dialog confirmation buttons");
 });
 
 
