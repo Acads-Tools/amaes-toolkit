@@ -1102,33 +1102,12 @@
                     if (m) cmid = m[1];
                 }
 
-                // Check cached attempt details
+                // Check cached attempt details from prior visits to quiz landing
                 let attemptsInfo = null;
                 if (cmid) {
                     try {
                         const raw = localStorage.getItem('amaes_quiz_attempts_' + cmid);
                         if (raw) attemptsInfo = JSON.parse(raw);
-                    } catch (e) {}
-                }
-
-                // If not cached and quiz link is available, fetch quiz landing to check attempt limits
-                if (!attemptsInfo && linkElem && linkElem.href) {
-                    try {
-                        const resp = await fetch(linkElem.href);
-                        if (resp.ok) {
-                            const html = await resp.text();
-                            const doc = new DOMParser().parseFromString(html, 'text/html');
-                            attemptsInfo = parseQuizLandingData(doc, linkElem.href);
-                            if (cmid) {
-                                try {
-                                    localStorage.setItem('amaes_quiz_attempts_' + cmid, JSON.stringify(attemptsInfo));
-                                } catch (e) {}
-                            }
-                            if (attemptsInfo.hasGrade && attemptsInfo.highestPct !== null && attemptsInfo.highestPct >= 80) {
-                                // Passed with >= 80%!
-                                continue;
-                            }
-                        }
                     } catch (e) {}
                 }
 

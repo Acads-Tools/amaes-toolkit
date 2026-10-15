@@ -6571,6 +6571,42 @@ test("Sequential Activity Link Resolver & Failsafe Navigation (v1.13.10)", () =>
     assert.ok(detectorSrc.includes("amaes_last_active_course_id"), "detectCourseInfo must persist courseId across page hops");
 });
 
+// --------------------------------------------------
+// 197. Gapselect Dropdown Normalization, Term Completed Attempts Breakdown, Fast Missing Highlighter & Attempt Shortcut (v1.13.11)
+// --------------------------------------------------
+test("Gapselect Dropdown Normalization, Term Completed Attempts Breakdown, Fast Missing Highlighter & Attempt Shortcut (v1.13.11)", () => {
+    const fs = require('fs');
+    const detectorSrc = fs.readFileSync('src/moodle/detector.js', 'utf8');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const iconsSrc = fs.readFileSync('src/ui/icons.js', 'utf8');
+    const hlSrc = fs.readFileSync('src/moodle/highlighter.js', 'utf8');
+
+    // 1. stripQuestionMarkup & normalizeQuestionMatchKey in detector.js
+    assert.ok(detectorSrc.includes("function stripQuestionMarkup("), "detector.js must define stripQuestionMarkup helper");
+    assert.ok(detectorSrc.includes("moodle-asset|dropdown|blank|image|___+"), "stripQuestionMarkup must iteratively strip variable question tokens");
+    assert.ok(detectorSrc.includes("stripQuestionMarkup(value)"), "normalizeQuestionMatchKey must apply stripQuestionMarkup");
+
+    // 2. Candidate Prioritization & Verified Matches in solver.js
+    assert.ok(solverSrc.includes("liveImgTokens"), "solver.js must extract image asset tokens to disambiguate identical prompt questions");
+    assert.ok(solverSrc.includes("const confirmed = candidates.filter(c => isConfirmedCandidate(c));"), "solver.js must prioritize verified candidates when multiple candidates match");
+
+    // 3. Drag & Drop Study Guide Text Protection
+    assert.ok(solverSrc.includes("if (isConfirmedCandidate(bestCand)) {\n                                        dropZone.innerText = targetAns;"), "solver.js must only mutate dropZone.innerText for confirmed candidates");
+
+    // 4. Attempt Shortcut on Quiz Landing Pages
+    assert.ok(solverSrc.includes("function decorateQuizLandingAttemptButton("), "solver.js must define decorateQuizLandingAttemptButton");
+    assert.ok(solverSrc.includes("e.key === 'a' || e.key === 'A' || e.key === 'Enter'"), "solver.js must listen for A or Enter shortcut on quiz landing pages");
+    assert.ok(solverSrc.includes("(Press A)"), "decorateQuizLandingAttemptButton must inject (Press A) hint");
+
+    // 5. Term Completed Attempts Calculation & Highlight Missing Quizzes Connection in icons.js
+    assert.ok(iconsSrc.includes("completedAttempts: 0"), "calculateCourseConfidence must track completedAttempts per term");
+    assert.ok(iconsSrc.includes("attemptsText") && iconsSrc.includes("completedAttempts"), "injectCourseConfidenceCard must display completed attempts count on term cards");
+    assert.ok(iconsSrc.includes("highlightMissingOrUnansweredQuizzes()"), "icons.js must connect card highlight button directly to highlightMissingOrUnansweredQuizzes");
+
+    // 6. Non-blocking Missing Quiz Highlighter in highlighter.js
+    assert.ok(!hlSrc.includes("await fetch(linkElem.href)"), "highlighter.js must avoid blocking sequential fetches in highlightMissingOrUnansweredQuizzes");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

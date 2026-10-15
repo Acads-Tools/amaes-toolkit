@@ -655,10 +655,10 @@
 
         // Quiz grade stats per term
         const termQuizzes = {
-            prelim: { total: 0, passed: 0, attempted: 0 },
-            midterm: { total: 0, passed: 0, attempted: 0 },
-            prefi: { total: 0, passed: 0, attempted: 0 },
-            final: { total: 0, passed: 0, attempted: 0 }
+            prelim: { total: 0, passed: 0, attempted: 0, completedAttempts: 0 },
+            midterm: { total: 0, passed: 0, attempted: 0, completedAttempts: 0 },
+            prefi: { total: 0, passed: 0, attempted: 0, completedAttempts: 0 },
+            final: { total: 0, passed: 0, attempted: 0, completedAttempts: 0 }
         };
 
         let totalQuizzes = 0;
@@ -677,23 +677,33 @@
                 if (entry.hasGrade) totalAttempted++;
                 if (entry.isPassable) totalPassed++;
 
+                let attemptsUsed = 0;
+                if (entry.cmid && typeof localStorage !== 'undefined') {
+                    try {
+                        const raw = localStorage.getItem('amaes_quiz_attempts_' + entry.cmid);
+                        if (raw) {
+                            const parsed = JSON.parse(raw);
+                            if (parsed && typeof parsed.attemptsUsed === 'number') {
+                                attemptsUsed = parsed.attemptsUsed;
+                            }
+                        }
+                    } catch (_) {}
+                }
+                if (attemptsUsed === 0 && entry.hasGrade) {
+                    attemptsUsed = 1;
+                }
+
                 const t = typeof detectTermFromText === 'function' ? detectTermFromText(entry.title) : null;
-                if (t === 'Prelim') {
-                    termQuizzes.prelim.total++;
-                    if (entry.hasGrade) termQuizzes.prelim.attempted++;
-                    if (entry.isPassable) termQuizzes.prelim.passed++;
-                } else if (t === 'Midterm') {
-                    termQuizzes.midterm.total++;
-                    if (entry.hasGrade) termQuizzes.midterm.attempted++;
-                    if (entry.isPassable) termQuizzes.midterm.passed++;
-                } else if (t === 'Prefi') {
-                    termQuizzes.prefi.total++;
-                    if (entry.hasGrade) termQuizzes.prefi.attempted++;
-                    if (entry.isPassable) termQuizzes.prefi.passed++;
-                } else if (t === 'Final') {
-                    termQuizzes.final.total++;
-                    if (entry.hasGrade) termQuizzes.final.attempted++;
-                    if (entry.isPassable) termQuizzes.final.passed++;
+                const targetTerm = t === 'Prelim' ? termQuizzes.prelim
+                    : (t === 'Midterm' ? termQuizzes.midterm
+                    : (t === 'Prefi' ? termQuizzes.prefi
+                    : (t === 'Final' ? termQuizzes.final : null)));
+
+                if (targetTerm) {
+                    targetTerm.total++;
+                    targetTerm.completedAttempts += attemptsUsed;
+                    if (entry.hasGrade) targetTerm.attempted++;
+                    if (entry.isPassable) targetTerm.passed++;
                 }
             });
         }
@@ -796,10 +806,10 @@
         `;
 
         const terms = [
-            { name: 'Prelim', count: metrics.termStats.prelim, qz: metrics.termQuizzes.prelim },
-            { name: 'Midterm', count: metrics.termStats.midterm, qz: metrics.termQuizzes.midterm },
-            { name: 'Prefinal', count: metrics.termStats.prefi, qz: metrics.termQuizzes.prefi },
-            { name: 'Final', count: metrics.termStats.final, qz: metrics.termQuizzes.final }
+            { name: 'Prelim', count: metrics.termStats.prelim, qz: metrics.termQuizzes.prelim, completedAttempts: metrics.termQuizzes.prelim.completedAttempts || 0 },
+            { name: 'Midterm', count: metrics.termStats.midterm, qz: metrics.termQuizzes.midterm, completedAttempts: metrics.termQuizzes.midterm.completedAttempts || 0 },
+            { name: 'Prefinal', count: metrics.termStats.prefi, qz: metrics.termQuizzes.prefi, completedAttempts: metrics.termQuizzes.prefi.completedAttempts || 0 },
+            { name: 'Final', count: metrics.termStats.final, qz: metrics.termQuizzes.final, completedAttempts: metrics.termQuizzes.final.completedAttempts || 0 }
         ];
 
         card.innerHTML = `
@@ -851,21 +861,32 @@
                 </div>
             </div>
 
-            <!-- Term Breakdown Cards -->
+            <!-- Term Breakdown Cards: Progress & Completed Attempts -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px;">
                 ${terms.map(t => {
-                    const isReady = t.count >= 15;
-                    const hasSome = t.count > 0;
-                    const passText = t.qz.total > 0 ? `${t.qz.passed}/${t.qz.total} Passed` : (hasSome ? `${t.count} Qs Stored` : 'No Qs Stored');
+                    const isCompleted = t.qz.total > 0 && t.qz.passed >= t.qz.total;
+                    const inProgress = t.completedAttempts > 0 || t.qz.passed > 0;
+                    const statusLabel = isCompleted ? 'Completed' : (inProgress ? 'In Progress' : 'Not Started');
+                    const badgeStyle = isCompleted
+                        ? 'background: rgba(16,185,129,0.15); color: #059669;'
+                        : (inProgress ? 'background: rgba(59,130,246,0.15); color: #2563eb;' : 'background: rgba(148,163,184,0.15); color: #64748b;');
+                    const borderStyle = isCompleted
+                        ? 'rgba(16, 185, 129, 0.4)'
+                        : (inProgress ? 'rgba(59, 130, 246, 0.35)' : 'rgba(148, 163, 184, 0.25)');
+                    const bgStyle = isCompleted
+                        ? 'rgba(16, 185, 129, 0.05)'
+                        : (inProgress ? 'rgba(59, 130, 246, 0.04)' : 'rgba(148, 163, 184, 0.03)');
+                    const attemptsText = `${t.completedAttempts} Attempt${t.completedAttempts === 1 ? '' : 's'} Done`;
+                    const passText = t.qz.total > 0 ? `${t.qz.passed}/${t.qz.total} Quizzes Passed` : (t.completedAttempts > 0 ? `${t.completedAttempts} Completed` : 'No Quizzes Found');
                     return `
-                        <div style="border: 1px solid ${isReady ? 'rgba(16, 185, 129, 0.4)' : hasSome ? 'rgba(59, 130, 246, 0.35)' : 'rgba(148, 163, 184, 0.25)'}; background: ${isReady ? 'rgba(16, 185, 129, 0.05)' : hasSome ? 'rgba(59, 130, 246, 0.04)' : 'rgba(148, 163, 184, 0.03)'}; border-radius: 6px; padding: 7px 9px;">
+                        <div style="border: 1px solid ${borderStyle}; background: ${bgStyle}; border-radius: 6px; padding: 7px 9px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
                                 <span style="font-size: 11px; font-weight: 700; color: inherit;">${t.name}</span>
-                                <span style="font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 3px; ${isReady ? 'background: rgba(16,185,129,0.15); color: #059669;' : hasSome ? 'background: rgba(59,130,246,0.15); color: #2563eb;' : 'background: rgba(148,163,184,0.15); color: #64748b;'}">
-                                    ${isReady ? 'Ready' : hasSome ? 'AI Fallback' : 'Uncached'}
+                                <span style="font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 3px; ${badgeStyle}">
+                                    ${statusLabel}
                                 </span>
                             </div>
-                            <div style="font-size: 12px; font-weight: 700; color: inherit;">${t.count} Questions</div>
+                            <div style="font-size: 12px; font-weight: 700; color: inherit;">${attemptsText}</div>
                             <div style="font-size: 10.5px; opacity: 0.75; margin-top: 2px;">${passText}</div>
                         </div>
                     `;
@@ -901,10 +922,17 @@
         if (btnHighlight) {
             btnHighlight.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (typeof highlightUnfinishedActivities === 'function') {
-                    highlightUnfinishedActivities();
-                } else if (typeof highlightMissingQuizzesUI === 'function') {
-                    highlightMissingQuizzesUI();
+                if (typeof highlightMissingOrUnansweredQuizzes === 'function') {
+                    highlightMissingOrUnansweredQuizzes().then(res => {
+                        if (res && res.message) {
+                            if (typeof showToast === 'function') showToast(res.message, 3500);
+                        } else if (res && typeof res.count === 'number') {
+                            const msg = res.count > 0 ? `Highlighted ${res.count} quiz(zes) needing attention` : 'All quizzes on page are passed with ≥ 80%!';
+                            if (typeof showToast === 'function') showToast(msg, 3500);
+                        }
+                    }).catch(err => {
+                        if (typeof showToast === 'function') showToast(`Highlight note: ${err.message}`, 3000);
+                    });
                 }
             });
         }

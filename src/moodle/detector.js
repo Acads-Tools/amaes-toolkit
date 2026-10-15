@@ -316,8 +316,25 @@
         return text.trim();
     }
 
+    function stripQuestionMarkup(text) {
+        if (!text) return '';
+        let prev;
+        let curr = String(text);
+        // Iteratively strip innermost bracket tokens first (moodle-asset, dropdown, blank, ____, image)
+        do {
+            prev = curr;
+            curr = curr.replace(/\[\s*(?:moodle-asset|dropdown|blank|image|___+)[^\[\]]*\]/gi, ' ');
+        } while (curr !== prev);
+        // Strip any remaining outer container tags (e.g. outer [Image: ...])
+        do {
+            prev = curr;
+            curr = curr.replace(/\[\s*(?:image|dropdown|blank)[^\[\]]*\]/gi, ' ');
+        } while (curr !== prev);
+        return curr;
+    }
+
     function normalizeQuestionMatchKey(value) {
-        return normalizeText(value)
+        return normalizeText(stripQuestionMarkup(value))
             .replace(/\[\s*_{2,}(?:\s*:\s*[\s\S]*?)?\s*\]/g, ' ')
             .replace(/^(?:identification|identify)\s*:\s*/i, '')
             .replace(/^(?:answer\s+)?question\s*(?:no\.?|#)?\s*\d+[\s:.-]*/i, '')

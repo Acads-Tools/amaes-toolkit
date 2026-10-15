@@ -1811,10 +1811,10 @@
 
         // Quiz grade stats per term
         const termQuizzes = {
-            prelim: { total: 0, passed: 0, attempted: 0 },
-            midterm: { total: 0, passed: 0, attempted: 0 },
-            prefi: { total: 0, passed: 0, attempted: 0 },
-            final: { total: 0, passed: 0, attempted: 0 }
+            prelim: { total: 0, passed: 0, attempted: 0, completedAttempts: 0 },
+            midterm: { total: 0, passed: 0, attempted: 0, completedAttempts: 0 },
+            prefi: { total: 0, passed: 0, attempted: 0, completedAttempts: 0 },
+            final: { total: 0, passed: 0, attempted: 0, completedAttempts: 0 }
         };
 
         let totalQuizzes = 0;
@@ -1833,23 +1833,33 @@
                 if (entry.hasGrade) totalAttempted++;
                 if (entry.isPassable) totalPassed++;
 
+                let attemptsUsed = 0;
+                if (entry.cmid && typeof localStorage !== 'undefined') {
+                    try {
+                        const raw = localStorage.getItem('amaes_quiz_attempts_' + entry.cmid);
+                        if (raw) {
+                            const parsed = JSON.parse(raw);
+                            if (parsed && typeof parsed.attemptsUsed === 'number') {
+                                attemptsUsed = parsed.attemptsUsed;
+                            }
+                        }
+                    } catch (_) {}
+                }
+                if (attemptsUsed === 0 && entry.hasGrade) {
+                    attemptsUsed = 1;
+                }
+
                 const t = typeof detectTermFromText === 'function' ? detectTermFromText(entry.title) : null;
-                if (t === 'Prelim') {
-                    termQuizzes.prelim.total++;
-                    if (entry.hasGrade) termQuizzes.prelim.attempted++;
-                    if (entry.isPassable) termQuizzes.prelim.passed++;
-                } else if (t === 'Midterm') {
-                    termQuizzes.midterm.total++;
-                    if (entry.hasGrade) termQuizzes.midterm.attempted++;
-                    if (entry.isPassable) termQuizzes.midterm.passed++;
-                } else if (t === 'Prefi') {
-                    termQuizzes.prefi.total++;
-                    if (entry.hasGrade) termQuizzes.prefi.attempted++;
-                    if (entry.isPassable) termQuizzes.prefi.passed++;
-                } else if (t === 'Final') {
-                    termQuizzes.final.total++;
-                    if (entry.hasGrade) termQuizzes.final.attempted++;
-                    if (entry.isPassable) termQuizzes.final.passed++;
+                const targetTerm = t === 'Prelim' ? termQuizzes.prelim
+                    : (t === 'Midterm' ? termQuizzes.midterm
+                    : (t === 'Prefi' ? termQuizzes.prefi
+                    : (t === 'Final' ? termQuizzes.final : null)));
+
+                if (targetTerm) {
+                    targetTerm.total++;
+                    targetTerm.completedAttempts += attemptsUsed;
+                    if (entry.hasGrade) targetTerm.attempted++;
+                    if (entry.isPassable) targetTerm.passed++;
                 }
             });
         }
@@ -1952,10 +1962,10 @@
         `;
 
         const terms = [
-            { name: 'Prelim', count: metrics.termStats.prelim, qz: metrics.termQuizzes.prelim },
-            { name: 'Midterm', count: metrics.termStats.midterm, qz: metrics.termQuizzes.midterm },
-            { name: 'Prefinal', count: metrics.termStats.prefi, qz: metrics.termQuizzes.prefi },
-            { name: 'Final', count: metrics.termStats.final, qz: metrics.termQuizzes.final }
+            { name: 'Prelim', count: metrics.termStats.prelim, qz: metrics.termQuizzes.prelim, completedAttempts: metrics.termQuizzes.prelim.completedAttempts || 0 },
+            { name: 'Midterm', count: metrics.termStats.midterm, qz: metrics.termQuizzes.midterm, completedAttempts: metrics.termQuizzes.midterm.completedAttempts || 0 },
+            { name: 'Prefinal', count: metrics.termStats.prefi, qz: metrics.termQuizzes.prefi, completedAttempts: metrics.termQuizzes.prefi.completedAttempts || 0 },
+            { name: 'Final', count: metrics.termStats.final, qz: metrics.termQuizzes.final, completedAttempts: metrics.termQuizzes.final.completedAttempts || 0 }
         ];
 
         card.innerHTML = `
@@ -2007,21 +2017,32 @@
                 </div>
             </div>
 
-            <!-- Term Breakdown Cards -->
+            <!-- Term Breakdown Cards: Progress & Completed Attempts -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px;">
                 ${terms.map(t => {
-                    const isReady = t.count >= 15;
-                    const hasSome = t.count > 0;
-                    const passText = t.qz.total > 0 ? `${t.qz.passed}/${t.qz.total} Passed` : (hasSome ? `${t.count} Qs Stored` : 'No Qs Stored');
+                    const isCompleted = t.qz.total > 0 && t.qz.passed >= t.qz.total;
+                    const inProgress = t.completedAttempts > 0 || t.qz.passed > 0;
+                    const statusLabel = isCompleted ? 'Completed' : (inProgress ? 'In Progress' : 'Not Started');
+                    const badgeStyle = isCompleted
+                        ? 'background: rgba(16,185,129,0.15); color: #059669;'
+                        : (inProgress ? 'background: rgba(59,130,246,0.15); color: #2563eb;' : 'background: rgba(148,163,184,0.15); color: #64748b;');
+                    const borderStyle = isCompleted
+                        ? 'rgba(16, 185, 129, 0.4)'
+                        : (inProgress ? 'rgba(59, 130, 246, 0.35)' : 'rgba(148, 163, 184, 0.25)');
+                    const bgStyle = isCompleted
+                        ? 'rgba(16, 185, 129, 0.05)'
+                        : (inProgress ? 'rgba(59, 130, 246, 0.04)' : 'rgba(148, 163, 184, 0.03)');
+                    const attemptsText = `${t.completedAttempts} Attempt${t.completedAttempts === 1 ? '' : 's'} Done`;
+                    const passText = t.qz.total > 0 ? `${t.qz.passed}/${t.qz.total} Quizzes Passed` : (t.completedAttempts > 0 ? `${t.completedAttempts} Completed` : 'No Quizzes Found');
                     return `
-                        <div style="border: 1px solid ${isReady ? 'rgba(16, 185, 129, 0.4)' : hasSome ? 'rgba(59, 130, 246, 0.35)' : 'rgba(148, 163, 184, 0.25)'}; background: ${isReady ? 'rgba(16, 185, 129, 0.05)' : hasSome ? 'rgba(59, 130, 246, 0.04)' : 'rgba(148, 163, 184, 0.03)'}; border-radius: 6px; padding: 7px 9px;">
+                        <div style="border: 1px solid ${borderStyle}; background: ${bgStyle}; border-radius: 6px; padding: 7px 9px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
                                 <span style="font-size: 11px; font-weight: 700; color: inherit;">${t.name}</span>
-                                <span style="font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 3px; ${isReady ? 'background: rgba(16,185,129,0.15); color: #059669;' : hasSome ? 'background: rgba(59,130,246,0.15); color: #2563eb;' : 'background: rgba(148,163,184,0.15); color: #64748b;'}">
-                                    ${isReady ? 'Ready' : hasSome ? 'AI Fallback' : 'Uncached'}
+                                <span style="font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 3px; ${badgeStyle}">
+                                    ${statusLabel}
                                 </span>
                             </div>
-                            <div style="font-size: 12px; font-weight: 700; color: inherit;">${t.count} Questions</div>
+                            <div style="font-size: 12px; font-weight: 700; color: inherit;">${attemptsText}</div>
                             <div style="font-size: 10.5px; opacity: 0.75; margin-top: 2px;">${passText}</div>
                         </div>
                     `;
@@ -2057,10 +2078,17 @@
         if (btnHighlight) {
             btnHighlight.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (typeof highlightUnfinishedActivities === 'function') {
-                    highlightUnfinishedActivities();
-                } else if (typeof highlightMissingQuizzesUI === 'function') {
-                    highlightMissingQuizzesUI();
+                if (typeof highlightMissingOrUnansweredQuizzes === 'function') {
+                    highlightMissingOrUnansweredQuizzes().then(res => {
+                        if (res && res.message) {
+                            if (typeof showToast === 'function') showToast(res.message, 3500);
+                        } else if (res && typeof res.count === 'number') {
+                            const msg = res.count > 0 ? `Highlighted ${res.count} quiz(zes) needing attention` : 'All quizzes on page are passed with ≥ 80%!';
+                            if (typeof showToast === 'function') showToast(msg, 3500);
+                        }
+                    }).catch(err => {
+                        if (typeof showToast === 'function') showToast(`Highlight note: ${err.message}`, 3000);
+                    });
                 }
             });
         }
@@ -3133,8 +3161,25 @@
         return text.trim();
     }
 
+    function stripQuestionMarkup(text) {
+        if (!text) return '';
+        let prev;
+        let curr = String(text);
+        // Iteratively strip innermost bracket tokens first (moodle-asset, dropdown, blank, ____, image)
+        do {
+            prev = curr;
+            curr = curr.replace(/\[\s*(?:moodle-asset|dropdown|blank|image|___+)[^\[\]]*\]/gi, ' ');
+        } while (curr !== prev);
+        // Strip any remaining outer container tags (e.g. outer [Image: ...])
+        do {
+            prev = curr;
+            curr = curr.replace(/\[\s*(?:image|dropdown|blank)[^\[\]]*\]/gi, ' ');
+        } while (curr !== prev);
+        return curr;
+    }
+
     function normalizeQuestionMatchKey(value) {
-        return normalizeText(value)
+        return normalizeText(stripQuestionMarkup(value))
             .replace(/\[\s*_{2,}(?:\s*:\s*[\s\S]*?)?\s*\]/g, ' ')
             .replace(/^(?:identification|identify)\s*:\s*/i, '')
             .replace(/^(?:answer\s+)?question\s*(?:no\.?|#)?\s*\d+[\s:.-]*/i, '')
@@ -7956,10 +8001,36 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         return cycleQuizOrExam('prev', opts);
     }
 
+    // Decorate Attempt quiz now / Re-attempt quiz button with key hint (Press A)
+    function decorateQuizLandingAttemptButton() {
+        if (typeof window === 'undefined' || !window.location.pathname.includes('/mod/quiz/view.php')) return;
+        const startBtn = document.querySelector(
+            'form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], ' +
+            '.quizstartbutton button, .quizstartbutton input[type="submit"], ' +
+            '#region-main button.btn-primary, #region-main input.btn-primary'
+        );
+        if (!startBtn || startBtn.dataset.amaesShortcutBound) return;
+        startBtn.dataset.amaesShortcutBound = 'true';
+
+        let hint = startBtn.querySelector('.amaes-attempt-key-hint');
+        if (!hint && startBtn.tagName === 'BUTTON') {
+            hint = document.createElement('span');
+            hint.className = 'amaes-attempt-key-hint';
+            hint.style.cssText = 'margin-left: 8px; font-size: 11px; font-weight: 600; opacity: 0.9; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.35); display: inline-block; vertical-align: middle;';
+            hint.textContent = '(Press A)';
+            startBtn.appendChild(hint);
+        } else if (!hint && startBtn.tagName === 'INPUT') {
+            if (!startBtn.value.includes('(Press A)')) {
+                startBtn.value = `${startBtn.value} (Press A)`;
+            }
+        }
+    }
+
     // Toggleable Keyboard Navigation & Fast Shortcuts for Quiz
     function setupQuizKeyboardShortcuts() {
         decorateNativeActivityNavigation();
         injectQuizBottomNavigation();
+        decorateQuizLandingAttemptButton();
 
         window.addEventListener('keydown', (e) => {
             if (!enableKeyboardShortcuts) return;
@@ -7976,6 +8047,31 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             }
 
             if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+            // Attempt / Re-attempt Quiz Shortcut on Quiz Landing Pages (/mod/quiz/view.php): 'A' or 'Enter'
+            const isQuizLanding = typeof window !== 'undefined' && window.location.pathname.includes('/mod/quiz/view.php');
+            if (isQuizLanding && (e.key === 'a' || e.key === 'A' || e.key === 'Enter')) {
+                const confirmModalBtn = document.querySelector('.moodle-dialogue-bd button.btn-primary, .modal.show button.btn-primary, .modal button.btn-primary[data-action="save"]');
+                if (confirmModalBtn) {
+                    e.preventDefault();
+                    confirmModalBtn.click();
+                    showToast("Confirming attempt...");
+                    return;
+                }
+
+                const startBtn = document.querySelector(
+                    'form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], ' +
+                    '.quizstartbutton button, .quizstartbutton input[type="submit"], ' +
+                    '#region-main button.btn-primary, #region-main input.btn-primary'
+                );
+                if (startBtn) {
+                    e.preventDefault();
+                    showToast("Starting quiz attempt... (A)");
+                    setLog("Triggered <b>Attempt Quiz</b> via keyboard shortcut [A]", "var(--accent-green)");
+                    startBtn.click();
+                    return;
+                }
+            }
 
             // Global Escape Handler: First press closes open Help/Contribute modal, subsequent press minimizes/toggles toolkit panel
             if (e.key === 'Escape' || e.key === 'Esc') {
@@ -8503,6 +8599,32 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             let candidates = exactCandidates.length > 0
                 ? exactCandidates
                 : (hasAmbiguousQuestionMatch ? [] : matchingCandidates);
+
+            // Prioritize candidates when multiple match:
+            // 1. By matching image asset token from the question DOM
+            // 2. By verified candidate status
+            if (candidates.length > 1) {
+                const liveImgTokens = Array.from(que.querySelectorAll('.formulation img, .qtext img')).map(img => {
+                    const src = img.src || img.getAttribute('data-src') || '';
+                    const m = src.match(/\/pluginfile\.php\/\d+\/question\/(?:answer|questiontext|feedback)\/\d+(?:\/\d+)?\/([^?#\s]+)/i);
+                    return m ? m[1].toLowerCase() : '';
+                }).filter(Boolean);
+
+                if (liveImgTokens.length > 0) {
+                    const assetMatched = candidates.filter(c => {
+                        const qStr = (c.qRaw || c.question || '').toLowerCase();
+                        return liveImgTokens.some(tok => qStr.includes(tok));
+                    });
+                    if (assetMatched.length > 0) {
+                        candidates = assetMatched;
+                    }
+                }
+
+                const confirmed = candidates.filter(c => isConfirmedCandidate(c));
+                if (confirmed.length > 0) {
+                    candidates = confirmed;
+                }
+            }
             const reviewEliminationCandidates = [];
             questionCandidateIndex.forEach((items, candidateKey) => {
                 if (candidateKey === currentQuestionKey || !questionTextMatches(candidateKey, currentQuestionKey)) return;
@@ -10051,7 +10173,9 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
                                     matchingDrag.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
                                     dropZone.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-                                    dropZone.innerText = targetAns;
+                                    if (isConfirmedCandidate(bestCand)) {
+                                        dropZone.innerText = targetAns;
+                                    }
                                     dropZone.style.outline = `2px solid ${sourceColor}`;
                                     dropZone.style.fontWeight = '700';
 
@@ -11240,33 +11364,12 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     if (m) cmid = m[1];
                 }
 
-                // Check cached attempt details
+                // Check cached attempt details from prior visits to quiz landing
                 let attemptsInfo = null;
                 if (cmid) {
                     try {
                         const raw = localStorage.getItem('amaes_quiz_attempts_' + cmid);
                         if (raw) attemptsInfo = JSON.parse(raw);
-                    } catch (e) {}
-                }
-
-                // If not cached and quiz link is available, fetch quiz landing to check attempt limits
-                if (!attemptsInfo && linkElem && linkElem.href) {
-                    try {
-                        const resp = await fetch(linkElem.href);
-                        if (resp.ok) {
-                            const html = await resp.text();
-                            const doc = new DOMParser().parseFromString(html, 'text/html');
-                            attemptsInfo = parseQuizLandingData(doc, linkElem.href);
-                            if (cmid) {
-                                try {
-                                    localStorage.setItem('amaes_quiz_attempts_' + cmid, JSON.stringify(attemptsInfo));
-                                } catch (e) {}
-                            }
-                            if (attemptsInfo.hasGrade && attemptsInfo.highestPct !== null && attemptsInfo.highestPct >= 80) {
-                                // Passed with >= 80%!
-                                continue;
-                            }
-                        }
                     } catch (e) {}
                 }
 

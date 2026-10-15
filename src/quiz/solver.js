@@ -3938,10 +3938,36 @@
         return cycleQuizOrExam('prev', opts);
     }
 
+    // Decorate Attempt quiz now / Re-attempt quiz button with key hint (Press A)
+    function decorateQuizLandingAttemptButton() {
+        if (typeof window === 'undefined' || !window.location.pathname.includes('/mod/quiz/view.php')) return;
+        const startBtn = document.querySelector(
+            'form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], ' +
+            '.quizstartbutton button, .quizstartbutton input[type="submit"], ' +
+            '#region-main button.btn-primary, #region-main input.btn-primary'
+        );
+        if (!startBtn || startBtn.dataset.amaesShortcutBound) return;
+        startBtn.dataset.amaesShortcutBound = 'true';
+
+        let hint = startBtn.querySelector('.amaes-attempt-key-hint');
+        if (!hint && startBtn.tagName === 'BUTTON') {
+            hint = document.createElement('span');
+            hint.className = 'amaes-attempt-key-hint';
+            hint.style.cssText = 'margin-left: 8px; font-size: 11px; font-weight: 600; opacity: 0.9; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.35); display: inline-block; vertical-align: middle;';
+            hint.textContent = '(Press A)';
+            startBtn.appendChild(hint);
+        } else if (!hint && startBtn.tagName === 'INPUT') {
+            if (!startBtn.value.includes('(Press A)')) {
+                startBtn.value = `${startBtn.value} (Press A)`;
+            }
+        }
+    }
+
     // Toggleable Keyboard Navigation & Fast Shortcuts for Quiz
     function setupQuizKeyboardShortcuts() {
         decorateNativeActivityNavigation();
         injectQuizBottomNavigation();
+        decorateQuizLandingAttemptButton();
 
         window.addEventListener('keydown', (e) => {
             if (!enableKeyboardShortcuts) return;
@@ -3958,6 +3984,31 @@
             }
 
             if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+            // Attempt / Re-attempt Quiz Shortcut on Quiz Landing Pages (/mod/quiz/view.php): 'A' or 'Enter'
+            const isQuizLanding = typeof window !== 'undefined' && window.location.pathname.includes('/mod/quiz/view.php');
+            if (isQuizLanding && (e.key === 'a' || e.key === 'A' || e.key === 'Enter')) {
+                const confirmModalBtn = document.querySelector('.moodle-dialogue-bd button.btn-primary, .modal.show button.btn-primary, .modal button.btn-primary[data-action="save"]');
+                if (confirmModalBtn) {
+                    e.preventDefault();
+                    confirmModalBtn.click();
+                    showToast("Confirming attempt...");
+                    return;
+                }
+
+                const startBtn = document.querySelector(
+                    'form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], ' +
+                    '.quizstartbutton button, .quizstartbutton input[type="submit"], ' +
+                    '#region-main button.btn-primary, #region-main input.btn-primary'
+                );
+                if (startBtn) {
+                    e.preventDefault();
+                    showToast("Starting quiz attempt... (A)");
+                    setLog("Triggered <b>Attempt Quiz</b> via keyboard shortcut [A]", "var(--accent-green)");
+                    startBtn.click();
+                    return;
+                }
+            }
 
             // Global Escape Handler: First press closes open Help/Contribute modal, subsequent press minimizes/toggles toolkit panel
             if (e.key === 'Escape' || e.key === 'Esc') {
@@ -4485,6 +4536,32 @@
             let candidates = exactCandidates.length > 0
                 ? exactCandidates
                 : (hasAmbiguousQuestionMatch ? [] : matchingCandidates);
+
+            // Prioritize candidates when multiple match:
+            // 1. By matching image asset token from the question DOM
+            // 2. By verified candidate status
+            if (candidates.length > 1) {
+                const liveImgTokens = Array.from(que.querySelectorAll('.formulation img, .qtext img')).map(img => {
+                    const src = img.src || img.getAttribute('data-src') || '';
+                    const m = src.match(/\/pluginfile\.php\/\d+\/question\/(?:answer|questiontext|feedback)\/\d+(?:\/\d+)?\/([^?#\s]+)/i);
+                    return m ? m[1].toLowerCase() : '';
+                }).filter(Boolean);
+
+                if (liveImgTokens.length > 0) {
+                    const assetMatched = candidates.filter(c => {
+                        const qStr = (c.qRaw || c.question || '').toLowerCase();
+                        return liveImgTokens.some(tok => qStr.includes(tok));
+                    });
+                    if (assetMatched.length > 0) {
+                        candidates = assetMatched;
+                    }
+                }
+
+                const confirmed = candidates.filter(c => isConfirmedCandidate(c));
+                if (confirmed.length > 0) {
+                    candidates = confirmed;
+                }
+            }
             const reviewEliminationCandidates = [];
             questionCandidateIndex.forEach((items, candidateKey) => {
                 if (candidateKey === currentQuestionKey || !questionTextMatches(candidateKey, currentQuestionKey)) return;
@@ -6033,7 +6110,9 @@
 
                                     matchingDrag.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
                                     dropZone.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-                                    dropZone.innerText = targetAns;
+                                    if (isConfirmedCandidate(bestCand)) {
+                                        dropZone.innerText = targetAns;
+                                    }
                                     dropZone.style.outline = `2px solid ${sourceColor}`;
                                     dropZone.style.fontWeight = '700';
 
