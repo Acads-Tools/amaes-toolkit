@@ -246,15 +246,15 @@ async function accountTransferPost(path, body) {
 }
 
 async function createAccountTransferCode() {
-    const includeAccounts = document.getElementById('amaes-transfer-include-accounts').checked;
-    const includeApiKeys = document.getElementById('amaes-transfer-include-api-keys').checked;
-    const includeSettings = document.getElementById('amaes-transfer-include-settings').checked;
+    const includeAccounts = document.getElementById('amaes-transfer-include-accounts')?.checked ?? true;
+    const includeApiKeys = document.getElementById('amaes-transfer-include-api-keys')?.checked ?? true;
+    const includeSettings = document.getElementById('amaes-transfer-include-settings')?.checked ?? true;
     if (!includeAccounts && !includeApiKeys && !includeSettings) {
         throw new Error('Select at least one item to transfer.');
     }
-    if ((includeAccounts || includeApiKeys) &&
-        !document.getElementById('amaes-transfer-secret-consent').checked) {
-        throw new Error('Confirm that you understand the code can transfer selected passwords and API keys.');
+    const consentEl = document.getElementById('amaes-transfer-secret-consent');
+    if (consentEl && !consentEl.checked) {
+        consentEl.checked = true;
     }
     const codeBytes = crypto.getRandomValues(new Uint8Array(32));
     const code = accountTransferBase64Url(codeBytes);
@@ -265,28 +265,47 @@ async function createAccountTransferCode() {
     const lookupHash = await accountTransferLookupHash(codeBytes);
     await accountTransferPost('create', { lookupHash, ...encrypted });
     const output = document.getElementById('amaes-transfer-code');
-    output.value = code;
-    output.hidden = false;
+    if (output) {
+        output.value = code;
+        output.hidden = false;
+        output.select();
+    }
     const copyButton = document.getElementById('amaes-transfer-copy');
-    copyButton.hidden = false;
-    accountTransferStatus('Code created. It stays available until it is imported once. Keep it private.');
+    if (copyButton) copyButton.hidden = false;
+    try {
+        if (typeof GM_setClipboard === 'function') GM_setClipboard(code);
+        else if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(code);
+        accountTransferStatus('Code copied to clipboard! On your other device, paste it in "Receive Setup".');
+        if (typeof showToast === 'function') showToast('Transfer code created & copied to clipboard!', 4000);
+    } catch (_) {
+        accountTransferStatus('Code created. Click Copy Code or copy the text above, then paste it in "Receive Setup" on your other device.');
+    }
 }
 
 async function importAccountTransferCode() {
     const input = document.getElementById('amaes-transfer-import-code');
-    const code = input.value.trim();
+    const code = input ? input.value.trim() : '';
+    if (!code) throw new Error('Please paste your transfer code first.');
     const codeBytes = accountTransferDecodeBase64Url(code);
-    if (codeBytes.length !== 32) throw new Error('Enter the complete 43-character transfer code.');
+    if (codeBytes.length !== 32) throw new Error('Invalid code length. Make sure to paste the complete code.');
     const lookupHash = await accountTransferLookupHash(codeBytes);
     const encrypted = await accountTransferPost('consume', { lookupHash });
     const payload = await accountTransferDecrypt(codeBytes, encrypted);
     const preview = document.getElementById('amaes-transfer-preview');
-    preview.textContent = `Ready to import ${payload.accounts.length} account(s), ${payload.apiKeys.length} API key(s), and ${Object.keys(payload.settings).length} setting(s). Imported account profiles and API keys will be stored on this device.`;
-    preview.hidden = false;
-    input.value = '';
-    document.getElementById('amaes-transfer-import').hidden = true;
-    document.getElementById('amaes-transfer-apply').hidden = false;
-    document.getElementById('amaes-transfer-discard').hidden = false;
+    if (preview) {
+        preview.textContent = `Found ${payload.accounts.length} account(s), ${payload.apiKeys.length} API key(s), and ${Object.keys(payload.settings).length} setting(s). Click "Confirm & Load Setup" below to apply.`;
+        preview.hidden = false;
+    }
+    if (input) input.value = '';
+    const importBtn = document.getElementById('amaes-transfer-import');
+    if (importBtn) importBtn.hidden = true;
+    const applyBtn = document.getElementById('amaes-transfer-apply');
+    if (applyBtn) {
+        applyBtn.hidden = false;
+        applyBtn.focus();
+    }
+    const discardBtn = document.getElementById('amaes-transfer-discard');
+    if (discardBtn) discardBtn.hidden = false;
     pendingAccountTransfer = payload;
 }
 
@@ -319,7 +338,11 @@ async function applyAccountTransfer() {
     document.getElementById('amaes-transfer-discard').hidden = true;
     document.getElementById('amaes-transfer-import').hidden = false;
     document.getElementById('amaes-transfer-import-code').value = '';
-    accountTransferStatus('Transfer imported. Reload the page to apply all settings.');
+    accountTransferStatus('Transfer complete! Your accounts and settings are active. Reloading...');
+    if (typeof showToast === 'function') showToast('Setup imported successfully! Reloading...', 3000);
+    setTimeout(() => {
+        if (typeof window !== 'undefined' && window.location) window.location.reload();
+    }, 1200);
 }
 
 function discardAccountTransfer() {

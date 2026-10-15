@@ -2924,8 +2924,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.12.7'), "Userscript header must specify v1.12.7");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.12.7";'), "Constant SCRIPT_VERSION must be v1.12.7");
+    assert.ok(script.includes('@version      1.12.8'), "Userscript header must specify v1.12.8");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.12.8";'), "Constant SCRIPT_VERSION must be v1.12.8");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4136,11 +4136,11 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     // 2. README documentation
     assert.ok(readme.includes("### 4. Built-in Google Gemini AI Assistant (Experimental)"), "README must document Gemini AI Assistant in features");
     assert.ok(readme.includes("### Step 4: (Optional) Setup Free Google Gemini AI"), "README must include step-by-step setup guide for Gemini AI");
-    assert.ok(readme.includes("version-1.12.7-blue.svg"), "README badge must show v1.12.7");
+    assert.ok(readme.includes("version-1.12.8-blue.svg"), "README badge must show v1.12.8");
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.12.7<"), "Website must display v1.12.7 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.12.8<"), "Website must display v1.12.8 badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -5077,7 +5077,7 @@ test("Quiz Summary Attempt Completion: verifies immediate quest_done audio chime
     // 3. Quiz summary page handler (handleQuizSummaryAutoSubmit)
     assert.ok(script.includes("function handleQuizSummaryAutoSubmit()"), "Must define handleQuizSummaryAutoSubmit");
     assert.ok(script.includes("All questions answered and saved. Waiting for your confirmation to submit."), "Must indicate quiz completed and waiting for confirmation");
-    assert.ok(script.includes("✓ Ready to Submit"), "Must update document title to notify background multitasking users");
+    assert.ok(script.includes("(Ready to Submit)"), "Must update document title to notify background multitasking users");
 
     // 4. UI synchronizer state on summary page
     assert.ok(script.includes("Review & Submit"), "btnMasterAutoQuiz must display 'Review & Submit' on summary page");
@@ -5913,7 +5913,7 @@ test("Cross-Domain Storage Bridge, Quiz Summary Smart Evaluator, Calm Study Guid
     // 2. Quiz Summary Page Smart Evaluator
     assert.ok(script.includes("function evaluateQuizSummaryPage()"), "Must define evaluateQuizSummaryPage evaluator");
     assert.ok(script.includes("unanswered.push({"), "Summary evaluator must collect unanswered questions");
-    assert.ok(script.includes("⚠️ Not Answered"), "Summary evaluator must attach ⚠️ Not Answered badge to incomplete rows");
+    assert.ok(script.includes("Not Answered"), "Summary evaluator must attach Not Answered badge to incomplete rows");
     assert.ok(script.includes("amaes-summary-incomplete-banner"), "Summary handler must render incomplete warning banner");
     assert.ok(script.includes("amaes-btn-jump-first-unanswered"), "Summary incomplete banner must provide 1-click jump button");
     assert.ok(script.includes("amaes-summary-ready-banner"), "Summary handler must render ready-to-submit banner when all questions are answered");
@@ -5934,7 +5934,7 @@ test("Cross-Domain Storage Bridge, Quiz Summary Smart Evaluator, Calm Study Guid
     assert.ok(script.includes("function setQuestionStudyGuideTag("), "Must tag question with study guide source attribution");
 
     // 5. Redesigned Unified AI Setup Modal
-    assert.ok(script.includes("Get Free Key ↗"), "AI setup modal must provide 1-click link to get free API key");
+    assert.ok(script.includes("Get Free Key"), "AI setup modal must provide 1-click link to get free API key");
     assert.ok(script.includes("amaes-gemini-key-rows"), "AI setup modal must render key inputs");
     assert.ok(script.includes("Save & Activate AI") && script.includes("amaes-gemini-btn-test-save"), "AI setup modal must provide test and save action");
     assert.ok(script.includes("<details") && script.includes("Advanced Settings (Backup Keys, Jev Classifier & Sharing)"), "AI setup modal must collapse advanced settings in <details>");
@@ -5960,7 +5960,7 @@ test("Auto-Harvest Reviewability Detection, Locked Exam Skip Protection & Exam P
     assert.ok(script.includes(".fa-lock, .icon-lock"), "Locked check must catch lock icon indicators");
     assert.ok(script.includes("isActivityLockedOrRestricted(container)") && script.includes("scanBlock"), "findButtons must skip locked/restricted activities");
     assert.ok(script.includes("if (isActivityLockedOrRestricted(container)) return;"), "setupAutoViewBadges must skip locked/restricted activities");
-    assert.ok(script.includes("🔒 ${classification.badge} (Locked)"), "highlightItems must display locked badge on restricted activities");
+    assert.ok(script.includes("[Locked] ${classification.badge}"), "highlightItems must display locked badge on restricted activities");
 
     // 3. Exam Portal Course Tools Adaptation & Guard
     assert.ok(script.includes("amaes-exam-portal-banner"), "Course tools tab must render exam portal mode banner when on exam site");
@@ -6143,6 +6143,34 @@ test("Panel Initialization & Quiz Attempt Safe Runtime Execution (v1.12.7)", () 
     }
     assert.strictEqual(threw, false, `Userscript threw on quiz attempt page initialization: ${errorMsg}`);
     assert.ok(elements['amaes-toolkit-panel'], "amaes-toolkit-panel must be created without throwing");
+});
+
+test("Zero Generic Emojis Policy, Simple 2-Step Setup Transfer & Exam Answer Highlighting (v1.12.8)", () => {
+    const fs = require('fs');
+    const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Zero Generic Emojis Policy: check that generic emojis were purged from UI strings
+    assert.ok(!script.includes("⚡ <b>Speed Mode"), "Speed mode must not use emoji ⚡");
+    assert.ok(!script.includes("🔒 [Locked]"), "Locked badge must not prepend emoji 🔒");
+    assert.ok(!script.includes("💡 Instant Fill"), "Instant fill must not use emoji 💡");
+    assert.ok(!script.includes("✓ Ready to Submit"), "Ready to submit must not use emoji ✓");
+
+    // 2. Simple 2-Step Setup Transfer Layout
+    assert.ok(script.includes("Step 1: Send Setup (This Device)"), "Setup transfer must present clear Step 1");
+    assert.ok(script.includes("Step 2: Receive Setup (New Device)"), "Setup transfer must present clear Step 2");
+    assert.ok(script.includes("The code does not expire, but works once only"), "Transfer footer must explain security invariant");
+    assert.ok(script.includes("id=\"amaes-transfer-create\""), "Must have transfer code generator button");
+    assert.ok(script.includes("id=\"amaes-transfer-import\""), "Must have transfer import button");
+
+    // 3. Quiz & Exam Answer Highlighting with NO SAVED ANSWER Badge and Left Border
+    assert.ok(script.includes(".que.amaes-no-answer-que"), "Must define .que.amaes-no-answer-que CSS styling");
+    assert.ok(script.includes("NO SAVED ANSWER"), "Must render NO SAVED ANSWER badge when no answer is known");
+    assert.ok(script.includes("que.classList.add('amaes-no-answer-que')"), "Must add amaes-no-answer-que to question containers lacking saved answers");
+
+    // 4. Clear Exam & Quiz Matched Messaging
+    assert.ok(script.includes("Highlighted all <b>${res.total}</b> answers!"), "Must report 100% matched answers cleanly");
+    assert.ok(script.includes("have no saved answer in database)"), "Must report count of questions lacking saved answers");
+    assert.ok(script.includes("No saved answers in database for this"), "Must report 0 matches with actionable Gemini advice");
 });
 
 

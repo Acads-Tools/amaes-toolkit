@@ -713,7 +713,7 @@
 
                 const badge = document.createElement('span');
                 badge.className = 'amaes-type-badge';
-                badge.innerText = isLocked ? `🔒 ${classification.badge} (Locked)` : classification.badge;
+                badge.innerText = isLocked ? `[Locked] ${classification.badge}` : classification.badge;
                 badge.style.cssText = `
                     position: absolute;
                     top: 6px;

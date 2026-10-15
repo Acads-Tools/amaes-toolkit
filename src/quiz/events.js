@@ -716,30 +716,42 @@
         // Highlight Button
         if (hlAnswersBtn) hlAnswersBtn.onclick = () => {
             const cached = getCachedAnswers(subCode);
+            const isExamSite = typeof isExamPortalDomain === 'function' && isExamPortalDomain();
+            const term = isExamSite ? 'exam' : 'quiz';
             if (!cached) {
-                setLog("No answers cached yet for this subject!", "var(--accent-pink)");
+                setLog(`No answers cached yet for this ${term}!`, "var(--accent-pink)");
                 return;
             }
             const res = highlightQuizAnswers(cached, false);
             if (res.error) {
                 setLog(res.error, "var(--accent-pink)");
+            } else if (res.matched === res.total && res.total > 0) {
+                setLog(`Highlighted all <b>${res.total}</b> answers!`, "var(--accent-green)");
+            } else if (res.matched === 0 && res.total > 0) {
+                setLog(`No saved answers in database for this ${term}. Answer manually or use Gemini AI (C/V) to solve.`, "var(--accent-amber)");
             } else {
-                setLog(`Matched & highlighted <b>${res.matched}/${res.total}</b> questions!`, "var(--accent-green)");
+                setLog(`Highlighted <b>${res.matched}/${res.total}</b> answers. (${res.total - res.matched} question(s) have no saved answer in database)`, "var(--accent-green)");
             }
         };
 
         // Auto-Select Button
         if (selectAnswersBtn) selectAnswersBtn.onclick = () => {
             const cached = getCachedAnswers(subCode);
+            const isExamSite = typeof isExamPortalDomain === 'function' && isExamPortalDomain();
+            const term = isExamSite ? 'exam' : 'quiz';
             if (!cached) {
-                setLog("No answers cached yet for this subject!", "var(--accent-pink)");
+                setLog(`No answers cached yet for this ${term}!`, "var(--accent-pink)");
                 return;
             }
             const res = highlightQuizAnswers(cached, true, true);
             if (res.error) {
                 setLog(res.error, "var(--accent-pink)");
+            } else if (res.matched === res.total && res.total > 0) {
+                setLog(`Auto-selected all <b>${res.total}</b> answers!`, "var(--accent-green)");
+            } else if (res.matched === 0 && res.total > 0) {
+                setLog(`No saved answers in database for this ${term}. Answer manually or use Gemini AI (C/V) to solve.`, "var(--accent-amber)");
             } else {
-                setLog(`Auto-selected <b>${res.matched}/${res.total}</b> answers!`, "var(--accent-green)");
+                setLog(`Auto-selected <b>${res.matched}/${res.total}</b> answers. (${res.total - res.matched} question(s) have no saved answer in database)`, "var(--accent-green)");
             }
         };
 
@@ -1128,17 +1140,36 @@
                 const courseInfo = detectCourseInfo();
                 const subCode = courseInfo.subjectCode || 'CS6301';
                 const cached = getCachedAnswers(subCode);
+                const isExamSite = typeof isExamPortalDomain === 'function' && isExamPortalDomain();
+                const term = isExamSite ? 'exam' : 'quiz';
                 if (cached && cached.length > 0) {
                     const res = highlightQuizAnswers(cached, false, true);
-                    showToast(`Highlighted ${res.matched}/${res.total} questions!`);
-                    setLog(`Highlighted <b>${res.matched}/${res.total}</b> questions.`, "var(--accent-green)");
+                    if (res.matched === res.total && res.total > 0) {
+                        showToast(`Highlighted all ${res.total} answers!`);
+                        setLog(`Highlighted all <b>${res.total}</b> answers!`, "var(--accent-green)");
+                    } else if (res.matched === 0 && res.total > 0) {
+                        showToast(`No saved answers in database for this ${term}. Answer manually or use Gemini AI (C/V) to solve.`);
+                        setLog(`No saved answers in database for this ${term}. Answer manually or use Gemini AI (C/V) to solve.`, "var(--accent-amber)");
+                    } else {
+                        showToast(`Highlighted ${res.matched}/${res.total} answers. (${res.total - res.matched} with no saved answer)`);
+                        setLog(`Highlighted <b>${res.matched}/${res.total}</b> answers. (${res.total - res.matched} question(s) have no saved answer in database)`, "var(--accent-green)");
+                    }
                 } else if (typeof autoFetchCloudAnswersIfMissing === 'function') {
                     showToast("Checking cloud database for answers...");
                     autoFetchCloudAnswersIfMissing(subCode).then(ok => {
                         if (ok) {
                             const fresh = getCachedAnswers(subCode);
                             const res = highlightQuizAnswers(fresh, false, true);
-                            showToast(`Highlighted ${res.matched}/${res.total} questions from cloud!`);
+                            if (res.matched === res.total && res.total > 0) {
+                                showToast(`Highlighted all ${res.total} answers from cloud!`);
+                                setLog(`Highlighted all <b>${res.total}</b> answers from cloud!`, "var(--accent-green)");
+                            } else if (res.matched === 0 && res.total > 0) {
+                                showToast(`No saved answers in database for this ${term}. Answer manually or use Gemini AI (C/V) to solve.`);
+                                setLog(`No saved answers in database for this ${term}. Answer manually or use Gemini AI (C/V) to solve.`, "var(--accent-amber)");
+                            } else {
+                                showToast(`Highlighted ${res.matched}/${res.total} answers from cloud. (${res.total - res.matched} with no saved answer)`);
+                                setLog(`Highlighted <b>${res.matched}/${res.total}</b> answers from cloud. (${res.total - res.matched} question(s) have no saved answer in database)`, "var(--accent-green)");
+                            }
                         } else {
                             showToast(`No answers found in database for ${subCode}`);
                         }

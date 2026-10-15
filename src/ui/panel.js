@@ -161,8 +161,8 @@
                     <!-- Seamless Quiz Highlighter -->
                     ${!isQuiz ? `
                     <div style="display: flex; gap: 4px; margin-top: 2px;">
-                        <button id="btn-hl-missing-quizzes" class="amaes-btn amaes-btn-outline" style="flex: 1; justify-content: center; padding: 6px 8px; font-size: 10.5px; font-weight: 600; border-radius: 6px; gap: 5px;" title="Highlight unanswered, unattempted, or missing quizzes on Course or Grades page">
-                            ${ICONS.target} <span>Highlight Missing Quizzes</span>
+                        <button id="btn-hl-missing-quizzes" class="amaes-btn amaes-btn-outline" style="flex: 1; justify-content: center; padding: 6px 8px; font-size: 10.5px; font-weight: 600; border-radius: 6px; gap: 5px;" title="${isExamPortal ? 'Highlight unanswered, unattempted, or missing exams on Course or Grades page' : 'Highlight unanswered, unattempted, or missing quizzes on Course or Grades page'}">
+                            ${ICONS.target} <span>${isExamPortal ? 'Highlight Missing Exams' : 'Highlight Missing Quizzes'}</span>
                         </button>
                     </div>
                     ` : `
@@ -415,7 +415,7 @@
                 <div id="tab-pane-course" class="amaes-tab-pane" style="display: none; padding: 8px; flex-direction: column; gap: 6px;">
                     ${isExamPortal ? `
                         <div id="amaes-exam-portal-banner" style="display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 6px; font-size: 11px; color: var(--accent-blue, #2563eb);">
-                            <span style="font-size: 14px;">🎯</span>
+                            <span style="display: inline-flex; align-items: center; color: var(--accent-blue);">${ICONS.target}</span>
                             <span><b>Exam Portal Mode:</b> Only exam assessments are hosted here. Non-exam tools (lectures/videos) are disabled.</span>
                         </div>
                     ` : ''}
@@ -533,39 +533,59 @@
                             <button id="amaes-account-switcher-cancel-edit" type="button" class="amaes-btn amaes-btn-outline" style="display: none; justify-content: center; padding: 6px; font-size: 10px;">Cancel edit</button>
                         </form>
                         <div id="amaes-account-switcher-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
-                        <details id="amaes-account-transfer" style="border: 1px solid var(--border-subtle); border-radius: 5px; padding: 5px 6px;">
-                            <summary style="cursor: pointer; font-size: 9.5px; font-weight: 600; color: var(--text-secondary);">Transfer setup to another device</summary>
-                            <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 5px;">
-                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
-                                    <input id="amaes-transfer-include-settings" type="checkbox" checked />
-                                    <span>Toolkit preferences (automation, AI, appearance, and panel layout)</span>
-                                </label>
-                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
-                                    <input id="amaes-transfer-include-accounts" type="checkbox" checked />
-                                    <span>Moodle account profiles (usernames, passwords, nicknames)</span>
-                                </label>
-                                <label style="display: flex; gap: 5px; align-items: center; font-size: 9px; color: var(--text-secondary);">
-                                    <input id="amaes-transfer-include-api-keys" type="checkbox" checked />
-                                    <span>Personal Gemini API keys</span>
-                                </label>
-                                <label style="display: flex; gap: 5px; align-items: flex-start; font-size: 8.5px; color: var(--accent-amber, #f59e0b); line-height: 1.3;">
-                                    <input id="amaes-transfer-secret-consent" type="checkbox" style="margin-top: 1px;" />
-                                    <span>I understand anyone with the one-time code can import the selected passwords and API keys.</span>
-                                </label>
-                                <button id="amaes-transfer-create" type="button" class="amaes-btn amaes-btn-outline" style="justify-content: center; font-size: 9px; padding: 5px;">Create one-time transfer code</button>
-                                <input id="amaes-transfer-code" type="text" readonly hidden aria-label="One-time transfer code" style="width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 5px 6px; border-radius: 4px; font-size: 9px; font-family: monospace;" />
-                                <button id="amaes-transfer-copy" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Copy code</button>
-                                <div style="font-size: 8.5px; color: var(--text-muted); line-height: 1.3;">The code does not expire, but works once only. The relay keeps encrypted data until it is imported, then deletes it. Anyone with the code can import it, so keep it private. Service tokens, Moodle sessions, caches, and installation identity are not included. Imported credentials are saved in this browser's userscript storage.</div>
-                                <div style="display: flex; gap: 4px; align-items: center;">
-                                    <input id="amaes-transfer-import-code" type="password" autocomplete="off" placeholder="Enter transfer code" aria-label="Transfer code" style="flex: 1; min-width: 0; background: var(--bg); color: var(--text-primary); border: 1px solid var(--border); padding: 5px 7px; border-radius: 4px; font-size: 9.5px; font-family: monospace;" />
-                                    <button id="amaes-transfer-import" type="button" class="amaes-btn amaes-btn-outline" style="width: auto; flex-shrink: 0; white-space: nowrap; justify-content: center; font-size: 9px; padding: 5px 9px;">Preview</button>
-                                </div>
-                                <div id="amaes-transfer-preview" hidden role="status" style="font-size: 9px; color: var(--text-secondary); line-height: 1.4;"></div>
-                                <button id="amaes-transfer-apply" type="button" class="amaes-btn amaes-btn-monotone" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Import into this device</button>
-                                <button id="amaes-transfer-discard" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Discard preview</button>
-                                <div id="amaes-account-transfer-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary);"></div>
+                        <div id="amaes-account-transfer" style="border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px; background: rgba(255, 255, 255, 0.02); display: flex; flex-direction: column; gap: 8px;">
+                            <div style="font-size: 11px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                <span style="display: inline-flex; align-items: center; color: var(--accent-blue);">${ICONS.share || ICONS.cloud}</span>
+                                <span>Transfer Setup to Another Device</span>
                             </div>
-                        </details>
+                            <div style="font-size: 9.5px; color: var(--text-secondary); line-height: 1.4;">
+                                Easily sync your saved Moodle accounts, Gemini AI keys, and settings to your other phone, laptop, or computer in two simple steps.
+                            </div>
+
+                            <!-- Step 1: Send from this device -->
+                            <div style="background: var(--bg); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
+                                <div style="font-size: 10px; font-weight: 700; color: var(--text-primary);">Step 1: Send Setup (This Device)</div>
+                                <div style="display: flex; flex-direction: column; gap: 3px;">
+                                    <label style="display: flex; gap: 6px; align-items: center; font-size: 9px; color: var(--text-secondary); cursor: pointer;">
+                                        <input id="amaes-transfer-include-accounts" type="checkbox" checked style="cursor: pointer; margin: 0;" />
+                                        <span>Saved Moodle Accounts & Logins</span>
+                                    </label>
+                                    <label style="display: flex; gap: 6px; align-items: center; font-size: 9px; color: var(--text-secondary); cursor: pointer;">
+                                        <input id="amaes-transfer-include-api-keys" type="checkbox" checked style="cursor: pointer; margin: 0;" />
+                                        <span>Personal Gemini API Keys</span>
+                                    </label>
+                                    <label style="display: flex; gap: 6px; align-items: center; font-size: 9px; color: var(--text-secondary); cursor: pointer;">
+                                        <input id="amaes-transfer-include-settings" type="checkbox" checked style="cursor: pointer; margin: 0;" />
+                                        <span>Toolkit Preferences & Themes</span>
+                                    </label>
+                                    <input id="amaes-transfer-secret-consent" type="checkbox" checked style="display: none;" />
+                                </div>
+                                <button id="amaes-transfer-create" type="button" class="amaes-btn amaes-btn-monotone" style="justify-content: center; font-size: 9.5px; font-weight: 700; padding: 6px;">
+                                    Generate One-Time Transfer Code
+                                </button>
+                                <input id="amaes-transfer-code" type="text" readonly hidden aria-label="One-time transfer code" style="width: 100%; box-sizing: border-box; background: var(--surface, #1e293b); color: var(--text-primary); border: 1px solid var(--accent-blue, #3b82f6); padding: 6px 8px; border-radius: 4px; font-size: 10px; font-family: monospace; text-align: center;" />
+                                <button id="amaes-transfer-copy" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">
+                                    ${ICONS.copy} <span>Copy Code Again</span>
+                                </button>
+                            </div>
+
+                            <!-- Step 2: Receive on this device -->
+                            <div style="background: var(--bg); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
+                                <div style="font-size: 10px; font-weight: 700; color: var(--text-primary);">Step 2: Receive Setup (New Device)</div>
+                                <div style="font-size: 9px; color: var(--text-secondary);">
+                                    Paste the 43-character code generated from your other device:
+                                </div>
+                                <div style="display: flex; gap: 4px; align-items: center;">
+                                    <input id="amaes-transfer-import-code" type="password" autocomplete="off" placeholder="Paste transfer code here..." aria-label="Transfer code" style="flex: 1; min-width: 0; background: var(--surface, #1e293b); color: var(--text-primary); border: 1px solid var(--border); padding: 5px 7px; border-radius: 4px; font-size: 9.5px; font-family: monospace;" />
+                                    <button id="amaes-transfer-import" type="button" class="amaes-btn amaes-btn-outline" style="width: auto; flex-shrink: 0; white-space: nowrap; justify-content: center; font-size: 9px; padding: 5px 9px;">Import Setup</button>
+                                </div>
+                                <div id="amaes-transfer-preview" hidden role="status" style="font-size: 9px; color: var(--text-secondary); line-height: 1.4; padding: 5px 7px; background: rgba(59, 130, 246, 0.08); border-radius: 4px;"></div>
+                                <button id="amaes-transfer-apply" type="button" class="amaes-btn amaes-btn-monotone" hidden style="justify-content: center; font-size: 9px; font-weight: 700; padding: 5px;">Confirm & Apply Setup</button>
+                                <button id="amaes-transfer-discard" type="button" class="amaes-btn amaes-btn-outline" hidden style="justify-content: center; font-size: 9px; padding: 5px;">Cancel</button>
+                            </div>
+                            <div style="font-size: 8.5px; color: var(--text-muted); line-height: 1.3;">The code does not expire, but works once only. End-to-end encrypted; credentials are saved directly to this browser.</div>
+                            <div id="amaes-account-transfer-status" role="status" aria-live="polite" style="font-size: 9px; color: var(--text-secondary); min-height: 12px;"></div>
+                        </div>
                         <label style="display: flex; align-items: flex-start; gap: 6px; font-size: 9.5px; color: var(--text-secondary); cursor: pointer;">
                             <input id="amaes-account-switcher-return" type="checkbox" style="margin: 1px 0 0; cursor: pointer;" />
                             <span>Return to current page after switch</span>
@@ -1209,6 +1229,10 @@
                 }
                 .que.amaes-active-focus-que .amaes-active-focus-badge {
                     display: inline-flex !important;
+                }
+
+                .que.amaes-no-answer-que {
+                    border-left: 4px solid var(--accent-amber, #f59e0b) !important;
                 }
 
                 /* Choice Row Highlight Styling */

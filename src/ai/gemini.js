@@ -1944,7 +1944,7 @@
                                 padding: 3px 8px;
                                 border-radius: 5px;
                             ">
-                                ${ICONS.external} <span>Get Free Key ↗</span>
+                                ${ICONS.external} <span>Get Free Key</span>
                             </a>
                         </div>
 
@@ -1955,7 +1955,7 @@
                     <!-- Collapsible Advanced Settings (Non-Tech Friendly) -->
                     <details style="padding: 0; margin: 0;">
                         <summary style="font-size: 11px; font-weight: 600; color: var(--text-muted, #94a3b8); cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
-                            <span>⚙️ Advanced Settings (Backup Keys, Jev Classifier & Sharing)</span>
+                            <span>Advanced Settings (Backup Keys, Jev Classifier & Sharing)</span>
                         </summary>
                         <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px; padding-left: 4px;">
                             <!-- Backup Keys & Tier -->
@@ -2000,7 +2000,7 @@
                                         <span style="font-weight: 700; color: #60a5fa; font-size: 11.5px;">TypeSafe Jev</span>
                                         <span style="font-size: 9px; background: rgba(59, 130, 246, 0.25); color: #bfdbfe; padding: 1px 5px; border-radius: 4px; font-weight: 600;">Fast Classifier</span>
                                     </div>
-                                    <a href="https://console.typesafe.ai" target="_blank" rel="noopener noreferrer" style="color: #93c5fd; font-size: 10.5px; text-decoration: none; font-weight: 600;">Get Key ↗</a>
+                                    <a href="https://console.typesafe.ai" target="_blank" rel="noopener noreferrer" style="color: #93c5fd; font-size: 10.5px; text-decoration: none; font-weight: 600;">Get Key</a>
                                 </div>
 
                                 <label style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-primary, #f8fafc); cursor: pointer;">
@@ -2094,7 +2094,7 @@
                     <span style="font-size:9.5px; color:#a78bfa; min-width:90px; font-weight:600;">${KEY_LABELS[idx] || ('Key #' + (idx+1))}</span>
                     <input type="password" placeholder="AIzaSy..." value="${val.replace(/"/g, '&quot;')}" style="flex:1; background:var(--surface,#1e293b); color:#f8fafc; border:1px solid var(--border,#334155); padding:5px 8px; border-radius:5px; font-size:11px; outline:none; font-family:monospace;" />
                     <button type="button" class="amaes-key-paste-btn" style="background:var(--surface,#1e293b); border:1px solid var(--border,#334155); color:#a78bfa; border-radius:5px; padding:4px 8px; font-size:10px; cursor:pointer;">Paste</button>
-                    ${idx > 0 ? `<button type="button" class="amaes-key-remove-btn" style="background:transparent; border:1px solid rgba(239,68,68,0.35); color:#f87171; border-radius:5px; padding:4px 8px; font-size:10px; cursor:pointer;">✕</button>` : ''}
+                    ${idx > 0 ? `<button type="button" class="amaes-key-remove-btn" style="background:transparent; border:1px solid rgba(239,68,68,0.35); color:#f87171; border-radius:5px; padding:4px 8px; font-size:10px; cursor:pointer;" title="Remove key">Remove</button>` : ''}
                 `;
                 row.querySelector('.amaes-key-paste-btn').onclick = async () => {
                     const inp = row.querySelector('input');
@@ -2169,7 +2169,7 @@
                     jevFeedback.style.background = 'rgba(16, 185, 129, 0.15)';
                     jevFeedback.style.color = '#34d399';
                     jevFeedback.style.border = '1px solid rgba(16, 185, 129, 0.3)';
-                    jevFeedback.textContent = `✓ Jev Connected! Decision: "${testRes.decision}" (${Math.round((testRes.confidence || 0.9) * 100)}% conf in ${testRes.durationMs}ms)`;
+                    jevFeedback.textContent = `Jev Connected! Decision: "${testRes.decision}" (${Math.round((testRes.confidence || 0.9) * 100)}% conf in ${testRes.durationMs}ms)`;
                 } catch (e) {
                     jevFeedback.style.background = 'rgba(239, 68, 68, 0.15)';
                     jevFeedback.style.color = '#f87171';

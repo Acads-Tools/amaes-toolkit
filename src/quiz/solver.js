@@ -453,9 +453,9 @@
         `;
         chip.title = 'Click to skip to the next question or page';
         chip.innerHTML = `
-            <span style="font-size: 13px;">💡</span>
+            <span style="display:inline-flex; align-items:center;">${ICONS.lightbulb}</span>
             <span>Unsure? Pick an answer or press <kbd style="background: rgba(59, 130, 246, 0.2); color: #3b82f6; font-weight: 800; padding: 1px 5px; border-radius: 3px; font-size: 10px; border: 1px solid rgba(59, 130, 246, 0.35); font-family: monospace;">N</kbd> to skip to next question</span>
-            <span style="margin-left: auto; font-weight: 700; font-size: 10.5px; opacity: 0.85;">Skip ➔</span>
+            <span style="margin-left: auto; font-weight: 700; font-size: 10.5px; opacity: 0.85;">Skip &rarr;</span>
         `;
         chip.onclick = (e) => {
             e.preventDefault();
@@ -529,19 +529,19 @@
                 <span style="font-size: 10.5px; color: #b45309; font-weight: 600;">Not in database yet</span>
             </div>
             <div style="font-size: 11.5px; color: #78350f; line-height: 1.45; margin-bottom: 8px;">
-                📋 <b>Question is ready to paste!</b> Press <kbd style="background: rgba(0,0,0,0.08); padding: 1px 4px; border-radius: 3px; font-weight: 700; font-family: monospace;">Ctrl+V</kbd> in Google Gemini or ChatGPT to get the answer.<br>
-                💡 Unsure? Pick a choice or press <kbd style="background: rgba(0,0,0,0.08); padding: 1px 4px; border-radius: 3px; font-weight: 700; font-family: monospace;">N</kbd> (or click Next) to skip.
+                <b>Question is ready to paste!</b> Press <kbd style="background: rgba(0,0,0,0.08); padding: 1px 4px; border-radius: 3px; font-weight: 700; font-family: monospace;">Ctrl+V</kbd> in Google Gemini or ChatGPT to get the answer.<br>
+                Unsure? Pick a choice or press <kbd style="background: rgba(0,0,0,0.08); padding: 1px 4px; border-radius: 3px; font-weight: 700; font-family: monospace;">N</kbd> (or click Next) to skip.
             </div>
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                 <a href="https://gemini.google.com" target="_blank" rel="noopener noreferrer" style="
                     display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; border-radius: 5px; font-size: 11px; font-weight: 700; text-decoration: none; cursor: pointer;
-                ">${ICONS.gemini} <span>Open Google Gemini ↗</span></a>
+                ">${ICONS.gemini} <span>Open Google Gemini</span></a>
                 <button type="button" class="amaes-btn-recopy-q" style="
                     display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #ffffff; color: #78350f; border: 1px solid #d97706; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer;
                 ">${ICONS.copy} <span>Copy Again</span></button>
                 <button type="button" class="amaes-btn-skip-q" style="
                     display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer; margin-left: auto;
-                "><span>Next Question (N) ➔</span></button>
+                "><span>Next Question (N) &rarr;</span></button>
             </div>
         `;
 
@@ -2035,7 +2035,7 @@
                     const badge = document.createElement('span');
                     badge.className = 'amaes-unanswered-badge';
                     badge.style.cssText = 'background:#f59e0b; color:#ffffff; padding:2px 7px; border-radius:4px; font-weight:800; font-size:10px; margin-left:8px; display:inline-block;';
-                    badge.textContent = '⚠️ Not Answered';
+                    badge.textContent = 'Not Answered';
                     item.statusCell.appendChild(badge);
                 }
             });
@@ -2048,14 +2048,14 @@
                 banner.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0; padding:12px 16px; border:2px solid #f59e0b; border-radius:10px; background:#fffbeb; color:#78350f; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; box-shadow:0 4px 12px rgba(245,158,11,0.15);';
                 banner.innerHTML = `
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <span style="font-size:22px;">⚠️</span>
+                        <span style="display:inline-flex; align-items:center; color:#d97706;">${ICONS.alertTriangle}</span>
                         <div>
                             <div style="font-weight:800; font-size:13px; color:#92400e;">Incomplete Quiz: ${evalRes.unansweredQuestions.length} Question${evalRes.unansweredQuestions.length > 1 ? 's' : ''} Not Answered!</div>
                             <div style="font-size:11.5px; color:#b45309; margin-top:2px;">Auto-submit paused to protect your grade. Questions needing answers: <b>${evalRes.unansweredQuestions.map(u => '#' + u.qNum).join(', ')}</b>.</div>
                         </div>
                     </div>
                     ${evalRes.unansweredQuestions[0].link ? `
-                    <a id="amaes-btn-jump-first-unanswered" href="${evalRes.unansweredQuestions[0].link.href}" style="padding:7px 14px; background:#f59e0b; color:#ffffff; border:none; border-radius:6px; font-weight:700; font-size:11.5px; cursor:pointer; white-space:nowrap; text-decoration:none;">Answer Question #${evalRes.unansweredQuestions[0].qNum} ➔</a>
+                    <a id="amaes-btn-jump-first-unanswered" href="${evalRes.unansweredQuestions[0].link.href}" style="padding:7px 14px; background:#f59e0b; color:#ffffff; border:none; border-radius:6px; font-weight:700; font-size:11.5px; cursor:pointer; white-space:nowrap; text-decoration:none;">Answer Question #${evalRes.unansweredQuestions[0].qNum} &rarr;</a>
                     ` : ''}
                 `;
                 const mainArea = document.querySelector('#region-main, main, [role="main"]') || document.body;
@@ -2064,7 +2064,7 @@
 
             syncAutoQuizUI();
             setLog(`<b>Incomplete Quiz:</b> ${evalRes.unansweredQuestions.length} questions not answered (${evalRes.unansweredQuestions.map(u => '#' + u.qNum).join(', ')}). Auto-submit paused.`, "var(--accent-amber)");
-            showToast(`⚠️ Incomplete quiz: ${evalRes.unansweredQuestions.length} questions not answered!`, 4500);
+            showToast(`Incomplete quiz: ${evalRes.unansweredQuestions.length} questions not answered!`, 4500);
             return;
         }
 
@@ -2081,13 +2081,13 @@
             readyBanner.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0; padding:12px 16px; border:2px solid #10b981; border-radius:10px; background:#ecfdf5; color:#065f46; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; box-shadow:0 4px 12px rgba(16,185,129,0.15);';
             readyBanner.innerHTML = `
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-size:22px; color:#10b981;">✓</span>
+                    <span style="display:inline-flex; align-items:center; color:#10b981;">${ICONS.checkCircle}</span>
                     <div>
                         <div style="font-weight:800; font-size:13px; color:#065f46;">All ${evalRes ? evalRes.totalQuestions : ''} Questions Answered & Saved!</div>
                         <div style="font-size:11.5px; color:#047857; margin-top:2px;">${shouldAutoSubmit ? 'Auto-submitting attempt...' : 'Review your saved answers below and click Submit all and finish.'}</div>
                     </div>
                 </div>
-                <button id="amaes-btn-quick-submit" type="button" style="padding:7px 16px; background:#10b981; color:#ffffff; border:none; border-radius:6px; font-weight:800; font-size:12px; cursor:pointer; white-space:nowrap; box-shadow:0 2px 6px rgba(16,185,129,0.3);">Submit All & Finish ➔</button>
+                <button id="amaes-btn-quick-submit" type="button" style="padding:7px 16px; background:#10b981; color:#ffffff; border:none; border-radius:6px; font-weight:800; font-size:12px; cursor:pointer; white-space:nowrap; box-shadow:0 2px 6px rgba(16,185,129,0.3);">Submit All & Finish &rarr;</button>
             `;
             readyBanner.querySelector('#amaes-btn-quick-submit').onclick = () => {
                 const sBtn = findQuizSummarySubmitButton();
@@ -2106,11 +2106,11 @@
             "var(--accent-green)",
             shouldAutoSubmit ? "Moodle submission will be confirmed automatically" : "Review your saved answers below and click Submit all and finish"
         );
-        showToast(shouldAutoSubmit ? "✓ All questions answered! Auto-submitting..." : "✓ All questions answered! Waiting for confirmation...", 4000);
+        showToast(shouldAutoSubmit ? "All questions answered. Auto-submitting..." : "All questions answered. Waiting for confirmation...", 4000);
 
         // Update document title so students multitasking in background tabs know it's ready
-        if (typeof document !== 'undefined' && document.title && !document.title.includes('(✓ Ready to Submit)')) {
-            document.title = '(✓ Ready to Submit) ' + document.title;
+        if (typeof document !== 'undefined' && document.title && !document.title.includes('(Ready to Submit)')) {
+            document.title = '(Ready to Submit) ' + document.title;
         }
 
         // Highlight Moodle's "Submit all and finish" button
@@ -3282,6 +3282,7 @@
 
         queContainers.forEach(que => {
             delete que.dataset.amaesStudyGuideFallbackPicked;
+            que.classList.remove('amaes-no-answer-que');
             if (identifyQuestionType(que) === 'unknown') {
                 recordUnknownQuestionType(que);
                 return;
@@ -3470,6 +3471,7 @@
 
             if (candidates.length === 0) {
                 if (checkIsQuizAttemptPage() && !que.querySelector('.amaes-unanswered-hint') && !que.querySelector('.amaes-unreviewed-history-note') && !que.querySelector('.amaes-blockage-hud')) {
+                    que.classList.add('amaes-no-answer-que');
                     const formulation = que.querySelector('.formulation, .content') || que;
                     const hint = document.createElement('div');
                     hint.className = 'amaes-unanswered-hint';
@@ -3488,7 +3490,7 @@
                         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                     `;
                     hint.innerHTML = `
-                        <span style="background: rgba(245, 158, 11, 0.22); color: #d97706; padding: 1px 5px; border-radius: 4px; font-weight: 800; font-size: 9px; letter-spacing: 0.5px;">NEW</span>
+                        <span style="background: rgba(245, 158, 11, 0.22); color: #d97706; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 9px; letter-spacing: 0.5px;">NO SAVED ANSWER</span>
                         <span>No answer known to the system yet — <b>be the first to answer and share it!</b></span>
                     `;
                     formulation.insertBefore(hint, formulation.firstChild);
@@ -3497,6 +3499,8 @@
                     renderNewQuestionFocusBanner(que, qNum);
                     renderUnsureActionChip(que);
                     updateNextButtonIndicator();
+                } else if (checkIsQuizAttemptPage()) {
+                    que.classList.add('amaes-no-answer-que');
                 }
                 return;
             }
@@ -3775,7 +3779,7 @@
                         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                     `;
                     warn.innerHTML = `
-                        <span style="background: rgba(245,158,11,0.22); color: #d97706; padding: 1px 5px; border-radius: 4px; font-weight: 800; font-size: 9px; letter-spacing: 0.5px;">⚠ POOL CHANGED</span>
+                        <span style="background: rgba(245,158,11,0.22); color: #d97706; padding: 1px 5px; border-radius: 4px; font-weight: 800; font-size: 9px; letter-spacing: 0.5px;">POOL CHANGED</span>
                         <span>Stored answer not in current choices — question pool may have been updated. Using elimination hints only.</span>
                     `;
                     formulation.insertBefore(warn, formulation.firstChild);
@@ -4438,7 +4442,7 @@
                                 showToast(`Filled: ${targetAns}`);
                                 hint.style.background = 'rgba(16, 185, 129, 0.2)';
                                 const btn = hint.querySelector('.amaes-fill-btn');
-                                if (btn) btn.innerText = '✓ Filled';
+                                if (btn) btn.innerText = 'Filled';
                             };
 
                             hint.onclick = fillFn;
@@ -4752,7 +4756,7 @@
                                     showToast(`Selected: ${matchedOption.text}`);
                                     hint.style.background = 'rgba(16, 185, 129, 0.2)';
                                     const btn = hint.querySelector('.amaes-select-btn');
-                                    if (btn) btn.innerText = '✓ Picked';
+                                    if (btn) btn.innerText = 'Picked';
                                 };
 
                                 hint.onclick = pickFn;
@@ -4896,7 +4900,7 @@
                                     showToast(`Placed: ${targetAns}`);
                                     hint.style.background = 'rgba(16, 185, 129, 0.2)';
                                     const btn = hint.querySelector('.amaes-drag-btn');
-                                    if (btn) btn.innerText = '✓ Placed';
+                                    if (btn) btn.innerText = 'Placed';
                                 };
 
                                 hint.onclick = placeFn;
@@ -4954,6 +4958,7 @@
 
             if (!foundMatchForQuestion) {
                 if (checkIsQuizAttemptPage() && !que.querySelector('.amaes-unanswered-hint') && !que.querySelector('.amaes-blockage-hud')) {
+                    que.classList.add('amaes-no-answer-que');
                     const formulation = que.querySelector('.formulation, .content') || que;
                     const hint = document.createElement('div');
                     hint.className = 'amaes-unanswered-hint';
@@ -4972,7 +4977,7 @@
                         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                     `;
                     hint.innerHTML = `
-                        <span style="background: rgba(245, 158, 11, 0.22); color: #d97706; padding: 1px 5px; border-radius: 4px; font-weight: 800; font-size: 9px; letter-spacing: 0.5px;">NEW</span>
+                        <span style="background: rgba(245, 158, 11, 0.22); color: #d97706; padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 9px; letter-spacing: 0.5px;">NO SAVED ANSWER</span>
                         <span>No answer known to the system yet — <b>be the first to answer and share it!</b></span>
                     `;
                     formulation.insertBefore(hint, formulation.firstChild);
@@ -4981,8 +4986,11 @@
                     renderNewQuestionFocusBanner(que, qNum);
                     renderUnsureActionChip(que);
                     updateNextButtonIndicator();
+                } else if (checkIsQuizAttemptPage()) {
+                    que.classList.add('amaes-no-answer-que');
                 }
             } else {
+                que.classList.remove('amaes-no-answer-que');
                 matchedCount++;
             }
 

@@ -2394,7 +2394,7 @@
                 banner.id = 'amaes-unreviewable-page-banner';
                 banner.style.cssText = 'display:flex; align-items:center; gap:10px; margin:14px 0; padding:12px 16px; border:2px solid #f59e0b; border-radius:10px; background:#fffbeb; color:#78350f; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; box-shadow:0 4px 12px rgba(245,158,11,0.15);';
                 banner.innerHTML = `
-                    <span style="font-size:22px;">🔒</span>
+                    <span style="display:inline-flex; align-items:center; color:#92400e;">${ICONS.lock}</span>
                     <div>
                         <div style="font-weight:800; font-size:13px; color:#92400e;">Non-Reviewable Assessment — Auto-Harvesting Paused</div>
                         <div style="font-size:11.5px; color:#b45309; margin-top:2px;">Moodle has hidden answer feedback and marks for this assessment. Answer scraping is safely disabled to prevent unverified data pollution.</div>
@@ -2404,7 +2404,7 @@
                 mainArea.prepend(banner);
             }
             setLog("<b>Non-Reviewable Assessment:</b> Answer feedback and marks are hidden by Moodle for this attempt. Answer scraping safely paused.", "var(--accent-amber)");
-            showToast("🔒 Non-reviewable assessment: answer scraping safely paused.", 4000);
+            showToast("Non-reviewable assessment: answer scraping safely paused.", 4000);
             return;
         }
 
@@ -2446,7 +2446,7 @@
             reviewBadge = document.createElement('div');
             reviewBadge.id = 'amaes-reviewable-page-badge';
             reviewBadge.style.cssText = 'display:inline-flex; align-items:center; gap:6px; margin:8px 0; padding:5px 12px; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); border-radius:6px; color:#059669; font-size:11.5px; font-weight:700; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
-            reviewBadge.innerHTML = `<span>✓</span> <span>Reviewable Assessment: Ground truth available (${harvested.harvestedCount} verified answers, ${harvested.eliminatedCount || 0} wrong choices harvested)</span>`;
+            reviewBadge.innerHTML = `<span style="display:inline-flex; align-items:center;">${ICONS.check}</span> <span>Reviewable Assessment: Ground truth available (${harvested.harvestedCount} verified answers, ${harvested.eliminatedCount || 0} wrong choices harvested)</span>`;
             if (summaryTable.parentNode) {
                 summaryTable.parentNode.insertBefore(reviewBadge, summaryTable);
             }

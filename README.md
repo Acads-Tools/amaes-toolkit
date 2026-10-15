@@ -10,14 +10,14 @@
 </p>
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js"><img src="https://img.shields.io/badge/version-1.12.7-blue.svg" alt="Version 1.12.7"></a>
+  <a href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js"><img src="https://img.shields.io/badge/version-1.12.8-blue.svg" alt="Version 1.12.8"></a>
   <a href="https://acads-tools.github.io/amaes-toolkit/"><img src="https://img.shields.io/badge/platform-Violentmonkey%20%7C%20Tampermonkey-darkblue.svg" alt="Platform Compatibility"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="#zero-telemetry--privacy-architecture"><img src="https://img.shields.io/badge/privacy-zero--telemetry-success.svg" alt="Zero Telemetry"></a>
   <a href=".github/workflows/privacy-check.yml"><img src="https://img.shields.io/badge/privacy--audit-passing-brightgreen.svg" alt="Privacy Check Passed"></a>
 </p>
 
-> **Compatibility Notice:** Version **1.12.7** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](docs/CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
+> **Compatibility Notice:** Version **1.12.8** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](docs/CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
 
 ---
 
@@ -167,10 +167,10 @@ The toolkit offers two distinct operational modes depending on your preference:
   * **How to Enable:** In the **Quiz** tab, toggle **Auto-Quiz Mode: ON** (or press keyboard shortcut `P`), or click **Start Auto-Quiz** directly from the quiz introduction landing page.
   * **Hands-Free Background Execution:** Answers questions and advances smoothly without freezing. Fully un-gated progression ensures resolved questions do not stall automation.
   * **Safety Gate:** If a question has no confirmed answer and AI cannot resolve it, the solver pauses automatically, brings up the in-question toolbar, and sounds a gentle intervention chime.
-* **⚡ Fast Answer (Turbo) Mode:**
-  * **What it does:** Reduces the toolkit's post-answer navigation delay to **200ms** and enables 1-click batch solving for visible questions. Locally cached verified answers are checked first; optional online study-guide refreshes run in the background. Turbo does not accelerate Moodle's page/network response or turn unconfirmed suggestions into auto-answers.
+* **Built-in Fast Answer Acceleration:**
+  * **What it does:** Reduces the toolkit's post-answer navigation delay to **200ms** and enables 1-click batch solving for visible questions. Locally cached verified answers are checked first; optional online study-guide refreshes run in the background without accelerating Moodle's page/network response or turning unconfirmed suggestions into auto-answers.
   * **Multi-Question Pages:** Adds a 1-click **"Fill Verified Answers"** button that selects all verified answers on the current page simultaneously in 0.1s. If unknown questions remain and AI is enabled, it resolves them concurrently in parallel.
-  * **How to Toggle:** Toggle **⚡ Fast Answer Mode** in the Quiz tab, click the **⚡ Turbo** button in the floating HUD, or press keyboard shortcut **`F`**.
+  * **Built-in by Default:** Operates out of the box with zero setup required.
 
 ### Activity Auto-Marker & Passable Grade Guard (≥ 80%)
 Located in the **Course Tools** tab under **Activity Auto-Marker**, this utility automates course completion tracking while strictly enforcing academic safety:
