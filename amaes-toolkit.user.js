@@ -2060,12 +2060,9 @@
             <!-- Footer Action Row -->
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(148, 163, 184, 0.18);">
                 <div style="font-size: 11px; opacity: 0.75;">
-                    Auto-Submit Mode: High-confidence quizzes execute hands-free with instant local answers.
+                    Auto-Harvest & Autonomous Solver running automatically in background.
                 </div>
-                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-                    <button id="amaes-card-btn-batch-harvest" class="btn btn-sm btn-outline-success" style="font-size: 11px; padding: 3px 8px; border-radius: 4px; color: #059669; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.06);" title="Scan and harvest all completed quiz reviews into the verified database in one go">
-                        Harvest All Reviews
-                    </button>
+                <div style="display: flex; gap: 6px; align-items: center;">
                     <button id="amaes-card-btn-highlight" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 3px 8px; border-radius: 4px;" title="Scan course page and highlight quizzes needing attention (Press U)">
                         Highlight Missing Quizzes (U)
                     </button>
@@ -2077,29 +2074,6 @@
         `;
 
         // Bind Card Action Buttons
-        const btnBatchHarvest = card.querySelector('#amaes-card-btn-batch-harvest');
-        if (btnBatchHarvest) {
-            btnBatchHarvest.addEventListener('click', (e) => {
-                e.preventDefault();
-                btnBatchHarvest.disabled = true;
-                btnBatchHarvest.innerText = 'Harvesting Reviews...';
-                if (typeof batchHarvestCourseReviews === 'function') {
-                    batchHarvestCourseReviews(courseId, subjectCode, (curr, total, label) => {
-                        btnBatchHarvest.innerText = `Harvesting [${curr}/${total}]...`;
-                    }).then(() => {
-                        btnBatchHarvest.disabled = false;
-                        btnBatchHarvest.innerText = 'Harvest All Reviews';
-                    }).catch(() => {
-                        btnBatchHarvest.disabled = false;
-                        btnBatchHarvest.innerText = 'Harvest All Reviews';
-                    });
-                } else {
-                    btnBatchHarvest.disabled = false;
-                    btnBatchHarvest.innerText = 'Harvest All Reviews';
-                }
-            });
-        }
-
         const btnHighlight = card.querySelector('#amaes-card-btn-highlight');
         if (btnHighlight) {
             btnHighlight.addEventListener('click', (e) => {
@@ -19661,9 +19635,9 @@ function setupAccountTransferUI() {
         return { success: false, count: 0, quizzes: completedQuizzes.length, subCode };
     }
 
-    async function batchHarvestCourseReviews(targetCourseId, targetSubCode, statusCallback) {
+    async function batchHarvestCourseReviews(targetCourseId, targetSubCode, statusCallback, isBackground = true) {
         if (isHarvestingInProgress) {
-            showToast("Answer collection is already running in background...", 2500);
+            if (!isBackground) showToast("Answer collection is already running in background...", 2500);
             return { success: false, inProgress: true };
         }
         isHarvestingInProgress = true;
@@ -19673,8 +19647,8 @@ function setupAccountTransferUI() {
             const subCode = targetSubCode || courseInfo.subjectCode || 'GENERAL';
             const courseId = targetCourseId || courseInfo.courseId || new URLSearchParams(window.location.search).get('id') || '';
 
-            setLog(`<b>Batch Harvester:</b> Discovering completed quiz reviews for <b>${escapeHtml(subCode)}</b>...`, "var(--accent-blue)");
-            showToast(`Batch Harvester: Scanning reviews for ${subCode}...`, 3000);
+            setLog(`<b>Auto-Harvest:</b> Background review scanner inspecting <b>${escapeHtml(subCode)}</b>...`, "var(--accent-blue)");
+            if (!isBackground) showToast(`Scanning reviews for ${subCode}...`, 2500);
 
             // 1. Gather all quiz links from course page DOM and/or grade report
             const quizLinksMap = new Map();
@@ -19718,8 +19692,8 @@ function setupAccountTransferUI() {
 
             const quizList = Array.from(quizLinksMap.entries()).map(([url, title]) => ({ url, title }));
             if (quizList.length === 0) {
-                showToast(`No quiz links found for ${subCode}.`);
-                setLog(`Batch Harvester: No quiz links found for <b>${escapeHtml(subCode)}</b>.`, "var(--accent-amber)");
+                if (!isBackground) showToast(`No quiz links found for ${subCode}.`);
+                setLog(`Auto-Harvest: No quiz links found for <b>${escapeHtml(subCode)}</b>.`, "var(--accent-amber)");
                 return { success: false, count: 0, quizzes: 0 };
             }
 
@@ -19756,13 +19730,13 @@ function setupAccountTransferUI() {
             }
 
             if (reviewUrlsToHarvest.length === 0) {
-                showToast("No completed review attempts available for this course.");
-                setLog(`Batch Harvester: No completed review attempts available for <b>${escapeHtml(subCode)}</b>.`, "var(--accent-amber)");
+                if (!isBackground) showToast("No completed review attempts available for this course.");
+                setLog(`Auto-Harvest: No completed review attempts available for <b>${escapeHtml(subCode)}</b>.`, "var(--accent-amber)");
                 return { success: false, count: 0, reviews: 0 };
             }
 
-            setLog(`Batch Harvester: Found <b>${reviewUrlsToHarvest.length} review attempt(s)</b>. Extracting verified answers...`, "var(--accent-cyan)");
-            showToast(`Harvesting ${reviewUrlsToHarvest.length} review attempt(s)...`, 3000);
+            setLog(`Auto-Harvest: Found <b>${reviewUrlsToHarvest.length} review attempt(s)</b>. Extracting verified answers in background...`, "var(--accent-cyan)");
+            if (!isBackground) showToast(`Harvesting ${reviewUrlsToHarvest.length} review attempt(s)...`, 3000);
 
             // 3. Fetch each review page and extract answers
             let totalHarvested = 0;
@@ -19799,8 +19773,8 @@ function setupAccountTransferUI() {
             if (allQuestions.length > 0) {
                 mergeAnswersIntoCache(subCode, allQuestions, 'Batch-Course-Harvester');
                 flushCommunityContributions(subCode, { source: 'batch_course_harvester' }).catch(() => {});
-                setLog(`Batch Harvest Complete! Saved <b>${totalHarvested} verified answers</b> from ${reviewUrlsToHarvest.length} review(s) into <b>${escapeHtml(subCode)}</b>.`, "var(--accent-green)");
-                showToast(`Harvest Complete: ${totalHarvested} verified answers saved!`, 4500);
+                setLog(`Auto-Harvest Complete: Saved <b>${totalHarvested} verified answers</b> from ${reviewUrlsToHarvest.length} review(s) into <b>${escapeHtml(subCode)}</b>.`, "var(--accent-green)");
+                showToast(`Auto-Harvest: Saved ${totalHarvested} verified answers into ${subCode} database!`, 4000);
 
                 if (typeof injectCourseConfidenceCard === 'function') {
                     injectCourseConfidenceCard();
@@ -19810,13 +19784,13 @@ function setupAccountTransferUI() {
                 }
                 return { success: true, count: totalHarvested, reviews: reviewUrlsToHarvest.length, subCode };
             } else {
-                setLog(`Batch Harvester finished. No new verified answers found in <b>${reviewUrlsToHarvest.length} review(s)</b>.`, "var(--accent-amber)");
-                showToast("All reviews checked, no new answers to harvest.");
+                setLog(`Auto-Harvest finished. No new verified answers found in <b>${reviewUrlsToHarvest.length} review(s)</b>.`, "var(--accent-amber)");
+                if (!isBackground) showToast("All reviews checked, no new answers to harvest.");
                 return { success: false, count: 0, reviews: reviewUrlsToHarvest.length, subCode };
             }
         } catch (e) {
-            setLog(`Batch Harvester error: ${e.message}`, "var(--accent-pink)");
-            showToast("Batch harvest failed: " + e.message);
+            setLog(`Auto-Harvest error: ${e.message}`, "var(--accent-pink)");
+            if (!isBackground) showToast("Batch harvest failed: " + e.message);
             return { success: false, error: e.message };
         } finally {
             isHarvestingInProgress = false;
@@ -25739,18 +25713,19 @@ function setupAccountTransferUI() {
                     const courseKey = (cInfo && cInfo.subjectCode && cInfo.subjectCode !== 'DEFAULT' && cInfo.subjectCode !== 'GENERAL')
                         ? cInfo.subjectCode
                         : (cInfo?.courseId || new URLSearchParams(window.location.search).get('id') || 'grades');
-                    const sessKey = `amaes_grades_harvested_${courseKey}`;
-                    if (!sessionStorage.getItem(sessKey)) {
-                        sessionStorage.setItem(sessKey, '1');
+                    const lastScan = parseInt(sessionStorage.getItem(`amaes_auto_harvest_time_${courseKey}`) || '0', 10);
+                    const shouldScan = (Date.now() - lastScan > 60000);
+                    if (shouldScan) {
+                        sessionStorage.setItem(`amaes_auto_harvest_time_${courseKey}`, String(Date.now()));
                         setTimeout(() => {
                             if (isCoursePage && typeof batchHarvestCourseReviews === 'function') {
-                                setLog(`Auto-Harvest: Scanning all available reviews for <b>${courseKey}</b>...`, "var(--accent-blue)");
-                                batchHarvestCourseReviews(cInfo?.courseId, cInfo?.subjectCode);
+                                setLog(`Auto-Harvest: Scanning all available reviews for <b>${courseKey}</b> in background...`, "var(--accent-blue)");
+                                batchHarvestCourseReviews(cInfo?.courseId, cInfo?.subjectCode, null, true);
                             } else {
-                                setLog(`Auto-Harvest: Scanning past quizzes for <b>${courseKey}</b>...`, "var(--accent-blue)");
+                                setLog(`Auto-Harvest: Scanning past quizzes for <b>${courseKey}</b> in background...`, "var(--accent-blue)");
                                 executeGradesHarvester();
                             }
-                        }, 1800);
+                        }, 1200);
                     }
                 }
             } catch (e) {

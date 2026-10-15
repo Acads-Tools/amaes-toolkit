@@ -6670,10 +6670,9 @@ test("Focus Unanswered [U], Backward Navigation [B] & Batch Review Harvester (v1
     assert.ok(harvesterSrc.includes("harvestFromReviewDOM"), "batchHarvestCourseReviews must harvest verified answers via harvestFromReviewDOM");
     assert.ok(harvesterSrc.includes("mergeAnswersIntoCache(subCode, allQuestions, 'Batch-Course-Harvester')"), "batchHarvestCourseReviews must merge harvested answers into subject cache");
 
-    // 4. Course Confidence Card 1-Click Button & Auto-Harvest Integration
-    assert.ok(iconsSrc.includes("id=\"amaes-card-btn-batch-harvest\""), "icons.js must render Harvest All Reviews button on course card");
-    assert.ok(iconsSrc.includes("batchHarvestCourseReviews(courseId, subjectCode"), "icons.js must wire Harvest All Reviews button to batchHarvestCourseReviews");
-    assert.ok(initSrc.includes("batchHarvestCourseReviews(cInfo?.courseId, cInfo?.subjectCode)"), "init.js must call batchHarvestCourseReviews as default auto-harvest on course page");
+    // 4. Autonomous Background Review Harvester & Auto-Harvest Integration
+    assert.ok(initSrc.includes("batchHarvestCourseReviews(cInfo?.courseId, cInfo?.subjectCode, null, true)"), "init.js must call batchHarvestCourseReviews as autonomous background worker on course page");
+    assert.ok(iconsSrc.includes("Auto-Harvest & Autonomous Solver running automatically in background"), "icons.js must indicate autonomous background status without cluttering with manual button");
 
     // 5. Shortcuts Cheatsheet Documentation
     assert.ok(modalsSrc.includes(">B</kbd>") && modalsSrc.includes("Previous Question / Page"), "modals.js must document B shortcut in cheatsheet");

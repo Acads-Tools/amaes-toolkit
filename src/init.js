@@ -115,18 +115,19 @@
                     const courseKey = (cInfo && cInfo.subjectCode && cInfo.subjectCode !== 'DEFAULT' && cInfo.subjectCode !== 'GENERAL')
                         ? cInfo.subjectCode
                         : (cInfo?.courseId || new URLSearchParams(window.location.search).get('id') || 'grades');
-                    const sessKey = `amaes_grades_harvested_${courseKey}`;
-                    if (!sessionStorage.getItem(sessKey)) {
-                        sessionStorage.setItem(sessKey, '1');
+                    const lastScan = parseInt(sessionStorage.getItem(`amaes_auto_harvest_time_${courseKey}`) || '0', 10);
+                    const shouldScan = (Date.now() - lastScan > 60000);
+                    if (shouldScan) {
+                        sessionStorage.setItem(`amaes_auto_harvest_time_${courseKey}`, String(Date.now()));
                         setTimeout(() => {
                             if (isCoursePage && typeof batchHarvestCourseReviews === 'function') {
-                                setLog(`Auto-Harvest: Scanning all available reviews for <b>${courseKey}</b>...`, "var(--accent-blue)");
-                                batchHarvestCourseReviews(cInfo?.courseId, cInfo?.subjectCode);
+                                setLog(`Auto-Harvest: Scanning all available reviews for <b>${courseKey}</b> in background...`, "var(--accent-blue)");
+                                batchHarvestCourseReviews(cInfo?.courseId, cInfo?.subjectCode, null, true);
                             } else {
-                                setLog(`Auto-Harvest: Scanning past quizzes for <b>${courseKey}</b>...`, "var(--accent-blue)");
+                                setLog(`Auto-Harvest: Scanning past quizzes for <b>${courseKey}</b> in background...`, "var(--accent-blue)");
                                 executeGradesHarvester();
                             }
-                        }, 1800);
+                        }, 1200);
                     }
                 }
             } catch (e) {

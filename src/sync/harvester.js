@@ -1679,9 +1679,9 @@
         return { success: false, count: 0, quizzes: completedQuizzes.length, subCode };
     }
 
-    async function batchHarvestCourseReviews(targetCourseId, targetSubCode, statusCallback) {
+    async function batchHarvestCourseReviews(targetCourseId, targetSubCode, statusCallback, isBackground = true) {
         if (isHarvestingInProgress) {
-            showToast("Answer collection is already running in background...", 2500);
+            if (!isBackground) showToast("Answer collection is already running in background...", 2500);
             return { success: false, inProgress: true };
         }
         isHarvestingInProgress = true;
@@ -1691,8 +1691,8 @@
             const subCode = targetSubCode || courseInfo.subjectCode || 'GENERAL';
             const courseId = targetCourseId || courseInfo.courseId || new URLSearchParams(window.location.search).get('id') || '';
 
-            setLog(`<b>Batch Harvester:</b> Discovering completed quiz reviews for <b>${escapeHtml(subCode)}</b>...`, "var(--accent-blue)");
-            showToast(`Batch Harvester: Scanning reviews for ${subCode}...`, 3000);
+            setLog(`<b>Auto-Harvest:</b> Background review scanner inspecting <b>${escapeHtml(subCode)}</b>...`, "var(--accent-blue)");
+            if (!isBackground) showToast(`Scanning reviews for ${subCode}...`, 2500);
 
             // 1. Gather all quiz links from course page DOM and/or grade report
             const quizLinksMap = new Map();
@@ -1736,8 +1736,8 @@
 
             const quizList = Array.from(quizLinksMap.entries()).map(([url, title]) => ({ url, title }));
             if (quizList.length === 0) {
-                showToast(`No quiz links found for ${subCode}.`);
-                setLog(`Batch Harvester: No quiz links found for <b>${escapeHtml(subCode)}</b>.`, "var(--accent-amber)");
+                if (!isBackground) showToast(`No quiz links found for ${subCode}.`);
+                setLog(`Auto-Harvest: No quiz links found for <b>${escapeHtml(subCode)}</b>.`, "var(--accent-amber)");
                 return { success: false, count: 0, quizzes: 0 };
             }
 
@@ -1774,13 +1774,13 @@
             }
 
             if (reviewUrlsToHarvest.length === 0) {
-                showToast("No completed review attempts available for this course.");
-                setLog(`Batch Harvester: No completed review attempts available for <b>${escapeHtml(subCode)}</b>.`, "var(--accent-amber)");
+                if (!isBackground) showToast("No completed review attempts available for this course.");
+                setLog(`Auto-Harvest: No completed review attempts available for <b>${escapeHtml(subCode)}</b>.`, "var(--accent-amber)");
                 return { success: false, count: 0, reviews: 0 };
             }
 
-            setLog(`Batch Harvester: Found <b>${reviewUrlsToHarvest.length} review attempt(s)</b>. Extracting verified answers...`, "var(--accent-cyan)");
-            showToast(`Harvesting ${reviewUrlsToHarvest.length} review attempt(s)...`, 3000);
+            setLog(`Auto-Harvest: Found <b>${reviewUrlsToHarvest.length} review attempt(s)</b>. Extracting verified answers in background...`, "var(--accent-cyan)");
+            if (!isBackground) showToast(`Harvesting ${reviewUrlsToHarvest.length} review attempt(s)...`, 3000);
 
             // 3. Fetch each review page and extract answers
             let totalHarvested = 0;
@@ -1817,8 +1817,8 @@
             if (allQuestions.length > 0) {
                 mergeAnswersIntoCache(subCode, allQuestions, 'Batch-Course-Harvester');
                 flushCommunityContributions(subCode, { source: 'batch_course_harvester' }).catch(() => {});
-                setLog(`Batch Harvest Complete! Saved <b>${totalHarvested} verified answers</b> from ${reviewUrlsToHarvest.length} review(s) into <b>${escapeHtml(subCode)}</b>.`, "var(--accent-green)");
-                showToast(`Harvest Complete: ${totalHarvested} verified answers saved!`, 4500);
+                setLog(`Auto-Harvest Complete: Saved <b>${totalHarvested} verified answers</b> from ${reviewUrlsToHarvest.length} review(s) into <b>${escapeHtml(subCode)}</b>.`, "var(--accent-green)");
+                showToast(`Auto-Harvest: Saved ${totalHarvested} verified answers into ${subCode} database!`, 4000);
 
                 if (typeof injectCourseConfidenceCard === 'function') {
                     injectCourseConfidenceCard();
@@ -1828,13 +1828,13 @@
                 }
                 return { success: true, count: totalHarvested, reviews: reviewUrlsToHarvest.length, subCode };
             } else {
-                setLog(`Batch Harvester finished. No new verified answers found in <b>${reviewUrlsToHarvest.length} review(s)</b>.`, "var(--accent-amber)");
-                showToast("All reviews checked, no new answers to harvest.");
+                setLog(`Auto-Harvest finished. No new verified answers found in <b>${reviewUrlsToHarvest.length} review(s)</b>.`, "var(--accent-amber)");
+                if (!isBackground) showToast("All reviews checked, no new answers to harvest.");
                 return { success: false, count: 0, reviews: reviewUrlsToHarvest.length, subCode };
             }
         } catch (e) {
-            setLog(`Batch Harvester error: ${e.message}`, "var(--accent-pink)");
-            showToast("Batch harvest failed: " + e.message);
+            setLog(`Auto-Harvest error: ${e.message}`, "var(--accent-pink)");
+            if (!isBackground) showToast("Batch harvest failed: " + e.message);
             return { success: false, error: e.message };
         } finally {
             isHarvestingInProgress = false;
