@@ -2183,6 +2183,7 @@
                     clearTimeout(summaryAutoSubmitTimer);
                     summaryAutoSubmitTimer = null;
                 }
+                sessionStorage.removeItem('amaes_summary_deadline_' + window.location.href);
                 const fallbackNotice = document.getElementById('amaes-auto-submit-fallback');
                 if (fallbackNotice) fallbackNotice.remove();
                 summaryAutoSubmitAttempted = false;
@@ -2196,6 +2197,7 @@
                         clearTimeout(summaryAutoSubmitTimer);
                         summaryAutoSubmitTimer = null;
                     }
+                    sessionStorage.removeItem('amaes_summary_deadline_' + window.location.href);
                     summaryAutoSubmitAttempted = true;
                     cancelBtn.remove();
                     const descEl = document.getElementById('amaes-summary-banner-desc');
@@ -2258,16 +2260,29 @@
                     executeQuizSummaryFinalSubmit();
                 }, 200);
             } else {
-                let remainingSec = delaySec;
+                const deadlineKey = 'amaes_summary_deadline_' + window.location.href;
+                let targetDeadline = parseInt(sessionStorage.getItem(deadlineKey) || '0', 10);
+                if (!targetDeadline || isNaN(targetDeadline) || targetDeadline > Date.now() + (delaySec * 2000) || targetDeadline < Date.now() - 5000) {
+                    targetDeadline = Date.now() + (delaySec * 1000);
+                    sessionStorage.setItem(deadlineKey, String(targetDeadline));
+                }
+                let remainingSec = Math.max(0, Math.ceil((targetDeadline - Date.now()) / 1000));
+                if (remainingSec <= 0) {
+                    sessionStorage.removeItem(deadlineKey);
+                    executeQuizSummaryFinalSubmit();
+                    return;
+                }
+
                 setLog(`<b>Auto-Submit:</b> Submitting attempt in <b>${remainingSec}s</b>... (Click Cancel to review)`, "var(--accent-green)");
                 showToast(`Auto-submitting in ${remainingSec}s...`, 2500);
 
                 const countdownInterval = setInterval(() => {
-                    remainingSec--;
+                    remainingSec = Math.max(0, Math.ceil((targetDeadline - Date.now()) / 1000));
                     const secEl = document.getElementById('amaes-summary-countdown-sec');
                     if (secEl) secEl.textContent = `${remainingSec}s`;
                     if (remainingSec <= 0) {
                         clearInterval(countdownInterval);
+                        sessionStorage.removeItem(deadlineKey);
                         summaryAutoSubmitTimer = null;
                         setLog("<b>Auto-Submit:</b> Leeway finished. Submitting attempt now...", "var(--accent-green)");
                         executeQuizSummaryFinalSubmit();
@@ -4550,9 +4565,21 @@
             if (!foundMatchForQuestion || que.querySelectorAll('select').length > 0) {
                 const selectInputs = que.querySelectorAll('select');
                 const matchingRows = Array.from(selectInputs).map(selectInput => {
-                    const row = selectInput.closest('tr');
-                    const textCell = row && row.querySelector('td.text, td:first-child');
-                    return { selectInput, row, subQuestion: textCell ? textCell.innerText.trim() : '' };
+                    const row = selectInput.closest('tr, .r0, .r1, [class*="r"], .answer > div, li') || selectInput.parentElement;
+                    const cells = row ? Array.from(row.querySelectorAll('td, th')).filter(td => !td.querySelector('select')) : [];
+                    let textCell = row && row.querySelector('td.text, td:first-child');
+                    if (textCell && /^\d+[\s:.)-]*$/.test(textCell.innerText.trim()) && cells.length > 1) {
+                        const promptCell = cells.find(c => c.innerText.trim().length > 2 && !/^\d+[\s:.)-]*$/.test(c.innerText.trim()));
+                        if (promptCell) textCell = promptCell;
+                    }
+                    let subQuestion = textCell ? textCell.innerText.trim() : '';
+                    if (!subQuestion && row) {
+                        const clone = row.cloneNode(true);
+                        clone.querySelectorAll('select, button, .amaes-ai-match-row-btn, .amaes-select-hint').forEach(e => e.remove());
+                        subQuestion = clone.innerText.trim();
+                    }
+                    subQuestion = subQuestion.replace(/^(?:(?:\d+|[a-zA-Z])[\s:.)-]+)/, '').trim();
+                    return { selectInput, row, subQuestion };
                 }).filter(item => item.subQuestion);
                 const hasMatchingRows = matchingRows.length > 0;
                 if (selectInputs.length > 0 && (validCandidates.length > 0 || hasMatchingRows) && !checkIsReviewPage()) {
@@ -4579,9 +4606,20 @@
 
                     selectInputs.forEach((selectInput, idx) => {
                         // Check if dropdown is inside a matching table row with sub-question text
-                        const row = selectInput.closest('tr');
-                        const rowTextElem = row ? row.querySelector('td.text, td:first-child') : null;
-                        const subQText = rowTextElem ? rowTextElem.innerText.trim() : '';
+                        const row = selectInput.closest('tr, .r0, .r1, [class*="r"], .answer > div, li') || selectInput.parentElement;
+                        const cells = row ? Array.from(row.querySelectorAll('td, th')).filter(td => !td.querySelector('select')) : [];
+                        let rowTextElem = row ? row.querySelector('td.text, td:first-child') : null;
+                        if (rowTextElem && /^\d+[\s:.)-]*$/.test(rowTextElem.innerText.trim()) && cells.length > 1) {
+                            const promptCell = cells.find(c => c.innerText.trim().length > 2 && !/^\d+[\s:.)-]*$/.test(c.innerText.trim()));
+                            if (promptCell) rowTextElem = promptCell;
+                        }
+                        let subQText = rowTextElem ? rowTextElem.innerText.trim() : '';
+                        if (!subQText && row) {
+                            const clone = row.cloneNode(true);
+                            clone.querySelectorAll('select, button, .amaes-ai-match-row-btn, .amaes-select-hint').forEach(e => e.remove());
+                            subQText = clone.innerText.trim();
+                        }
+                        subQText = subQText.replace(/^(?:(?:\d+|[a-zA-Z])[\s:.)-]+)/, '').trim();
                         const rowEvidence = hasMatchingRows
                             ? getMatchingRowAnswerEvidence(questionsDb, subQText)
                             : { candidates: [], wrongAnswers: [], hasConflict: false };
