@@ -418,6 +418,15 @@
                 aiActions.className = 'amaes-card-ai-actions';
                 aiActions.style.cssText = 'display: flex; flex-direction: column; gap: 4px; width: 100%; box-sizing: border-box;';
 
+                // On composite questions (e.g. matching questions with multiple dropdown rows or inputs),
+                // hide whole-card AI actions to avoid clutter and confusion since each row has its own dedicated '+ AI' button.
+                const isCompositeQuestion = que.querySelectorAll('select').length > 1 ||
+                    que.querySelectorAll('.answer table tr select, .answer tr select').length > 0 ||
+                    que.querySelectorAll('input[type="text"]').length > 1;
+                if (isCompositeQuestion) {
+                    aiActions.style.display = 'none';
+                }
+
                 // 1a. Copy Question Text / Visual Snippet Button
                 const btnText = document.createElement('button');
                 btnText.type = 'button';
@@ -509,6 +518,16 @@
                     contentCol.insertBefore(btnContainer, contentCol.firstChild);
                 } else {
                     que.insertBefore(btnContainer, que.firstChild);
+                }
+            } else {
+                const existingAiActions = que.querySelector('.amaes-card-ai-actions');
+                if (existingAiActions) {
+                    const isComposite = que.querySelectorAll('select').length > 1 ||
+                        que.querySelectorAll('.answer table tr select, .answer tr select').length > 0 ||
+                        que.querySelectorAll('input[type="text"]').length > 1;
+                    if (isComposite) {
+                        existingAiActions.style.display = 'none';
+                    }
                 }
             }
 

@@ -56,6 +56,7 @@
         'amaes_auto_min_quiz',
         'amaes_theme',
         'amaes_active_tab',
+        'amaes_auto_submit_delay',
         'amaes_anonymous_contributor_id'
     ];
 

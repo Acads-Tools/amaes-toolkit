@@ -110,8 +110,9 @@ function accountTransferValidateSettings(settings) {
         if (key === 'amaes_preferred_web_ai' && !['chatgpt', 'perplexity', 'gemini'].includes(value)) {
             throw new Error('The transferred preferred AI setting is invalid.');
         }
-        if (key === 'amaes_active_tab' && !['quiz', 'db', 'course'].includes(value)) {
-            throw new Error('The transferred panel tab setting is invalid.');
+        if (key === 'amaes_active_tab') {
+            result[key] = ['quiz', 'db', 'course', 'accounts'].includes(value) ? value : 'quiz';
+            continue;
         }
         if (key !== 'amaes_toolkit_theme' && key !== 'amaes_quiz_personality' &&
             key !== 'amaes_ai_plan_tier' && key !== 'amaes_adaptive_probe_budget' &&
@@ -205,7 +206,10 @@ async function accountTransferReadSelectedData(includeAccounts, includeApiKeys, 
     const settings = includeSettings
         ? Object.fromEntries(ACCOUNT_TRANSFER_SETTINGS_KEYS
             .filter(key => key !== 'amaes_account_switcher_return_enabled')
-            .map(key => [key, localStorage.getItem(key)])
+            .map(key => [
+                key,
+                key === 'amaes_active_tab' && localStorage.getItem(key) === 'accounts' ? 'quiz' : localStorage.getItem(key)
+            ])
             .filter(([, value]) => value !== null))
         : {};
     if (includeSettings) {

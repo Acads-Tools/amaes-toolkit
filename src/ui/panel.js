@@ -280,6 +280,17 @@
                                 <span>Adaptive Probe (Unreviewed Quizzes)</span>
                             </label>
                             <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
+                                <span style="font-size: 10px; color: var(--text-secondary); font-weight: 500;" title="Review leeway delay before auto-submitting on the quiz summary check page">Auto-Submit Leeway:</span>
+                                <select id="sel-auto-submit-delay" style="background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 6px; cursor: pointer;">
+                                    <option value="0" ${autoSubmitDelay === 0 ? 'selected' : ''}>0s (Instant)</option>
+                                    <option value="5" ${autoSubmitDelay === 5 ? 'selected' : ''}>5 seconds</option>
+                                    <option value="10" ${autoSubmitDelay === 10 ? 'selected' : ''}>10 seconds (Default)</option>
+                                    <option value="15" ${autoSubmitDelay === 15 ? 'selected' : ''}>15 seconds</option>
+                                    <option value="20" ${autoSubmitDelay === 20 ? 'selected' : ''}>20 seconds</option>
+                                    <option value="30" ${autoSubmitDelay === 30 ? 'selected' : ''}>30 seconds</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 0;">
                                 <span style="font-size: 10px; color: var(--text-secondary); font-weight: 500;" title="Number of unverified questions to rotate per attempt">Probe Budget / Attempt:</span>
                                 <select id="sel-adaptive-probe-budget" style="background: var(--surface); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 10px; padding: 2px 6px; cursor: pointer;">
                                     <option value="1" ${adaptiveProbeBudget === 1 ? 'selected' : ''}>1 question (Safe)</option>

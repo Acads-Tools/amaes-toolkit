@@ -153,6 +153,8 @@
     if (isNaN(adaptiveProbeBudget) || adaptiveProbeBudget < 1) adaptiveProbeBudget = 2;
     let isWaitingForUserAnswer = false; // session state: true when paused on an unknown question waiting for student input
     let autoSubmitQuiz = localStorage.getItem('amaes_auto_submit_quiz') === 'true'; // default false: safe manual review before final submission
+    let autoSubmitDelay = parseInt(localStorage.getItem('amaes_auto_submit_delay') || '10', 10);
+    if (isNaN(autoSubmitDelay) || autoSubmitDelay < 0) autoSubmitDelay = 10;
     let autoNextTimer = null;
     let pageLoadSolverTimer = null;
 

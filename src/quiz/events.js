@@ -215,6 +215,17 @@
             };
         }
 
+        const selAutoSubmitDelay = document.getElementById('sel-auto-submit-delay');
+        if (selAutoSubmitDelay) {
+            selAutoSubmitDelay.onchange = () => {
+                autoSubmitDelay = parseInt(selAutoSubmitDelay.value, 10);
+                if (isNaN(autoSubmitDelay) || autoSubmitDelay < 0) autoSubmitDelay = 10;
+                localStorage.setItem('amaes_auto_submit_delay', autoSubmitDelay);
+                showToast(`Auto-Submit Leeway: ${autoSubmitDelay === 0 ? 'Instant' : autoSubmitDelay + 's'}`);
+                setLog(`Auto-Submit Leeway: <b>${autoSubmitDelay === 0 ? 'Instant' : autoSubmitDelay + 's'}</b> before auto-submitting on summary page`, "var(--accent-green)");
+            };
+        }
+
         const chkKeyboardShortcuts = document.getElementById('chk-keyboard-shortcuts');
         if (chkKeyboardShortcuts) {
             chkKeyboardShortcuts.onchange = () => {

@@ -125,6 +125,22 @@ async function run() {
         accounts: [{ ...payload.accounts[0], sessionCookie: 'not-transferable' }]
     }), /invalid account profiles/);
 
+    const accountsTabValidated = validate({
+        ...payload,
+        settings: { amaes_active_tab: 'accounts' }
+    });
+    assert.equal(accountsTabValidated.settings.amaes_active_tab, 'accounts');
+
+    const unknownTabValidated = validate({
+        ...payload,
+        settings: { amaes_active_tab: 'legacy_custom_tab' }
+    });
+    assert.equal(unknownTabValidated.settings.amaes_active_tab, 'quiz');
+
+    settingsStorage.set('amaes_active_tab', 'accounts');
+    const selectedFromAccountsTab = await readSelected(true, true, true);
+    assert.equal(selectedFromAccountsTab.settings.amaes_active_tab, 'quiz');
+
     const oversizedPayload = {
         ...payload,
         accounts: Array.from({ length: 30 }, (_, index) => ({

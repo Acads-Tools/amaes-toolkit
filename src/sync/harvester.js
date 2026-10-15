@@ -1098,18 +1098,19 @@
             }
 
             // If user got full mark, the selected/entered choice(s) are verified correct!
+            // Strict atomic question guard: Never harvest composite dropdowns, matching rows, or multi-input blanks as joined strings for the parent question.
             if (!rightAnswer && isFullMark) {
                 if (checkedTexts.length > 0) {
                     rightAnswer = checkedTexts.length === 1 ? checkedTexts[0] : checkedTexts.join(', ');
                     isVerified = true;
-                } else if (filledInputTexts.length > 0) {
-                    rightAnswer = filledInputTexts.length === 1 ? filledInputTexts[0] : filledInputTexts.join(', ');
+                } else if (filledInputTexts.length === 1) {
+                    rightAnswer = filledInputTexts[0];
                     isVerified = true;
-                } else if (selectedDropdownTexts.length > 0) {
-                    rightAnswer = selectedDropdownTexts.length === 1 ? selectedDropdownTexts[0] : selectedDropdownTexts.join(', ');
+                } else if (selectedDropdownTexts.length === 1 && !isMatchingQuestion) {
+                    rightAnswer = selectedDropdownTexts[0];
                     isVerified = true;
-                } else if (placedDropTexts.length > 0) {
-                    rightAnswer = placedDropTexts.length === 1 ? placedDropTexts[0] : placedDropTexts.join(', ');
+                } else if (placedDropTexts.length === 1) {
+                    rightAnswer = placedDropTexts[0];
                     isVerified = true;
                 }
             }
@@ -1320,11 +1321,16 @@
 
     function queueCommunityContribution(subCode, questions, options = {}) {
         if (!questions || questions.length === 0) return;
-        const validQuestions = questions.filter(q => Boolean(
-            q.ansRaw || q.answer || q.correctAnswer ||
-            (q.evidenceType === 'moodle_review_elimination' &&
-                Array.isArray(q.wrongAnswers) && q.wrongAnswers.length > 0)
-        ));
+        const validQuestions = questions.filter(q => {
+            if (!q) return false;
+            const hasAns = Boolean(q.ansRaw || q.answer || q.correctAnswer);
+            const hasElim = q.evidenceType === 'moodle_review_elimination' && Array.isArray(q.wrongAnswers) && q.wrongAnswers.length > 0;
+            if (!hasAns && !hasElim) return false;
+            // Guard: Never contribute composite comma-separated answers or unmapped match parent questions
+            const ansText = String(q.ansRaw || q.answer || q.correctAnswer || '').trim();
+            if (q.questionType === 'match' && ansText.includes(',')) return false;
+            return true;
+        });
         if (validQuestions.length === 0) return;
 
         if (!pendingContributionBatches[subCode]) {

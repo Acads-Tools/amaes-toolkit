@@ -6273,6 +6273,45 @@ test("Activity Auto-Marker & Lecture Completion: fixes manual completion button 
 });
 
 
+// --------------------------------------------------
+// 189. Composite Matching Question UI Hygiene, Configurable Summary Leeway Delay & 100% Score Verification (v1.13.3)
+// --------------------------------------------------
+test("Composite Matching Question UI Hygiene, Configurable Summary Leeway Delay & 100% Score Verification (v1.13.3)", () => {
+    const fs = require('fs');
+    const promptsSrc = fs.readFileSync('src/ai/prompts.js', 'utf8');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const panelSrc = fs.readFileSync('src/ui/panel.js', 'utf8');
+    const themeSrc = fs.readFileSync('src/ui/theme.js', 'utf8');
+    const configSrc = fs.readFileSync('src/core/config.js', 'utf8');
+    const transferSrc = fs.readFileSync('src/moodle/account-transfer.js', 'utf8');
+
+    // 1. Redundant Card-Level AI Actions Hidden on Composite Questions
+    assert.ok(promptsSrc.includes("const isCompositeQuestion = que.querySelectorAll('select').length > 1"), "prompts.js must identify composite dropdown questions");
+    assert.ok(promptsSrc.includes("if (isCompositeQuestion) {\n                    aiActions.style.display = 'none';\n                }"), "prompts.js must hide whole-card aiActions on composite questions");
+    assert.ok(promptsSrc.includes("existingAiActions.style.display = 'none';"), "prompts.js must keep aiActions hidden on re-render for composite questions");
+
+    // 2. Configurable Auto-Submit Leeway Delay
+    assert.ok(configSrc.includes("'amaes_auto_submit_delay'"), "config.js must include amaes_auto_submit_delay in ALL_CONFIG_KEYS");
+    assert.ok(themeSrc.includes("let autoSubmitDelay = parseInt(localStorage.getItem('amaes_auto_submit_delay') || '10', 10);"), "theme.js must default autoSubmitDelay to 10 seconds");
+    assert.ok(panelSrc.includes('id="sel-auto-submit-delay"'), "panel.js must render sel-auto-submit-delay dropdown in Advanced Settings");
+    assert.ok(solverSrc.includes('id="amaes-summary-countdown-sec"'), "solver.js ready banner must render countdown seconds element");
+    assert.ok(solverSrc.includes('id="amaes-btn-cancel-auto-submit"'), "solver.js ready banner must provide cancel auto-submit button");
+    assert.ok(solverSrc.includes("function executeQuizSummaryFinalSubmit()"), "solver.js must encapsulate final submission in executeQuizSummaryFinalSubmit");
+
+    // 3. Non-Reviewable Quiz 100% Perfect Score Promotion
+    assert.ok(solverSrc.includes("if (isReviewPermitted !== true) {\n            if (earned < maximum) {"), "saveQuizAttemptSummary must only block unreviewed promotion if score is strictly below maximum");
+
+    // 4. Setup Transfer Accounts Tab Compatibility
+    assert.ok(transferSrc.includes("'accounts'"), "account-transfer.js must include 'accounts' in ACCOUNT_TRANSFER_SETTINGS_KEYS allowlist");
+
+    // 5. Strict 1-Point / Atomic Question Isolation
+    const harvesterSrc = fs.readFileSync('src/sync/harvester.js', 'utf8');
+    assert.ok(harvesterSrc.includes("selectedDropdownTexts.length === 1 && !isMatchingQuestion"), "harvester.js must not harvest composite dropdowns as joined string");
+    assert.ok(harvesterSrc.includes("if (q.questionType === 'match' && ansText.includes(',')) return false;"), "harvester.js queueCommunityContribution must reject joined match answers");
+    assert.ok(solverSrc.includes("selectInputs.length === 1"), "solver.js syncCurrentPageSelectionsToEvidence must only record single select answers");
+    assert.ok(solverSrc.includes("!isCompositeOrMatching && !hasAnyVerifiedCandidate && prevAnsText"), "solver.js must suppress unreviewed history banner on composite/matching questions");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);
@@ -6282,4 +6321,5 @@ console.log("==================================================");
 if (failed > 0) {
     process.exit(1);
 }
+
 
