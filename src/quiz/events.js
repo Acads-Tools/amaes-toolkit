@@ -1594,6 +1594,13 @@
             };
         }
 
+        const headerBugBtn = document.getElementById('amaes-bug-header-btn');
+        if (headerBugBtn) {
+            headerBugBtn.onclick = () => {
+                showBugReportModal();
+            };
+        }
+
         // Debug Copy Handler
         if (debugBtn) {
             if (debugBtn) debugBtn.onclick = async () => {

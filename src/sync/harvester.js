@@ -1304,7 +1304,40 @@
                                         wrongAnswers: candidate.wrongAnswers || []
                                     }
                                 });
+                            } else if (matchesSubmitted) {
+                                detectAndReportQuestionAnomaly({
+                                    anomalyType: 'UNVERIFIED_CHOICE_FAILED',
+                                    subjectCode: subCode,
+                                    activityTitle: quizTitle,
+                                    questionRaw: qData.qText,
+                                    questionNorm: qNorm,
+                                    domType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : 'unknown'),
+                                    submittedAnswer: submittedAnswers.join(', '),
+                                    markScored: gradeInfo.earned ?? 0,
+                                    maxMark: gradeInfo.max ?? 1,
+                                    attemptHistory: [...(candidate.wrongAnswers || []), ...wrongAnswers],
+                                    dbCandidate: {
+                                        answer: candAns,
+                                        questionType: candidate.questionType,
+                                        verified: candidate.verified,
+                                        wrongAnswers: candidate.wrongAnswers || []
+                                    }
+                                });
                             }
+                        } else if (submittedAnswers.length > 0) {
+                            detectAndReportQuestionAnomaly({
+                                anomalyType: 'UNINDEXED_QUESTION_FAILED',
+                                subjectCode: subCode,
+                                activityTitle: quizTitle,
+                                questionRaw: qData.qText,
+                                questionNorm: qNorm,
+                                domType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : 'unknown'),
+                                submittedAnswer: submittedAnswers.join(', '),
+                                markScored: gradeInfo.earned ?? 0,
+                                maxMark: gradeInfo.max ?? 1,
+                                attemptHistory: wrongAnswers,
+                                dbCandidate: null
+                            });
                         }
                     } catch (err) {
                         if (typeof logDebug === 'function') logDebug('Review anomaly detection note:', err.message);

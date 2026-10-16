@@ -7117,6 +7117,41 @@ test("Fill-in-the-Blank & Cloze Accuracy: question type classification, candidat
         "Built script must strictly enforce Zero Generic Emojis Policy");
 });
 
+// --------------------------------------------------
+// 208. Reinforced Bug Reporting & Sub-Passing Score Anomaly Telemetry
+// --------------------------------------------------
+test("Reinforced Bug Reporting & Sub-Passing Score Anomaly Telemetry: header 1-click bug report, sub-80% score anomaly telemetry & unverified failure tracking", () => {
+    const fs = require('fs');
+    const panelSrc = fs.readFileSync('src/ui/panel.js', 'utf8');
+    const eventsSrc = fs.readFileSync('src/quiz/events.js', 'utf8');
+    const diagSrc = fs.readFileSync('src/dev/diagnostics.js', 'utf8');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const harvesterSrc = fs.readFileSync('src/sync/harvester.js', 'utf8');
+    const builtScript = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Header 1-click bug report button in panel and minimized CSS
+    assert.ok(panelSrc.includes('id="amaes-bug-header-btn"'), "panel.js must render amaes-bug-header-btn in top actions bar");
+    assert.ok(panelSrc.includes("#amaes-toolkit-panel.amaes-minimized #amaes-bug-header-btn,"), "panel.js must hide amaes-bug-header-btn when panel is minimized");
+    assert.ok(eventsSrc.includes("const headerBugBtn = document.getElementById('amaes-bug-header-btn');"), "events.js must bind click listener to amaes-bug-header-btn");
+
+    // 2. showBugReportModal prefill capability
+    assert.ok(diagSrc.includes("const prefill = arguments[0] || {};"), "showBugReportModal must extract prefill options from arguments");
+    assert.ok(diagSrc.includes("if (prefill.description) {\n            textarea.value = prefill.description;"), "showBugReportModal must populate textarea with prefill.description");
+
+    // 3. Solver sub-passing (<80%) and critical (<70%) score anomaly dispatch
+    assert.ok(solverSrc.includes("function dispatchQuizLowScoreAnomaly(subCode, earned, maximum, percentage, evidence)"), "solver.js must define dispatchQuizLowScoreAnomaly helper");
+    assert.ok(solverSrc.includes("anomalyType: isCritical ? 'LOW_QUIZ_SCORE_CRITICAL' : 'QUIZ_SCORE_BELOW_PASSING'"), "solver.js must dispatch LOW_QUIZ_SCORE_CRITICAL or QUIZ_SCORE_BELOW_PASSING");
+    assert.ok(solverSrc.includes("showToast(`${alertMsg} Click to report question issues.`, 8000"), "solver.js must display actionable toast on sub-passing score");
+
+    // 4. Harvester unverified choice and unindexed question failure tracking
+    assert.ok(harvesterSrc.includes("anomalyType: 'UNVERIFIED_CHOICE_FAILED'"), "harvester.js must detect and report UNVERIFIED_CHOICE_FAILED");
+    assert.ok(harvesterSrc.includes("anomalyType: 'UNINDEXED_QUESTION_FAILED'"), "harvester.js must detect and report UNINDEXED_QUESTION_FAILED");
+
+    // 5. Zero Generic Emojis Policy
+    assert.ok(!builtScript.includes("⚡") && !builtScript.includes("⚠️") && !builtScript.includes("🚀") && !builtScript.includes("🤖"),
+        "Built script must strictly enforce Zero Generic Emojis Policy");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

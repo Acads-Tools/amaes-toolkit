@@ -5029,7 +5029,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     }
 
     function showUnreviewableQuizRetryWarning(summary) {
-        if (!checkIsQuizViewPage() || !summary || summary.isReviewPermitted !== false) return;
+        if (!checkIsQuizViewPage() || !summary) return;
         const retryControl = document.querySelector('a[href*="attempt.php"], input[name="startattempt"], button[name="startattempt"]');
         const attemptTable = document.querySelector('.quizattemptsummary, .generaltable.quizattemptsummary, .quizsummarytable');
         const anchor = retryControl || attemptTable;
@@ -5040,7 +5040,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             warning = document.createElement('div');
             warning.id = 'amaes-unreviewable-retry-warning';
             warning.setAttribute('role', 'note');
-            warning.style.cssText = 'margin: 12px 0; padding: 10px 12px; border-left: 4px solid #f59e0b; border-radius: 5px; background: rgba(245, 158, 11, 0.12); color: inherit; font-size: 13px; line-height: 1.5;';
+            warning.style.cssText = 'margin: 12px 0; padding: 12px 14px; border-left: 4px solid #f59e0b; border-radius: 6px; background: rgba(245, 158, 11, 0.12); color: inherit; font-size: 12.5px; line-height: 1.5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
             if (retryControl) {
                 (retryControl.closest('form, .singlebutton, .quizattempt') || retryControl.parentElement).insertAdjacentElement('beforebegin', warning);
             } else {
@@ -5048,8 +5048,55 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             }
         }
 
-        const isHighestGrade = /grading method\s*:\s*highest grade/i.test(document.body.innerText || '');
-        warning.textContent = `Review is not permitted for the previous attempt (${summary.percentage}% overall). This score does not identify which individual answers were correct. Your first attempt is only the available baseline, not proof of which answers were right; a retry may score lower. Check the grading method and attempt limit before retrying.${isHighestGrade ? ' Moodle currently lists Highest grade for this quiz.' : ''}`;
+        const isLowScore = typeof summary.percentage === 'number' && summary.percentage < 80;
+        const isCritical = typeof summary.percentage === 'number' && summary.percentage < 70;
+        const courseInfo = (typeof detectCourseInfo === 'function') ? detectCourseInfo() : {};
+        const subCode = courseInfo.subjectCode || 'GENERAL';
+        const quizTitle = (typeof getQuizTitle === 'function' ? getQuizTitle() : '') || document.title;
+
+        if (summary.isReviewPermitted === false) {
+            const isHighestGrade = /grading method\s*:\s*highest grade/i.test(document.body.innerText || '');
+            warning.innerHTML = `
+                <div style="font-weight: 700; color: #f59e0b; margin-bottom: 4px;">Review is not permitted for the previous attempt (${summary.percentage}% overall)</div>
+                <div>This score does not identify which individual answers were correct. Your first attempt is only the available baseline, not proof of which answers were right; a retry may score lower. Check the grading method and attempt limit before retrying.${isHighestGrade ? ' Moodle currently lists Highest grade for this quiz.' : ''}</div>
+                ${isLowScore ? `
+                <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                    <button id="amaes-btn-warning-report-bug" type="button" style="padding: 4px 10px; background: #ef4444; color: #fff; border: none; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer;">
+                        Report Quiz Anomaly (${summary.percentage}%)
+                    </button>
+                    <span style="font-size: 11px; color: #94a3b8;">Score is below passable grade (80%)</span>
+                </div>` : ''}
+            `;
+        } else if (isLowScore) {
+            warning.style.borderLeftColor = isCritical ? '#ef4444' : '#f59e0b';
+            warning.style.background = isCritical ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)';
+            warning.innerHTML = `
+                <div style="font-weight: 700; color: ${isCritical ? '#f87171' : '#f59e0b'}; margin-bottom: 4px;">
+                    Attempt Score Alert: ${summary.percentage}% (Below 80% Passing Cutoff)
+                </div>
+                <div>Your latest attempt scored below the 80% passing grade. If the quiz has a review link above, open the review so the toolkit can harvest confirmed wrong answers. If answers were missing or incorrect, please report them below.</div>
+                <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                    <button id="amaes-btn-warning-report-bug" type="button" style="padding: 4px 10px; background: #ef4444; color: #fff; border: none; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer;">
+                        Report Quiz Anomaly (${summary.percentage}%)
+                    </button>
+                </div>
+            `;
+        } else {
+            warning.remove();
+            return;
+        }
+
+        const reportBtn = warning.querySelector('#amaes-btn-warning-report-bug');
+        if (reportBtn) {
+            reportBtn.onclick = () => {
+                if (typeof showBugReportModal === 'function') {
+                    showBugReportModal({
+                        subjectCode: subCode,
+                        description: `Quiz "${quizTitle}" scored ${summary.percentage}% (below 80% passing grade). Answers appear outdated, missing, or incorrect.`
+                    });
+                }
+            };
+        }
     }
 
     function promoteAttemptEvidenceFromScore() {
@@ -5146,10 +5193,51 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         } catch (_) {}
         if (!Array.isArray(evidence) || evidence.length === 0) return;
 
+        function dispatchQuizLowScoreAnomaly(subCode, earned, maximum, percentage, evidence) {
+            if (percentage >= 80) return;
+            const isCritical = percentage < 70;
+            const quizTitle = (typeof getQuizTitle === 'function' ? getQuizTitle() : '') || (document.title ? document.title.replace(/\s*\|.*$/, '').trim() : 'Quiz Attempt');
+
+            if (typeof detectAndReportQuestionAnomaly === 'function' && Array.isArray(evidence) && evidence.length > 0) {
+                const sampleQue = evidence[0];
+                const samplePrompt = sampleQue ? (sampleQue.qRaw || sampleQue.qText || '') : `Quiz scored ${earned}/${maximum} (${percentage}%) in ${subCode}`;
+                detectAndReportQuestionAnomaly({
+                    anomalyType: isCritical ? 'LOW_QUIZ_SCORE_CRITICAL' : 'QUIZ_SCORE_BELOW_PASSING',
+                    subjectCode: subCode,
+                    activityTitle: quizTitle,
+                    questionRaw: samplePrompt,
+                    questionNorm: (typeof normalizeText === 'function' ? normalizeText(samplePrompt) : samplePrompt.toLowerCase()).slice(0, 100),
+                    domType: 'quiz_attempt_score',
+                    submittedAnswer: `Attempt scored ${earned}/${maximum} (${percentage}%) across ${evidence.length} questions`,
+                    markScored: earned,
+                    maxMark: maximum,
+                    attemptHistory: evidence.slice(0, 5).map(e => `${(e.qRaw || e.qText || '').slice(0, 40)}: ${e.ansRaw || 'N/A'}`),
+                    dbCandidate: null
+                });
+            }
+
+            const alertMsg = isCritical
+                ? `Quiz score (${earned}/${maximum} - ${percentage}%) is critical (<70%). Anomaly telemetry dispatched.`
+                : `Quiz score (${earned}/${maximum} - ${percentage}%) is below passable grade (80%).`;
+            setLog(`[Score Anomaly] ${alertMsg}`, 'var(--accent-amber)');
+
+            if (typeof showToast === 'function') {
+                showToast(`${alertMsg} Click to report question issues.`, 8000, () => {
+                    if (typeof showBugReportModal === 'function') {
+                        showBugReportModal({
+                            subjectCode: subCode,
+                            description: `Quiz "${quizTitle}" scored ${earned}/${maximum} (${percentage}%). One or more questions appear to have mismatched, rotated, or incorrect answers.`
+                        });
+                    }
+                });
+            }
+        }
+
         if (isReviewPermitted !== true) {
             if (earned < maximum) {
                 saveUnreviewedAttemptEvidence(subCode, evidence, earned, maximum, isReviewPermitted);
                 setLog(`Attempt score recorded (${earned}/${maximum} - ${percentage}%). Review permission is ${isReviewPermitted === false ? 'restricted' : 'unknown'}; overall scores cannot verify individual answers, so these answers were not promoted or shared.`, 'var(--accent-amber)');
+                dispatchQuizLowScoreAnomaly(subCode, earned, maximum, percentage, evidence);
                 return;
             }
         }
@@ -5158,6 +5246,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             saveUnreviewedAttemptEvidence(subCode, evidence, earned, maximum, isReviewPermitted);
             recordAdaptiveProbeAttempt(subCode, evidence, earned, maximum, isReviewPermitted);
             setLog(`Attempt score recorded (${earned}/${maximum} - ${percentage}%). This overall score does not identify which individual answers were correct. Unconfirmed choices remain unverified.`, 'var(--accent-amber)');
+            dispatchQuizLowScoreAnomaly(subCode, earned, maximum, percentage, evidence);
             return;
         }
 
@@ -13437,7 +13526,7 @@ function setupAccountTransferUI() {
     }
 
     // Floating Non-intrusive Stacking Toast Notifications
-    function showToast(message, duration = 2400) {
+    function showToast(message, duration = 2400, onClick = null) {
         if (!message) return;
 
         let container = document.getElementById('amaes-toast-notification');
@@ -13507,7 +13596,7 @@ function setupAccountTransferUI() {
             cursor: pointer;
             user-select: none;
         `;
-        toastItem.title = 'Click to dismiss';
+        toastItem.title = typeof onClick === 'function' ? 'Click to open details' : 'Click to dismiss';
         toastItem.innerHTML = `${ICONS.sparkles} <span style="line-height: 1.4;">${message}</span>`;
         container.appendChild(toastItem);
 
@@ -13519,6 +13608,11 @@ function setupAccountTransferUI() {
 
         // Click to dismiss immediately
         toastItem.onclick = () => dismissToast(toastItem);
+        if (typeof onClick === 'function') {
+            toastItem.addEventListener('click', (e) => {
+                try { onClick(e); } catch (_) {}
+            });
+        }
 
         // Independent timer per toast
         toastItem._timer = setTimeout(() => dismissToast(toastItem), duration);
@@ -14335,17 +14429,25 @@ function setupAccountTransferUI() {
     }
 
     function showBugReportModal() {
+        const prefill = arguments[0] || {};
         const existing = document.getElementById('amaes-bug-modal');
         if (existing) {
-            existing.querySelector('textarea')?.focus();
+            const ta = existing.querySelector('textarea');
+            if (ta) {
+                if (prefill.description && !ta.value.trim()) {
+                    ta.value = prefill.description;
+                    ta.dispatchEvent(new Event('input'));
+                }
+                ta.focus();
+            }
             return;
         }
 
         const courseInfo = (typeof detectCourseInfo === 'function') ? detectCourseInfo() : {};
-        const activeSubCode = courseInfo.subjectCode || (typeof subCode !== 'undefined' ? subCode : 'GENERAL');
-        const activePageType = (typeof checkIsQuizPage === 'function' && checkIsQuizPage()) ? 'quiz_attempt'
+        const activeSubCode = prefill.subjectCode || courseInfo.subjectCode || (typeof subCode !== 'undefined' ? subCode : 'GENERAL');
+        const activePageType = prefill.context || ((typeof checkIsQuizPage === 'function' && checkIsQuizPage()) ? 'quiz_attempt'
             : ((typeof checkIsReviewPage === 'function' && checkIsReviewPage()) ? 'quiz_review'
-            : ((typeof checkIsCoursePage === 'function' && checkIsCoursePage()) ? 'course_view' : 'dashboard'));
+            : ((typeof checkIsCoursePage === 'function' && checkIsCoursePage()) ? 'course_view' : 'dashboard')));
 
         const modal = document.createElement('div');
         modal.id = 'amaes-bug-modal';
@@ -14502,6 +14604,10 @@ function setupAccountTransferUI() {
         const logsCheckbox = modal.querySelector('#amaes-bug-include-logs');
         const modalBody = modal.querySelector('#amaes-bug-modal-body');
 
+        if (prefill.description) {
+            textarea.value = prefill.description;
+        }
+
         textarea.focus();
 
         textarea.oninput = () => {
@@ -14514,6 +14620,10 @@ function setupAccountTransferUI() {
             }
             errorMsg.style.display = 'none';
         };
+
+        if (prefill.description) {
+            textarea.dispatchEvent(new Event('input'));
+        }
 
         submitBtn.onclick = async () => {
             const desc = textarea.value.trim();
@@ -19938,7 +20048,40 @@ function setupAccountTransferUI() {
                                         wrongAnswers: candidate.wrongAnswers || []
                                     }
                                 });
+                            } else if (matchesSubmitted) {
+                                detectAndReportQuestionAnomaly({
+                                    anomalyType: 'UNVERIFIED_CHOICE_FAILED',
+                                    subjectCode: subCode,
+                                    activityTitle: quizTitle,
+                                    questionRaw: qData.qText,
+                                    questionNorm: qNorm,
+                                    domType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : 'unknown'),
+                                    submittedAnswer: submittedAnswers.join(', '),
+                                    markScored: gradeInfo.earned ?? 0,
+                                    maxMark: gradeInfo.max ?? 1,
+                                    attemptHistory: [...(candidate.wrongAnswers || []), ...wrongAnswers],
+                                    dbCandidate: {
+                                        answer: candAns,
+                                        questionType: candidate.questionType,
+                                        verified: candidate.verified,
+                                        wrongAnswers: candidate.wrongAnswers || []
+                                    }
+                                });
                             }
+                        } else if (submittedAnswers.length > 0) {
+                            detectAndReportQuestionAnomaly({
+                                anomalyType: 'UNINDEXED_QUESTION_FAILED',
+                                subjectCode: subCode,
+                                activityTitle: quizTitle,
+                                questionRaw: qData.qText,
+                                questionNorm: qNorm,
+                                domType: qData.questionType || (typeof identifyQuestionType === 'function' ? identifyQuestionType(que) : 'unknown'),
+                                submittedAnswer: submittedAnswers.join(', '),
+                                markScored: gradeInfo.earned ?? 0,
+                                maxMark: gradeInfo.max ?? 1,
+                                attemptHistory: wrongAnswers,
+                                dbCandidate: null
+                            });
                         }
                     } catch (err) {
                         if (typeof logDebug === 'function') logDebug('Review anomaly detection note:', err.message);
@@ -22941,6 +23084,10 @@ function setupAccountTransferUI() {
                         ${ICONS.home}
                     </a>
 
+                    <button id="amaes-bug-header-btn" class="amaes-icon-btn" title="Report a Problem or Question Anomaly" style="color: var(--text-muted, #94a3b8);">
+                        ${ICONS.bug}
+                    </button>
+
                     <button id="amaes-help-btn" class="amaes-icon-btn" title="Quick Start Guide, Utilities & Documentation">
                         ${ICONS.help}
                     </button>
@@ -23630,6 +23777,7 @@ function setupAccountTransferUI() {
                 }
 
                 #amaes-toolkit-panel.amaes-minimized #amaes-version-pill,
+                #amaes-toolkit-panel.amaes-minimized #amaes-bug-header-btn,
                 #amaes-toolkit-panel.amaes-minimized #amaes-help-btn,
                 #amaes-toolkit-panel.amaes-minimized #amaes-home-btn {
                     display: none !important;
@@ -26414,6 +26562,13 @@ function setupAccountTransferUI() {
         const bugBtn = document.getElementById('amaes-bug-btn');
         if (bugBtn) {
             bugBtn.onclick = () => {
+                showBugReportModal();
+            };
+        }
+
+        const headerBugBtn = document.getElementById('amaes-bug-header-btn');
+        if (headerBugBtn) {
+            headerBugBtn.onclick = () => {
                 showBugReportModal();
             };
         }

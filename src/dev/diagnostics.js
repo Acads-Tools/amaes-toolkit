@@ -90,7 +90,7 @@
     }
 
     // Floating Non-intrusive Stacking Toast Notifications
-    function showToast(message, duration = 2400) {
+    function showToast(message, duration = 2400, onClick = null) {
         if (!message) return;
 
         let container = document.getElementById('amaes-toast-notification');
@@ -160,7 +160,7 @@
             cursor: pointer;
             user-select: none;
         `;
-        toastItem.title = 'Click to dismiss';
+        toastItem.title = typeof onClick === 'function' ? 'Click to open details' : 'Click to dismiss';
         toastItem.innerHTML = `${ICONS.sparkles} <span style="line-height: 1.4;">${message}</span>`;
         container.appendChild(toastItem);
 
@@ -172,6 +172,11 @@
 
         // Click to dismiss immediately
         toastItem.onclick = () => dismissToast(toastItem);
+        if (typeof onClick === 'function') {
+            toastItem.addEventListener('click', (e) => {
+                try { onClick(e); } catch (_) {}
+            });
+        }
 
         // Independent timer per toast
         toastItem._timer = setTimeout(() => dismissToast(toastItem), duration);
@@ -988,17 +993,25 @@
     }
 
     function showBugReportModal() {
+        const prefill = arguments[0] || {};
         const existing = document.getElementById('amaes-bug-modal');
         if (existing) {
-            existing.querySelector('textarea')?.focus();
+            const ta = existing.querySelector('textarea');
+            if (ta) {
+                if (prefill.description && !ta.value.trim()) {
+                    ta.value = prefill.description;
+                    ta.dispatchEvent(new Event('input'));
+                }
+                ta.focus();
+            }
             return;
         }
 
         const courseInfo = (typeof detectCourseInfo === 'function') ? detectCourseInfo() : {};
-        const activeSubCode = courseInfo.subjectCode || (typeof subCode !== 'undefined' ? subCode : 'GENERAL');
-        const activePageType = (typeof checkIsQuizPage === 'function' && checkIsQuizPage()) ? 'quiz_attempt'
+        const activeSubCode = prefill.subjectCode || courseInfo.subjectCode || (typeof subCode !== 'undefined' ? subCode : 'GENERAL');
+        const activePageType = prefill.context || ((typeof checkIsQuizPage === 'function' && checkIsQuizPage()) ? 'quiz_attempt'
             : ((typeof checkIsReviewPage === 'function' && checkIsReviewPage()) ? 'quiz_review'
-            : ((typeof checkIsCoursePage === 'function' && checkIsCoursePage()) ? 'course_view' : 'dashboard'));
+            : ((typeof checkIsCoursePage === 'function' && checkIsCoursePage()) ? 'course_view' : 'dashboard')));
 
         const modal = document.createElement('div');
         modal.id = 'amaes-bug-modal';
@@ -1155,6 +1168,10 @@
         const logsCheckbox = modal.querySelector('#amaes-bug-include-logs');
         const modalBody = modal.querySelector('#amaes-bug-modal-body');
 
+        if (prefill.description) {
+            textarea.value = prefill.description;
+        }
+
         textarea.focus();
 
         textarea.oninput = () => {
@@ -1167,6 +1184,10 @@
             }
             errorMsg.style.display = 'none';
         };
+
+        if (prefill.description) {
+            textarea.dispatchEvent(new Event('input'));
+        }
 
         submitBtn.onclick = async () => {
             const desc = textarea.value.trim();

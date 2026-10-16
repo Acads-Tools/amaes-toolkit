@@ -74,6 +74,10 @@
                         ${ICONS.home}
                     </a>
 
+                    <button id="amaes-bug-header-btn" class="amaes-icon-btn" title="Report a Problem or Question Anomaly" style="color: var(--text-muted, #94a3b8);">
+                        ${ICONS.bug}
+                    </button>
+
                     <button id="amaes-help-btn" class="amaes-icon-btn" title="Quick Start Guide, Utilities & Documentation">
                         ${ICONS.help}
                     </button>
@@ -763,6 +767,7 @@
                 }
 
                 #amaes-toolkit-panel.amaes-minimized #amaes-version-pill,
+                #amaes-toolkit-panel.amaes-minimized #amaes-bug-header-btn,
                 #amaes-toolkit-panel.amaes-minimized #amaes-help-btn,
                 #amaes-toolkit-panel.amaes-minimized #amaes-home-btn {
                     display: none !important;
