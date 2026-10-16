@@ -4487,7 +4487,7 @@
                     <div style="font-size: 12px; color: #475569;">Retake this quiz immediately with fresh questions and verified answers.</div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <button id="amaes-btn-retake-quiz" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 7px; padding: 7px 16px; font-size: 13px; font-weight: 700; border-radius: 6px; background: #0f6cbf; border: 1px solid #0f6cbf; color: #ffffff; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(15,108,191,0.2);" title="Retake this quiz immediately (Press R or A)">
+                    <button id="amaes-btn-retake-quiz" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 7px; padding: 7px 16px; font-size: 13px; font-weight: 700; border-radius: 6px; background: #0f6cbf; border: 1px solid #0f6cbf; color: #ffffff; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(15,108,191,0.2);" title="Retake this quiz immediately (Press R)">
                         ${ICONS.rotateCcw || ''}
                         <span>Retake Quiz</span>
                         <span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.9; font-weight: 600; padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,0.22);">(Press R)</span>
@@ -4605,13 +4605,13 @@
 
             if (e.ctrlKey || e.altKey || e.metaKey) return;
 
-            // Retake Quiz Shortcut on Review Pages (/mod/quiz/review.php): 'R', 'r', 'A', 'a'
+            // Retake Quiz Shortcut on Review Pages (/mod/quiz/review.php): 'R', 'r'
             const isReviewPage = typeof checkIsReviewPage === 'function' && checkIsReviewPage();
-            if (isReviewPage && (e.key === 'r' || e.key === 'R' || e.key === 'a' || e.key === 'A')) {
+            if (isReviewPage && (e.key === 'r' || e.key === 'R')) {
                 e.preventDefault();
                 if (typeof triggerQuizRetake === 'function') {
-                    showToast("Retaking quiz... (" + e.key.toUpperCase() + ")");
-                    setLog("Triggered <b>Retake Quiz</b> via keyboard shortcut [" + e.key.toUpperCase() + "]", "var(--accent-green)");
+                    showToast("Retaking quiz... (R)");
+                    setLog("Triggered <b>Retake Quiz</b> via keyboard shortcut [R]", "var(--accent-green)");
                     triggerQuizRetake();
                 }
                 return;

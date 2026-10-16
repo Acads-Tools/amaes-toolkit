@@ -6986,9 +6986,11 @@ test("Instant Quiz Retake Button, Fast Form Start & Review Page Keyboard Shortcu
     assert.ok(solverSrc.includes("confirmModalBtn.click()"),
         "checkAutoStartAttemptOnLanding must poll and auto-confirm Moodle attempt dialogue");
 
-    // 6. Review Page Keyboard Shortcut [R]
-    assert.ok(solverSrc.includes("isReviewPage && (e.key === 'r' || e.key === 'R' || e.key === 'a' || e.key === 'A')"),
-        "setupQuizKeyboardShortcuts must listen for R and A keys on review pages");
+    // 6. Review Page Keyboard Shortcut [R] (Unified strictly to R only)
+    assert.ok(solverSrc.includes("isReviewPage && (e.key === 'r' || e.key === 'R')"),
+        "setupQuizKeyboardShortcuts must listen strictly for R key on review pages");
+    assert.ok(!solverSrc.includes("isReviewPage && (e.key === 'r' || e.key === 'R' || e.key === 'a' || e.key === 'A')"),
+        "Review page retake shortcut must not listen to A key and remain unified to R only");
     assert.ok(solverSrc.includes("triggerQuizRetake()"),
         "Keyboard shortcut handler must call triggerQuizRetake on review page");
     assert.ok(modalsSrc.includes(">R</kbd>") && modalsSrc.includes("Retake Quiz (Review Page)"),
