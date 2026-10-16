@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.13'), "Userscript header must specify v1.13.13");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.13";'), "Constant SCRIPT_VERSION must be v1.13.13");
+    assert.ok(script.includes('@version      1.13.14'), "Userscript header must specify v1.13.14");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.14";'), "Constant SCRIPT_VERSION must be v1.13.14");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -6708,6 +6708,40 @@ test("Dual-Track Fast Auto-Marker, Instant Attempt Shortcut [A] with Modal Auto-
     // 4. Enhanced Auto-Mark Done on Quiz Landing in highlighter.js
     assert.ok(hlSrc.includes("table.generaltable tbody tr"), "highlighter.js must inspect generaltable for 100% attempts");
     assert.ok(hlSrc.includes("button.btn-outline-secondary"), "highlighter.js must search btn-outline-secondary completion buttons");
+});
+
+// --------------------------------------------------
+// 201. Partial Matching Row Harvesting, 2-Way Elimination Deduction & Identification AI Precision (v1.13.14)
+// --------------------------------------------------
+test("Partial Matching Row Harvesting, 2-Way Elimination Deduction & Identification AI Precision (v1.13.14)", () => {
+    const fs = require('fs');
+    const harvesterSrc = fs.readFileSync('src/sync/harvester.js', 'utf8');
+    const geminiSrc = fs.readFileSync('src/ai/gemini.js', 'utf8');
+    const promptsSrc = fs.readFileSync('src/ai/prompts.js', 'utf8');
+
+    // 1. Partial Matching Question Row Checkmark Extraction & Deduction in harvester.js
+    assert.ok(harvesterSrc.includes("allMatchingOptions = new Set();"), "harvester.js must gather all option pool candidates from select elements");
+    assert.ok(harvesterSrc.includes("rowAnalyses = [];"), "harvester.js must evaluate per-row correctness and wrong answers");
+    assert.ok(harvesterSrc.includes("unverifiedRows.length === 2 && remainingChoices.length === 2"), "harvester.js must implement 2-choice swap deduction");
+    assert.ok(harvesterSrc.includes("r1WrongNorms.includes(c1Norm) && r2WrongNorms.includes(c2Norm)"), "harvester.js must verify swapped choice elimination for row 1 and row 2");
+    assert.ok(harvesterSrc.includes("evidenceType: 'elimination_deduction'") || harvesterSrc.includes("analysis.deduced ? 'elimination_deduction'"), "harvester.js must tag deduced rows with elimination_deduction evidence");
+
+    // 2. Dedicated Matching Review UI & Per-Row Badges
+    assert.ok(harvesterSrc.includes("amaes-matching-row-badge"), "harvester.js must inject per-row visual feedback badges in matching table");
+    assert.ok(harvesterSrc.includes("Deduced:"), "harvester.js must render Deduced indicator on deduced matching rows");
+    assert.ok(harvesterSrc.includes("Saved (${totalMatchingRows - deducedRowCount} Verified, ${deducedRowCount} Deduced)"), "harvester.js must render detailed sidebar pill when matching question is fully resolved via deduction");
+    assert.ok(harvesterSrc.includes("Partially Harvested (${verifiedRowCount} Verified, ${eliminatedRowCount} Eliminated)"), "harvester.js must render partial harvest pill when some matching rows are verified");
+
+    // 3. Identification & Technical AI Prompt Directives
+    assert.ok(geminiSrc.includes("RULES FOR IDENTIFICATION & PROGRAMMING QUESTIONS:"), "gemini.js must include identification & programming rules in compact prompt");
+    assert.ok(geminiSrc.includes("In MaterializeCSS, the grid prefix for desktop/large screens is 'l' (not Bootstrap 'lg')"), "gemini.js must instruct AI on MaterializeCSS vs Bootstrap prefix differences");
+    assert.ok(geminiSrc.includes("Output the canonical identifier in lowercase or camelCase"), "gemini.js must instruct AI to output lowercase/camelCase identifiers");
+    assert.ok(promptsSrc.includes("strict framework-specific classes like MaterializeCSS \"l\" vs Bootstrap \"lg\""), "prompts.js must include framework-specific class directives");
+
+    // 4. Short-Answer Response Post-Processing & Normalization
+    assert.ok(geminiSrc.includes("cleaned.startsWith('.') && isCommandQuestion && !isCssClassQuestion"), "gemini.js must strip leading dot from commands/methods like .hide()");
+    assert.ok(geminiSrc.includes("cleaned.charAt(0).toLowerCase() + cleaned.slice(1)"), "gemini.js must canonicalize capitalized command names like Val -> val");
+    assert.ok(geminiSrc.includes("qTextLower.includes('materialize') && qTextLower.includes('prefix')") && geminiSrc.includes("cleaned = 'l'"), "gemini.js must correct MaterializeCSS prefix lg -> l");
 });
 
 console.log("\n==================================================");

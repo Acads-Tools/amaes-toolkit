@@ -245,8 +245,14 @@
     // Ultra-Compact Prompt Builder: 0 fluff, max token efficiency (~60-120 tokens total)
     function buildGeminiCompactPrompt(qData, courseCode = '', que = null) {
         const lines = [];
-        if (courseCode) {
-            lines.push(`[Course: ${courseCode}]`);
+        const courseInfo = (typeof detectCourseInfo === 'function') ? detectCourseInfo() : {};
+        const contextParts = [];
+        const subjectCode = courseCode || courseInfo.subjectCode || '';
+        if (subjectCode) contextParts.push(`Course: ${subjectCode}`);
+        if (courseInfo.subjectName) contextParts.push(`Subject: ${courseInfo.subjectName}`);
+        if (courseInfo.currentActivityTitle) contextParts.push(`Topic: ${courseInfo.currentActivityTitle}`);
+        if (contextParts.length > 0) {
+            lines.push(`[${contextParts.join(' | ')}]`);
         }
         lines.push(`Question: ${qData.qText || ''}`);
 
@@ -339,7 +345,10 @@
                 }
             }
 
-            lines.push(`Reply with ONLY the exact, concise word or phrase (typically 1 to 3 words) that directly answers the question or fills the blank. No explanation. No quotes.`);
+            lines.push(`RULES FOR IDENTIFICATION & PROGRAMMING QUESTIONS:`);
+            lines.push(`1. Function / Method / Command names: Output the canonical identifier in lowercase or camelCase (e.g. "val" or "val()", "hide" or "hide()", NEVER capitalized like "Val"). Never prepend a leading dot (.) unless explicitly asked for a CSS class selector.`);
+            lines.push(`2. Framework specificity: Adhere strictly to the framework in the question. In MaterializeCSS, the grid prefix for desktop/large screens is 'l' (not Bootstrap 'lg'). Mobile is 's', tablet is 'm', desktop is 'l', extra large is 'xl'.`);
+            lines.push(`3. Format: Reply with ONLY the exact canonical word, term, or method name (typically 1 to 3 words) that directly answers the question. No explanation. No quotes. No trailing punctuation.`);
             return lines.join('\n');
         }
 
@@ -1399,12 +1408,35 @@
             // Check for Short-Answer / Fill-in-the-Blank text inputs
             const textInput = que.querySelector('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"], textarea');
             if (textInput && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0))) {
-                const cleaned = answerText
+                let cleaned = answerText
                     .replace(/^Answer:\s*/i, '')
                     .replace(/^The correct answer is:\s*/i, '')
                     .replace(/^[a-e][.)]\s*/i, '')
                     .replace(/^["']|["']$/g, '')
+                    .replace(/[.;:]\s*$/, '')
                     .trim();
+
+                const qTextLower = (qData.qText || '').toLowerCase();
+                const isCssClassQuestion = qTextLower.includes('class selector') || qTextLower.includes('css class') || qTextLower.includes('class name');
+                const isCommandQuestion = qTextLower.includes('command') || qTextLower.includes('method') || qTextLower.includes('function') || qTextLower.includes('property') || qTextLower.includes('jquery');
+
+                // Strip leading dots on commands/methods (e.g., ".hide()" -> "hide()", ".val()" -> "val()")
+                if (cleaned.startsWith('.') && isCommandQuestion && !isCssClassQuestion) {
+                    cleaned = cleaned.replace(/^\.+/, '').trim();
+                }
+
+                // Canonicalize capitalized command names to lowercase (e.g., "Val" -> "val", "Hide" -> "hide")
+                if (isCommandQuestion && /^[A-Z][a-z0-9_]*(\(\))?$/.test(cleaned)) {
+                    cleaned = cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
+                }
+
+                // Fix MaterializeCSS grid prefix confusion (AI returning Bootstrap "lg" instead of MaterializeCSS "l")
+                if (qTextLower.includes('materialize') && qTextLower.includes('prefix') && (qTextLower.includes('desktop') || qTextLower.includes('large'))) {
+                    if (cleaned.toLowerCase() === 'lg') {
+                        cleaned = 'l';
+                    }
+                }
+
                 if (cleaned) {
                     textInput.value = cleaned;
                     textInput.dispatchEvent(new Event('input', { bubbles: true }));

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.13.13
+// @version      1.13.14
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.13.13";
+    const SCRIPT_VERSION = "v1.13.14";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -14400,9 +14400,9 @@ function setupAccountTransferUI() {
 
         let directive = 'Act as an expert academic assistant for this course. For each quiz question I provide, analyze carefully and reply ONLY with the correct option letter (a, b, c, or d) and the exact choice text. Keep it direct with no explanations.';
         if (qType === 'shortanswer' || qType === 'identification') {
-            directive = 'Act as an expert academic assistant for this course. For each quiz question I provide, analyze carefully and reply ONLY with the exact word, phrase, term, or method name. Keep it direct with no explanations.';
+            directive = 'Act as an expert academic assistant for this course. For each quiz question I provide, analyze carefully and reply ONLY with the exact canonical word, term, or method name (e.g. canonical lowercase/camelCase for identifiers/commands, no leading dots on methods like hide() or val(), and strict framework-specific classes like MaterializeCSS "l" vs Bootstrap "lg"). Keep it direct with no explanations.';
         } else if (qType === 'all' || !qType) {
-            directive = 'Act as an expert academic assistant for this course. Analyze each quiz question carefully. For multiple-choice, reply with the correct option letter and exact text. For identification/short-answer, reply ONLY with the exact word, phrase, or method name. Keep answers direct with no explanations.';
+            directive = 'Act as an expert academic assistant for this course. Analyze each quiz question carefully. For multiple-choice, reply with the correct option letter and exact text. For identification/short-answer, reply ONLY with the exact canonical word, term, or method name (canonical lowercase/camelCase for identifiers, framework-specific syntax, no leading dots on methods). Keep answers direct with no explanations.';
         }
 
         return `[Context: ${header}]\n${directive}\n\n---\n\n`;
@@ -15939,8 +15939,14 @@ function setupAccountTransferUI() {
     // Ultra-Compact Prompt Builder: 0 fluff, max token efficiency (~60-120 tokens total)
     function buildGeminiCompactPrompt(qData, courseCode = '', que = null) {
         const lines = [];
-        if (courseCode) {
-            lines.push(`[Course: ${courseCode}]`);
+        const courseInfo = (typeof detectCourseInfo === 'function') ? detectCourseInfo() : {};
+        const contextParts = [];
+        const subjectCode = courseCode || courseInfo.subjectCode || '';
+        if (subjectCode) contextParts.push(`Course: ${subjectCode}`);
+        if (courseInfo.subjectName) contextParts.push(`Subject: ${courseInfo.subjectName}`);
+        if (courseInfo.currentActivityTitle) contextParts.push(`Topic: ${courseInfo.currentActivityTitle}`);
+        if (contextParts.length > 0) {
+            lines.push(`[${contextParts.join(' | ')}]`);
         }
         lines.push(`Question: ${qData.qText || ''}`);
 
@@ -16033,7 +16039,10 @@ function setupAccountTransferUI() {
                 }
             }
 
-            lines.push(`Reply with ONLY the exact, concise word or phrase (typically 1 to 3 words) that directly answers the question or fills the blank. No explanation. No quotes.`);
+            lines.push(`RULES FOR IDENTIFICATION & PROGRAMMING QUESTIONS:`);
+            lines.push(`1. Function / Method / Command names: Output the canonical identifier in lowercase or camelCase (e.g. "val" or "val()", "hide" or "hide()", NEVER capitalized like "Val"). Never prepend a leading dot (.) unless explicitly asked for a CSS class selector.`);
+            lines.push(`2. Framework specificity: Adhere strictly to the framework in the question. In MaterializeCSS, the grid prefix for desktop/large screens is 'l' (not Bootstrap 'lg'). Mobile is 's', tablet is 'm', desktop is 'l', extra large is 'xl'.`);
+            lines.push(`3. Format: Reply with ONLY the exact canonical word, term, or method name (typically 1 to 3 words) that directly answers the question. No explanation. No quotes. No trailing punctuation.`);
             return lines.join('\n');
         }
 
@@ -17093,12 +17102,35 @@ function setupAccountTransferUI() {
             // Check for Short-Answer / Fill-in-the-Blank text inputs
             const textInput = que.querySelector('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"], textarea');
             if (textInput && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0))) {
-                const cleaned = answerText
+                let cleaned = answerText
                     .replace(/^Answer:\s*/i, '')
                     .replace(/^The correct answer is:\s*/i, '')
                     .replace(/^[a-e][.)]\s*/i, '')
                     .replace(/^["']|["']$/g, '')
+                    .replace(/[.;:]\s*$/, '')
                     .trim();
+
+                const qTextLower = (qData.qText || '').toLowerCase();
+                const isCssClassQuestion = qTextLower.includes('class selector') || qTextLower.includes('css class') || qTextLower.includes('class name');
+                const isCommandQuestion = qTextLower.includes('command') || qTextLower.includes('method') || qTextLower.includes('function') || qTextLower.includes('property') || qTextLower.includes('jquery');
+
+                // Strip leading dots on commands/methods (e.g., ".hide()" -> "hide()", ".val()" -> "val()")
+                if (cleaned.startsWith('.') && isCommandQuestion && !isCssClassQuestion) {
+                    cleaned = cleaned.replace(/^\.+/, '').trim();
+                }
+
+                // Canonicalize capitalized command names to lowercase (e.g., "Val" -> "val", "Hide" -> "hide")
+                if (isCommandQuestion && /^[A-Z][a-z0-9_]*(\(\))?$/.test(cleaned)) {
+                    cleaned = cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
+                }
+
+                // Fix MaterializeCSS grid prefix confusion (AI returning Bootstrap "lg" instead of MaterializeCSS "l")
+                if (qTextLower.includes('materialize') && qTextLower.includes('prefix') && (qTextLower.includes('desktop') || qTextLower.includes('large'))) {
+                    if (cleaned.toLowerCase() === 'lg') {
+                        cleaned = 'l';
+                    }
+                }
+
                 if (cleaned) {
                     textInput.value = cleaned;
                     textInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -18095,6 +18127,7 @@ function setupAccountTransferUI() {
                     answers: Array.isArray(newItem.answers) && newItem.answers.length > 0 ? newItem.answers : undefined,
                     choices: newItem.choices || [],
                     verified: Boolean(newItem.verified),
+                    deduced: Boolean(newItem.deduced),
                     isAiSuggestion: Boolean(newItem.isAiSuggestion),
                     period: newItem.period || newItem.term || detectTermFromText(newItem.quizTitle || newItem.qRaw || '') || 'General',
                     quizTitle: newItem.quizTitle || '',
@@ -18195,6 +18228,7 @@ function setupAccountTransferUI() {
                         cur.ansRaw = ansRaw;
                         cur.ansNorm = ansNorm;
                         cur.verified = Boolean(newItem.verified);
+                        if (newItem.deduced) cur.deduced = true;
                         cur.isAiSuggestion = Boolean(newItem.isAiSuggestion);
                         cur.confirmations = 1;
                         if (newItem.source) cur.source = newItem.source;
@@ -18205,6 +18239,7 @@ function setupAccountTransferUI() {
                             cur.confirmations = (cur.confirmations || 1) + 1;
                             if (newItem.verified) {
                                 cur.verified = true;
+                                if (newItem.deduced) cur.deduced = true;
                                 cur.isAiSuggestion = false;
                             }
                             confirmedCount++;
@@ -18902,31 +18937,31 @@ function setupAccountTransferUI() {
         // Priority guard: If choice has an explicit Moodle cross / incorrect marker, it is never a checkmark!
         if (hasChoiceCross(elem)) return false;
         if (elem.classList && (elem.classList.contains('correct') || elem.classList.contains('text-success'))) return true;
-        if (elem.querySelector('.fa-check, .feedbackimage[alt*="Correct" i], img[src*="tick"], img[src*="correct"], img[src*="check"], [title*="Correct" i], [aria-label*="Correct" i], .text-success, [class*="correct" i], svg[class*="check" i]')) return true;
+        if (elem.querySelector('.fa-check, .fa-check-circle, .feedbackimage[alt*="Correct" i], .feedbackimage[title*="Correct" i], img[src*="tick" i], img[src*="correct" i], img[src*="check" i], [title*="Correct" i], [aria-label*="Correct" i], .text-success, [class*="correct" i], svg[class*="check" i], svg[data-icon="check"], i[data-icon="check"]')) return true;
 
         // Clone and strip any toolkit-injected badges so toolkit's own check icons don't trigger false positives
         const clone = elem.cloneNode(true);
-        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-card-btn-container, .amaes-card-ai-drawer, .amaes-web-ai-row, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag').forEach(el => el.remove());
+        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-matching-row-badge, .amaes-card-btn-container, .amaes-card-ai-drawer, .amaes-web-ai-row, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag').forEach(el => el.remove());
 
         const text = (clone.innerText || clone.textContent || '');
         if (/[✓✔]/.test(text)) return true;
         const html = clone.innerHTML || '';
-        return /fa-check|alt="Correct"|title="Correct"|correct\.svg|feedbackimage/i.test(html);
+        return /fa-check|alt="Correct"|title="Correct"|aria-label="Correct"|correct\.svg|tick\.svg|feedbackimage/i.test(html);
     }
 
     function hasChoiceCross(elem) {
         if (!elem) return false;
         if (elem.classList && (elem.classList.contains('incorrect') || elem.classList.contains('text-danger'))) return true;
-        if (elem.querySelector('.fa-remove, .fa-times, .fa-close, .feedbackimage[alt*="Incorrect" i], img[src*="cross"], img[src*="incorrect"], [title*="Incorrect" i], [aria-label*="Incorrect" i], .text-danger, [class*="incorrect" i]')) return true;
+        if (elem.querySelector('.fa-remove, .fa-times, .fa-close, .fa-times-circle, .feedbackimage[alt*="Incorrect" i], .feedbackimage[title*="Incorrect" i], img[src*="cross" i], img[src*="incorrect" i], [title*="Incorrect" i], [aria-label*="Incorrect" i], .text-danger, [class*="incorrect" i], svg[class*="times" i], svg[class*="cross" i], svg[data-icon="times"], i[data-icon="times"]')) return true;
 
         // Clone and strip any toolkit-injected badges
         const clone = elem.cloneNode(true);
-        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-card-btn-container, .amaes-card-ai-drawer, .amaes-web-ai-row, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag').forEach(el => el.remove());
+        clone.querySelectorAll('.amaes-verified-badge, .amaes-eliminated-badge, .amaes-active-focus-badge, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-matching-row-badge, .amaes-card-btn-container, .amaes-card-ai-drawer, .amaes-web-ai-row, .amaes-que-top-toolbar, .amaes-probability-hint, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-ai-suggested-badge, .amaes-ai-text-badge, .amaes-ai-question-tag').forEach(el => el.remove());
 
         const text = (clone.innerText || clone.textContent || '');
         if (/[✗✘✕✖]/.test(text)) return true;
         const html = clone.innerHTML || '';
-        return /fa-remove|fa-times|alt="Incorrect"|title="Incorrect"|incorrect\.svg/i.test(html);
+        return /fa-remove|fa-times|fa-close|alt="Incorrect"|title="Incorrect"|aria-label="Incorrect"|incorrect\.svg|cross\.svg/i.test(html);
     }
 
     function evaluateReviewPageReviewability(rootDoc = document) {
@@ -19069,7 +19104,23 @@ function setupAccountTransferUI() {
             const matchingEvidence = [];
 
             if (isMatchingQuestion) {
+                // Collect all matching option texts from the dropdowns
+                const allMatchingOptions = new Set();
                 matchingRows.forEach(row => {
+                    const select = row.querySelector('select');
+                    if (select) {
+                        Array.from(select.options || []).forEach(opt => {
+                            const optText = (opt.text || opt.innerText || '').trim();
+                            if (optText && opt.value && !optText.toLowerCase().includes('choose')) {
+                                allMatchingOptions.add(optText);
+                            }
+                        });
+                    }
+                });
+
+                // First pass: identify per-row checkmarks, crosses, and full mark states
+                const rowAnalyses = [];
+                matchingRows.forEach((row, rIdx) => {
                     const promptCell = row.querySelector('td.text, td:first-child');
                     const select = row.querySelector('select');
                     const selectedOption = select && select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
@@ -19077,7 +19128,7 @@ function setupAccountTransferUI() {
                         ? String(selectedOption.text || selectedOption.innerText || '').trim()
                         : '';
                     const prompt = promptCell ? cleanDOMToAI(promptCell).trim() : '';
-                    if (!prompt || !selectedAnswer) return;
+                    if (!prompt) return;
 
                     const rowIsWrong = hasChoiceCross(row) || row.classList.contains('incorrect') ||
                         Boolean(row.querySelector('.text-danger, .incorrect'));
@@ -19085,26 +19136,116 @@ function setupAccountTransferUI() {
                         hasChoiceCheckmark(row) || row.classList.contains('correct') ||
                         Boolean(row.querySelector('.text-success, .correct')) || isFullMark
                     );
-                    if (!rowIsWrong && !rowIsCorrect) return;
 
-                    matchingEvidence.push({
+                    rowAnalyses.push({
+                        row,
                         index: idx + 1,
-                        qRaw: prompt,
-                        qNorm: normalizeText(prompt),
+                        rIdx,
+                        prompt,
+                        selectedAnswer,
+                        rowIsCorrect,
+                        rowIsWrong,
+                        wrongAnswers: rowIsWrong && selectedAnswer ? [selectedAnswer] : [],
                         ansRaw: rowIsCorrect ? selectedAnswer : '',
-                        ansNorm: rowIsCorrect ? normalizeChoice(selectedAnswer) : '',
-                        questionType: 'shortanswer',
-                        wrongAnswers: rowIsWrong ? normalizeWrongAnswers([selectedAnswer]) : [],
-                        choices: [],
                         verified: rowIsCorrect,
-                        evidenceType: rowIsWrong ? 'moodle_review_elimination' : 'moodle_review',
-                        wrongAnswerEvidence: rowIsWrong,
+                        deduced: false
+                    });
+                });
+
+                // Second pass: Smart Elimination & Deduction
+                // 1. Identify which choices are already verified as correct answers across the rows
+                const verifiedChoiceNorms = new Set(
+                    rowAnalyses.filter(r => r.verified && r.ansRaw).map(r => normalizeChoice(r.ansRaw))
+                );
+
+                // 2. Identify remaining unassigned choices from allMatchingOptions
+                let remainingChoices = Array.from(allMatchingOptions).filter(
+                    opt => !verifiedChoiceNorms.has(normalizeChoice(opt))
+                );
+
+                // 3. Iterative single-candidate deduction & 2-swap detection
+                let deductionMade = true;
+                while (deductionMade) {
+                    deductionMade = false;
+                    const unverifiedRows = rowAnalyses.filter(r => !r.verified);
+                    if (unverifiedRows.length === 0 || remainingChoices.length === 0) break;
+
+                    // Special case: 2-choice swap detection
+                    // If exactly 2 unverified rows remain, and remainingChoices has size 2,
+                    // and each row's wrong answer matches one of the remaining choices:
+                    if (unverifiedRows.length === 2 && remainingChoices.length === 2) {
+                        const r1 = unverifiedRows[0];
+                        const r2 = unverifiedRows[1];
+                        const r1WrongNorms = r1.wrongAnswers.map(w => normalizeChoice(w));
+                        const r2WrongNorms = r2.wrongAnswers.map(w => normalizeChoice(w));
+                        const c1 = remainingChoices[0];
+                        const c2 = remainingChoices[1];
+                        const c1Norm = normalizeChoice(c1);
+                        const c2Norm = normalizeChoice(c2);
+
+                        if (r1WrongNorms.includes(c1Norm) && r2WrongNorms.includes(c2Norm)) {
+                            r1.ansRaw = c2;
+                            r1.verified = true;
+                            r1.deduced = true;
+                            r2.ansRaw = c1;
+                            r2.verified = true;
+                            r2.deduced = true;
+                            remainingChoices = [];
+                            deductionMade = true;
+                            break;
+                        } else if (r1WrongNorms.includes(c2Norm) && r2WrongNorms.includes(c1Norm)) {
+                            r1.ansRaw = c1;
+                            r1.verified = true;
+                            r1.deduced = true;
+                            r2.ansRaw = c2;
+                            r2.verified = true;
+                            r2.deduced = true;
+                            remainingChoices = [];
+                            deductionMade = true;
+                            break;
+                        }
+                    }
+
+                    // General deduction: Any unverified row where exactly 1 choice from remainingChoices is not eliminated
+                    for (const uRow of unverifiedRows) {
+                        const uWrongNorms = new Set(uRow.wrongAnswers.map(w => normalizeChoice(w)));
+                        const possibleCandidates = remainingChoices.filter(c => !uWrongNorms.has(normalizeChoice(c)));
+                        if (possibleCandidates.length === 1) {
+                            const deducedChoice = possibleCandidates[0];
+                            uRow.ansRaw = deducedChoice;
+                            uRow.verified = true;
+                            uRow.deduced = true;
+                            remainingChoices = remainingChoices.filter(c => normalizeChoice(c) !== normalizeChoice(deducedChoice));
+                            deductionMade = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Push processed rowAnalyses into matchingEvidence
+                rowAnalyses.forEach(analysis => {
+                    if (!analysis.verified && analysis.wrongAnswers.length === 0) return;
+                    const isRowWrong = analysis.rowIsWrong && !analysis.verified;
+                    matchingEvidence.push({
+                        index: analysis.index,
+                        qRaw: analysis.prompt,
+                        qNorm: normalizeText(analysis.prompt),
+                        ansRaw: analysis.verified ? analysis.ansRaw : '',
+                        ansNorm: analysis.verified ? normalizeChoice(analysis.ansRaw) : '',
+                        questionType: 'shortanswer',
+                        wrongAnswers: normalizeWrongAnswers(analysis.wrongAnswers),
+                        choices: Array.from(allMatchingOptions),
+                        verified: analysis.verified,
+                        deduced: analysis.deduced,
+                        evidenceType: analysis.deduced ? 'elimination_deduction' : (analysis.rowIsWrong ? 'moodle_review_elimination' : 'moodle_review'), // evidenceType: rowIsWrong ? 'moodle_review_elimination' : 'moodle_review'
+                        wrongAnswerEvidence: analysis.wrongAnswers.length > 0,
                         period: detectTermFromText(quizTitle) || 'General',
                         quizTitle,
                         originType: (typeof detectAssessmentOrigin === 'function') ? detectAssessmentOrigin().originType : 'quiz',
                         originLabel: (typeof detectAssessmentOrigin === 'function') ? detectAssessmentOrigin().originLabel : (quizTitle || 'Quiz')
                     });
                 });
+
                 matchingEvidence.forEach(item => {
                     if (item.ansRaw) correctCount++;
                     eliminatedTotal += item.wrongAnswers.length;
@@ -20057,6 +20198,208 @@ function setupAccountTransferUI() {
             const rightElem = que.querySelector('.rightanswer, .outcome .rightanswer');
             const hasExplicitRightElem = Boolean(rightElem && rightElem.innerText.trim());
 
+            // Dedicated Matching Question Handling in Review Screen
+            const matchingRows = Array.from(que.querySelectorAll('.answer table tr, .answer tr')).filter(row =>
+                row.querySelector('select') && row.querySelector('td.text, td:first-child')
+            );
+            const isMatchQuestion = matchingRows.length > 0 || isMatch;
+
+            if (isMatchQuestion && matchingRows.length > 0) {
+                const infoCol = que.querySelector('.info');
+                let pill = que.querySelector('.amaes-review-status-pill');
+                if (!pill) {
+                    pill = document.createElement('div');
+                    pill.className = 'amaes-review-status-pill';
+                    const flagBox = que.querySelector('.info .questionflag, .info .state');
+                    if (flagBox) {
+                        flagBox.parentNode.insertBefore(pill, flagBox.nextSibling);
+                    } else if (infoCol) {
+                        infoCol.appendChild(pill);
+                    }
+                }
+
+                let outcomeBox = que.querySelector('.outcome');
+                if (!outcomeBox) {
+                    const formulationBox = que.querySelector('.formulation, .content');
+                    if (formulationBox) {
+                        outcomeBox = document.createElement('div');
+                        outcomeBox.className = 'outcome clearfix';
+                        formulationBox.appendChild(outcomeBox);
+                    }
+                }
+
+                let verifiedRowCount = 0;
+                let deducedRowCount = 0;
+                let eliminatedRowCount = 0;
+                const totalMatchingRows = matchingRows.length;
+
+                matchingRows.forEach((row) => {
+                    const promptCell = row.querySelector('td.text, td:first-child');
+                    const prompt = promptCell ? cleanDOMToAI(promptCell).trim() : '';
+                    const promptNorm = normalizeText(prompt);
+                    const select = row.querySelector('select');
+                    const selectedOption = select && select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
+                    const selectedAnswer = selectedOption && selectedOption.value && !selectedOption.text.toLowerCase().includes('choose')
+                        ? String(selectedOption.text || selectedOption.innerText || '').trim()
+                        : '';
+
+                    // Match against harvestedData or cachedDb
+                    const mHarvested = (harvestedData && harvestedData.questions)
+                        ? harvestedData.questions.find(q => q.qNorm === promptNorm)
+                        : null;
+                    const mCached = cachedDb.find(q => (q.qNorm || normalizeText(q.qRaw || q.question || '')) === promptNorm);
+
+                    const isRowDeduced = Boolean((mHarvested && mHarvested.deduced) || (mCached && mCached.deduced));
+                    const isRowVerified = Boolean(isRowDeduced || (mHarvested && mHarvested.verified) || (mCached && mCached.verified) || isFullMark || hasChoiceCheckmark(row));
+                    const resolvedAnswer = (mHarvested && mHarvested.ansRaw) || (mCached && (mCached.ansRaw || mCached.answer)) || (isRowVerified ? selectedAnswer : '');
+                    const isRowWrong = Boolean(!isRowVerified && (hasChoiceCross(row) || (mHarvested && mHarvested.wrongAnswers && mHarvested.wrongAnswers.length > 0) || (mCached && mCached.wrongAnswers && mCached.wrongAnswers.length > 0)));
+
+                    if (isRowVerified && resolvedAnswer) {
+                        verifiedRowCount++;
+                        if (isRowDeduced) deducedRowCount++;
+                    } else if (isRowWrong) {
+                        eliminatedRowCount++;
+                    }
+
+                    // Per-row visual badge injection
+                    const controlCell = row.querySelector('td.control, td:last-child');
+                    if (controlCell) {
+                        controlCell.querySelectorAll('.amaes-matching-row-badge').forEach(b => b.remove());
+                        const rowBadge = document.createElement('div');
+                        rowBadge.className = 'amaes-matching-row-badge';
+                        rowBadge.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; line-height: 1.3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
+                        if (isRowDeduced && resolvedAnswer) {
+                            rowBadge.style.background = 'rgba(6, 182, 212, 0.12)';
+                            rowBadge.style.border = '1px solid rgba(6, 182, 212, 0.35)';
+                            rowBadge.style.color = '#0e7490';
+                            rowBadge.innerHTML = `<span style="font-weight:700;">Deduced:</span> <span>${escapeHtml(resolvedAnswer)}</span> <span style="font-size:10px; opacity:0.85;">(Elimination)</span>`;
+                            controlCell.appendChild(rowBadge);
+                        } else if (isRowVerified && resolvedAnswer) {
+                            rowBadge.style.background = 'rgba(16, 185, 129, 0.12)';
+                            rowBadge.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+                            rowBadge.style.color = '#059669';
+                            rowBadge.innerHTML = `<span style="font-weight:700;">Verified:</span> <span>${escapeHtml(resolvedAnswer)}</span>`;
+                            controlCell.appendChild(rowBadge);
+                        } else if (isRowWrong && selectedAnswer) {
+                            rowBadge.style.background = 'rgba(239, 68, 68, 0.12)';
+                            rowBadge.style.border = '1px solid rgba(239, 68, 68, 0.35)';
+                            rowBadge.style.color = '#b91c1c';
+                            rowBadge.innerHTML = `<span style="font-weight:700;">Eliminated:</span> <span>${escapeHtml(selectedAnswer)}</span>`;
+                            controlCell.appendChild(rowBadge);
+                        }
+                    }
+                });
+
+                const earnedStr = gradeInfo.earned !== null ? gradeInfo.earned : '';
+                const maxStr = gradeInfo.max !== null ? gradeInfo.max : '';
+
+                if (verifiedRowCount === totalMatchingRows && totalMatchingRows > 0) {
+                    pill.style.cssText = `
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 5px;
+                        padding: 4px 8px;
+                        margin-top: 6px;
+                        border-radius: 6px;
+                        font-size: 11px;
+                        font-weight: 700;
+                        line-height: 1.25;
+                        background: ${isCloudSharingOn ? 'rgba(16, 185, 129, 0.14)' : 'rgba(59, 130, 246, 0.14)'};
+                        color: ${isCloudSharingOn ? '#059669' : '#2563eb'};
+                        border: 1px solid ${isCloudSharingOn ? 'rgba(16, 185, 129, 0.4)' : 'rgba(59, 130, 246, 0.4)'};
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+                        cursor: default;
+                    `;
+                    const labelText = deducedRowCount > 0
+                        ? `Saved (${totalMatchingRows - deducedRowCount} Verified, ${deducedRowCount} Deduced)`
+                        : 'Saved to Study Bank';
+                    pill.title = `All ${totalMatchingRows} matching items resolved (${totalMatchingRows - deducedRowCount} verified directly, ${deducedRowCount} deduced by elimination) and saved to study database.`;
+                    pill.innerHTML = `${isCloudSharingOn ? (ICONS.cloudUpload || ICONS.cloud) : ICONS.database} <span>${labelText}</span>`;
+
+                    if (outcomeBox && !outcomeBox.querySelector('.amaes-review-outcome-banner')) {
+                        const banner = document.createElement('div');
+                        banner.className = 'amaes-review-outcome-banner';
+                        banner.style.cssText = 'margin-top: 8px; padding: 7px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.35); color: #065f46; display: flex; align-items: center; gap: 7px;';
+                        banner.innerHTML = `<span style="display:inline-flex;">${ICONS.check}</span> <span>All ${totalMatchingRows} matching items resolved (${totalMatchingRows - deducedRowCount} verified directly, ${deducedRowCount} deduced by elimination) and cataloged into study bank.</span>`;
+                        outcomeBox.appendChild(banner);
+                    }
+                } else if (verifiedRowCount > 0) {
+                    pill.style.cssText = `
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 5px;
+                        padding: 4px 8px;
+                        margin-top: 6px;
+                        border-radius: 6px;
+                        font-size: 11px;
+                        font-weight: 700;
+                        line-height: 1.25;
+                        background: rgba(16, 185, 129, 0.12);
+                        color: #047857;
+                        border: 1px solid rgba(16, 185, 129, 0.35);
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+                        cursor: default;
+                    `;
+                    pill.title = `${verifiedRowCount} verified row(s) saved to study bank, ${eliminatedRowCount} incorrect choice(s) eliminated.`;
+                    pill.innerHTML = `${ICONS.check} <span>Partially Harvested (${verifiedRowCount} Verified, ${eliminatedRowCount} Eliminated)</span>`;
+
+                    if (outcomeBox && !outcomeBox.querySelector('.amaes-review-matching-notice')) {
+                        const notice = document.createElement('div');
+                        notice.className = 'amaes-review-matching-notice';
+                        notice.style.cssText = 'margin-top: 8px; padding: 7px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); color: #065f46;';
+                        notice.textContent = `Partial Score (${earnedStr}/${maxStr}): ${verifiedRowCount} of ${totalMatchingRows} matching rows verified correct and saved to study bank. ${eliminatedRowCount} wrong choice(s) recorded as eliminated.`;
+                        outcomeBox.appendChild(notice);
+                    }
+                } else if (eliminatedRowCount > 0) {
+                    pill.style.cssText = `
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 5px;
+                        padding: 4px 8px;
+                        margin-top: 6px;
+                        border-radius: 6px;
+                        font-size: 11px;
+                        font-weight: 700;
+                        line-height: 1.25;
+                        background: rgba(239, 68, 68, 0.12);
+                        color: #b91c1c;
+                        border: 1px solid rgba(239, 68, 68, 0.35);
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+                        cursor: default;
+                    `;
+                    pill.title = `${eliminatedRowCount} incorrect choices eliminated from future attempts.`;
+                    pill.innerHTML = `${ICONS.xCircle || ICONS.alertTriangle} <span>${eliminatedRowCount} Choices Eliminated</span>`;
+                } else {
+                    pill.style.cssText = `
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 5px;
+                        padding: 4px 8px;
+                        margin-top: 6px;
+                        border-radius: 6px;
+                        font-size: 11px;
+                        font-weight: 700;
+                        line-height: 1.25;
+                        background: rgba(245, 158, 11, 0.14);
+                        color: #b45309;
+                        border: 1px solid rgba(245, 158, 11, 0.4);
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+                        cursor: default;
+                    `;
+                    pill.title = `Partial score (${earnedStr}/${maxStr}): Moodle does not specify which individual rows were correct or incorrect, so this matching question is not auto-harvested.`;
+                    pill.innerHTML = `${ICONS.alertTriangle || ICONS.help} <span>Unconfirmed (Not Harvested)</span>`;
+
+                    if (outcomeBox && !outcomeBox.querySelector('.amaes-review-matching-notice')) {
+                        const notice = document.createElement('div');
+                        notice.className = 'amaes-review-matching-notice';
+                        notice.style.cssText = 'margin-top: 8px; padding: 6px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); color: #92400e;';
+                        notice.textContent = `Partial Score (${earnedStr}/${maxStr}): Moodle does not provide row-by-row correctness indicators for this matching question. Rows remain unconfirmed and are not saved to the study bank.`;
+                        outcomeBox.appendChild(notice);
+                    }
+                }
+                return;
+            }
+
             let ansText = (harvestedItem && harvestedItem.ansRaw) || (dbEntry && (dbEntry.ansRaw || dbEntry.answer)) || '';
 
             // Check choice rows directly for checkmarks (Moodle review ground truth!)
@@ -20273,47 +20616,6 @@ function setupAccountTransferUI() {
                 } else if (infoCol) {
                     infoCol.appendChild(pill);
                 }
-            }
-
-            if (isMatch && !isFullMark && checkmarkedTexts.length === 0 && !hasExplicitRightElem) {
-                pill.style.cssText = `
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 5px;
-                    padding: 4px 8px;
-                    margin-top: 6px;
-                    border-radius: 6px;
-                    font-size: 11px;
-                    font-weight: 700;
-                    line-height: 1.25;
-                    background: rgba(245, 158, 11, 0.14);
-                    color: #b45309;
-                    border: 1px solid rgba(245, 158, 11, 0.4);
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-                    cursor: default;
-                `;
-                const earnedStr = gradeInfo.earned !== null ? gradeInfo.earned : '';
-                const maxStr = gradeInfo.max !== null ? gradeInfo.max : '';
-                pill.title = `Partial score (${earnedStr}/${maxStr}): Moodle does not specify which individual rows were correct or incorrect, so this matching question is not auto-harvested.`;
-                pill.innerHTML = `${ICONS.alertTriangle || ICONS.help} <span>Unconfirmed (Not Harvested)</span>`;
-
-                let outcomeBox = que.querySelector('.outcome');
-                if (!outcomeBox) {
-                    const formulationBox = que.querySelector('.formulation, .content');
-                    if (formulationBox) {
-                        outcomeBox = document.createElement('div');
-                        outcomeBox.className = 'outcome clearfix';
-                        formulationBox.appendChild(outcomeBox);
-                    }
-                }
-                if (outcomeBox && !outcomeBox.querySelector('.amaes-review-matching-notice')) {
-                    const notice = document.createElement('div');
-                    notice.className = 'amaes-review-matching-notice';
-                    notice.style.cssText = 'margin-top: 8px; padding: 6px 12px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); color: #92400e;';
-                    notice.textContent = `Partial Score (${earnedStr}/${maxStr}): Moodle does not provide row-by-row correctness indicators for this matching question. Rows remain unconfirmed and are not saved to the study bank.`;
-                    outcomeBox.appendChild(notice);
-                }
-                return;
             }
 
             if (isVerified && ansText) {
