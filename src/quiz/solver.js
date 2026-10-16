@@ -5401,13 +5401,7 @@
             // Compile all eliminated wrong choices known for this question
             const allWrongList = [];
             candidates.forEach(cand => {
-                const hasReviewBackedWrongAnswers = cand.wrongAnswerEvidence === true ||
-                    cand.evidenceType === 'moodle_review_elimination' ||
-                    (Array.isArray(cand.wrongAnswers) && cand.wrongAnswers.some(w =>
-                        w && typeof w === 'object' && Array.isArray(w.sources) &&
-                        w.sources.some(source => source === 'Review' || source === 'moodle_review')
-                    ));
-                if ((isConfirmedCandidate(cand) || hasReviewBackedWrongAnswers) && Array.isArray(cand.wrongAnswers)) {
+                if (Array.isArray(cand.wrongAnswers) && cand.wrongAnswers.length > 0) {
                     cand.wrongAnswers.forEach(w => {
                         const wNorm = typeof w === 'string' ? normalizeChoice(w) : (w.norm || normalizeChoice(w.text || ''));
                         const wCount = typeof w === 'object' && typeof w.count === 'number' ? w.count : 1;
@@ -6133,7 +6127,8 @@
                 if (textInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()) {
                     // Exclude multiple-choice, True/False, and choice-letter candidates from text inputs
                     const shortAnsCandidates = validCandidates.filter(cand => {
-                        if (cand.questionType && ['multichoice', 'match', 'gapselect', 'ddwtos'].includes(cand.questionType)) return false;
+                        if (cand.questionType && ['multichoice', 'match', 'ddwtos'].includes(cand.questionType)) return false;
+                        if (cand.questionType === 'gapselect' && Array.isArray(cand.choices) && cand.choices.length > 0) return false;
                         if (Array.isArray(cand.choices) && cand.choices.length > 1) return false;
                         const raw = String(cand.ansRaw || cand.answer || '').trim();
                         if (/^[a-d][.)]\s*(true|false)$/i.test(raw)) return false;

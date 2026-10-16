@@ -993,10 +993,10 @@
             }
 
             // Text inputs & textareas (e.g. cloze sentences, short answers)
-            const textInputs = que.querySelectorAll('input[type="text"], textarea');
+            const textInputs = que.querySelectorAll('input[type="text"], textarea, input.form-control, input[type="number"], input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
             const filledInputTexts = [];
             textInputs.forEach(inp => {
-                const val = inp.value ? inp.value.trim() : '';
+                const val = (inp.value || inp.getAttribute('value') || '').trim();
                 if (val) filledInputTexts.push(val);
             });
 

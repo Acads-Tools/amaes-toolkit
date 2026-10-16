@@ -279,9 +279,10 @@
             return lines.join('\n');
         }
 
-        // Handle Gapselect / Inline Dropdowns
-        if (qData.isGapSelect || (que && que.querySelectorAll('select').length > 0 && (!qData.choices || qData.choices.length === 0))) {
-            const selects = que ? Array.from(que.querySelectorAll('select')) : [];
+        // Handle Gapselect / Inline Dropdowns (only when dropdown selects actually exist in DOM or data)
+        const selects = que ? Array.from(que.querySelectorAll('select')) : [];
+        const hasGapSelectOptions = Boolean(qData.gapSelectOptions && qData.gapSelectOptions.length > 0);
+        if ((qData.isGapSelect || selects.length > 0 || hasGapSelectOptions) && (selects.length > 0 || hasGapSelectOptions) && (!qData.choices || qData.choices.length === 0)) {
             lines.push(`[Dropdown Pick / Fill Blank]`);
             if (selects.length > 0) {
                 selects.forEach((sel, idx) => {
@@ -292,12 +293,12 @@
                         lines.push(`Dropdown ${idx + 1} options: ${options.join(', ')}`);
                     }
                 });
-            } else if (qData.gapSelectOptions && qData.gapSelectOptions.length > 0) {
+            } else if (hasGapSelectOptions) {
                 qData.gapSelectOptions.forEach(g => {
                     lines.push(`Dropdown ${g.index} options: ${g.options.join(', ')}`);
                 });
             }
-            if (selects.length <= 1) {
+            if (selects.length <= 1 && (!hasGapSelectOptions || qData.gapSelectOptions.length <= 1)) {
                 lines.push(`Reply with ONLY the exact option text that completes the statement. No explanation.`);
             } else {
                 lines.push(`Reply with the exact option text for each dropdown (e.g. "Dropdown 1: OptionText, Dropdown 2: OptionText"). No explanation.`);
@@ -1121,7 +1122,7 @@
         const cachedAns = getCachedAiAnswer(qData);
         if (cachedAns && cachedAns.choiceText && qData.questionType !== 'match') {
             const textInput = que.querySelector('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"], textarea');
-            if (textInput && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0)) && !qData.isGapSelect) {
+            if (textInput && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0)) && que.querySelectorAll('select').length === 0) {
                 textInput.value = cachedAns.choiceText;
                 applyAiTextHighlight(que, textInput, cachedAns.choiceText);
                 setLog(`[AI Cache] Reusing previously solved answer for Question #${qData ? qData.qNum : ''} (0 API requests)`, "var(--accent-purple)");
@@ -1406,8 +1407,8 @@
 
         if (answerText) {
             // Check for Short-Answer / Fill-in-the-Blank text inputs
-            const textInput = que.querySelector('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"], textarea');
-            if (textInput && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0))) {
+            const textInputs = Array.from(que.querySelectorAll('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"], textarea'));
+            if (textInputs.length > 0 && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0)) && que.querySelectorAll('select').length === 0) {
                 let cleaned = answerText
                     .replace(/^Answer:\s*/i, '')
                     .replace(/^The correct answer is:\s*/i, '')
@@ -1438,12 +1439,36 @@
                 }
 
                 if (cleaned) {
-                    textInput.value = cleaned;
-                    textInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    textInput.dispatchEvent(new Event('change', { bubbles: true }));
-                    textInput.dispatchEvent(new Event('blur', { bubbles: true }));
+                    let multiAnswers = [];
+                    if (/blank\s*\d+\s*:/i.test(cleaned)) {
+                        const parts = cleaned.split(/(?=blank\s*\d+\s*:)/i).filter(Boolean);
+                        parts.forEach(p => {
+                            multiAnswers.push(p.replace(/^blank\s*\d+\s*:\s*/i, '').trim());
+                        });
+                    } else if (textInputs.length > 1 && (cleaned.includes(',') || cleaned.includes('\n') || cleaned.includes(';') || cleaned.includes('|'))) {
+                        multiAnswers = cleaned.split(/[\n,;|]+/).map(s => s.trim()).filter(Boolean);
+                    }
 
-                    applyAiTextHighlight(que, textInput, cleaned);
+                    if (multiAnswers.length > 1 && textInputs.length > 1) {
+                        textInputs.forEach((ti, tIdx) => {
+                            const val = multiAnswers[tIdx] || '';
+                            if (val) {
+                                ti.value = val;
+                                ti.dispatchEvent(new Event('input', { bubbles: true }));
+                                ti.dispatchEvent(new Event('change', { bubbles: true }));
+                                ti.dispatchEvent(new Event('blur', { bubbles: true }));
+                                applyAiTextHighlight(que, ti, val);
+                            }
+                        });
+                    } else {
+                        const textInput = textInputs[0];
+                        textInput.value = cleaned;
+                        textInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        textInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        textInput.dispatchEvent(new Event('blur', { bubbles: true }));
+                        applyAiTextHighlight(que, textInput, cleaned);
+                    }
+
                     saveAiAnswerToCache(qData, { choiceText: cleaned });
                     recordAttemptAnswerEvidence(que, cleaned, 'ai_inference');
                     try {
@@ -1472,7 +1497,7 @@
                     setLog(`[AI Suggestion] Gemini suggested <b>${escapeHtml(cleaned)}</b> for #${qData ? qData.qNum : ''}. (Paused for review)`, "var(--accent-purple)");
                     showToast(`Gemini suggested: "${cleaned}" for #${qData ? qData.qNum : ''}.`, 3000);
                     if (typeof onSuccess === 'function') {
-                        await onSuccess({ choiceText: cleaned, input: textInput });
+                        await onSuccess({ choiceText: cleaned, input: textInputs[0] });
                     }
                     return;
                 }

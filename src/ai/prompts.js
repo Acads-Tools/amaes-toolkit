@@ -87,6 +87,40 @@
             }
         });
 
+        // 1b. Inspect que dataset and live inputs for known wrong answers (crucial for shortanswer / fill-in-the-blank)
+        if (que.dataset && que.dataset.amaesKnownWrongAnswers) {
+            try {
+                const parsed = JSON.parse(que.dataset.amaesKnownWrongAnswers);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach(item => {
+                        const val = typeof item === 'string' ? item : (item.text || item.norm);
+                        if (val && !eliminatedWrong.some(w => normalizeChoice(w) === normalizeChoice(val))) {
+                            eliminatedWrong.push(val);
+                        }
+                    });
+                }
+            } catch (_) {}
+        }
+        que.querySelectorAll('.amaes-known-wrong-selection, [data-amaes-known-wrong-answers]').forEach(inp => {
+            if (inp.dataset && inp.dataset.amaesKnownWrongAnswers) {
+                try {
+                    const parsed = JSON.parse(inp.dataset.amaesKnownWrongAnswers);
+                    if (Array.isArray(parsed)) {
+                        parsed.forEach(item => {
+                            const val = typeof item === 'string' ? item : (item.text || item.norm);
+                            if (val && !eliminatedWrong.some(w => normalizeChoice(w) === normalizeChoice(val))) {
+                                eliminatedWrong.push(val);
+                            }
+                        });
+                    }
+                } catch (_) {}
+            }
+            const val = (inp.value || inp.getAttribute('value') || '').trim();
+            if (val && !eliminatedWrong.some(w => normalizeChoice(w) === normalizeChoice(val))) {
+                eliminatedWrong.push(val);
+            }
+        });
+
         // 2. Cross-reference with subject database across ALL matching candidate entries
         if (cached && cached.length > 0) {
             const moodleQNorm = normalizeText(data.qText);
@@ -201,13 +235,11 @@
                     output += `\n\nInstructions: Answer ONLY with the correct option letter (a, b, c, or d) and the exact choice text. Do NOT pick any confirmed wrong choices. Do NOT give explanations.`;
                 }
             }
-        } else if (data.isGapSelect) {
+        } else if (data.isGapSelect && data.gapSelectOptions && data.gapSelectOptions.length > 0) {
             output += `[Dropdown Selection / Cloze Question]\n`;
-            if (data.gapSelectOptions && data.gapSelectOptions.length > 0) {
-                data.gapSelectOptions.forEach(g => {
-                    output += `Dropdown ${g.index} Options: ${g.options.join(' | ')}\n`;
-                });
-            }
+            data.gapSelectOptions.forEach(g => {
+                output += `Dropdown ${g.index} Options: ${g.options.join(' | ')}\n`;
+            });
             if (detectedAnswer && copyIncludeConfidence) {
                 output += `\n[DETECTED ANSWER IN DATABASE]:\n- Suggested: ${detectedAnswer.text} (${detectedAnswer.label} • ${detectedAnswer.source})\n`;
             }
@@ -229,6 +261,10 @@
             }
         } else if (data.isShortAnswer) {
             output += `[Fill-in-the-Blank / Short Answer Question]\n[The blank is marked as [____] in the question text above.]`;
+            if (eliminatedWrong.length > 0) {
+                output += `\n\n[CONFIRMED WRONG ANSWERS - DO NOT USE]:\n` + eliminatedWrong.map(w => `- "${w}" (Tested and confirmed INCORRECT in prior attempt)`).join('\n');
+                output += `\nCRITICAL: Do NOT provide any of the confirmed wrong answers listed above.`;
+            }
             if (detectedAnswer && copyIncludeConfidence) {
                 output += `\n\n[DETECTED ANSWER IN DATABASE]:\n- Suggested: ${detectedAnswer.text} (${detectedAnswer.label} • ${detectedAnswer.source})`;
             }

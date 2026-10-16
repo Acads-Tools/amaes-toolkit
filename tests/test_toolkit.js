@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.19'), "Userscript header must specify v1.13.19");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.19";'), "Constant SCRIPT_VERSION must be v1.13.19");
+    assert.ok(script.includes('@version      1.13.20'), "Userscript header must specify v1.13.20");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.20";'), "Constant SCRIPT_VERSION must be v1.13.20");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -7045,6 +7045,74 @@ test("Streamlined Quiz Summary Auto-Submit, Unified Pause/Resume & Instant Enter
     // 7. Zero Generic Emojis Policy Enforcement
     assert.ok(!solverSrc.includes("⚡") && !solverSrc.includes("⚠️") && !solverSrc.includes("🚀") && !solverSrc.includes("🤖"),
         "solver.js must strictly enforce Zero Generic Emojis Policy");
+    assert.ok(!builtScript.includes("⚡") && !builtScript.includes("⚠️") && !builtScript.includes("🚀") && !builtScript.includes("🤖"),
+        "Built script must strictly enforce Zero Generic Emojis Policy");
+});
+
+// 207. Fill-in-the-Blank & Cloze Accuracy: question type classification, candidate relaxation, wrong answer warnings and AI prompt exclusion (v1.13.20)
+// --------------------------------------------------
+test("Fill-in-the-Blank & Cloze Accuracy: question type classification, candidate relaxation, wrong answer warnings and AI prompt exclusion (v1.13.20)", () => {
+    const fs = require('fs');
+    const vm = require('vm');
+    const builtScript = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Question Type Detection & Cloze / multianswer differentiation
+    assert.ok(builtScript.includes("if (t === 'multianswer') return 'shortanswer';"), "mapQuestionTypeCategory must map multianswer to shortanswer by default");
+    assert.ok(builtScript.includes("sub === 'multianswer'"), "identifyQuestionType must inspect multianswer for select vs text inputs");
+    assert.ok(builtScript.includes("const isGapSelect = Boolean(gapSelects.length > 0 && choices.length === 0);"), "isGapSelect must require gapSelects dropdown elements");
+
+    // 2. Question Normalization with Leading Underscores and Preambles
+    const detectorSrc = fs.readFileSync('src/moodle/detector.js', 'utf8');
+    const startDet = detectorSrc.indexOf('    function normalizeText(');
+    const endDet = detectorSrc.indexOf('    function unscriptDigits(', startDet);
+    const sandboxDet = {
+        DOMParser: class {
+            parseFromString(val) { return { body: { textContent: val } }; }
+        },
+        unscriptDigits: val => val
+    };
+    vm.runInNewContext(`${detectorSrc.slice(startDet, endDet)}\nglobalThis.matchQuestion = questionTextMatches;\nglobalThis.normalizeQuestion = normalizeQuestionMatchKey;`, sandboxDet);
+
+    const leadingBlankQ = "_______ : It is the process of assuring that a system conforms to its specification";
+    const cleanPromptQ = "It is the process of assuring that a system conforms to its specification";
+    const identifyHeaderQ = "Identify the following: It is the process of assuring that a system conforms to its specification";
+    assert.strictEqual(sandboxDet.normalizeQuestion(leadingBlankQ), sandboxDet.normalizeQuestion(cleanPromptQ), "Leading underscores and colon must be normalized to clean question text");
+    assert.strictEqual(sandboxDet.normalizeQuestion(identifyHeaderQ), sandboxDet.normalizeQuestion(cleanPromptQ), "Identify the following preamble must be normalized to clean question text");
+    assert.strictEqual(sandboxDet.matchQuestion(leadingBlankQ, cleanPromptQ), true, "Leading blank question must match database prompt");
+    assert.strictEqual(sandboxDet.matchQuestion(identifyHeaderQ, cleanPromptQ), true, "Preamble question must match database prompt");
+
+    // Code prefix isolation check: .vals() must still NOT collide with non-code statement
+    const identVal = "IDENTIFICATION: It is used to get or set values from and to an input element particularly textboxes.";
+    const tfVal = ".vals() It is used to get or set values from and to an input element particularly textboxes.";
+    assert.strictEqual(sandboxDet.matchQuestion(identVal, tfVal), false, "Code prefix .vals() must not collide with non-code statement");
+
+    // 3. Solver Short-Answer Candidate Relaxation & Wrong Answer Aggregation
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    assert.ok(solverSrc.includes("if (cand.questionType === 'gapselect' && Array.isArray(cand.choices) && cand.choices.length > 0) return false;"),
+        "Solver must allow text gapselect/multianswer candidates into shortAnsCandidates when choices are absent");
+    assert.ok(solverSrc.includes("if (Array.isArray(cand.wrongAnswers) && cand.wrongAnswers.length > 0) {"),
+        "Solver must aggregate wrong answers from all candidates with wrongAnswers");
+
+    // 4. Warning and Theme Eliminated Choices for Text Inputs
+    const themeSrc = fs.readFileSync('src/ui/theme.js', 'utf8');
+    assert.ok(themeSrc.includes("if (que.dataset && que.dataset.amaesKnownWrongAnswers) {"),
+        "getEliminatedChoicesForQuestion must inspect que.dataset.amaesKnownWrongAnswers");
+    assert.ok(themeSrc.includes("que.querySelectorAll('.amaes-known-wrong-selection, [data-amaes-known-wrong-answers]')"),
+        "getEliminatedChoicesForQuestion must inspect live inputs with known wrong selection");
+
+    // 5. AI Prompt Builder inclusion of confirmed wrong answers for short answer
+    const promptsSrc = fs.readFileSync('src/ai/prompts.js', 'utf8');
+    assert.ok(promptsSrc.includes("[CONFIRMED WRONG ANSWERS - DO NOT USE]:"),
+        "prompts.js must include confirmed wrong answers in short answer AI prompts");
+    assert.ok(promptsSrc.includes("CRITICAL: Do NOT provide any of the confirmed wrong answers listed above."),
+        "prompts.js must instruct AI not to use confirmed wrong answers in short answer prompts");
+
+    // 6. Gemini live prompt builder gapselect guard and text blanks routing
+    const geminiSrc = fs.readFileSync('src/ai/gemini.js', 'utf8');
+    assert.ok(geminiSrc.includes("if ((qData.isGapSelect || selects.length > 0 || hasGapSelectOptions) && (selects.length > 0 || hasGapSelectOptions) && (!qData.choices || qData.choices.length === 0))"),
+        "gemini.js must strictly require select elements or gapSelectOptions to route to dropdown prompt");
+
+    // 7. Zero Generic Emojis Policy Enforcement
     assert.ok(!builtScript.includes("⚡") && !builtScript.includes("⚠️") && !builtScript.includes("🚀") && !builtScript.includes("🤖"),
         "Built script must strictly enforce Zero Generic Emojis Policy");
 });

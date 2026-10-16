@@ -653,6 +653,39 @@
                     if (txt) eliminatedTexts.add(txt);
                 }
             });
+
+            // Inspect que dataset for known wrong answers (essential for shortanswer / fill-in-the-blank)
+            if (que.dataset && que.dataset.amaesKnownWrongAnswers) {
+                try {
+                    const parsed = JSON.parse(que.dataset.amaesKnownWrongAnswers);
+                    if (Array.isArray(parsed)) {
+                        parsed.forEach(item => {
+                            const val = typeof item === 'string' ? item : (item.text || item.norm);
+                            const n = normalizeChoice(val);
+                            if (n) eliminatedTexts.add(n);
+                        });
+                    }
+                } catch (_) {}
+            }
+
+            // Inspect live inputs with known-wrong markings or datasets
+            que.querySelectorAll('.amaes-known-wrong-selection, [data-amaes-known-wrong-answers]').forEach(inp => {
+                if (inp.dataset && inp.dataset.amaesKnownWrongAnswers) {
+                    try {
+                        const parsed = JSON.parse(inp.dataset.amaesKnownWrongAnswers);
+                        if (Array.isArray(parsed)) {
+                            parsed.forEach(item => {
+                                const val = typeof item === 'string' ? item : (item.text || item.norm);
+                                const n = normalizeChoice(val);
+                                if (n) eliminatedTexts.add(n);
+                            });
+                        }
+                    } catch (_) {}
+                }
+                const val = (inp.value || inp.getAttribute('value') || '').trim();
+                const n = normalizeChoice(val);
+                if (n) eliminatedTexts.add(n);
+            });
         }
         const cCode = courseCode || (typeof detectCourseInfo === 'function' ? (detectCourseInfo().subjectCode || '') : '');
         if (cCode) {

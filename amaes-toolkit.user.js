@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.13.19
+// @version      1.13.20
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.13.19";
+    const SCRIPT_VERSION = "v1.13.20";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -2816,6 +2816,39 @@
                     if (txt) eliminatedTexts.add(txt);
                 }
             });
+
+            // Inspect que dataset for known wrong answers (essential for shortanswer / fill-in-the-blank)
+            if (que.dataset && que.dataset.amaesKnownWrongAnswers) {
+                try {
+                    const parsed = JSON.parse(que.dataset.amaesKnownWrongAnswers);
+                    if (Array.isArray(parsed)) {
+                        parsed.forEach(item => {
+                            const val = typeof item === 'string' ? item : (item.text || item.norm);
+                            const n = normalizeChoice(val);
+                            if (n) eliminatedTexts.add(n);
+                        });
+                    }
+                } catch (_) {}
+            }
+
+            // Inspect live inputs with known-wrong markings or datasets
+            que.querySelectorAll('.amaes-known-wrong-selection, [data-amaes-known-wrong-answers]').forEach(inp => {
+                if (inp.dataset && inp.dataset.amaesKnownWrongAnswers) {
+                    try {
+                        const parsed = JSON.parse(inp.dataset.amaesKnownWrongAnswers);
+                        if (Array.isArray(parsed)) {
+                            parsed.forEach(item => {
+                                const val = typeof item === 'string' ? item : (item.text || item.norm);
+                                const n = normalizeChoice(val);
+                                if (n) eliminatedTexts.add(n);
+                            });
+                        }
+                    } catch (_) {}
+                }
+                const val = (inp.value || inp.getAttribute('value') || '').trim();
+                const n = normalizeChoice(val);
+                if (n) eliminatedTexts.add(n);
+            });
         }
         const cCode = courseCode || (typeof detectCourseInfo === 'function' ? (detectCourseInfo().subjectCode || '') : '');
         if (cCode) {
@@ -3175,13 +3208,17 @@
     function normalizeQuestionMatchKey(value) {
         return normalizeText(stripQuestionMarkup(value))
             .replace(/\[\s*_{2,}(?:\s*:\s*[\s\S]*?)?\s*\]/g, ' ')
-            .replace(/^(?:identification|identify)\s*:\s*/i, '')
+            .replace(/[_\u00a0]+/g, ' ')
+            .trim()
+            .replace(/^[:?!;,—–-]+\s*/g, '')
+            .replace(/^(?:(?:identify\s+(?:the\s+)?(?:following|term|what\s+is\s+being\s+described)|fill\s+in\s+the\s+blanks?|complete\s+the\s+(?:statement|sentence|following)|identification|identify))\s*[:.-]*\s*/i, '')
+            .replace(/^[:?!;,—–-]+\s*/g, '')
             .replace(/^(?:answer\s+)?question\s*(?:no\.?|#)?\s*\d+[\s:.-]*/i, '')
             .replace(/^(?:(?:this\s+(?:command|method|function)|jquery\s+(?:method|command|function)|it)\s+(?:is\s+)?(?:used\s+to\s+|that\s+is\s+used\s+to\s+))/i, '')
             .replace(/\bcreates\b/gi, 'create')
-            .replace(/[_\u00a0]+/g, ' ')
             .replace(/\s+/g, ' ')
-            .replace(/[.:?!;,]+$/g, '')
+            .replace(/^[:?!;,—–-]+\s*/g, '')
+            .replace(/[.:?!;,—–-]+$/g, '')
             .trim();
     }
 
@@ -9458,13 +9495,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             // Compile all eliminated wrong choices known for this question
             const allWrongList = [];
             candidates.forEach(cand => {
-                const hasReviewBackedWrongAnswers = cand.wrongAnswerEvidence === true ||
-                    cand.evidenceType === 'moodle_review_elimination' ||
-                    (Array.isArray(cand.wrongAnswers) && cand.wrongAnswers.some(w =>
-                        w && typeof w === 'object' && Array.isArray(w.sources) &&
-                        w.sources.some(source => source === 'Review' || source === 'moodle_review')
-                    ));
-                if ((isConfirmedCandidate(cand) || hasReviewBackedWrongAnswers) && Array.isArray(cand.wrongAnswers)) {
+                if (Array.isArray(cand.wrongAnswers) && cand.wrongAnswers.length > 0) {
                     cand.wrongAnswers.forEach(w => {
                         const wNorm = typeof w === 'string' ? normalizeChoice(w) : (w.norm || normalizeChoice(w.text || ''));
                         const wCount = typeof w === 'object' && typeof w.count === 'number' ? w.count : 1;
@@ -10190,7 +10221,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 if (textInputs.length > 0 && validCandidates.length > 0 && !checkIsReviewPage()) {
                     // Exclude multiple-choice, True/False, and choice-letter candidates from text inputs
                     const shortAnsCandidates = validCandidates.filter(cand => {
-                        if (cand.questionType && ['multichoice', 'match', 'gapselect', 'ddwtos'].includes(cand.questionType)) return false;
+                        if (cand.questionType && ['multichoice', 'match', 'ddwtos'].includes(cand.questionType)) return false;
+                        if (cand.questionType === 'gapselect' && Array.isArray(cand.choices) && cand.choices.length > 0) return false;
                         if (Array.isArray(cand.choices) && cand.choices.length > 1) return false;
                         const raw = String(cand.ansRaw || cand.answer || '').trim();
                         if (/^[a-d][.)]\s*(true|false)$/i.test(raw)) return false;
@@ -13617,9 +13649,7 @@ function setupAccountTransferUI() {
             // Only convert inputs inside the question text area (not answer choice inputs)
             if (inp.closest('.answer, .submitbtns, .amaes-card-btn-container')) return;
             blankCount++;
-            const currentVal = (inp.value || inp.getAttribute('value') || '').trim();
-            // If user already typed something, show it in context; otherwise show blank
-            const blankLabel = currentVal ? `[____${blankCount > 1 ? ' ' + blankCount : ''}: ${currentVal}]` : `[____${blankCount > 1 ? ' ' + blankCount : ''}]`;
+            const blankLabel = `[____${blankCount > 1 ? ' ' + blankCount : ''}]`;
             inp.replaceWith(document.createTextNode(` ${blankLabel} `));
         });
 
@@ -13856,7 +13886,7 @@ function setupAccountTransferUI() {
         if (t === 'match' || t === 'matching') return 'match';
         if (t.startsWith('dd') || t.includes('drag') || t.includes('drop')) return 'dragdrop';
         if (t === 'essay') return 'essay';
-        if (t === 'multianswer') return 'gapselect';
+        if (t === 'multianswer') return 'shortanswer';
         return 'unknown';
     }
 
@@ -13869,9 +13899,21 @@ function setupAccountTransferUI() {
             const lower = cls.toLowerCase();
             if (lower.startsWith('qtype_')) {
                 const sub = lower.replace('qtype_', '');
+                if (sub === 'multianswer') {
+                    if (que.querySelectorAll('select').length > 0) return 'gapselect';
+                    if (que.querySelectorAll('input[type="text"], input.form-control, input[type="number"], input:not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="hidden"])').length > 0) {
+                        return 'shortanswer';
+                    }
+                }
                 return mapQuestionTypeCategory(sub);
             }
             if (['multichoice', 'truefalse', 'shortanswer', 'gapselect', 'match', 'ddwtos', 'ddimageortext', 'ddmarker', 'essay', 'numerical', 'multianswer', 'calculated'].includes(lower)) {
+                if (lower === 'multianswer') {
+                    if (que.querySelectorAll('select').length > 0) return 'gapselect';
+                    if (que.querySelectorAll('input[type="text"], input.form-control, input[type="number"], input:not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="hidden"])').length > 0) {
+                        return 'shortanswer';
+                    }
+                }
                 return mapQuestionTypeCategory(lower);
             }
         }
@@ -14709,8 +14751,9 @@ function setupAccountTransferUI() {
         const isEssay = Boolean(que.querySelector('textarea, [contenteditable="true"], .qtype_essay, [data-fieldtype="editor"]') && choices.length === 0);
 
         // 4b. Short Answer check
-        const textInput = que.querySelector('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"]');
-        const isShortAnswer = Boolean(textInput && choices.length === 0 && !isEssay);
+        const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
+        const gapSelects = Array.from(que.querySelectorAll('.qtext select, .formulation select'));
+        const isShortAnswer = Boolean(textInputs.length > 0 && choices.length === 0 && !isEssay && gapSelects.length === 0);
 
         // 5. Matching type check
         const matchRows = que.querySelectorAll('.answer table tr, .answer tr, .answer .r0, .answer .r1, .answer [class*="r"], .answer > div, .answer li');
@@ -14732,18 +14775,15 @@ function setupAccountTransferUI() {
         }
 
         // 5b. Inline Gapselect / Cloze Select dropdowns check
-        if (choices.length === 0 && matchPairs.length === 0) {
-            const gapSelects = que.querySelectorAll('.qtext select, .formulation select');
-            if (gapSelects.length > 0) {
-                gapSelects.forEach((sel, gIdx) => {
-                    const options = Array.from(sel.querySelectorAll('option'))
-                        .map(o => o.innerText.trim())
-                        .filter(o => o && !o.toLowerCase().includes('choose'));
-                    if (options.length > 0) {
-                        matchPairs.push({ subQ: `Blank [${gIdx + 1}]`, options });
-                    }
-                });
-            }
+        if (choices.length === 0 && matchPairs.length === 0 && gapSelects.length > 0) {
+            gapSelects.forEach((sel, gIdx) => {
+                const options = Array.from(sel.querySelectorAll('option'))
+                    .map(o => o.innerText.trim())
+                    .filter(o => o && !o.toLowerCase().includes('choose'));
+                if (options.length > 0) {
+                    matchPairs.push({ subQ: `Blank [${gIdx + 1}]`, options });
+                }
+            });
         }
 
         // 5c. Drag and Drop Question Type check (ddwtos, ddimageortext, ddmarker)
@@ -14775,8 +14815,7 @@ function setupAccountTransferUI() {
         );
 
         const questionType = identifyQuestionType(que);
-        const gapSelects = Array.from(que.querySelectorAll('.qtext select, .formulation select'));
-        const isGapSelect = (questionType === 'gapselect' || (gapSelects.length > 0 && choices.length === 0));
+        const isGapSelect = Boolean(gapSelects.length > 0 && choices.length === 0);
 
         if (questionType === 'unknown') {
             recordUnknownQuestionType(que, { qNum, qText, questionType });
@@ -14890,6 +14929,40 @@ function setupAccountTransferUI() {
             let text = cleanDOMToAI(label).replace(/^[a-zA-Z0-9][.)]\s*/, '').replace(/(?:Wrong|Incorrect Choice)\s*\(?\d*x?\)?\s*(?:•?\s*0%\s*Prob)?/i, '').trim();
             if (text && !eliminatedWrong.some(w => normalizeChoice(w) === normalizeChoice(text))) {
                 eliminatedWrong.push(text);
+            }
+        });
+
+        // 1b. Inspect que dataset and live inputs for known wrong answers (crucial for shortanswer / fill-in-the-blank)
+        if (que.dataset && que.dataset.amaesKnownWrongAnswers) {
+            try {
+                const parsed = JSON.parse(que.dataset.amaesKnownWrongAnswers);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach(item => {
+                        const val = typeof item === 'string' ? item : (item.text || item.norm);
+                        if (val && !eliminatedWrong.some(w => normalizeChoice(w) === normalizeChoice(val))) {
+                            eliminatedWrong.push(val);
+                        }
+                    });
+                }
+            } catch (_) {}
+        }
+        que.querySelectorAll('.amaes-known-wrong-selection, [data-amaes-known-wrong-answers]').forEach(inp => {
+            if (inp.dataset && inp.dataset.amaesKnownWrongAnswers) {
+                try {
+                    const parsed = JSON.parse(inp.dataset.amaesKnownWrongAnswers);
+                    if (Array.isArray(parsed)) {
+                        parsed.forEach(item => {
+                            const val = typeof item === 'string' ? item : (item.text || item.norm);
+                            if (val && !eliminatedWrong.some(w => normalizeChoice(w) === normalizeChoice(val))) {
+                                eliminatedWrong.push(val);
+                            }
+                        });
+                    }
+                } catch (_) {}
+            }
+            const val = (inp.value || inp.getAttribute('value') || '').trim();
+            if (val && !eliminatedWrong.some(w => normalizeChoice(w) === normalizeChoice(val))) {
+                eliminatedWrong.push(val);
             }
         });
 
@@ -15007,13 +15080,11 @@ function setupAccountTransferUI() {
                     output += `\n\nInstructions: Answer ONLY with the correct option letter (a, b, c, or d) and the exact choice text. Do NOT pick any confirmed wrong choices. Do NOT give explanations.`;
                 }
             }
-        } else if (data.isGapSelect) {
+        } else if (data.isGapSelect && data.gapSelectOptions && data.gapSelectOptions.length > 0) {
             output += `[Dropdown Selection / Cloze Question]\n`;
-            if (data.gapSelectOptions && data.gapSelectOptions.length > 0) {
-                data.gapSelectOptions.forEach(g => {
-                    output += `Dropdown ${g.index} Options: ${g.options.join(' | ')}\n`;
-                });
-            }
+            data.gapSelectOptions.forEach(g => {
+                output += `Dropdown ${g.index} Options: ${g.options.join(' | ')}\n`;
+            });
             if (detectedAnswer && copyIncludeConfidence) {
                 output += `\n[DETECTED ANSWER IN DATABASE]:\n- Suggested: ${detectedAnswer.text} (${detectedAnswer.label} • ${detectedAnswer.source})\n`;
             }
@@ -15035,6 +15106,10 @@ function setupAccountTransferUI() {
             }
         } else if (data.isShortAnswer) {
             output += `[Fill-in-the-Blank / Short Answer Question]\n[The blank is marked as [____] in the question text above.]`;
+            if (eliminatedWrong.length > 0) {
+                output += `\n\n[CONFIRMED WRONG ANSWERS - DO NOT USE]:\n` + eliminatedWrong.map(w => `- "${w}" (Tested and confirmed INCORRECT in prior attempt)`).join('\n');
+                output += `\nCRITICAL: Do NOT provide any of the confirmed wrong answers listed above.`;
+            }
             if (detectedAnswer && copyIncludeConfidence) {
                 output += `\n\n[DETECTED ANSWER IN DATABASE]:\n- Suggested: ${detectedAnswer.text} (${detectedAnswer.label} • ${detectedAnswer.source})`;
             }
@@ -16426,9 +16501,10 @@ function setupAccountTransferUI() {
             return lines.join('\n');
         }
 
-        // Handle Gapselect / Inline Dropdowns
-        if (qData.isGapSelect || (que && que.querySelectorAll('select').length > 0 && (!qData.choices || qData.choices.length === 0))) {
-            const selects = que ? Array.from(que.querySelectorAll('select')) : [];
+        // Handle Gapselect / Inline Dropdowns (only when dropdown selects actually exist in DOM or data)
+        const selects = que ? Array.from(que.querySelectorAll('select')) : [];
+        const hasGapSelectOptions = Boolean(qData.gapSelectOptions && qData.gapSelectOptions.length > 0);
+        if ((qData.isGapSelect || selects.length > 0 || hasGapSelectOptions) && (selects.length > 0 || hasGapSelectOptions) && (!qData.choices || qData.choices.length === 0)) {
             lines.push(`[Dropdown Pick / Fill Blank]`);
             if (selects.length > 0) {
                 selects.forEach((sel, idx) => {
@@ -16439,12 +16515,12 @@ function setupAccountTransferUI() {
                         lines.push(`Dropdown ${idx + 1} options: ${options.join(', ')}`);
                     }
                 });
-            } else if (qData.gapSelectOptions && qData.gapSelectOptions.length > 0) {
+            } else if (hasGapSelectOptions) {
                 qData.gapSelectOptions.forEach(g => {
                     lines.push(`Dropdown ${g.index} options: ${g.options.join(', ')}`);
                 });
             }
-            if (selects.length <= 1) {
+            if (selects.length <= 1 && (!hasGapSelectOptions || qData.gapSelectOptions.length <= 1)) {
                 lines.push(`Reply with ONLY the exact option text that completes the statement. No explanation.`);
             } else {
                 lines.push(`Reply with the exact option text for each dropdown (e.g. "Dropdown 1: OptionText, Dropdown 2: OptionText"). No explanation.`);
@@ -17268,7 +17344,7 @@ function setupAccountTransferUI() {
         const cachedAns = getCachedAiAnswer(qData);
         if (cachedAns && cachedAns.choiceText && qData.questionType !== 'match') {
             const textInput = que.querySelector('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"], textarea');
-            if (textInput && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0)) && !qData.isGapSelect) {
+            if (textInput && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0)) && que.querySelectorAll('select').length === 0) {
                 textInput.value = cachedAns.choiceText;
                 applyAiTextHighlight(que, textInput, cachedAns.choiceText);
                 setLog(`[AI Cache] Reusing previously solved answer for Question #${qData ? qData.qNum : ''} (0 API requests)`, "var(--accent-purple)");
@@ -17553,8 +17629,8 @@ function setupAccountTransferUI() {
 
         if (answerText) {
             // Check for Short-Answer / Fill-in-the-Blank text inputs
-            const textInput = que.querySelector('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"], textarea');
-            if (textInput && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0))) {
+            const textInputs = Array.from(que.querySelectorAll('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"], textarea'));
+            if (textInputs.length > 0 && (qData.isShortAnswer || (!qData.choices || qData.choices.length === 0)) && que.querySelectorAll('select').length === 0) {
                 let cleaned = answerText
                     .replace(/^Answer:\s*/i, '')
                     .replace(/^The correct answer is:\s*/i, '')
@@ -17585,12 +17661,36 @@ function setupAccountTransferUI() {
                 }
 
                 if (cleaned) {
-                    textInput.value = cleaned;
-                    textInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    textInput.dispatchEvent(new Event('change', { bubbles: true }));
-                    textInput.dispatchEvent(new Event('blur', { bubbles: true }));
+                    let multiAnswers = [];
+                    if (/blank\s*\d+\s*:/i.test(cleaned)) {
+                        const parts = cleaned.split(/(?=blank\s*\d+\s*:)/i).filter(Boolean);
+                        parts.forEach(p => {
+                            multiAnswers.push(p.replace(/^blank\s*\d+\s*:\s*/i, '').trim());
+                        });
+                    } else if (textInputs.length > 1 && (cleaned.includes(',') || cleaned.includes('\n') || cleaned.includes(';') || cleaned.includes('|'))) {
+                        multiAnswers = cleaned.split(/[\n,;|]+/).map(s => s.trim()).filter(Boolean);
+                    }
 
-                    applyAiTextHighlight(que, textInput, cleaned);
+                    if (multiAnswers.length > 1 && textInputs.length > 1) {
+                        textInputs.forEach((ti, tIdx) => {
+                            const val = multiAnswers[tIdx] || '';
+                            if (val) {
+                                ti.value = val;
+                                ti.dispatchEvent(new Event('input', { bubbles: true }));
+                                ti.dispatchEvent(new Event('change', { bubbles: true }));
+                                ti.dispatchEvent(new Event('blur', { bubbles: true }));
+                                applyAiTextHighlight(que, ti, val);
+                            }
+                        });
+                    } else {
+                        const textInput = textInputs[0];
+                        textInput.value = cleaned;
+                        textInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        textInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        textInput.dispatchEvent(new Event('blur', { bubbles: true }));
+                        applyAiTextHighlight(que, textInput, cleaned);
+                    }
+
                     saveAiAnswerToCache(qData, { choiceText: cleaned });
                     recordAttemptAnswerEvidence(que, cleaned, 'ai_inference');
                     try {
@@ -17619,7 +17719,7 @@ function setupAccountTransferUI() {
                     setLog(`[AI Suggestion] Gemini suggested <b>${escapeHtml(cleaned)}</b> for #${qData ? qData.qNum : ''}. (Paused for review)`, "var(--accent-purple)");
                     showToast(`Gemini suggested: "${cleaned}" for #${qData ? qData.qNum : ''}.`, 3000);
                     if (typeof onSuccess === 'function') {
-                        await onSuccess({ choiceText: cleaned, input: textInput });
+                        await onSuccess({ choiceText: cleaned, input: textInputs[0] });
                     }
                     return;
                 }
@@ -19526,10 +19626,10 @@ function setupAccountTransferUI() {
             }
 
             // Text inputs & textareas (e.g. cloze sentences, short answers)
-            const textInputs = que.querySelectorAll('input[type="text"], textarea');
+            const textInputs = que.querySelectorAll('input[type="text"], textarea, input.form-control, input[type="number"], input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
             const filledInputTexts = [];
             textInputs.forEach(inp => {
-                const val = inp.value ? inp.value.trim() : '';
+                const val = (inp.value || inp.getAttribute('value') || '').trim();
                 if (val) filledInputTexts.push(val);
             });
 

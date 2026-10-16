@@ -303,9 +303,7 @@
             // Only convert inputs inside the question text area (not answer choice inputs)
             if (inp.closest('.answer, .submitbtns, .amaes-card-btn-container')) return;
             blankCount++;
-            const currentVal = (inp.value || inp.getAttribute('value') || '').trim();
-            // If user already typed something, show it in context; otherwise show blank
-            const blankLabel = currentVal ? `[____${blankCount > 1 ? ' ' + blankCount : ''}: ${currentVal}]` : `[____${blankCount > 1 ? ' ' + blankCount : ''}]`;
+            const blankLabel = `[____${blankCount > 1 ? ' ' + blankCount : ''}]`;
             inp.replaceWith(document.createTextNode(` ${blankLabel} `));
         });
 
@@ -542,7 +540,7 @@
         if (t === 'match' || t === 'matching') return 'match';
         if (t.startsWith('dd') || t.includes('drag') || t.includes('drop')) return 'dragdrop';
         if (t === 'essay') return 'essay';
-        if (t === 'multianswer') return 'gapselect';
+        if (t === 'multianswer') return 'shortanswer';
         return 'unknown';
     }
 
@@ -555,9 +553,21 @@
             const lower = cls.toLowerCase();
             if (lower.startsWith('qtype_')) {
                 const sub = lower.replace('qtype_', '');
+                if (sub === 'multianswer') {
+                    if (que.querySelectorAll('select').length > 0) return 'gapselect';
+                    if (que.querySelectorAll('input[type="text"], input.form-control, input[type="number"], input:not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="hidden"])').length > 0) {
+                        return 'shortanswer';
+                    }
+                }
                 return mapQuestionTypeCategory(sub);
             }
             if (['multichoice', 'truefalse', 'shortanswer', 'gapselect', 'match', 'ddwtos', 'ddimageortext', 'ddmarker', 'essay', 'numerical', 'multianswer', 'calculated'].includes(lower)) {
+                if (lower === 'multianswer') {
+                    if (que.querySelectorAll('select').length > 0) return 'gapselect';
+                    if (que.querySelectorAll('input[type="text"], input.form-control, input[type="number"], input:not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="hidden"])').length > 0) {
+                        return 'shortanswer';
+                    }
+                }
                 return mapQuestionTypeCategory(lower);
             }
         }
@@ -1395,8 +1405,9 @@
         const isEssay = Boolean(que.querySelector('textarea, [contenteditable="true"], .qtype_essay, [data-fieldtype="editor"]') && choices.length === 0);
 
         // 4b. Short Answer check
-        const textInput = que.querySelector('input[type="text"].form-control, input.form-control, input[type="text"], input[type="number"]');
-        const isShortAnswer = Boolean(textInput && choices.length === 0 && !isEssay);
+        const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
+        const gapSelects = Array.from(que.querySelectorAll('.qtext select, .formulation select'));
+        const isShortAnswer = Boolean(textInputs.length > 0 && choices.length === 0 && !isEssay && gapSelects.length === 0);
 
         // 5. Matching type check
         const matchRows = que.querySelectorAll('.answer table tr, .answer tr, .answer .r0, .answer .r1, .answer [class*="r"], .answer > div, .answer li');
@@ -1418,18 +1429,15 @@
         }
 
         // 5b. Inline Gapselect / Cloze Select dropdowns check
-        if (choices.length === 0 && matchPairs.length === 0) {
-            const gapSelects = que.querySelectorAll('.qtext select, .formulation select');
-            if (gapSelects.length > 0) {
-                gapSelects.forEach((sel, gIdx) => {
-                    const options = Array.from(sel.querySelectorAll('option'))
-                        .map(o => o.innerText.trim())
-                        .filter(o => o && !o.toLowerCase().includes('choose'));
-                    if (options.length > 0) {
-                        matchPairs.push({ subQ: `Blank [${gIdx + 1}]`, options });
-                    }
-                });
-            }
+        if (choices.length === 0 && matchPairs.length === 0 && gapSelects.length > 0) {
+            gapSelects.forEach((sel, gIdx) => {
+                const options = Array.from(sel.querySelectorAll('option'))
+                    .map(o => o.innerText.trim())
+                    .filter(o => o && !o.toLowerCase().includes('choose'));
+                if (options.length > 0) {
+                    matchPairs.push({ subQ: `Blank [${gIdx + 1}]`, options });
+                }
+            });
         }
 
         // 5c. Drag and Drop Question Type check (ddwtos, ddimageortext, ddmarker)
@@ -1461,8 +1469,7 @@
         );
 
         const questionType = identifyQuestionType(que);
-        const gapSelects = Array.from(que.querySelectorAll('.qtext select, .formulation select'));
-        const isGapSelect = (questionType === 'gapselect' || (gapSelects.length > 0 && choices.length === 0));
+        const isGapSelect = Boolean(gapSelects.length > 0 && choices.length === 0);
 
         if (questionType === 'unknown') {
             recordUnknownQuestionType(que, { qNum, qText, questionType });

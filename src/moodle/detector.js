@@ -336,13 +336,17 @@
     function normalizeQuestionMatchKey(value) {
         return normalizeText(stripQuestionMarkup(value))
             .replace(/\[\s*_{2,}(?:\s*:\s*[\s\S]*?)?\s*\]/g, ' ')
-            .replace(/^(?:identification|identify)\s*:\s*/i, '')
+            .replace(/[_\u00a0]+/g, ' ')
+            .trim()
+            .replace(/^[:?!;,—–-]+\s*/g, '')
+            .replace(/^(?:(?:identify\s+(?:the\s+)?(?:following|term|what\s+is\s+being\s+described)|fill\s+in\s+the\s+blanks?|complete\s+the\s+(?:statement|sentence|following)|identification|identify))\s*[:.-]*\s*/i, '')
+            .replace(/^[:?!;,—–-]+\s*/g, '')
             .replace(/^(?:answer\s+)?question\s*(?:no\.?|#)?\s*\d+[\s:.-]*/i, '')
             .replace(/^(?:(?:this\s+(?:command|method|function)|jquery\s+(?:method|command|function)|it)\s+(?:is\s+)?(?:used\s+to\s+|that\s+is\s+used\s+to\s+))/i, '')
             .replace(/\bcreates\b/gi, 'create')
-            .replace(/[_\u00a0]+/g, ' ')
             .replace(/\s+/g, ' ')
-            .replace(/[.:?!;,]+$/g, '')
+            .replace(/^[:?!;,—–-]+\s*/g, '')
+            .replace(/[.:?!;,—–-]+$/g, '')
             .trim();
     }
 
