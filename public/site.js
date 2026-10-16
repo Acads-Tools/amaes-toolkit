@@ -49,7 +49,7 @@
     }
     if (comparison < 0) {
       versionResult.className = 'version-result outdated';
-      versionResult.innerHTML = 'Update available: <strong>v' + latestVersion + '</strong> <a href="https://github.com/Acads-Tools/amaes-toolkit/releases/latest" target="_blank" rel="noreferrer">View release ↗</a>';
+      versionResult.innerHTML = 'Update available: <strong>v' + latestVersion + '</strong> <a href="https://github.com/Acads-Tools/amaes-toolkit/releases/latest" target="_blank" rel="noreferrer">View release</a>';
     } else if (comparison === 0) {
       versionResult.className = 'version-result current';
       versionResult.textContent = 'Up to date';
@@ -66,7 +66,7 @@
     activeActions.hidden = false;
     browserStep.classList.add('completed');
     managerStep.classList.add('completed');
-    managerLink.textContent = 'Open Violentmonkey ↗';
+    managerLink.textContent = 'Open Violentmonkey';
     managerLink.classList.remove('completed-action');
     managerLink.removeAttribute('aria-disabled');
     if (statusCard) statusCard.dataset.state = 'found';
@@ -100,12 +100,12 @@
     browserName.textContent = names[browser];
     managerLink.href = links[browser] || links.other;
     managerLink.textContent = browser === 'chrome'
-      ? 'Install from Chrome Web Store ↗'
+      ? 'Install from Chrome Web Store'
       : browser === 'edge'
-      ? 'Install from Edge Add-ons ↗'
+      ? 'Install from Edge Add-ons'
       : browser === 'firefox'
-      ? 'Install from Firefox Add-ons ↗'
-      : 'Get Violentmonkey ↗';
+      ? 'Install from Firefox Add-ons'
+      : 'Get Violentmonkey';
     if (allowScriptsText) {
       if (browser === 'chrome') {
         allowScriptsText.innerHTML = '<strong>Chrome &amp; Brave:</strong> Open <code>chrome://extensions</code> or click the Extensions icon in your toolbar, turn <strong>Developer mode</strong> ON (top right), then toggle ON <strong>Allow access to user scripts</strong> for Violentmonkey.';

@@ -13,6 +13,15 @@
     })();
   </script>
   <title>AMAES Toolkit - Dashboard</title>
+  <meta name="description" content="Live metrics, cloud relay status, and telemetry diagnostics for the AMAES Toolkit.">
+  <link rel="canonical" href="https://amaestoolkit.pages.dev/dashboard">
+  <link rel="icon" type="image/png" href="assets/amaes-toolkit-logo.png">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://amaestoolkit.pages.dev/dashboard">
+  <meta property="og:title" content="AMAES Toolkit | Live Metrics & Dashboard">
+  <meta property="og:description" content="Live metrics, cloud relay status, and telemetry diagnostics for the AMAES Toolkit.">
+  <meta property="og:image" content="https://amaestoolkit.pages.dev/assets/amaes-toolkit-logo.png">
+  <meta name="twitter:card" content="summary">
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -50,7 +59,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
         </svg>
         <span class="text-xs font-semibold tracking-wider uppercase text-slate-300">AMAES Toolkit</span>
-        <span class="text-[10px] bg-slate-800 text-grafana-subtext px-1.5 py-0.5 rounded font-mono">v1.3.2</span>
+        <span class="text-[10px] bg-slate-800 text-grafana-subtext px-1.5 py-0.5 rounded font-mono">v1.13.20</span>
       </div>
 
       <!-- Navigation Tabs (Only standard tabs visible initially) -->
@@ -96,10 +105,10 @@
           <div class="flex items-baseline justify-between py-1">
             <div>
               <div class="text-xs text-grafana-subtext">Questions Saved</div>
-              <div id="statCount" class="text-2xl font-bold font-mono text-white tracking-tight">142</div>
+              <div id="statCount" class="text-2xl font-bold font-mono text-white tracking-tight">3,344+</div>
             </div>
             <div class="text-[11px] text-grafana-green bg-grafana-green/10 border border-grafana-green/20 px-1.5 py-0.5 rounded font-mono">
-              +18 verified
+              33 courses
             </div>
           </div>
         </section>
@@ -137,8 +146,8 @@
           </div>
           <div id="logConsole" class="bg-black/40 border border-slate-800/80 rounded p-2.5 h-28 overflow-y-auto font-mono text-[11px] space-y-1 select-text scrollbar-thin">
             <div class="text-slate-400"><span class="text-grafana-subtext">[13:25:10]</span> <span class="text-blue-400">&gt;</span> Toolkit initialized silently.</div>
-            <div class="text-slate-300"><span class="text-grafana-subtext">[13:25:11]</span> <span class="text-grafana-green">✓</span> Course matched: CS6301</div>
-            <div class="text-emerald-400"><span class="text-grafana-subtext">[13:25:12]</span> <span class="text-grafana-green">✓</span> Cloud relay ready.</div>
+            <div class="text-slate-300"><span class="text-grafana-subtext">[13:25:11]</span> <span class="text-grafana-green font-semibold">[OK]</span> Course matched: CS6301</div>
+            <div class="text-emerald-400"><span class="text-grafana-subtext">[13:25:12]</span> <span class="text-grafana-green font-semibold">[OK]</span> Cloud relay ready.</div>
           </div>
         </section>
 
@@ -220,7 +229,7 @@
     <div class="bg-grafana-panel border border-grafana-border rounded-lg max-w-xs w-full p-4 space-y-3 shadow-2xl text-slate-100">
       <div class="flex items-center justify-between">
         <span class="text-xs font-bold uppercase tracking-wider text-grafana-purple">Developer Authentication</span>
-        <button onclick="closeAuthModal()" class="text-grafana-subtext hover:text-white text-xs font-mono">✕</button>
+        <button onclick="closeAuthModal()" class="text-grafana-subtext hover:text-white text-xs font-mono" aria-label="Close">&times;</button>
       </div>
       <p class="text-[11px] text-grafana-subtext">Enter secret authorization key to unlock dev console:</p>
       <div class="space-y-1">
@@ -268,7 +277,7 @@
       return [
         `=== AMAES TOOLKIT DIAGNOSTIC AUDIT LOG ===`,
         `Timestamp: ${now.toISOString()} (${now.toLocaleString()})`,
-        `Toolkit Version: v1.3.2`,
+        `Toolkit Version: v1.13.20`,
         `Engine Status: ${document.getElementById('statusText')?.innerText.trim() || 'Unknown'}`,
         `Questions Saved: ${document.getElementById('statCount')?.innerText.trim() || '0'}`,
         `Page URL: ${window.location.href}`,
