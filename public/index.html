@@ -3,18 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    (function () {
+      if (window.location.hostname === 'acads-tools.github.io') {
+        var targetPath = window.location.pathname.replace(/^\/amaes-toolkit\/?/, '/');
+        var newUrl = 'https://amaestoolkit.pages.dev' + targetPath + window.location.search + window.location.hash;
+        window.location.replace(newUrl);
+      }
+    })();
+  </script>
   <meta name="description" content="Install the AMAES Moodle Toolkit with browser-specific guidance and a live demo.">
-  <link rel="canonical" href="https://acads-tools.github.io/amaes-toolkit/">
+  <link rel="canonical" href="https://amaestoolkit.pages.dev/">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://acads-tools.github.io/amaes-toolkit/">
+  <meta property="og:url" content="https://amaestoolkit.pages.dev/">
   <meta property="og:title" content="AMAES Toolkit | Friendly Installer">
   <meta property="og:description" content="Install the AMAES Toolkit with browser-specific guidance, a live interface preview, and installation status checking.">
-  <meta property="og:image" content="https://acads-tools.github.io/amaes-toolkit/assets/amaes-toolkit-logo.png">
+  <meta property="og:image" content="https://amaestoolkit.pages.dev/assets/amaes-toolkit-logo.png">
   <meta property="og:image:alt" content="AMAES Toolkit shield-terminal logo">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="AMAES Toolkit | Friendly Installer">
   <meta name="twitter:description" content="Install the AMAES Toolkit with browser-specific guidance and installation status checking.">
-  <meta name="twitter:image" content="https://acads-tools.github.io/amaes-toolkit/assets/amaes-toolkit-logo.png">
+  <meta name="twitter:image" content="https://amaestoolkit.pages.dev/assets/amaes-toolkit-logo.png">
   <title>AMAES Toolkit | Friendly Installer</title>
   <link rel="icon" type="image/png" href="assets/amaes-toolkit-logo.png">
   <link rel="stylesheet" href="site.css">
@@ -34,7 +43,7 @@
   <main>
     <section class="hero">
       <div class="eyebrow">Answer once · 1-click next time</div>
-      <h1><span class="hero-title-line"><span>Install the toolkit in a few clicks.</span><span class="release-badge">v1.13.9</span></span></h1>
+      <h1><span class="hero-title-line"><span>Install the toolkit in a few clicks.</span><span class="release-badge">v1.13.20</span></span></h1>
       <p class="hero-copy">When one student answers a question on Moodle, everyone gets the answer next time. Choose your browser below and install the toolkit in less than a minute.</p>
     </section>
 
@@ -107,7 +116,7 @@
           </div>
           <a class="qr-download-link" id="qr-card-link" href="assets/amaes-toolkit-qr.png" download="amaes-toolkit-qr.png" title="Click to maximize full screen and download QR code">
             <div class="qr-image-wrapper">
-              <img src="assets/amaes-toolkit-qr.png" alt="Scan QR code to open https://acads-tools.github.io/amaes-toolkit/" width="90" height="90">
+              <img src="assets/amaes-toolkit-qr.png" alt="Scan QR code to open https://amaestoolkit.pages.dev/" width="90" height="90">
               <div class="qr-hover-overlay">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <polyline points="15 3 21 3 21 9"/>
@@ -195,11 +204,11 @@
       <button class="qr-modal-close" id="qr-modal-close" type="button" aria-label="Close fullscreen QR view">&times;</button>
       <div class="qr-modal-card">
         <div class="qr-modal-image-wrapper">
-          <img src="assets/amaes-toolkit-qr.png" alt="Scan QR code to open https://acads-tools.github.io/amaes-toolkit/" width="320" height="320" class="qr-modal-img">
+          <img src="assets/amaes-toolkit-qr.png" alt="Scan QR code to open https://amaestoolkit.pages.dev/" width="320" height="320" class="qr-modal-img">
         </div>
         <div class="qr-modal-content">
           <h2 id="qr-modal-title">AMAES Toolkit</h2>
-          <p class="qr-modal-url"><code>https://acads-tools.github.io/amaes-toolkit/</code></p>
+          <p class="qr-modal-url"><code>https://amaestoolkit.pages.dev/</code></p>
           <p class="qr-modal-hint">Scan with your phone camera to open instantly on mobile.</p>
           <div class="qr-modal-actions">
             <a class="button primary" id="qr-modal-download-btn" href="assets/amaes-toolkit-qr.png" download="amaes-toolkit-qr.png">

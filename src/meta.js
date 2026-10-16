@@ -11,6 +11,7 @@
 // @match        http://semestralexam.amaes.com/*
 // @match        *://semestralexam.amaes.com/*
 // @match        https://acads-tools.github.io/amaes-toolkit/*
+// @match        https://amaestoolkit.pages.dev/*
 // @updateURL    https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js
 // @downloadURL  https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js
 // @grant        GM_xmlhttpRequest

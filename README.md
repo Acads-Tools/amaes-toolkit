@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js"><img src="https://img.shields.io/badge/version-1.13.9-blue.svg" alt="Version 1.13.9"></a>
-  <a href="https://acads-tools.github.io/amaes-toolkit/"><img src="https://img.shields.io/badge/platform-Violentmonkey%20%7C%20Tampermonkey-darkblue.svg" alt="Platform Compatibility"></a>
+  <a href="https://amaestoolkit.pages.dev/"><img src="https://img.shields.io/badge/platform-Violentmonkey%20%7C%20Tampermonkey-darkblue.svg" alt="Platform Compatibility"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="#zero-telemetry--privacy-architecture"><img src="https://img.shields.io/badge/privacy-zero--telemetry-success.svg" alt="Zero Telemetry"></a>
   <a href=".github/workflows/privacy-check.yml"><img src="https://img.shields.io/badge/privacy--audit-passing-brightgreen.svg" alt="Privacy Check Passed"></a>
@@ -208,7 +208,7 @@ Install the **[Violentmonkey](https://violentmonkey.github.io/)** extension for 
   2. Open `edge://extensions` and enable **Developer mode**.
 
 ### Step 2: Install AMAES Toolkit
-* Visit the **[AMAES Toolkit Installer Website](https://acads-tools.github.io/amaes-toolkit/)** and click **Install AMAES Toolkit**, or install directly via the [UserScript Raw Link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js).
+* Visit the **[AMAES Toolkit Installer Website](https://amaestoolkit.pages.dev/)** and click **Install AMAES Toolkit**, or install directly via the [UserScript Raw Link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js).
 * In the Violentmonkey tab that opens, click the green **"Confirm installation"** button.
 
 ### Step 3: Open Moodle
@@ -327,7 +327,7 @@ Privacy is the foundational design requirement of AMAES Toolkit:
 <details>
 <summary><b>Clicking the install link just shows raw JavaScript code. What should I do?</b></summary>
 <br>
-This happens when a userscript manager is not yet installed in your browser. Install <a href="https://violentmonkey.github.io/">Violentmonkey</a> first, or visit the <a href="https://acads-tools.github.io/amaes-toolkit/">Quick Install Site</a> which guides you through browser setup in one click.
+This happens when a userscript manager is not yet installed in your browser. Install <a href="https://violentmonkey.github.io/">Violentmonkey</a> first, or visit the <a href="https://amaestoolkit.pages.dev/">Quick Install Site</a> which guides you through browser setup in one click.
 </details>
 
 <details>
@@ -367,4 +367,4 @@ Recent versions of Chromium (Google Chrome and Brave) require users to enable "D
 
 ---
 
-**Links:** [GitHub Repository](https://github.com/Acads-Tools/amaes-toolkit) • [Quick Install Site](https://acads-tools.github.io/amaes-toolkit/) • [Question Database](https://github.com/Acads-Tools/database) • [Terms of Use](docs/TERMS.md) • [Security Policy](SECURITY.md) • [Greasy Fork](https://greasyfork.org/en/scripts/594744-amaes-toolkit) • [Report a Bug / Request Feature](https://github.com/Acads-Tools/amaes-toolkit/issues)
+**Links:** [GitHub Repository](https://github.com/Acads-Tools/amaes-toolkit) • [Quick Install Site](https://amaestoolkit.pages.dev/) • [Question Database](https://github.com/Acads-Tools/database) • [Terms of Use](docs/TERMS.md) • [Security Policy](SECURITY.md) • [Greasy Fork](https://greasyfork.org/en/scripts/594744-amaes-toolkit) • [Report a Bug / Request Feature](https://github.com/Acads-Tools/amaes-toolkit/issues)

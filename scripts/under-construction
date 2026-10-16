@@ -19,7 +19,7 @@ set -eo pipefail
 TOOLKIT_REPO="Acads-Tools/amaes-toolkit"
 DATABASE_REPO="Acads-Tools/database"
 GREASYFORK_ADMIN_URL="https://greasyfork.org/en/scripts/594744-amaes-toolkit/admin"
-PAGES_URL="https://acads-tools.github.io/amaes-toolkit/"
+PAGES_URL="https://amaestoolkit.pages.dev/"
 
 # Colors
 RED='\033[0;31m'

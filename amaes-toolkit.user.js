@@ -11,6 +11,7 @@
 // @match        http://semestralexam.amaes.com/*
 // @match        *://semestralexam.amaes.com/*
 // @match        https://acads-tools.github.io/amaes-toolkit/*
+// @match        https://amaestoolkit.pages.dev/*
 // @updateURL    https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js
 // @downloadURL  https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js
 // @grant        GM_xmlhttpRequest
@@ -165,8 +166,8 @@
     toolkitStorage.syncAll();
 
     // The installer page uses a same-page event as a privacy-safe installation check.
-    if (window.location.hostname === 'acads-tools.github.io' &&
-        window.location.pathname.startsWith('/amaes-toolkit')) {
+    if ((window.location.hostname === 'acads-tools.github.io' && window.location.pathname.startsWith('/amaes-toolkit')) ||
+        window.location.hostname === 'amaestoolkit.pages.dev') {
         document.documentElement.setAttribute(
             'data-amaes-toolkit-version',
             SCRIPT_VERSION.replace(/^v/, '')
@@ -315,7 +316,7 @@
     const SCRIPT_RAW_URL = "https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js";
     const GITHUB_REPO_URL = "https://github.com/Acads-Tools/amaes-toolkit";
     const GREASYFORK_URL = "https://greasyfork.org/en/scripts/594744-amaes-toolkit";
-    const WEBSITE_URL = "https://acads-tools.github.io/amaes-toolkit/";
+    const WEBSITE_URL = "https://amaestoolkit.pages.dev/";
 
     // Dynamic semester path detector (never hardcode e.g. /2612/ since term codes change every semester)
     function getSemesterBasePath() {

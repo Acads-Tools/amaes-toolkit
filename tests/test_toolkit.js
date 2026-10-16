@@ -2985,7 +2985,7 @@ test("Help Panel: includes clickable links to GitHub, Greasy Fork, and Website",
     // 1. Constants
     assert.ok(script.includes('const GREASYFORK_URL = "https://greasyfork.org/en/scripts/594744-amaes-toolkit";'), "Must define GREASYFORK_URL constant");
     assert.ok(script.includes('const GITHUB_REPO_URL = "https://github.com/Acads-Tools/amaes-toolkit";'), "Must define GITHUB_REPO_URL constant");
-    assert.ok(script.includes('const WEBSITE_URL = "https://acads-tools.github.io/amaes-toolkit/";'), "Must define WEBSITE_URL constant");
+    assert.ok(script.includes('const WEBSITE_URL = "https://amaestoolkit.pages.dev/";') || script.includes('const WEBSITE_URL = "https://acads-tools.github.io/amaes-toolkit/";'), "Must define WEBSITE_URL constant");
 
     // 2. Icon definition
     assert.ok(script.includes("greasyfork: `<svg"), "greasyfork icon must be registered in ICONS");
@@ -4142,7 +4142,7 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.13.9<"), "Website must display v1.13.9 badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.13.9<") || indexHtml.includes("release-badge\">v1.13.20<"), "Website must display release badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");

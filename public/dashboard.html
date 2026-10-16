@@ -3,6 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      if (window.location.hostname === 'acads-tools.github.io') {
+        var targetPath = window.location.pathname.replace(/^\/amaes-toolkit\/?/, '/');
+        var newUrl = 'https://amaestoolkit.pages.dev' + targetPath + window.location.search + window.location.hash;
+        window.location.replace(newUrl);
+      }
+    })();
+  </script>
   <title>AMAES Toolkit - Dashboard</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>

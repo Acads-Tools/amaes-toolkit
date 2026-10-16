@@ -4,7 +4,7 @@ Welcome to the technical documentation hub for the **AMAES Moodle Toolkit** and 
 
 ---
 
-## 📚 Technical & Architecture Guides
+## Technical & Architecture Guides
 
 | Document | Topic | Description |
 | :--- | :--- | :--- |
@@ -15,7 +15,7 @@ Welcome to the technical documentation hub for the **AMAES Moodle Toolkit** and 
 
 ---
 
-## ⚖️ Governance, Policies & Legal Safety
+## Governance, Policies & Legal Safety
 
 | Document | Topic | Description |
 | :--- | :--- | :--- |
@@ -26,10 +26,10 @@ Welcome to the technical documentation hub for the **AMAES Moodle Toolkit** and 
 
 ---
 
-## 🚀 Key Repository & Ecosystem Links
+## Key Repository & Ecosystem Links
 
 - **Userscript Source**: [Acads-Tools/amaes-toolkit](https://github.com/Acads-Tools/amaes-toolkit)
 - **Install / Update Userscript**: [amaes-toolkit.user.js](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js)
-- **Web Portal**: [acads-tools.github.io/amaes-toolkit](https://acads-tools.github.io/amaes-toolkit/)
+- **Web Portal**: [amaestoolkit.pages.dev](https://amaestoolkit.pages.dev/)
 - **Study Database**: [Acads-Tools/database](https://github.com/Acads-Tools/database)
 - **Cloudflare Serverless Relay**: `https://amaes-community-relay.acads-tools.workers.dev`
