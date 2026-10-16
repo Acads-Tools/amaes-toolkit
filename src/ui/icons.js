@@ -836,11 +836,6 @@
                 </div>
             </div>
 
-            <!-- Operational Description -->
-            <div style="font-size: 12px; opacity: 0.85; margin-bottom: 14px; line-height: 1.45;">
-                ${escapeHtml(metrics.desc)}
-            </div>
-
             <!-- 4 Metrics Counters -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 14px;">
                 <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 6px 10px; text-align: center;">
@@ -902,10 +897,7 @@
             ` : ''}
 
             <!-- Footer Action Row -->
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(148, 163, 184, 0.18);">
-                <div style="font-size: 11px; opacity: 0.75;">
-                    Auto-Harvest & Autonomous Solver running automatically in background.
-                </div>
+            <div style="display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(148, 163, 184, 0.18);">
                 <div style="display: flex; gap: 6px; align-items: center;">
                     <button id="amaes-card-btn-highlight" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 3px 8px; border-radius: 4px;" title="Scan course page and highlight quizzes needing attention (Press U)">
                         Highlight Missing Quizzes (U)

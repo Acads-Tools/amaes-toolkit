@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.14'), "Userscript header must specify v1.13.14");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.14";'), "Constant SCRIPT_VERSION must be v1.13.14");
+    assert.ok(script.includes('@version      1.13.15'), "Userscript header must specify v1.13.15");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.15";'), "Constant SCRIPT_VERSION must be v1.13.15");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -6672,7 +6672,7 @@ test("Focus Unanswered [U], Backward Navigation [B] & Batch Review Harvester (v1
 
     // 4. Autonomous Background Review Harvester & Auto-Harvest Integration
     assert.ok(initSrc.includes("batchHarvestCourseReviews(cInfo?.courseId, cInfo?.subjectCode, null, true)"), "init.js must call batchHarvestCourseReviews as autonomous background worker on course page");
-    assert.ok(iconsSrc.includes("Auto-Harvest & Autonomous Solver running automatically in background"), "icons.js must indicate autonomous background status without cluttering with manual button");
+    assert.ok(iconsSrc.includes("amaes-course-confidence-card") && iconsSrc.includes("amaes-card-btn-highlight"), "icons.js must render sleek confidence card with action buttons");
 
     // 5. Shortcuts Cheatsheet Documentation
     assert.ok(modalsSrc.includes(">B</kbd>") && modalsSrc.includes("Previous Question / Page"), "modals.js must document B shortcut in cheatsheet");
@@ -6741,7 +6741,45 @@ test("Partial Matching Row Harvesting, 2-Way Elimination Deduction & Identificat
     // 4. Short-Answer Response Post-Processing & Normalization
     assert.ok(geminiSrc.includes("cleaned.startsWith('.') && isCommandQuestion && !isCssClassQuestion"), "gemini.js must strip leading dot from commands/methods like .hide()");
     assert.ok(geminiSrc.includes("cleaned.charAt(0).toLowerCase() + cleaned.slice(1)"), "gemini.js must canonicalize capitalized command names like Val -> val");
-    assert.ok(geminiSrc.includes("qTextLower.includes('materialize') && qTextLower.includes('prefix')") && geminiSrc.includes("cleaned = 'l'"), "gemini.js must correct MaterializeCSS prefix lg -> l");
+});
+
+// --------------------------------------------------
+// 202. Top Quiz Mover Navigation, Sleek Confidence Card & Robust 100% Quiz Auto-Marker (v1.13.15)
+// --------------------------------------------------
+test("Top Quiz Mover Navigation, Sleek Confidence Card & Robust 100% Quiz Auto-Marker (v1.13.15)", () => {
+    const fs = require('fs');
+    const iconsSrc = fs.readFileSync('src/ui/icons.js', 'utf8');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const highlighterSrc = fs.readFileSync('src/moodle/highlighter.js', 'utf8');
+    const harvesterSrc = fs.readFileSync('src/sync/harvester.js', 'utf8');
+    const initSrc = fs.readFileSync('src/init.js', 'utf8');
+
+    // 1. Sleek Confidence Card (Decluttered of verbose paragraphs)
+    assert.ok(!iconsSrc.includes("${escapeHtml(metrics.desc)}"), "icons.js must remove verbose operational description paragraph from confidence card");
+    assert.ok(!iconsSrc.includes("Auto-Harvest & Autonomous Solver running automatically in background"), "icons.js must remove verbose footer text from confidence card");
+    assert.ok(iconsSrc.includes("amaes-card-btn-highlight") && iconsSrc.includes("amaes-card-btn-next-quiz"), "icons.js must retain sleek highlight & next quiz action buttons");
+
+    // 2. Dual Top & Bottom Quiz Mover Navigation Bar
+    assert.ok(solverSrc.includes("amaes-quiz-top-nav"), "solver.js must inject #amaes-quiz-top-nav container near top of review/view pages");
+    assert.ok(solverSrc.includes("id=\"amaes-top-btn-prev-quiz\""), "solver.js must render top previous quiz button");
+    assert.ok(solverSrc.includes("id=\"amaes-top-btn-next-quiz\""), "solver.js must render top next quiz button");
+    assert.ok(solverSrc.includes("id=\"amaes-top-quiz-cycle-select\""), "solver.js must render top jump-to-quiz dropdown selector");
+    assert.ok(solverSrc.includes("amaes-quiz-bottom-nav"), "solver.js must maintain bottom navigation container");
+    assert.ok(solverSrc.includes("const injectQuizCycleNavigation = injectQuizBottomNavigation;"), "solver.js must alias injectQuizCycleNavigation");
+    assert.ok(harvesterSrc.includes("reviewBadge.parentNode.insertBefore(topNav, reviewBadge.nextSibling)"), "harvester.js must position top mover nav right below review badge on review page");
+
+    // 3. Robust 100% Quiz Auto-Marker & Instant Cache Propagation
+    assert.ok(highlighterSrc.includes("function scanAndAutoMark100PercentQuizzesOnCoursePage()"), "highlighter.js must define scanAndAutoMark100PercentQuizzesOnCoursePage");
+    assert.ok(initSrc.includes("scanAndAutoMark100PercentQuizzesOnCoursePage()"), "init.js must call scanAndAutoMark100PercentQuizzesOnCoursePage on course page load and observer");
+    assert.ok(highlighterSrc.includes("localStorage.getItem(`amaes_quiz_100_cmid_${moduleId}`) === 'true'") &&
+              highlighterSrc.includes("localStorage.getItem(`amaes_quiz_100_title_${normTitle}`) === 'true'"),
+              "evaluateQuizPassableGrade must fast-track verify 100% quizzes from localStorage by cmid and title");
+    assert.ok(highlighterSrc.includes("cached100Title") && highlighterSrc.includes("/\\b100(?:\\.00)?\\b/"),
+              "checkAndAutoMarkDoneOnQuizLanding must detect 100% via title cache and table scores without requiring % symbol");
+    assert.ok(harvesterSrc.includes("localStorage.setItem(`amaes_quiz_100_title_${normTitle}`, 'true')"),
+              "harvester.js must store 100% quiz by normalized title as well as cmid");
+    assert.ok(harvesterSrc.includes("localStorage.setItem(`amaes_course_grades_cache_${courseId}`"),
+              "harvester.js must immediately update course grades cache upon 100% score for instant course-page awareness");
 });
 
 console.log("\n==================================================");

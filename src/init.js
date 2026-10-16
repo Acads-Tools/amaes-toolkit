@@ -47,12 +47,18 @@
         setupBreadcrumbListeners();
         if (typeof setupAutoViewBadges === 'function') {
             setupAutoViewBadges();
+            if (typeof scanAndAutoMark100PercentQuizzesOnCoursePage === 'function') {
+                scanAndAutoMark100PercentQuizzesOnCoursePage();
+            }
             if (typeof checkIsCoursePage === 'function' && checkIsCoursePage()) {
                 let courseViewDebounce = null;
                 const courseViewObs = new MutationObserver(() => {
                     if (courseViewDebounce) clearTimeout(courseViewDebounce);
                     courseViewDebounce = setTimeout(() => {
                         setupAutoViewBadges();
+                        if (typeof scanAndAutoMark100PercentQuizzesOnCoursePage === 'function') {
+                            scanAndAutoMark100PercentQuizzesOnCoursePage();
+                        }
                     }, 400);
                 });
                 const mainTarget = document.getElementById('region-main') || document.querySelector('.course-content') || document.body;

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.13.14
+// @version      1.13.15
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.13.14";
+    const SCRIPT_VERSION = "v1.13.15";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -1992,11 +1992,6 @@
                 </div>
             </div>
 
-            <!-- Operational Description -->
-            <div style="font-size: 12px; opacity: 0.85; margin-bottom: 14px; line-height: 1.45;">
-                ${escapeHtml(metrics.desc)}
-            </div>
-
             <!-- 4 Metrics Counters -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 14px;">
                 <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 6px 10px; text-align: center;">
@@ -2058,10 +2053,7 @@
             ` : ''}
 
             <!-- Footer Action Row -->
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(148, 163, 184, 0.18);">
-                <div style="font-size: 11px; opacity: 0.75;">
-                    Auto-Harvest & Autonomous Solver running automatically in background.
-                </div>
+            <div style="display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(148, 163, 184, 0.18);">
                 <div style="display: flex; gap: 6px; align-items: center;">
                     <button id="amaes-card-btn-highlight" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 3px 8px; border-radius: 4px;" title="Scan course page and highlight quizzes needing attention (Press U)">
                         Highlight Missing Quizzes (U)
@@ -7810,29 +7802,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         const target = document.querySelector('#region-main [role="main"], #region-main, .course-content, #page-content');
         if (!target) return;
 
-        let navContainer = document.getElementById('amaes-quiz-bottom-nav');
-        if (!navContainer) {
-            navContainer = document.createElement('div');
-            navContainer.id = 'amaes-quiz-bottom-nav';
-            navContainer.className = 'amaes-quiz-bottom-nav activity-navigation';
-            target.appendChild(navContainer);
-        }
-
-        navContainer.style.cssText = `
-            margin-top: 36px;
-            margin-bottom: 24px;
-            padding: 16px 20px;
-            border-top: 1px solid rgba(148, 163, 184, 0.25);
-            background: rgba(148, 163, 184, 0.04);
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 12px;
-            user-select: none;
-        `;
-
         const list = getCourseQuizzesList();
         const currentCmid = getCurrentQuizCmid();
         const courseInfo = typeof detectCourseInfo === 'function' ? detectCourseInfo() : {};
@@ -7923,79 +7892,234 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             jumpOptions += `<option value="${escapeHtml(item.url)}" ${isSelected ? 'selected' : ''}>${escapeHtml(item.title)}${escapeHtml(status)}</option>`;
         });
 
-        navContainer.innerHTML = `
-            <div id="amaes-prev-quiz-container" style="flex: 1; min-width: 140px; text-align: left;">
-                <button id="amaes-btn-prev-quiz" class="btn btn-secondary amaes-cycle-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: ${prevDisabled ? 'not-allowed' : 'pointer'}; opacity: ${prevDisabled ? '0.45' : '1'}; transition: all 0.2s ease;" ${prevDisabled ? 'disabled' : ''} title="${prevQuiz ? 'Previous Quiz: ' + prevLabel + ' (Press [)' : 'Previous Activity (Press [)'}">
-                    <span>&#9668;</span>
-                    <span class="amaes-cycle-title" style="max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(prevLabel)}</span>
-                    <span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; font-weight: 500;">(Press [)</span>
-                </button>
-            </div>
-            <div id="amaes-jump-quiz-container" style="flex: 0 1 auto; text-align: center;">
-                ${list.length > 0 ? `
-                    <select id="amaes-quiz-cycle-select" class="custom-select form-control" style="max-width: 280px; font-size: 12.5px; font-weight: 500; height: 36px; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(148, 163, 184, 0.4); background: inherit; color: inherit;">
-                        ${jumpOptions}
-                    </select>
-                ` : `
-                    <div style="display: inline-flex; align-items: center; gap: 8px;">
-                        <button id="amaes-pill-prev" class="btn btn-sm btn-outline-secondary" style="font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer;" title="Previous activity (Press [)">[ Prev</button>
-                        <span style="font-size: 12px; opacity: 0.65; font-weight: 500;">Cycle Quizzes</span>
-                        <button id="amaes-pill-next" class="btn btn-sm btn-outline-primary" style="font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer;" title="Next activity (Press ])">Next ]</button>
+        const navData = {
+            list,
+            currentIndex,
+            prevQuiz,
+            nextQuiz,
+            prevDisabled,
+            nextDisabled,
+            prevLabel,
+            nextLabel,
+            skipPassed,
+            jumpOptions
+        };
+
+        function populateQuizNavElement(container, isTop) {
+            if (isTop) {
+                container.innerHTML = `
+                    <div style="flex: 1; min-width: 140px; text-align: left;">
+                        <button id="amaes-top-btn-prev-quiz" class="btn btn-secondary amaes-cycle-btn amaes-cycle-btn-prev" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; border-radius: 6px; cursor: ${prevDisabled ? 'not-allowed' : 'pointer'}; opacity: ${prevDisabled ? '0.45' : '1'}; transition: all 0.2s ease;" ${prevDisabled ? 'disabled' : ''} title="${prevQuiz ? 'Previous Quiz: ' + prevLabel + ' (Press [)' : 'Previous Activity (Press [)'}">
+                            <span>&#9668;</span>
+                            <span class="amaes-cycle-title" style="max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(prevLabel)}</span>
+                            <span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; font-weight: 500;">(Press [)</span>
+                        </button>
                     </div>
-                `}
-            </div>
-            <div id="amaes-next-quiz-container" style="flex: 1; min-width: 140px; text-align: right;">
-                <button id="amaes-btn-next-quiz" class="btn btn-primary amaes-cycle-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: ${nextDisabled ? 'not-allowed' : 'pointer'}; opacity: ${nextDisabled ? '0.45' : '1'}; transition: all 0.2s ease; background: #0f6cbf; border-color: #0f6cbf; color: #fff;" ${nextDisabled ? 'disabled' : ''} title="${nextQuiz ? 'Next Quiz: ' + nextLabel + ' (Press ])' : (skipPassed && list.length > 0 ? 'All subsequent quizzes passed (≥80%)' : 'Next Activity (Press ])')}">
-                    <span class="amaes-cycle-title" style="max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(nextLabel)}</span>
-                    <span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; font-weight: 500;">(Press ])</span>
-                    <span>&#9658;</span>
-                </button>
-            </div>
-        `;
+                    <div style="flex: 0 1 auto; text-align: center;">
+                        ${list.length > 0 ? `
+                            <select id="amaes-top-quiz-cycle-select" class="custom-select form-control amaes-cycle-select" style="max-width: 280px; font-size: 12px; font-weight: 500; height: 34px; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(148, 163, 184, 0.4); background: inherit; color: inherit;">
+                                ${jumpOptions}
+                            </select>
+                        ` : `
+                            <div style="display: inline-flex; align-items: center; gap: 8px;">
+                                <button id="amaes-top-pill-prev" class="btn btn-sm btn-outline-secondary" style="font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer;" title="Previous activity (Press [)">[ Prev</button>
+                                <span style="font-size: 12px; opacity: 0.65; font-weight: 500;">Cycle Quizzes</span>
+                                <button id="amaes-top-pill-next" class="btn btn-sm btn-outline-primary" style="font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer;" title="Next activity (Press ])">Next ]</button>
+                            </div>
+                        `}
+                    </div>
+                    <div style="flex: 1; min-width: 140px; text-align: right;">
+                        <button id="amaes-top-btn-next-quiz" class="btn btn-primary amaes-cycle-btn amaes-cycle-btn-next" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; border-radius: 6px; cursor: ${nextDisabled ? 'not-allowed' : 'pointer'}; opacity: ${nextDisabled ? '0.45' : '1'}; transition: all 0.2s ease; background: #0f6cbf; border-color: #0f6cbf; color: #fff;" ${nextDisabled ? 'disabled' : ''} title="${nextQuiz ? 'Next Quiz: ' + nextLabel + ' (Press ])' : (skipPassed && list.length > 0 ? 'All subsequent quizzes passed (≥80%)' : 'Next Activity (Press ])')}">
+                            <span class="amaes-cycle-title" style="max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(nextLabel)}</span>
+                            <span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; font-weight: 500;">(Press ])</span>
+                            <span>&#9658;</span>
+                        </button>
+                    </div>
+                `;
 
-        const btnPrev = navContainer.querySelector('#amaes-btn-prev-quiz');
-        if (btnPrev && !prevDisabled) {
-            btnPrev.addEventListener('click', (e) => {
-                e.preventDefault();
-                cycleToPrevQuizOrExam();
-            });
-        }
-
-        const btnNext = navContainer.querySelector('#amaes-btn-next-quiz');
-        if (btnNext && !nextDisabled) {
-            btnNext.addEventListener('click', (e) => {
-                e.preventDefault();
-                cycleToNextQuizOrExam();
-            });
-        }
-
-        const pillPrev = navContainer.querySelector('#amaes-pill-prev');
-        if (pillPrev) {
-            pillPrev.addEventListener('click', (e) => {
-                e.preventDefault();
-                cycleToPrevQuizOrExam();
-            });
-        }
-
-        const pillNext = navContainer.querySelector('#amaes-pill-next');
-        if (pillNext) {
-            pillNext.addEventListener('click', (e) => {
-                e.preventDefault();
-                cycleToNextQuizOrExam();
-            });
-        }
-
-        const selectJump = navContainer.querySelector('#amaes-quiz-cycle-select');
-        if (selectJump) {
-            selectJump.addEventListener('change', (e) => {
-                const targetUrl = e.target.value;
-                if (targetUrl) {
-                    showToast("Navigating to selected quiz...", 1500);
-                    window.location.href = targetUrl;
+                const btnPrev = container.querySelector('#amaes-top-btn-prev-quiz');
+                if (btnPrev && !prevDisabled) {
+                    btnPrev.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        cycleToPrevQuizOrExam();
+                    });
                 }
-            });
+
+                const btnNext = container.querySelector('#amaes-top-btn-next-quiz');
+                if (btnNext && !nextDisabled) {
+                    btnNext.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        cycleToNextQuizOrExam();
+                    });
+                }
+
+                const pillPrev = container.querySelector('#amaes-top-pill-prev');
+                if (pillPrev) {
+                    pillPrev.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        cycleToPrevQuizOrExam();
+                    });
+                }
+
+                const pillNext = container.querySelector('#amaes-top-pill-next');
+                if (pillNext) {
+                    pillNext.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        cycleToNextQuizOrExam();
+                    });
+                }
+
+                const selectJump = container.querySelector('#amaes-top-quiz-cycle-select');
+                if (selectJump) {
+                    selectJump.addEventListener('change', (e) => {
+                        const targetUrl = e.target.value;
+                        if (targetUrl) {
+                            showToast("Navigating to selected quiz...", 1500);
+                            window.location.href = targetUrl;
+                        }
+                    });
+                }
+            } else {
+                container.innerHTML = `
+                    <div id="amaes-prev-quiz-container" style="flex: 1; min-width: 140px; text-align: left;">
+                        <button id="amaes-btn-prev-quiz" class="btn btn-secondary amaes-cycle-btn amaes-cycle-btn-prev" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: ${prevDisabled ? 'not-allowed' : 'pointer'}; opacity: ${prevDisabled ? '0.45' : '1'}; transition: all 0.2s ease;" ${prevDisabled ? 'disabled' : ''} title="${prevQuiz ? 'Previous Quiz: ' + prevLabel + ' (Press [)' : 'Previous Activity (Press [)'}">
+                            <span>&#9668;</span>
+                            <span class="amaes-cycle-title" style="max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(prevLabel)}</span>
+                            <span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; font-weight: 500;">(Press [)</span>
+                        </button>
+                    </div>
+                    <div id="amaes-jump-quiz-container" style="flex: 0 1 auto; text-align: center;">
+                        ${list.length > 0 ? `
+                            <select id="amaes-quiz-cycle-select" class="custom-select form-control amaes-cycle-select" style="max-width: 280px; font-size: 12.5px; font-weight: 500; height: 36px; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(148, 163, 184, 0.4); background: inherit; color: inherit;">
+                                ${jumpOptions}
+                            </select>
+                        ` : `
+                            <div style="display: inline-flex; align-items: center; gap: 8px;">
+                                <button id="amaes-pill-prev" class="btn btn-sm btn-outline-secondary" style="font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer;" title="Previous activity (Press [)">[ Prev</button>
+                                <span style="font-size: 12px; opacity: 0.65; font-weight: 500;">Cycle Quizzes</span>
+                                <button id="amaes-pill-next" class="btn btn-sm btn-outline-primary" style="font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer;" title="Next activity (Press ])">Next ]</button>
+                            </div>
+                        `}
+                    </div>
+                    <div id="amaes-next-quiz-container" style="flex: 1; min-width: 140px; text-align: right;">
+                        <button id="amaes-btn-next-quiz" class="btn btn-primary amaes-cycle-btn amaes-cycle-btn-next" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: ${nextDisabled ? 'not-allowed' : 'pointer'}; opacity: ${nextDisabled ? '0.45' : '1'}; transition: all 0.2s ease; background: #0f6cbf; border-color: #0f6cbf; color: #fff;" ${nextDisabled ? 'disabled' : ''} title="${nextQuiz ? 'Next Quiz: ' + nextLabel + ' (Press ])' : (skipPassed && list.length > 0 ? 'All subsequent quizzes passed (≥80%)' : 'Next Activity (Press ])')}">
+                            <span class="amaes-cycle-title" style="max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(nextLabel)}</span>
+                            <span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; font-weight: 500;">(Press ])</span>
+                            <span>&#9658;</span>
+                        </button>
+                    </div>
+                `;
+
+                const btnPrev = container.querySelector('#amaes-btn-prev-quiz');
+                if (btnPrev && !prevDisabled) {
+                    btnPrev.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        cycleToPrevQuizOrExam();
+                    });
+                }
+
+                const btnNext = container.querySelector('#amaes-btn-next-quiz');
+                if (btnNext && !nextDisabled) {
+                    btnNext.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        cycleToNextQuizOrExam();
+                    });
+                }
+
+                const pillPrev = container.querySelector('#amaes-pill-prev');
+                if (pillPrev) {
+                    pillPrev.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        cycleToPrevQuizOrExam();
+                    });
+                }
+
+                const pillNext = container.querySelector('#amaes-pill-next');
+                if (pillNext) {
+                    pillNext.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        cycleToNextQuizOrExam();
+                    });
+                }
+
+                const selectJump = container.querySelector('#amaes-quiz-cycle-select');
+                if (selectJump) {
+                    selectJump.addEventListener('change', (e) => {
+                        const targetUrl = e.target.value;
+                        if (targetUrl) {
+                            showToast("Navigating to selected quiz...", 1500);
+                            window.location.href = targetUrl;
+                        }
+                    });
+                }
+            }
         }
+
+        // 1. Inject Top Navigation Bar (above review questions / summary table so user navigates without scrolling)
+        let topNav = document.getElementById('amaes-quiz-top-nav');
+        if (!topNav) {
+            topNav = document.createElement('div');
+            topNav.id = 'amaes-quiz-top-nav';
+            topNav.className = 'amaes-quiz-top-nav activity-navigation';
+
+            const reviewBadge = document.getElementById('amaes-reviewable-page-badge');
+            const summaryTable = target.querySelector('.quizreviewsummary, table.generaltable, .quizattemptsummary');
+            const mainHeader = target.querySelector('h2, h3, .page-header-headings');
+
+            if (reviewBadge && reviewBadge.parentNode) {
+                reviewBadge.parentNode.insertBefore(topNav, reviewBadge.nextSibling);
+            } else if (summaryTable && summaryTable.parentNode) {
+                summaryTable.parentNode.insertBefore(topNav, summaryTable);
+            } else if (mainHeader && mainHeader.nextSibling) {
+                mainHeader.parentNode.insertBefore(topNav, mainHeader.nextSibling);
+            } else {
+                target.insertBefore(topNav, target.firstChild);
+            }
+        }
+
+        topNav.style.cssText = `
+            margin-top: 10px;
+            margin-bottom: 16px;
+            padding: 10px 16px;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            background: rgba(148, 163, 184, 0.05);
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            user-select: none;
+        `;
+        populateQuizNavElement(topNav, true);
+
+        // 2. Inject Bottom Navigation Bar
+        let navContainer = document.getElementById('amaes-quiz-bottom-nav');
+        if (!navContainer) {
+            navContainer = document.createElement('div');
+            navContainer.id = 'amaes-quiz-bottom-nav';
+            navContainer.className = 'amaes-quiz-bottom-nav activity-navigation';
+            target.appendChild(navContainer);
+        }
+
+        navContainer.style.cssText = `
+            margin-top: 36px;
+            margin-bottom: 24px;
+            padding: 16px 20px;
+            border-top: 1px solid rgba(148, 163, 184, 0.25);
+            background: rgba(148, 163, 184, 0.04);
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            user-select: none;
+        `;
+        populateQuizNavElement(navContainer, false);
     }
+
+    const injectQuizCycleNavigation = injectQuizBottomNavigation;
 
     // Cycles to the next or previous quiz/exam
     function cycleQuizOrExam(direction = 'next', opts = {}) {
@@ -10750,18 +10874,41 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     }
 
     function evaluateQuizPassableGrade(container, title = '', gradesMap = null) {
+        // Resolve container cmid if available (id="module-123" or data-id="123")
+        let moduleId = (container && container.id ? container.id.replace(/^module-/, '') : '') || (container && container.dataset ? container.dataset.id : '') || '';
+        if (!moduleId && container && container.querySelector) {
+            const link = container.querySelector('a[href*="/mod/quiz/view.php?id="], a[href*="id="]');
+            if (link) {
+                const m = (link.getAttribute('href') || link.href || '').match(/[?&]id=(\d+)/);
+                if (m) moduleId = m[1];
+            }
+        }
+        const normTitle = (title || (container && container.innerText ? container.innerText.split('\n')[0] : '') || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        // 0. Fast-track explicit 100% quiz completion cache check
+        if (typeof localStorage !== 'undefined') {
+            if (moduleId && localStorage.getItem(`amaes_quiz_100_cmid_${moduleId}`) === 'true') {
+                return { isPassable: true, hasGrade: true, percentage: 100, cmid: moduleId, source: 'quiz-100-cache-cmid' };
+            }
+            if (normTitle && localStorage.getItem(`amaes_quiz_100_title_${normTitle}`) === 'true') {
+                return { isPassable: true, hasGrade: true, percentage: 100, cmid: moduleId, source: 'quiz-100-cache-title' };
+            }
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('amaes_quiz_100_title_')) {
+                        const savedNorm = key.replace('amaes_quiz_100_title_', '');
+                        if (savedNorm && normTitle && (savedNorm === normTitle || (savedNorm.length > 5 && (normTitle.includes(savedNorm) || savedNorm.includes(normTitle))))) {
+                            return { isPassable: true, hasGrade: true, percentage: 100, cmid: moduleId, source: 'quiz-100-cache-title-fuzzy' };
+                        }
+                    }
+                }
+            } catch (_) {}
+        }
+
         // 1. Check gradesMap if provided or cached
         const map = gradesMap || (typeof window !== 'undefined' ? window.__amaesCourseGradesCache : null);
         if (map && Object.keys(map).length > 0) {
-            // Check by container cmid if available (id="module-123" or data-id="123")
-            let moduleId = (container && container.id ? container.id.replace(/^module-/, '') : '') || (container && container.dataset ? container.dataset.id : '') || '';
-            if (!moduleId && container && container.querySelector) {
-                const link = container.querySelector('a[href*="/mod/quiz/view.php?id="], a[href*="id="]');
-                if (link) {
-                    const m = (link.getAttribute('href') || link.href || '').match(/[?&]id=(\d+)/);
-                    if (m) moduleId = m[1];
-                }
-            }
             if (moduleId && map[`cmid_${moduleId}`]) {
                 const entry = map[`cmid_${moduleId}`];
                 return {
@@ -10773,8 +10920,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 };
             }
 
-            // Check by normalized title
-            const normTitle = (title || (container && container.innerText ? container.innerText.split('\n')[0] : '') || '').toLowerCase().replace(/[^a-z0-9]/g, '');
             if (normTitle && map[normTitle]) {
                 const entry = map[normTitle];
                 return {
@@ -11777,7 +11922,18 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         if (!autoMark100) return;
 
         const cmid = new URLSearchParams(window.location.search).get('id') || '';
-        const cached100 = cmid && localStorage.getItem(`amaes_quiz_100_cmid_${cmid}`) === 'true';
+        const cached100Cmid = cmid && localStorage.getItem(`amaes_quiz_100_cmid_${cmid}`) === 'true';
+
+        let rawTitle = '';
+        if (typeof document !== 'undefined') {
+            const h = document.querySelector('.page-header-headings h1, #region-main h2, h2, h3');
+            if (h) rawTitle = h.innerText.trim();
+        }
+        if (!rawTitle && typeof detectCourseInfo === 'function') {
+            rawTitle = detectCourseInfo().currentActivityTitle || '';
+        }
+        const normTitle = rawTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cached100Title = normTitle && localStorage.getItem(`amaes_quiz_100_title_${normTitle}`) === 'true';
 
         const pageText = document.body ? document.body.innerText : '';
         let has100Grade = /highest grade:\s*(\d+(?:\.\d+)?)\s*\/\s*\1/i.test(pageText) ||
@@ -11785,14 +11941,15 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                           /overall feedback[^\n]*100%/i.test(pageText) ||
                           /final grade[^\n]*100%/i.test(pageText) ||
                           /grade:[^\n]*100%/i.test(pageText) ||
-                          cached100;
+                          cached100Cmid ||
+                          cached100Title;
 
         // Inspect previous attempts table in DOM
         if (!has100Grade && typeof document !== 'undefined') {
             const tableRows = document.querySelectorAll('table.generaltable tbody tr, .quizattemptsummary tbody tr, #region-main table tbody tr');
             for (const row of tableRows) {
                 const rText = (row.innerText || '').toLowerCase();
-                if (rText.includes('100%') || rText.includes('100.00%')) {
+                if (rText.includes('100%') || rText.includes('100.00%') || /\b100(?:\.00)?\b/.test(rText)) {
                     has100Grade = true;
                     break;
                 }
@@ -11810,7 +11967,84 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
         if (has100Grade) {
             if (cmid) localStorage.setItem(`amaes_quiz_100_cmid_${cmid}`, 'true');
-            triggerManualCompletionOnPage();
+            if (normTitle) localStorage.setItem(`amaes_quiz_100_title_${normTitle}`, 'true');
+            const done = triggerManualCompletionOnPage();
+            if (!done) {
+                setTimeout(() => triggerManualCompletionOnPage(), 500);
+                setTimeout(() => triggerManualCompletionOnPage(), 1200);
+            }
+        }
+    }
+
+    // Auto-mark completed 100% quizzes on Course page (/course/view.php)
+    function scanAndAutoMark100PercentQuizzesOnCoursePage() {
+        if (typeof checkIsCoursePage === 'function' && !checkIsCoursePage()) return;
+        const autoMark100 = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_mark_done_100') !== 'false' : true);
+        if (!autoMark100) return;
+
+        const activityElements = document.querySelectorAll(
+            'li.activity, .activity-item, .course-section .activity, div[data-region="activity-card"]'
+        );
+        if (!activityElements || activityElements.length === 0) return;
+
+        let markedAny = false;
+
+        activityElements.forEach(container => {
+            if (!container) return;
+            if (isActivityAlreadyComplete(container)) return;
+            if (isActivityLockedOrRestricted(container)) return;
+
+            const classification = classifyActivity(container);
+            if (classification.type !== 'quiz') return;
+
+            const titleElem = container.querySelector('.instancename, .activityname, a.aal_link, .activity-title');
+            const title = titleElem ? titleElem.innerText.trim() : (container.innerText.split('\n')[0] || 'Quiz');
+
+            const gradeInfo = evaluateQuizPassableGrade(container, title);
+            if (!gradeInfo.isPassable) return;
+
+            // Find uncompleted manual completion button
+            const buttons = container.querySelectorAll(
+                'button[data-action="toggle-manual-completion"], ' +
+                'button[data-toggletype="manual:mark-done"], ' +
+                'button.btn-outline-secondary, ' +
+                'form.togglecompletion input[type="submit"], ' +
+                'form.togglecompletion button'
+            );
+
+            for (const btn of buttons) {
+                const text = (btn.innerText || btn.getAttribute('aria-label') || btn.value || '').trim().toLowerCase();
+                const toggleType = (btn.getAttribute('data-toggletype') || '').toLowerCase();
+                const isToggleAction = btn.getAttribute('data-action') === 'toggle-manual-completion';
+                const isToggleCompletionForm = Boolean(btn.closest('form.togglecompletion'));
+
+                const isMarkDoneText = text.includes('mark as done') || text === 'mark as done' || toggleType === 'manual:mark-done';
+                const isAlreadyDone = toggleType === 'manual:undo' || text === 'done' || text.startsWith('done') || btn.classList.contains('btn-success');
+
+                if (!isAlreadyDone && (isMarkDoneText || isToggleAction || isToggleCompletionForm)) {
+                    try {
+                        btn.click();
+                    } catch (_) {
+                        if (typeof triggerClick === 'function') triggerClick(btn);
+                    }
+
+                    try {
+                        btn.classList.remove('btn-outline-secondary');
+                        btn.classList.add('btn-outline-success');
+                        btn.style.opacity = '0.8';
+                    } catch (_) {}
+
+                    markedAny = true;
+                    if (typeof setLog === 'function') {
+                        setLog(`<b>100% Quiz Auto-Marked:</b> <b>${title.substring(0, 30)}</b> marked as Done.`, "var(--accent-green)");
+                    }
+                    break;
+                }
+            }
+        });
+
+        if (markedAny && typeof showToast === 'function') {
+            showToast("Auto-marked completed 100% quiz as Done!", 3000);
         }
     }
 
@@ -20965,14 +21199,92 @@ function setupAccountTransferUI() {
             }
         }
 
+        // Mount top quiz mover navigation right after review badge so user can immediately cycle to next quiz
+        if (typeof injectQuizBottomNavigation === 'function') {
+            injectQuizBottomNavigation();
+        }
+        const topNav = document.getElementById('amaes-quiz-top-nav');
+        if (reviewBadge && reviewBadge.parentNode && topNav && topNav.previousElementSibling !== reviewBadge) {
+            reviewBadge.parentNode.insertBefore(topNav, reviewBadge.nextSibling);
+        }
+
         // Check for 100% score and trigger auto-mark activity as Done if enabled
         if (typeof checkQuizAttemptIs100Percent === 'function' && checkQuizAttemptIs100Percent(harvested, document)) {
-            const cmid = new URLSearchParams(window.location.search).get('cmid') ||
-                         new URLSearchParams(window.location.search).get('id') ||
-                         (document.querySelector('a[href*="/mod/quiz/view.php?id="]')?.href.match(/[?&]id=(\d+)/)?.[1]) || '';
+            const urlParams = new URLSearchParams(window.location.search);
+            let cmid = urlParams.get('cmid') || urlParams.get('id') || '';
+            if (!cmid) {
+                const idInput = document.querySelector('input[name="cmid"], input[name="id"]');
+                if (idInput && idInput.value) cmid = idInput.value.trim();
+            }
+            if (!cmid) {
+                const mBody = (document.body?.className || '').match(/\bcmid-(\d+)\b/);
+                if (mBody) cmid = mBody[1];
+            }
+            if (!cmid) {
+                const viewLinks = document.querySelectorAll('a[href*="/mod/quiz/view.php?id="], a[href*="/mod/quiz/view.php?cmid="], .breadcrumb a[href*="id="], .breadcrumb-item a[href*="id="]');
+                for (const l of viewLinks) {
+                    const m = (l.getAttribute('href') || l.href || '').match(/[?&](?:id|cmid)=(\d+)/);
+                    if (m) {
+                        cmid = m[1];
+                        break;
+                    }
+                }
+            }
+
+            let rawTitle = (harvested && harvested.quizTitle) || '';
+            if (!rawTitle) {
+                const h = document.querySelector('.page-header-headings h1, #region-main h2, h2, h3, .breadcrumb-item:last-child');
+                if (h) rawTitle = h.innerText.trim();
+            }
+            if (!rawTitle && typeof detectCourseInfo === 'function') {
+                rawTitle = detectCourseInfo().currentActivityTitle || '';
+            }
+            const normTitle = rawTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+            if (!cmid && normTitle && typeof getCourseQuizzesList === 'function') {
+                const qList = getCourseQuizzesList();
+                const m = qList.find(q => {
+                    const qNorm = (q.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    return qNorm && (qNorm === normTitle || normTitle.includes(qNorm) || qNorm.includes(normTitle));
+                });
+                if (m && m.cmid) cmid = m.cmid;
+            }
+
             if (cmid) {
                 localStorage.setItem(`amaes_quiz_100_cmid_${cmid}`, 'true');
             }
+            if (normTitle) {
+                localStorage.setItem(`amaes_quiz_100_title_${normTitle}`, 'true');
+            }
+
+            // Immediately update and invalidate course grades cache with 100% passable score
+            const courseInfo = typeof detectCourseInfo === 'function' ? detectCourseInfo() : {};
+            const courseId = courseInfo && courseInfo.courseId ? courseInfo.courseId : '';
+            if (courseId) {
+                try {
+                    const cachedRaw = localStorage.getItem(`amaes_course_grades_cache_${courseId}`);
+                    const map = cachedRaw ? JSON.parse(cachedRaw) : {};
+                    const gradeEntry = {
+                        title: rawTitle,
+                        normTitle: normTitle,
+                        cmid: cmid,
+                        hasGrade: true,
+                        percentage: 100,
+                        gradeStr: '100%',
+                        isPassable: true,
+                        source: 'review-100'
+                    };
+                    if (normTitle) map[normTitle] = gradeEntry;
+                    if (cmid) map[`cmid_${cmid}`] = gradeEntry;
+                    localStorage.setItem(`amaes_course_grades_cache_${courseId}`, JSON.stringify(map));
+                    localStorage.setItem(`amaes_course_grades_cache_time_${courseId}`, String(Date.now()));
+                    if (typeof window !== 'undefined') {
+                        window.__amaesCourseGradesCache = map;
+                        window.__amaesCourseGradesCacheTime = Date.now();
+                    }
+                } catch (_) {}
+            }
+
             const autoMark100 = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_mark_done_100') !== 'false' : true);
             if (autoMark100 && typeof triggerManualCompletionOnPage === 'function') {
                 triggerManualCompletionOnPage();
@@ -26068,12 +26380,18 @@ function setupAccountTransferUI() {
         setupBreadcrumbListeners();
         if (typeof setupAutoViewBadges === 'function') {
             setupAutoViewBadges();
+            if (typeof scanAndAutoMark100PercentQuizzesOnCoursePage === 'function') {
+                scanAndAutoMark100PercentQuizzesOnCoursePage();
+            }
             if (typeof checkIsCoursePage === 'function' && checkIsCoursePage()) {
                 let courseViewDebounce = null;
                 const courseViewObs = new MutationObserver(() => {
                     if (courseViewDebounce) clearTimeout(courseViewDebounce);
                     courseViewDebounce = setTimeout(() => {
                         setupAutoViewBadges();
+                        if (typeof scanAndAutoMark100PercentQuizzesOnCoursePage === 'function') {
+                            scanAndAutoMark100PercentQuizzesOnCoursePage();
+                        }
                     }, 400);
                 });
                 const mainTarget = document.getElementById('region-main') || document.querySelector('.course-content') || document.body;

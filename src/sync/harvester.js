@@ -2890,14 +2890,92 @@
             }
         }
 
+        // Mount top quiz mover navigation right after review badge so user can immediately cycle to next quiz
+        if (typeof injectQuizBottomNavigation === 'function') {
+            injectQuizBottomNavigation();
+        }
+        const topNav = document.getElementById('amaes-quiz-top-nav');
+        if (reviewBadge && reviewBadge.parentNode && topNav && topNav.previousElementSibling !== reviewBadge) {
+            reviewBadge.parentNode.insertBefore(topNav, reviewBadge.nextSibling);
+        }
+
         // Check for 100% score and trigger auto-mark activity as Done if enabled
         if (typeof checkQuizAttemptIs100Percent === 'function' && checkQuizAttemptIs100Percent(harvested, document)) {
-            const cmid = new URLSearchParams(window.location.search).get('cmid') ||
-                         new URLSearchParams(window.location.search).get('id') ||
-                         (document.querySelector('a[href*="/mod/quiz/view.php?id="]')?.href.match(/[?&]id=(\d+)/)?.[1]) || '';
+            const urlParams = new URLSearchParams(window.location.search);
+            let cmid = urlParams.get('cmid') || urlParams.get('id') || '';
+            if (!cmid) {
+                const idInput = document.querySelector('input[name="cmid"], input[name="id"]');
+                if (idInput && idInput.value) cmid = idInput.value.trim();
+            }
+            if (!cmid) {
+                const mBody = (document.body?.className || '').match(/\bcmid-(\d+)\b/);
+                if (mBody) cmid = mBody[1];
+            }
+            if (!cmid) {
+                const viewLinks = document.querySelectorAll('a[href*="/mod/quiz/view.php?id="], a[href*="/mod/quiz/view.php?cmid="], .breadcrumb a[href*="id="], .breadcrumb-item a[href*="id="]');
+                for (const l of viewLinks) {
+                    const m = (l.getAttribute('href') || l.href || '').match(/[?&](?:id|cmid)=(\d+)/);
+                    if (m) {
+                        cmid = m[1];
+                        break;
+                    }
+                }
+            }
+
+            let rawTitle = (harvested && harvested.quizTitle) || '';
+            if (!rawTitle) {
+                const h = document.querySelector('.page-header-headings h1, #region-main h2, h2, h3, .breadcrumb-item:last-child');
+                if (h) rawTitle = h.innerText.trim();
+            }
+            if (!rawTitle && typeof detectCourseInfo === 'function') {
+                rawTitle = detectCourseInfo().currentActivityTitle || '';
+            }
+            const normTitle = rawTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+            if (!cmid && normTitle && typeof getCourseQuizzesList === 'function') {
+                const qList = getCourseQuizzesList();
+                const m = qList.find(q => {
+                    const qNorm = (q.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    return qNorm && (qNorm === normTitle || normTitle.includes(qNorm) || qNorm.includes(normTitle));
+                });
+                if (m && m.cmid) cmid = m.cmid;
+            }
+
             if (cmid) {
                 localStorage.setItem(`amaes_quiz_100_cmid_${cmid}`, 'true');
             }
+            if (normTitle) {
+                localStorage.setItem(`amaes_quiz_100_title_${normTitle}`, 'true');
+            }
+
+            // Immediately update and invalidate course grades cache with 100% passable score
+            const courseInfo = typeof detectCourseInfo === 'function' ? detectCourseInfo() : {};
+            const courseId = courseInfo && courseInfo.courseId ? courseInfo.courseId : '';
+            if (courseId) {
+                try {
+                    const cachedRaw = localStorage.getItem(`amaes_course_grades_cache_${courseId}`);
+                    const map = cachedRaw ? JSON.parse(cachedRaw) : {};
+                    const gradeEntry = {
+                        title: rawTitle,
+                        normTitle: normTitle,
+                        cmid: cmid,
+                        hasGrade: true,
+                        percentage: 100,
+                        gradeStr: '100%',
+                        isPassable: true,
+                        source: 'review-100'
+                    };
+                    if (normTitle) map[normTitle] = gradeEntry;
+                    if (cmid) map[`cmid_${cmid}`] = gradeEntry;
+                    localStorage.setItem(`amaes_course_grades_cache_${courseId}`, JSON.stringify(map));
+                    localStorage.setItem(`amaes_course_grades_cache_time_${courseId}`, String(Date.now()));
+                    if (typeof window !== 'undefined') {
+                        window.__amaesCourseGradesCache = map;
+                        window.__amaesCourseGradesCacheTime = Date.now();
+                    }
+                } catch (_) {}
+            }
+
             const autoMark100 = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_mark_done_100') !== 'false' : true);
             if (autoMark100 && typeof triggerManualCompletionOnPage === 'function') {
                 triggerManualCompletionOnPage();

@@ -233,18 +233,41 @@
     }
 
     function evaluateQuizPassableGrade(container, title = '', gradesMap = null) {
+        // Resolve container cmid if available (id="module-123" or data-id="123")
+        let moduleId = (container && container.id ? container.id.replace(/^module-/, '') : '') || (container && container.dataset ? container.dataset.id : '') || '';
+        if (!moduleId && container && container.querySelector) {
+            const link = container.querySelector('a[href*="/mod/quiz/view.php?id="], a[href*="id="]');
+            if (link) {
+                const m = (link.getAttribute('href') || link.href || '').match(/[?&]id=(\d+)/);
+                if (m) moduleId = m[1];
+            }
+        }
+        const normTitle = (title || (container && container.innerText ? container.innerText.split('\n')[0] : '') || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        // 0. Fast-track explicit 100% quiz completion cache check
+        if (typeof localStorage !== 'undefined') {
+            if (moduleId && localStorage.getItem(`amaes_quiz_100_cmid_${moduleId}`) === 'true') {
+                return { isPassable: true, hasGrade: true, percentage: 100, cmid: moduleId, source: 'quiz-100-cache-cmid' };
+            }
+            if (normTitle && localStorage.getItem(`amaes_quiz_100_title_${normTitle}`) === 'true') {
+                return { isPassable: true, hasGrade: true, percentage: 100, cmid: moduleId, source: 'quiz-100-cache-title' };
+            }
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('amaes_quiz_100_title_')) {
+                        const savedNorm = key.replace('amaes_quiz_100_title_', '');
+                        if (savedNorm && normTitle && (savedNorm === normTitle || (savedNorm.length > 5 && (normTitle.includes(savedNorm) || savedNorm.includes(normTitle))))) {
+                            return { isPassable: true, hasGrade: true, percentage: 100, cmid: moduleId, source: 'quiz-100-cache-title-fuzzy' };
+                        }
+                    }
+                }
+            } catch (_) {}
+        }
+
         // 1. Check gradesMap if provided or cached
         const map = gradesMap || (typeof window !== 'undefined' ? window.__amaesCourseGradesCache : null);
         if (map && Object.keys(map).length > 0) {
-            // Check by container cmid if available (id="module-123" or data-id="123")
-            let moduleId = (container && container.id ? container.id.replace(/^module-/, '') : '') || (container && container.dataset ? container.dataset.id : '') || '';
-            if (!moduleId && container && container.querySelector) {
-                const link = container.querySelector('a[href*="/mod/quiz/view.php?id="], a[href*="id="]');
-                if (link) {
-                    const m = (link.getAttribute('href') || link.href || '').match(/[?&]id=(\d+)/);
-                    if (m) moduleId = m[1];
-                }
-            }
             if (moduleId && map[`cmid_${moduleId}`]) {
                 const entry = map[`cmid_${moduleId}`];
                 return {
@@ -256,8 +279,6 @@
                 };
             }
 
-            // Check by normalized title
-            const normTitle = (title || (container && container.innerText ? container.innerText.split('\n')[0] : '') || '').toLowerCase().replace(/[^a-z0-9]/g, '');
             if (normTitle && map[normTitle]) {
                 const entry = map[normTitle];
                 return {
@@ -1260,7 +1281,18 @@
         if (!autoMark100) return;
 
         const cmid = new URLSearchParams(window.location.search).get('id') || '';
-        const cached100 = cmid && localStorage.getItem(`amaes_quiz_100_cmid_${cmid}`) === 'true';
+        const cached100Cmid = cmid && localStorage.getItem(`amaes_quiz_100_cmid_${cmid}`) === 'true';
+
+        let rawTitle = '';
+        if (typeof document !== 'undefined') {
+            const h = document.querySelector('.page-header-headings h1, #region-main h2, h2, h3');
+            if (h) rawTitle = h.innerText.trim();
+        }
+        if (!rawTitle && typeof detectCourseInfo === 'function') {
+            rawTitle = detectCourseInfo().currentActivityTitle || '';
+        }
+        const normTitle = rawTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cached100Title = normTitle && localStorage.getItem(`amaes_quiz_100_title_${normTitle}`) === 'true';
 
         const pageText = document.body ? document.body.innerText : '';
         let has100Grade = /highest grade:\s*(\d+(?:\.\d+)?)\s*\/\s*\1/i.test(pageText) ||
@@ -1268,14 +1300,15 @@
                           /overall feedback[^\n]*100%/i.test(pageText) ||
                           /final grade[^\n]*100%/i.test(pageText) ||
                           /grade:[^\n]*100%/i.test(pageText) ||
-                          cached100;
+                          cached100Cmid ||
+                          cached100Title;
 
         // Inspect previous attempts table in DOM
         if (!has100Grade && typeof document !== 'undefined') {
             const tableRows = document.querySelectorAll('table.generaltable tbody tr, .quizattemptsummary tbody tr, #region-main table tbody tr');
             for (const row of tableRows) {
                 const rText = (row.innerText || '').toLowerCase();
-                if (rText.includes('100%') || rText.includes('100.00%')) {
+                if (rText.includes('100%') || rText.includes('100.00%') || /\b100(?:\.00)?\b/.test(rText)) {
                     has100Grade = true;
                     break;
                 }
@@ -1293,7 +1326,84 @@
 
         if (has100Grade) {
             if (cmid) localStorage.setItem(`amaes_quiz_100_cmid_${cmid}`, 'true');
-            triggerManualCompletionOnPage();
+            if (normTitle) localStorage.setItem(`amaes_quiz_100_title_${normTitle}`, 'true');
+            const done = triggerManualCompletionOnPage();
+            if (!done) {
+                setTimeout(() => triggerManualCompletionOnPage(), 500);
+                setTimeout(() => triggerManualCompletionOnPage(), 1200);
+            }
+        }
+    }
+
+    // Auto-mark completed 100% quizzes on Course page (/course/view.php)
+    function scanAndAutoMark100PercentQuizzesOnCoursePage() {
+        if (typeof checkIsCoursePage === 'function' && !checkIsCoursePage()) return;
+        const autoMark100 = (typeof localStorage !== 'undefined' ? localStorage.getItem('amaes_auto_mark_done_100') !== 'false' : true);
+        if (!autoMark100) return;
+
+        const activityElements = document.querySelectorAll(
+            'li.activity, .activity-item, .course-section .activity, div[data-region="activity-card"]'
+        );
+        if (!activityElements || activityElements.length === 0) return;
+
+        let markedAny = false;
+
+        activityElements.forEach(container => {
+            if (!container) return;
+            if (isActivityAlreadyComplete(container)) return;
+            if (isActivityLockedOrRestricted(container)) return;
+
+            const classification = classifyActivity(container);
+            if (classification.type !== 'quiz') return;
+
+            const titleElem = container.querySelector('.instancename, .activityname, a.aal_link, .activity-title');
+            const title = titleElem ? titleElem.innerText.trim() : (container.innerText.split('\n')[0] || 'Quiz');
+
+            const gradeInfo = evaluateQuizPassableGrade(container, title);
+            if (!gradeInfo.isPassable) return;
+
+            // Find uncompleted manual completion button
+            const buttons = container.querySelectorAll(
+                'button[data-action="toggle-manual-completion"], ' +
+                'button[data-toggletype="manual:mark-done"], ' +
+                'button.btn-outline-secondary, ' +
+                'form.togglecompletion input[type="submit"], ' +
+                'form.togglecompletion button'
+            );
+
+            for (const btn of buttons) {
+                const text = (btn.innerText || btn.getAttribute('aria-label') || btn.value || '').trim().toLowerCase();
+                const toggleType = (btn.getAttribute('data-toggletype') || '').toLowerCase();
+                const isToggleAction = btn.getAttribute('data-action') === 'toggle-manual-completion';
+                const isToggleCompletionForm = Boolean(btn.closest('form.togglecompletion'));
+
+                const isMarkDoneText = text.includes('mark as done') || text === 'mark as done' || toggleType === 'manual:mark-done';
+                const isAlreadyDone = toggleType === 'manual:undo' || text === 'done' || text.startsWith('done') || btn.classList.contains('btn-success');
+
+                if (!isAlreadyDone && (isMarkDoneText || isToggleAction || isToggleCompletionForm)) {
+                    try {
+                        btn.click();
+                    } catch (_) {
+                        if (typeof triggerClick === 'function') triggerClick(btn);
+                    }
+
+                    try {
+                        btn.classList.remove('btn-outline-secondary');
+                        btn.classList.add('btn-outline-success');
+                        btn.style.opacity = '0.8';
+                    } catch (_) {}
+
+                    markedAny = true;
+                    if (typeof setLog === 'function') {
+                        setLog(`<b>100% Quiz Auto-Marked:</b> <b>${title.substring(0, 30)}</b> marked as Done.`, "var(--accent-green)");
+                    }
+                    break;
+                }
+            }
+        });
+
+        if (markedAny && typeof showToast === 'function') {
+            showToast("Auto-marked completed 100% quiz as Done!", 3000);
         }
     }
 
