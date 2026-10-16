@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.13.18
+// @version      1.13.19
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.13.18";
+    const SCRIPT_VERSION = "v1.13.19";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -6317,14 +6317,13 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 submitBtn.dataset.amaesOrigText = submitBtn.tagName === 'INPUT' ? submitBtn.value : submitBtn.textContent;
             }
             const orig = submitBtn.dataset.amaesOrigText || 'Submit all and finish';
-            const speedTag = multiplier > 1 ? ` · ${multiplier}x` : '';
             let btnText;
             if (isPaused) {
-                btnText = `${orig.trim()} (Auto-submit Paused · Press N or Click to submit)`;
+                btnText = `${orig.trim()} (Auto-submit Paused · Enter to submit)`;
             } else if (remainingSec > 0) {
-                btnText = `${orig.trim()} (${remainingSec}s${speedTag} · Press N to hasten)`;
+                btnText = `${orig.trim()} (${remainingSec}s · Enter to submit)`;
             } else {
-                btnText = `${orig.trim()} (Press N)`;
+                btnText = `${orig.trim()} (Enter)`;
             }
             if (submitBtn.tagName === 'INPUT') {
                 submitBtn.value = btnText;
@@ -6346,15 +6345,14 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 navInd.style.cssText = 'margin-top:10px; padding:8px 12px; background:#fffbeb; border:1px solid #f59e0b; border-radius:6px; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size:11px; color:#92400e; box-sizing:border-box; text-align:center;';
                 navInd.innerHTML = `
                     <div style="font-weight:700; color:#b45309;">Auto-submit Paused</div>
-                    <div style="font-size:10px; color:#92400e; margin-top:2px;">Press <b>P</b> to resume · <b>N</b> to hasten/submit</div>
+                    <div style="font-size:10px; color:#92400e; margin-top:2px;">Press <b>P</b> to resume · <b>Enter</b> to submit</div>
                     <button id="amaes-navblock-pause-btn" type="button" style="margin-top:5px; padding:2px 8px; font-size:10px; font-weight:600; background:#ffffff; border:1px solid #f59e0b; border-radius:4px; cursor:pointer; color:#b45309;">Resume (P)</button>
                 `;
             } else {
                 navInd.style.cssText = 'margin-top:10px; padding:8px 12px; background:#ecfdf5; border:1px solid #10b981; border-radius:6px; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size:11px; color:#065f46; box-sizing:border-box; text-align:center;';
-                const speedTag = multiplier > 1 ? ` (${multiplier}x speed)` : '';
                 navInd.innerHTML = remainingSec > 0
-                    ? `<div style="font-weight:700;">Auto-submit in <span id="amaes-navblock-countdown-sec">${remainingSec}s</span>${speedTag}</div>
-                       <div style="font-size:10px; color:#047857; margin-top:2px;">Press <b>N</b> to hasten (-2s) · <b>P</b> to pause</div>
+                    ? `<div style="font-weight:700;">Auto-submit in <span id="amaes-navblock-countdown-sec">${remainingSec}s</span></div>
+                       <div style="font-size:10px; color:#047857; margin-top:2px;">Press <b>Enter</b> to submit now · <b>P</b> to pause</div>
                        <button id="amaes-navblock-pause-btn" type="button" style="margin-top:5px; padding:2px 8px; font-size:10px; font-weight:600; background:#ffffff; border:1px solid #10b981; border-radius:4px; cursor:pointer; color:#065f46;">Pause (P)</button>`
                     : `<div style="font-weight:700;">Submitting attempt...</div>`;
             }
@@ -6369,15 +6367,10 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             }
         }
 
-        // Quick submit button on readyBanner
+        // Quick submit button on readyBanner: stable label to avoid width jitter
         const quickSubmitBtn = document.getElementById('amaes-btn-quick-submit');
         if (quickSubmitBtn) {
-            const speedTag = multiplier > 1 ? ` · ${multiplier}x` : '';
-            quickSubmitBtn.textContent = isPaused
-                ? 'Submit All & Finish (Press N) →'
-                : (remainingSec > 0
-                    ? `Submit All & Finish (${remainingSec}s${speedTag} · Press N) →`
-                    : 'Submit All & Finish (Press N) →');
+            quickSubmitBtn.textContent = 'Submit Now (Enter) \u2192';
         }
 
         // Pause/Resume button on readyBanner
@@ -6389,14 +6382,27 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             bannerPauseBtn.style.background = isPaused ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)';
         }
 
+        // Ready Banner container visual styling (green when active, amber when paused)
+        const readyBannerEl = document.getElementById('amaes-summary-ready-banner');
+        if (readyBannerEl) {
+            if (isPaused) {
+                readyBannerEl.style.borderColor = '#f59e0b';
+                readyBannerEl.style.background = '#fffbeb';
+                readyBannerEl.style.color = '#92400e';
+            } else {
+                readyBannerEl.style.borderColor = '#10b981';
+                readyBannerEl.style.background = '#ecfdf5';
+                readyBannerEl.style.color = '#065f46';
+            }
+        }
+
         // Description text on readyBanner
         const bannerDescEl = document.getElementById('amaes-summary-banner-desc');
         if (bannerDescEl) {
             if (isPaused) {
                 bannerDescEl.innerHTML = `Auto-submit paused (<b id="amaes-summary-countdown-sec">${remainingSec}s</b> remaining). Review at your own pace or press <b>P</b> to resume.`;
             } else if (remainingSec > 0) {
-                const speedTag = multiplier > 1 ? ` (${multiplier}x)` : '';
-                bannerDescEl.innerHTML = `Auto-submitting attempt in <b id="amaes-summary-countdown-sec">${remainingSec}s${speedTag}</b> (Press N to hasten · P to pause)...`;
+                bannerDescEl.innerHTML = `Auto-submitting attempt in <b id="amaes-summary-countdown-sec">${remainingSec}s</b> (Press Enter to submit · P to pause)...`;
             } else {
                 bannerDescEl.textContent = 'Auto-submitting attempt...';
             }
@@ -6408,12 +6414,11 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             if (isPaused) {
                 btnMasterAutoQuiz.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
                 btnMasterAutoQuiz.innerHTML = `${ICONS.pause || ICONS.zap} <span>Paused (Press P to resume)</span>`;
-                btnMasterAutoQuiz.title = 'Auto-submit paused. Click or press P to resume, or N to submit';
+                btnMasterAutoQuiz.title = 'Auto-submit paused. Click or press P to resume, or Enter to submit';
             } else {
                 btnMasterAutoQuiz.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-                const speedTag = multiplier > 1 ? ` ${multiplier}x` : '';
-                btnMasterAutoQuiz.innerHTML = `${ICONS.checkCircle} <span>Submit (${remainingSec}s${speedTag} · Press N)</span>`;
-                btnMasterAutoQuiz.title = 'Click or press N to hasten countdown (-2s) or submit immediately. Press P to pause';
+                btnMasterAutoQuiz.innerHTML = `${ICONS.checkCircle} <span>Submit (${remainingSec}s · Enter)</span>`;
+                btnMasterAutoQuiz.title = 'Auto-submitting. Click or press Enter to submit immediately, P to pause';
             }
         }
     }
@@ -6463,15 +6468,10 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
             const countdownInterval = setInterval(() => {
                 if (summaryAutoSubmitPaused) return;
-                if (summaryAutoSubmitHastenMultiplier > 1) {
-                    targetDeadline -= (summaryAutoSubmitHastenMultiplier - 1) * 1000;
-                }
                 remainingSec = Math.max(0, Math.ceil((targetDeadline - Date.now()) / 1000));
                 const secEl = document.getElementById('amaes-summary-countdown-sec');
                 if (secEl) {
-                    secEl.textContent = summaryAutoSubmitHastenMultiplier > 1
-                        ? `${remainingSec}s (${summaryAutoSubmitHastenMultiplier}x)`
-                        : `${remainingSec}s`;
+                    secEl.textContent = `${remainingSec}s`;
                 }
                 updateQuizSummarySubmitButtons(remainingSec, summaryAutoSubmitHastenMultiplier);
                 if (remainingSec <= 0) {
@@ -6489,70 +6489,39 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         }
     }
 
-    // Hastens summary countdown by -2s and speeds up tick rate (1x -> 2x -> 4x -> 8x) on pressing N
+    // Hastens or immediately executes summary submission on Enter, Space, N, or quick submit
     function hastenQuizSummaryAutoSubmit() {
         if (!checkIsQuizSummaryPage()) return false;
         const deadlineKey = 'amaes_summary_deadline_' + window.location.href;
         const pausedSecKey = 'amaes_summary_paused_sec_' + window.location.href;
 
-        // If paused, unpause immediately
-        if (summaryAutoSubmitPaused) {
-            summaryAutoSubmitPaused = false;
-            sessionStorage.removeItem(pausedSecKey);
+        // Clear timers immediately
+        if (summaryAutoSubmitTimer) {
+            clearInterval(summaryAutoSubmitTimer);
+            clearTimeout(summaryAutoSubmitTimer);
+            summaryAutoSubmitTimer = null;
         }
+        summaryAutoSubmitPaused = false;
+        sessionStorage.removeItem(deadlineKey);
+        sessionStorage.removeItem(pausedSecKey);
+
+        const fallbackNotice = document.getElementById('amaes-auto-submit-fallback');
+        if (fallbackNotice) fallbackNotice.remove();
+        summaryAutoSubmitAttempted = false;
 
         // Priority Check: If confirmation modal is ALREADY visible on screen, click its confirmation button immediately!
         const existingConfirmBtn = findQuizSubmitConfirmationButton();
         if (existingConfirmBtn) {
-            setLog("<b>Auto-Submit:</b> Submitting confirmation modal via <b>[N]</b>...", "var(--accent-green)");
+            setLog("<b>Auto-Submit:</b> Submitting confirmation modal via <b>[Enter/N]</b>...", "var(--accent-green)");
             showToast("Submitting confirmation...", 1500);
             triggerClick(existingConfirmBtn);
             monitorConfirmationSubmission();
             return true;
         }
 
-        let targetDeadline = parseInt(sessionStorage.getItem(deadlineKey) || '0', 10);
-
-        if (!targetDeadline || isNaN(targetDeadline) || !summaryAutoSubmitTimer) {
-            executeQuizSummaryFinalSubmit();
-            return true;
-        }
-
-        // Accelerate multiplier: 1x -> 2x -> 4x -> 8x
-        if (summaryAutoSubmitHastenMultiplier < 2) {
-            summaryAutoSubmitHastenMultiplier = 2;
-        } else if (summaryAutoSubmitHastenMultiplier < 4) {
-            summaryAutoSubmitHastenMultiplier = 4;
-        } else if (summaryAutoSubmitHastenMultiplier < 8) {
-            summaryAutoSubmitHastenMultiplier = 8;
-        }
-
-        // Hasten by deducting 2 seconds immediately per tap
-        targetDeadline = Math.max(Date.now(), targetDeadline - 2000);
-        sessionStorage.setItem(deadlineKey, String(targetDeadline));
-
-        let remainingSec = Math.max(0, Math.ceil((targetDeadline - Date.now()) / 1000));
-        const secEl = document.getElementById('amaes-summary-countdown-sec');
-        if (secEl) {
-            secEl.textContent = summaryAutoSubmitHastenMultiplier > 1
-                ? `${remainingSec}s (${summaryAutoSubmitHastenMultiplier}x)`
-                : `${remainingSec}s`;
-        }
-        updateQuizSummarySubmitButtons(remainingSec, summaryAutoSubmitHastenMultiplier);
-
-        if (remainingSec <= 0) {
-            if (summaryAutoSubmitTimer) {
-                clearInterval(summaryAutoSubmitTimer);
-                summaryAutoSubmitTimer = null;
-            }
-            sessionStorage.removeItem(deadlineKey);
-            setLog("<b>Auto-Submit:</b> Hastened to 0s via <b>[N]</b>. Submitting attempt now...", "var(--accent-green)");
-            showToast("Submitting attempt now...", 1500);
-            executeQuizSummaryFinalSubmit();
-        } else {
-            showToast(`Auto-submitting: ${remainingSec}s (-2s · ${summaryAutoSubmitHastenMultiplier}x speed)`, 1200);
-            setLog(`<b>Auto-Submit:</b> Hastened via <b>[N]</b> (-2s, ${summaryAutoSubmitHastenMultiplier}x speed, ${remainingSec}s remaining).`, "var(--accent-green)");
-        }
+        setLog("<b>Auto-Submit:</b> Instant submission triggered via <b>[Enter/N]</b>. Submitting attempt now...", "var(--accent-green)");
+        showToast("Submitting attempt now...", 1500);
+        executeQuizSummaryFinalSubmit();
         return true;
     }
 
@@ -6662,62 +6631,31 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         if (!readyBanner) {
             readyBanner = document.createElement('div');
             readyBanner.id = 'amaes-summary-ready-banner';
-            readyBanner.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0 8px 0; padding:8px 14px; border:1px solid #10b981; border-radius:8px; background:#ecfdf5; color:#065f46; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; box-sizing:border-box; box-shadow:0 1px 4px rgba(16,185,129,0.08);';
+            readyBanner.style.cssText = 'display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin:12px 0 8px 0; padding:10px 14px; border:1px solid #10b981; border-radius:8px; background:#ecfdf5; color:#065f46; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; box-sizing:border-box; box-shadow:0 1px 4px rgba(16,185,129,0.08);';
             const autoSubmitDesc = delaySec > 0
-                ? `Auto-submitting attempt in <b id="amaes-summary-countdown-sec">${delaySec}s</b> (Press N to hasten)...`
+                ? `Auto-submitting attempt in <b id="amaes-summary-countdown-sec">${delaySec}s</b> (Press Enter to submit · P to pause)...`
                 : 'Auto-submitting attempt...';
             readyBanner.innerHTML = `
-                <div style="display:flex; align-items:center; gap:8px;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <span style="display:inline-flex; align-items:center; color:#10b981;">${ICONS.checkCircle}</span>
                     <span style="font-weight:700; font-size:12px; color:#065f46;">All ${evalRes ? evalRes.totalQuestions : ''} questions answered</span>
                     <span style="color:#047857; font-size:10px; opacity:0.6;">•</span>
                     <span id="amaes-summary-banner-desc" style="font-size:11.5px; color:#047857;">${shouldAutoSubmit ? autoSubmitDesc : 'Review your saved answers below and click Submit all and finish.'}</span>
                 </div>
-                <div style="display:flex; align-items:center; gap:6px;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     ${shouldAutoSubmit ? `
-                    <button id="amaes-btn-pause-auto-submit" type="button" style="padding:4px 10px; background:rgba(16,185,129,0.1); color:#065f46; border:1px solid #10b981; border-radius:5px; font-weight:700; font-size:11px; cursor:pointer; white-space:nowrap;">Pause (P)</button>
-                    <button id="amaes-btn-cancel-auto-submit" type="button" style="padding:4px 10px; background:rgba(239,68,68,0.1); color:#dc2626; border:1px solid rgba(239,68,68,0.25); border-radius:5px; font-weight:700; font-size:11px; cursor:pointer; white-space:nowrap;">Cancel Auto-Submit</button>
+                    <button id="amaes-btn-pause-auto-submit" type="button" style="padding:5px 12px; background:rgba(16,185,129,0.1); color:#065f46; border:1px solid #10b981; border-radius:6px; font-weight:700; font-size:11px; cursor:pointer; white-space:nowrap; transition:all 0.15s ease;">Pause (P)</button>
                     ` : ''}
-                    <button id="amaes-btn-quick-submit" type="button" style="padding:5px 14px; background:#10b981; color:#ffffff; border:none; border-radius:5px; font-weight:700; font-size:11.5px; cursor:pointer; white-space:nowrap;">Submit All & Finish (Press N) &rarr;</button>
+                    <button id="amaes-btn-quick-submit" type="button" style="padding:5px 14px; background:#10b981; color:#ffffff; border:none; border-radius:6px; font-weight:700; font-size:11.5px; cursor:pointer; white-space:nowrap; transition:all 0.15s ease; box-shadow:0 1px 3px rgba(16,185,129,0.25);">Submit Now (Enter) &rarr;</button>
                 </div>
             `;
             readyBanner.querySelector('#amaes-btn-quick-submit').onclick = () => {
-                if (summaryAutoSubmitTimer) {
-                    clearInterval(summaryAutoSubmitTimer);
-                    clearTimeout(summaryAutoSubmitTimer);
-                    summaryAutoSubmitTimer = null;
-                }
-                sessionStorage.removeItem('amaes_summary_deadline_' + window.location.href);
-                const fallbackNotice = document.getElementById('amaes-auto-submit-fallback');
-                if (fallbackNotice) fallbackNotice.remove();
-                summaryAutoSubmitAttempted = false;
-                executeQuizSummaryFinalSubmit();
+                hastenQuizSummaryAutoSubmit();
             };
             const pauseBtn = readyBanner.querySelector('#amaes-btn-pause-auto-submit');
             if (pauseBtn) {
                 pauseBtn.onclick = () => {
                     pauseQuizSummaryAutoSubmit();
-                };
-            }
-            const cancelBtn = readyBanner.querySelector('#amaes-btn-cancel-auto-submit');
-            if (cancelBtn) {
-                cancelBtn.onclick = () => {
-                    if (summaryAutoSubmitTimer) {
-                        clearInterval(summaryAutoSubmitTimer);
-                        clearTimeout(summaryAutoSubmitTimer);
-                        summaryAutoSubmitTimer = null;
-                    }
-                    sessionStorage.removeItem('amaes_summary_deadline_' + window.location.href);
-                    summaryAutoSubmitAttempted = true;
-                    summaryAutoSubmitHastenMultiplier = 1;
-                    cancelBtn.remove();
-                    const descEl = document.getElementById('amaes-summary-banner-desc');
-                    if (descEl) {
-                        descEl.textContent = 'Auto-submit paused. Review your saved answers below and click Submit all and finish when ready.';
-                    }
-                    updateQuizSummarySubmitButtons(0, 1);
-                    setLog("<b>Auto-Submit:</b> Cancelled by user. Review at your own pace.", "var(--accent-amber)");
-                    showToast("Auto-submit paused for manual review", 3000);
                 };
             }
             const submitContainer = document.querySelector('.submitbtns, .quizsummarybtns, .btn-finishattempt');
@@ -6749,7 +6687,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         const submitBtn = findQuizSummarySubmitButton();
         if (submitBtn) {
             submitBtn.style.outline = '3px solid #10b981';
-            submitBtn.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.45)';
+            submitBtn.style.boxShadow = '0 0 15px rgba(16,185,129,0.45)';
         }
 
         if (!sessionStorage.getItem('amaes_summary_ding_' + window.location.href)) {
@@ -6791,20 +6729,16 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     return;
                 }
 
-                setLog(`<b>Auto-Submit:</b> Submitting attempt in <b>${remainingSec}s</b>... (Press N to hasten)`, "var(--accent-green)");
+                setLog(`<b>Auto-Submit:</b> Submitting attempt in <b>${remainingSec}s</b>... (Press Enter to submit · P to pause)`, "var(--accent-green)");
                 showToast(`Auto-submitting in ${remainingSec}s...`, 2500);
                 updateQuizSummarySubmitButtons(remainingSec, summaryAutoSubmitHastenMultiplier);
 
                 const countdownInterval = setInterval(() => {
-                    if (summaryAutoSubmitHastenMultiplier > 1) {
-                        targetDeadline -= (summaryAutoSubmitHastenMultiplier - 1) * 1000;
-                    }
+                    if (summaryAutoSubmitPaused) return;
                     remainingSec = Math.max(0, Math.ceil((targetDeadline - Date.now()) / 1000));
                     const secEl = document.getElementById('amaes-summary-countdown-sec');
                     if (secEl) {
-                        secEl.textContent = summaryAutoSubmitHastenMultiplier > 1
-                            ? `${remainingSec}s (${summaryAutoSubmitHastenMultiplier}x)`
-                            : `${remainingSec}s`;
+                        secEl.textContent = `${remainingSec}s`;
                     }
                     updateQuizSummarySubmitButtons(remainingSec, summaryAutoSubmitHastenMultiplier);
                     if (remainingSec <= 0) {

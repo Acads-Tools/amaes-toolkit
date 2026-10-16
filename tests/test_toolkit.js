@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.18'), "Userscript header must specify v1.13.18");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.18";'), "Constant SCRIPT_VERSION must be v1.13.18");
+    assert.ok(script.includes('@version      1.13.19'), "Userscript header must specify v1.13.19");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.19";'), "Constant SCRIPT_VERSION must be v1.13.19");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -6295,7 +6295,7 @@ test("Composite Matching Question UI Hygiene, Configurable Summary Leeway Delay 
     assert.ok(themeSrc.includes("let autoSubmitDelay = parseInt(localStorage.getItem('amaes_auto_submit_delay') || '10', 10);"), "theme.js must default autoSubmitDelay to 10 seconds");
     assert.ok(panelSrc.includes('id="sel-auto-submit-delay"'), "panel.js must render sel-auto-submit-delay dropdown in Advanced Settings");
     assert.ok(solverSrc.includes('id="amaes-summary-countdown-sec"'), "solver.js ready banner must render countdown seconds element");
-    assert.ok(solverSrc.includes('id="amaes-btn-cancel-auto-submit"'), "solver.js ready banner must provide cancel auto-submit button");
+    assert.ok(solverSrc.includes('id="amaes-btn-pause-auto-submit"') || solverSrc.includes('id="amaes-btn-cancel-auto-submit"'), "solver.js ready banner must provide pause or cancel auto-submit control");
     assert.ok(solverSrc.includes("function executeQuizSummaryFinalSubmit()"), "solver.js must encapsulate final submission in executeQuizSummaryFinalSubmit");
 
     // 3. Non-Reviewable Quiz 100% Perfect Score Promotion
@@ -6395,23 +6395,21 @@ test("Strict Answer Hierarchy, Sequential AI Queue & Native Moodle Navigation (v
     // 5. Minimalist 1-line quiz summary auto-submit strip
     assert.ok(solverSrc.includes("readyBanner.id = 'amaes-summary-ready-banner';"), "Quiz summary must render ready banner");
     assert.ok(solverSrc.includes('id="amaes-btn-quick-submit"'), "Quiz summary banner must retain quick submit button");
-    assert.ok(solverSrc.includes('id="amaes-btn-cancel-auto-submit"'), "Quiz summary banner must retain cancel button");
+    assert.ok(solverSrc.includes('id="amaes-btn-pause-auto-submit"') || solverSrc.includes('id="amaes-btn-cancel-auto-submit"'), "Quiz summary banner must retain pause or cancel control");
 });
 
 // --------------------------------------------------
-// 193. Summary Auto-Submit Hasten Key [N], Speed Multiplier & Native Right-Side Integration (v1.13.7)
+// 193. Summary Auto-Submit Key Shortcuts, Instant Submission & Native Integration (v1.13.7 / v1.13.19)
 // --------------------------------------------------
-test("Summary Auto-Submit Hasten Key [N], Speed Multiplier & Native Right-Side Integration (v1.13.7)", () => {
+test("Summary Auto-Submit Key Shortcuts, Instant Submission & Native Integration (v1.13.7 / v1.13.19)", () => {
     const fs = require('fs');
     const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
     const eventsSrc = fs.readFileSync('src/quiz/events.js', 'utf8');
 
-    // 1. Hasten function and multiplier logic
+    // 1. Hasten function and instant submit execution
     assert.ok(solverSrc.includes("function hastenQuizSummaryAutoSubmit()"), "solver.js must define hastenQuizSummaryAutoSubmit");
-    assert.ok(solverSrc.includes("summaryAutoSubmitHastenMultiplier < 2"), "Hasten logic must advance multiplier from 1x to 2x");
-    assert.ok(solverSrc.includes("summaryAutoSubmitHastenMultiplier < 4"), "Hasten logic must advance multiplier from 2x to 4x");
-    assert.ok(solverSrc.includes("summaryAutoSubmitHastenMultiplier < 8"), "Hasten logic must advance multiplier from 4x to 8x");
-    assert.ok(solverSrc.includes("targetDeadline = Math.max(Date.now(), targetDeadline - 2000);"), "Hasten logic must subtract 2000ms (2s) per tap");
+    assert.ok(solverSrc.includes("summaryAutoSubmitHastenMultiplier"), "solver.js must retain summaryAutoSubmitHastenMultiplier compatibility variable");
+    assert.ok(solverSrc.includes("executeQuizSummaryFinalSubmit();"), "Hasten logic must execute final submission immediately");
 
     // 2. Keyboard shortcut 'N', 'Space', 'Enter' on summary.php
     assert.ok(solverSrc.includes("if (checkIsQuizSummaryPage())"), "Keydown listener must handle quiz summary page");
@@ -6419,11 +6417,11 @@ test("Summary Auto-Submit Hasten Key [N], Speed Multiplier & Native Right-Side I
 
     // 3. Right-side Quiz Navigation block indicator
     assert.ok(solverSrc.includes("id = 'amaes-navblock-submit-indicator'"), "Must mount submit indicator in right-side Quiz Navigation block");
-    assert.ok(solverSrc.includes("Press <b>N</b> to hasten (-2s)"), "Nav block indicator must clearly guide pressing N to hasten");
+    assert.ok(solverSrc.includes("Press <b>Enter</b> to submit now"), "Nav block indicator must clearly guide pressing Enter to submit");
 
     // 4. Native Moodle button text decoration with live countdown
     assert.ok(solverSrc.includes("function updateQuizSummarySubmitButtons("), "solver.js must define updateQuizSummarySubmitButtons");
-    assert.ok(solverSrc.includes("Press N to hasten"), "Native Moodle submit button must announce Press N to hasten during countdown");
+    assert.ok(solverSrc.includes("Enter to submit"), "Native Moodle submit button must announce Enter to submit during countdown");
 
     // 5. Clean DOM insertion above native submit buttons
     assert.ok(solverSrc.includes("submitContainer.parentNode.insertBefore(readyBanner, submitContainer);"), "readyBanner must mount directly above native submitbtns container");
@@ -7006,6 +7004,49 @@ test("Instant Quiz Retake Button, Fast Form Start & Review Page Keyboard Shortcu
     assert.ok(!solverSrc.includes("\uD83D\uDD04"), "solver.js must not contain generic rotate emoji");
     assert.ok(!builtScript.includes("\uD83D\uDD04"), "Built script must not contain generic rotate emoji");
     assert.ok(solverSrc.includes("ICONS.rotateCcw"), "solver.js must use professional SVG ICONS.rotateCcw");
+});
+
+// --------------------------------------------------
+// 206. Streamlined Quiz Summary Auto-Submit, Unified Pause/Resume & Instant Enter/N Submission (v1.13.19)
+// --------------------------------------------------
+test("Streamlined Quiz Summary Auto-Submit, Unified Pause/Resume & Instant Enter/N Submission (v1.13.19)", () => {
+    const fs = require('fs');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const builtScript = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Elimination of redundant Cancel Auto-Submit button
+    assert.ok(!solverSrc.includes('id="amaes-btn-cancel-auto-submit"'), "solver.js must completely eliminate redundant #amaes-btn-cancel-auto-submit");
+    assert.ok(!builtScript.includes('id="amaes-btn-cancel-auto-submit"'), "Built script must completely eliminate redundant #amaes-btn-cancel-auto-submit");
+
+    // 2. Unified 2-button group with stable non-jittery labels
+    assert.ok(solverSrc.includes('id="amaes-btn-pause-auto-submit"'), "solver.js ready banner must include #amaes-btn-pause-auto-submit");
+    assert.ok(solverSrc.includes('id="amaes-btn-quick-submit"'), "solver.js ready banner must include #amaes-btn-quick-submit");
+    assert.ok(solverSrc.includes("Submit Now (Enter)"), "Quick submit button must maintain fixed label 'Submit Now (Enter)' to avoid width jitter");
+    assert.ok(!solverSrc.includes("Submit All & Finish (${remainingSec}s"), "Quick submit button must not include countdown seconds inside its text");
+
+    // 3. Responsive flex-wrap banner layout to prevent screen clipping
+    assert.ok(solverSrc.includes("flex-wrap:wrap;"), "Ready banner must enforce flex-wrap:wrap to prevent viewport overflow");
+
+    // 4. Instant submission on Enter, N, Space, or quick submit
+    assert.ok(solverSrc.includes("function hastenQuizSummaryAutoSubmit()"), "solver.js must define hastenQuizSummaryAutoSubmit");
+    assert.ok(solverSrc.includes("Instant submission triggered via <b>[Enter/N]</b>"), "hastenQuizSummaryAutoSubmit must log instant submission triggered via [Enter/N]");
+    assert.ok(solverSrc.includes("Submitting attempt now..."), "hastenQuizSummaryAutoSubmit must toast immediate submission");
+
+    // 5. Dynamic theme styling on pause/resume
+    assert.ok(solverSrc.includes("readyBannerEl.style.borderColor = '#f59e0b'"), "Pause state must update banner border to amber #f59e0b");
+    assert.ok(solverSrc.includes("readyBannerEl.style.background = '#fffbeb'"), "Pause state must update banner background to amber #fffbeb");
+    assert.ok(solverSrc.includes("readyBannerEl.style.borderColor = '#10b981'"), "Active state must update banner border to emerald #10b981");
+
+    // 6. Right navblock indicator and native button text decoration
+    assert.ok(solverSrc.includes("id = 'amaes-navblock-submit-indicator'"), "Must mount submit indicator in right-side Quiz Navigation block");
+    assert.ok(solverSrc.includes("Press <b>Enter</b> to submit now · <b>P</b> to pause"), "Navblock indicator must guide student to press Enter or P");
+    assert.ok(solverSrc.includes("btnText = `${orig.trim()} (${remainingSec}s · Enter to submit)`;"), "Native button must display clear Enter to submit decoration");
+
+    // 7. Zero Generic Emojis Policy Enforcement
+    assert.ok(!solverSrc.includes("⚡") && !solverSrc.includes("⚠️") && !solverSrc.includes("🚀") && !solverSrc.includes("🤖"),
+        "solver.js must strictly enforce Zero Generic Emojis Policy");
+    assert.ok(!builtScript.includes("⚡") && !builtScript.includes("⚠️") && !builtScript.includes("🚀") && !builtScript.includes("🤖"),
+        "Built script must strictly enforce Zero Generic Emojis Policy");
 });
 
 console.log("\n==================================================");
