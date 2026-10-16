@@ -1221,6 +1221,8 @@
         const compButtons = document.querySelectorAll(
             'button[data-action="toggle-manual-completion"], ' +
             'button[data-toggletype="manual:mark-done"], ' +
+            'button.btn-outline-secondary, ' +
+            'button.btn-outline-success, ' +
             'form.togglecompletion input[type="submit"], ' +
             'form.togglecompletion button'
         );
@@ -1236,6 +1238,13 @@
             if (!isAlreadyDone && (isMarkDoneText || isToggleAction || isToggleCompletionForm)) {
                 if (typeof triggerClick === 'function') triggerClick(btn);
                 else btn.click();
+
+                try {
+                    btn.classList.remove('btn-outline-secondary');
+                    btn.classList.add('btn-outline-success');
+                    btn.style.opacity = '0.8';
+                } catch (_) {}
+
                 if (typeof showToast === 'function') showToast("Quiz scored 100%! Auto-marked activity as Done.", 3500);
                 if (typeof setLog === 'function') setLog("<b>Auto-Completion:</b> Quiz achieved 100%! Auto-marked activity as Done.", "var(--accent-green)");
                 return true;
@@ -1254,10 +1263,33 @@
         const cached100 = cmid && localStorage.getItem(`amaes_quiz_100_cmid_${cmid}`) === 'true';
 
         const pageText = document.body ? document.body.innerText : '';
-        const has100Grade = /highest grade:\s*(\d+(?:\.\d+)?)\s*\/\s*\1/i.test(pageText) ||
-                           /highest grade:\s*100(?:\.00)?%/i.test(pageText) ||
-                           /overall feedback[^\n]*100%/i.test(pageText) ||
-                           cached100;
+        let has100Grade = /highest grade:\s*(\d+(?:\.\d+)?)\s*\/\s*\1/i.test(pageText) ||
+                          /highest grade:\s*100(?:\.00)?%/i.test(pageText) ||
+                          /overall feedback[^\n]*100%/i.test(pageText) ||
+                          /final grade[^\n]*100%/i.test(pageText) ||
+                          /grade:[^\n]*100%/i.test(pageText) ||
+                          cached100;
+
+        // Inspect previous attempts table in DOM
+        if (!has100Grade && typeof document !== 'undefined') {
+            const tableRows = document.querySelectorAll('table.generaltable tbody tr, .quizattemptsummary tbody tr, #region-main table tbody tr');
+            for (const row of tableRows) {
+                const rText = (row.innerText || '').toLowerCase();
+                if (rText.includes('100%') || rText.includes('100.00%')) {
+                    has100Grade = true;
+                    break;
+                }
+                const mFrac = rText.match(/(\d+(?:\.\d+)?)\s*(?:\/|out of)\s*(\d+(?:\.\d+)?)/i);
+                if (mFrac) {
+                    const scored = parseFloat(mFrac[1]);
+                    const max = parseFloat(mFrac[2]);
+                    if (!isNaN(scored) && !isNaN(max) && max > 0 && scored >= max) {
+                        has100Grade = true;
+                        break;
+                    }
+                }
+            }
+        }
 
         if (has100Grade) {
             if (cmid) localStorage.setItem(`amaes_quiz_100_cmid_${cmid}`, 'true');

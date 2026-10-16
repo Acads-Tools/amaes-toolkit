@@ -1722,35 +1722,46 @@
             }
 
             showToast(`Found ${items.length} ${category} items to ${goal === 'mark_done' ? 'mark' : 'undo'}. Processing...`, 2500);
-            setLog(`Found ${items.length} items. Starting...`);
+            // Partition items into Fast Track (manual clicks / undo) vs Safe Track (auto-view network fetches)
+            const fastItems = [];
+            const autoViewItems = [];
+
+            for (const item of items) {
+                if (item.isAutoView && item.autoViewUrl) {
+                    autoViewItems.push(item);
+                } else if (item.button) {
+                    fastItems.push(item);
+                }
+            }
+
+            const totalCount = items.length;
+            showToast(`Found ${totalCount} ${category} items to ${goal === 'mark_done' ? 'mark' : 'undo'}. Processing...`, 2500);
 
             let processedCount = 0;
-            for (let i = 0; i < items.length; i++) {
-                if (shouldStop) {
-                    showToast(`Stopped. Processed ${processedCount} items.`);
-                    setLog(`Stopped. Processed ${processedCount} items.`, "var(--accent-amber)");
-                    break;
-                }
 
-                const item = items[i];
-                const gradeSuffix = item.gradePct !== null && item.gradePct !== undefined ? ` [${item.gradePct}%]` : '';
-                setLog(`[${i + 1}/${items.length}] ${actionLabel}: <b>${item.title.substring(0, 22)}...</b>${gradeSuffix}`);
+            // Track 1: Fast Micro-Stagger Queue for Manual Buttons and Undo (Lectures, Passed Quizzes, Undo All)
+            if (fastItems.length > 0 && !shouldStop) {
+                setLog(`Processing ${fastItems.length} manual ${actionLabel.toLowerCase()} actions in high-speed batch...`);
 
-                const targetElem = item.button || item.badgeElem || item.container;
-                if (targetElem && typeof targetElem.scrollIntoView === 'function') {
-                    targetElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
+                for (let i = 0; i < fastItems.length; i++) {
+                    if (shouldStop) break;
 
-                if (item.isAutoView && item.autoViewUrl) {
-                    if (typeof autoViewActivity === 'function') {
-                        await autoViewActivity(item.autoViewUrl, item.badgeElem, item.container);
+                    const item = fastItems[i];
+                    processedCount++;
+
+                    // Throttled UI logging to avoid log feed DOM flooding on large lists
+                    if (i === 0 || i === fastItems.length - 1 || i % 3 === 0) {
+                        const gradeSuffix = item.gradePct !== null && item.gradePct !== undefined ? ` [${item.gradePct}%]` : '';
+                        setLog(`[${processedCount}/${totalCount}] ${actionLabel}: <b>${item.title.substring(0, 22)}...</b>${gradeSuffix}`);
                     }
-                } else if (item.button) {
+
+                    // Reliable pointer dispatch without jarring smooth-scroll
                     if (typeof triggerClick === 'function') {
                         triggerClick(item.button);
                     } else {
                         item.button.click();
                     }
+
                     if (goal === 'mark_done') {
                         try {
                             item.button.classList.remove('btn-outline-secondary');
@@ -1758,13 +1769,36 @@
                             item.button.style.opacity = '0.8';
                         } catch (_) {}
                     }
-                }
-                processedCount++;
 
-                await new Promise(r => setTimeout(r, 450));
+                    // Yield to browser event loop: keeps UI 60fps responsive, Stop button functional, and avoids server session queue deadlocks
+                    await new Promise(resolve => setTimeout(resolve, 40));
+                }
             }
 
-            if (!shouldStop) {
+            // Track 2: Safe Sequential Queue for Activities Requiring Page Loads ("To do: View")
+            if (autoViewItems.length > 0 && !shouldStop) {
+                setLog(`Opening ${autoViewItems.length} lecture activities requiring view verification...`, "var(--accent-blue)");
+
+                for (let i = 0; i < autoViewItems.length; i++) {
+                    if (shouldStop) break;
+
+                    const item = autoViewItems[i];
+                    processedCount++;
+                    setLog(`[${processedCount}/${totalCount}] Viewing: <b>${item.title.substring(0, 22)}...</b>`);
+
+                    if (typeof autoViewActivity === 'function') {
+                        await autoViewActivity(item.autoViewUrl, item.badgeElem, item.container);
+                    }
+
+                    // Safe network cadence
+                    await new Promise(resolve => setTimeout(resolve, 250));
+                }
+            }
+
+            if (shouldStop) {
+                showToast(`Stopped. Processed ${processedCount} of ${totalCount} items.`);
+                setLog(`Stopped by user. Processed ${processedCount} of ${totalCount} items.`, "var(--accent-amber)");
+            } else {
                 if (typeof playToolkitSound === 'function') {
                     playToolkitSound('quest_done');
                 }

@@ -6679,6 +6679,37 @@ test("Focus Unanswered [U], Backward Navigation [B] & Batch Review Harvester (v1
     assert.ok(modalsSrc.includes(">U</kbd>") && modalsSrc.includes("Focus First Unanswered"), "modals.js must document U shortcut in cheatsheet");
 });
 
+// --------------------------------------------------
+// 200. Dual-Track Fast Auto-Marker, Instant Attempt Shortcut [A] with Modal Auto-Confirm & Matching Question AI Auto-Pick (v1.13.13)
+// --------------------------------------------------
+test("Dual-Track Fast Auto-Marker, Instant Attempt Shortcut [A] with Modal Auto-Confirm & Matching Question AI Auto-Pick (v1.13.13)", () => {
+    const fs = require('fs');
+    const eventsSrc = fs.readFileSync('src/quiz/events.js', 'utf8');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const geminiSrc = fs.readFileSync('src/ai/gemini.js', 'utf8');
+    const hlSrc = fs.readFileSync('src/moodle/highlighter.js', 'utf8');
+
+    // 1. Dual-Track Execution Engine in events.js
+    assert.ok(eventsSrc.includes("const fastItems = [];"), "events.js must define fastItems queue");
+    assert.ok(eventsSrc.includes("const autoViewItems = [];"), "events.js must define autoViewItems queue");
+    assert.ok(eventsSrc.includes("setTimeout(resolve, 40)"), "events.js must yield 40ms micro-stagger for manual clicks");
+    assert.ok(eventsSrc.includes("setTimeout(resolve, 250)"), "events.js must use safe 250ms cadence for auto-view network requests");
+
+    // 2. Instant Attempt Quiz Shortcut [A] with Modal Auto-Confirmation in solver.js
+    assert.ok(solverSrc.includes("key === 'a' || e.key === 'A' || e.key === 'Enter'"), "solver.js must handle A key shortcut");
+    assert.ok(solverSrc.includes("confirmInterval"), "solver.js must auto-confirm attempt modal dialog immediately");
+    assert.ok(solverSrc.includes("Start attempt"), "solver.js must match Start attempt button in confirmation modal");
+
+    // 3. Matching Question AI Auto-Pick in gemini.js & solver.js
+    assert.ok(geminiSrc.includes("const shouldAutoApply = Boolean(aiAutoSelect || autoPickQuiz || autoQuizMode);"), "gemini.js must determine shouldAutoApply for matching suggestions");
+    assert.ok(geminiSrc.includes("useButton.click()"), "gemini.js must auto-apply suggestions when auto-pick/auto-quiz is enabled");
+    assert.ok(solverSrc.includes("oMatched.matchingRows.forEach"), "solver.js onSuccess must apply matchingRows dropdown choices");
+
+    // 4. Enhanced Auto-Mark Done on Quiz Landing in highlighter.js
+    assert.ok(hlSrc.includes("table.generaltable tbody tr"), "highlighter.js must inspect generaltable for 100% attempts");
+    assert.ok(hlSrc.includes("button.btn-outline-secondary"), "highlighter.js must search btn-outline-secondary completion buttons");
+});
+
 console.log("\n==================================================");
 console.log(`TOTAL TESTS: ${passed + failed}`);
 console.log(`PASSED:      ${passed}`);

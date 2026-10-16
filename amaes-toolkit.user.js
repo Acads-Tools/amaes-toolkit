@@ -5789,6 +5789,17 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                                                     oMatched.input.checked = true;
                                                     oMatched.input.click();
                                                 }
+                                            } else if (aiAutoSelect && oMatched && Array.isArray(oMatched.matchingRows)) {
+                                                oMatched.matchingRows.forEach(item => {
+                                                    if (item.select && item.option) {
+                                                        item.select.value = item.option.value;
+                                                        item.select.dispatchEvent(new Event('input', { bubbles: true }));
+                                                        item.select.dispatchEvent(new Event('change', { bubbles: true }));
+                                                        item.select.dispatchEvent(new Event('blur', { bubbles: true }));
+                                                        item.select.style.outline = '2px solid #a855f7';
+                                                        item.select.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+                                                    }
+                                                });
                                             }
                                         }
                                     }).catch(() => {});
@@ -8140,6 +8151,11 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     // Decorate Attempt quiz now / Re-attempt quiz button with key hint (Press A)
     function decorateQuizLandingAttemptButton() {
         if (typeof window === 'undefined' || !window.location.pathname.includes('/mod/quiz/view.php')) return;
+
+        if (typeof checkAndAutoMarkDoneOnQuizLanding === 'function') {
+            checkAndAutoMarkDoneOnQuizLanding();
+        }
+
         const startBtn = document.querySelector(
             'form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], ' +
             '.quizstartbutton button, .quizstartbutton input[type="submit"], ' +
@@ -8159,10 +8175,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             if (!startBtn.value.includes('(Press A)')) {
                 startBtn.value = `${startBtn.value} (Press A)`;
             }
-        }
-
-        if (typeof checkAndAutoMarkDoneOnQuizLanding === 'function') {
-            checkAndAutoMarkDoneOnQuizLanding();
         }
     }
 
@@ -8191,7 +8203,12 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             // Attempt / Re-attempt Quiz Shortcut on Quiz Landing Pages (/mod/quiz/view.php): 'A' or 'Enter'
             const isQuizLanding = typeof window !== 'undefined' && window.location.pathname.includes('/mod/quiz/view.php');
             if (isQuizLanding && (e.key === 'a' || e.key === 'A' || e.key === 'Enter')) {
-                const confirmModalBtn = document.querySelector('.moodle-dialogue-bd button.btn-primary, .modal.show button.btn-primary, .modal button.btn-primary[data-action="save"]');
+                const confirmModalBtn = document.querySelector(
+                    '.moodle-dialogue-bd button.btn-primary, .moodle-dialogue-bd input[type="submit"], ' +
+                    '.modal.show button.btn-primary, .modal.show input[type="submit"], ' +
+                    '.modal button.btn-primary[data-action="save"], input[type="submit"][value*="Start attempt" i], ' +
+                    'button[data-action="save"], .confirmation-dialog button.btn-primary'
+                );
                 if (confirmModalBtn) {
                     e.preventDefault();
                     confirmModalBtn.click();
@@ -8209,6 +8226,24 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                     showToast("Starting quiz attempt... (A)");
                     setLog("Triggered <b>Attempt Quiz</b> via keyboard shortcut [A]", "var(--accent-green)");
                     startBtn.click();
+
+                    // Immediately auto-confirm attempt modal if Moodle pops it up
+                    let attempts = 0;
+                    const confirmInterval = setInterval(() => {
+                        attempts++;
+                        const mBtn = document.querySelector(
+                            '.moodle-dialogue-bd button.btn-primary, .moodle-dialogue-bd input[type="submit"], ' +
+                            '.modal.show button.btn-primary, .modal.show input[type="submit"], ' +
+                            '.modal button.btn-primary[data-action="save"], input[type="submit"][value*="Start attempt" i], ' +
+                            'button[data-action="save"], .confirmation-dialog button.btn-primary'
+                        );
+                        if (mBtn) {
+                            clearInterval(confirmInterval);
+                            mBtn.click();
+                        } else if (attempts >= 25) {
+                            clearInterval(confirmInterval);
+                        }
+                    }, 40);
                     return;
                 }
             }
@@ -11703,6 +11738,8 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         const compButtons = document.querySelectorAll(
             'button[data-action="toggle-manual-completion"], ' +
             'button[data-toggletype="manual:mark-done"], ' +
+            'button.btn-outline-secondary, ' +
+            'button.btn-outline-success, ' +
             'form.togglecompletion input[type="submit"], ' +
             'form.togglecompletion button'
         );
@@ -11718,6 +11755,13 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             if (!isAlreadyDone && (isMarkDoneText || isToggleAction || isToggleCompletionForm)) {
                 if (typeof triggerClick === 'function') triggerClick(btn);
                 else btn.click();
+
+                try {
+                    btn.classList.remove('btn-outline-secondary');
+                    btn.classList.add('btn-outline-success');
+                    btn.style.opacity = '0.8';
+                } catch (_) {}
+
                 if (typeof showToast === 'function') showToast("Quiz scored 100%! Auto-marked activity as Done.", 3500);
                 if (typeof setLog === 'function') setLog("<b>Auto-Completion:</b> Quiz achieved 100%! Auto-marked activity as Done.", "var(--accent-green)");
                 return true;
@@ -11736,10 +11780,33 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
         const cached100 = cmid && localStorage.getItem(`amaes_quiz_100_cmid_${cmid}`) === 'true';
 
         const pageText = document.body ? document.body.innerText : '';
-        const has100Grade = /highest grade:\s*(\d+(?:\.\d+)?)\s*\/\s*\1/i.test(pageText) ||
-                           /highest grade:\s*100(?:\.00)?%/i.test(pageText) ||
-                           /overall feedback[^\n]*100%/i.test(pageText) ||
-                           cached100;
+        let has100Grade = /highest grade:\s*(\d+(?:\.\d+)?)\s*\/\s*\1/i.test(pageText) ||
+                          /highest grade:\s*100(?:\.00)?%/i.test(pageText) ||
+                          /overall feedback[^\n]*100%/i.test(pageText) ||
+                          /final grade[^\n]*100%/i.test(pageText) ||
+                          /grade:[^\n]*100%/i.test(pageText) ||
+                          cached100;
+
+        // Inspect previous attempts table in DOM
+        if (!has100Grade && typeof document !== 'undefined') {
+            const tableRows = document.querySelectorAll('table.generaltable tbody tr, .quizattemptsummary tbody tr, #region-main table tbody tr');
+            for (const row of tableRows) {
+                const rText = (row.innerText || '').toLowerCase();
+                if (rText.includes('100%') || rText.includes('100.00%')) {
+                    has100Grade = true;
+                    break;
+                }
+                const mFrac = rText.match(/(\d+(?:\.\d+)?)\s*(?:\/|out of)\s*(\d+(?:\.\d+)?)/i);
+                if (mFrac) {
+                    const scored = parseFloat(mFrac[1]);
+                    const max = parseFloat(mFrac[2]);
+                    if (!isNaN(scored) && !isNaN(max) && max > 0 && scored >= max) {
+                        has100Grade = true;
+                        break;
+                    }
+                }
+            }
+        }
 
         if (has100Grade) {
             if (cmid) localStorage.setItem(`amaes_quiz_100_cmid_${cmid}`, 'true');
@@ -17077,6 +17144,7 @@ function setupAccountTransferUI() {
                 const matchingRows = getMatchingAiRows(que);
                 const suggestions = parseMatchingAiResponse(answerText, matchingRows);
                 if (suggestions.length > 0) {
+                    const shouldAutoApply = Boolean(aiAutoSelect || autoPickQuiz || autoQuizMode);
                     suggestions.forEach(suggestion => {
                         suggestion.row.querySelectorAll('.amaes-ai-matching-suggestion').forEach(el => el.remove());
                         const badge = document.createElement('div');
@@ -17090,8 +17158,10 @@ function setupAccountTransferUI() {
                         useButton.textContent = 'Use suggestion';
                         useButton.style.cssText = 'padding: 2px 7px; border: 1px solid #c084fc; border-radius: 4px; background: #faf5ff; color: #7e22ce; font-size: 10px; font-weight: 700; cursor: pointer;';
                         useButton.addEventListener('click', event => {
-                            event.preventDefault();
-                            event.stopPropagation();
+                            if (event) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                            }
                             suggestion.select.value = suggestion.option.value;
                             suggestion.select.dispatchEvent(new Event('input', { bubbles: true }));
                             suggestion.select.dispatchEvent(new Event('change', { bubbles: true }));
@@ -17103,11 +17173,21 @@ function setupAccountTransferUI() {
                         });
                         badge.append(label, useButton);
                         suggestion.select.insertAdjacentElement('afterend', badge);
+
+                        if (shouldAutoApply) {
+                            useButton.click();
+                        }
                     });
                     const summary = suggestions.map(item => `Row ${item.rowIndex + 1}: ${item.option.text.trim()}`).join('; ');
                     const partial = suggestions.length < matchingRows.length;
-                    setLog(`[AI Suggestion] Gemini suggested ${suggestions.length} of ${matchingRows.length} matching rows${partial ? '; unmatched rows were left unchanged' : ''}. Review each unverified row before continuing.`, "var(--accent-purple)");
-                    showToast(`Gemini suggested ${suggestions.length} matching answer${suggestions.length === 1 ? '' : 's'}; review before continuing.`, 3500);
+                    setLog(`[AI Suggestion] Gemini suggested ${suggestions.length} of ${matchingRows.length} matching rows${partial ? '; unmatched rows were left unchanged' : ''}.${shouldAutoApply ? ' Auto-selected choices.' : ' Review each unverified row before continuing.'}`, "var(--accent-purple)");
+                    showToast(`Gemini suggested ${suggestions.length} matching answer${suggestions.length === 1 ? '' : 's'}${shouldAutoApply ? ' (auto-selected)' : '; review before continuing'}.`, 3500);
+
+                    if (shouldAutoApply) {
+                        que.querySelectorAll('.amaes-blockage-hud, .amaes-ai-fallback-bar, .amaes-unanswered-hint').forEach(el => el.remove());
+                        setQuestionAiTag(que, true);
+                    }
+
                     if (typeof onSuccess === 'function') {
                         await onSuccess({ choiceText: summary, matchingRows: suggestions });
                     }
@@ -17402,11 +17482,7 @@ function setupAccountTransferUI() {
         const courseCode = courseInfo.subjectCode || '';
 
         if (qData.questionType === 'match') {
-            if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini} <span>Built-in AI</span>`;
-            if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini} <span>Built-in AI</span>`;
-            showToast("Matching questions: click '+ AI' beside each dropdown to solve on-demand without rate limits.", 4000);
-            setLog("[AI Matching] Use the dedicated '+ AI' button beside each dropdown to avoid rate-limit exhaustion.", "var(--accent-purple)");
-            return;
+            setLog("[AI Matching] Analyzing matching rows with Gemini...", "var(--accent-purple)");
         }
 
         const promptText = buildGeminiCompactPrompt(qData, courseCode, que);
@@ -17435,6 +17511,17 @@ function setupAccountTransferUI() {
                         matched.input.dispatchEvent(new Event('input', { bubbles: true }));
                         matched.input.dispatchEvent(new Event('change', { bubbles: true }));
                     }
+                } else if (matched && Array.isArray(matched.matchingRows)) {
+                    matched.matchingRows.forEach(item => {
+                        if (item.select && item.option) {
+                            item.select.value = item.option.value;
+                            item.select.dispatchEvent(new Event('input', { bubbles: true }));
+                            item.select.dispatchEvent(new Event('change', { bubbles: true }));
+                            item.select.dispatchEvent(new Event('blur', { bubbles: true }));
+                            item.select.style.outline = '2px solid #a855f7';
+                            item.select.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+                        }
+                    });
                 }
 
                 if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
@@ -25511,35 +25598,46 @@ function setupAccountTransferUI() {
             }
 
             showToast(`Found ${items.length} ${category} items to ${goal === 'mark_done' ? 'mark' : 'undo'}. Processing...`, 2500);
-            setLog(`Found ${items.length} items. Starting...`);
+            // Partition items into Fast Track (manual clicks / undo) vs Safe Track (auto-view network fetches)
+            const fastItems = [];
+            const autoViewItems = [];
+
+            for (const item of items) {
+                if (item.isAutoView && item.autoViewUrl) {
+                    autoViewItems.push(item);
+                } else if (item.button) {
+                    fastItems.push(item);
+                }
+            }
+
+            const totalCount = items.length;
+            showToast(`Found ${totalCount} ${category} items to ${goal === 'mark_done' ? 'mark' : 'undo'}. Processing...`, 2500);
 
             let processedCount = 0;
-            for (let i = 0; i < items.length; i++) {
-                if (shouldStop) {
-                    showToast(`Stopped. Processed ${processedCount} items.`);
-                    setLog(`Stopped. Processed ${processedCount} items.`, "var(--accent-amber)");
-                    break;
-                }
 
-                const item = items[i];
-                const gradeSuffix = item.gradePct !== null && item.gradePct !== undefined ? ` [${item.gradePct}%]` : '';
-                setLog(`[${i + 1}/${items.length}] ${actionLabel}: <b>${item.title.substring(0, 22)}...</b>${gradeSuffix}`);
+            // Track 1: Fast Micro-Stagger Queue for Manual Buttons and Undo (Lectures, Passed Quizzes, Undo All)
+            if (fastItems.length > 0 && !shouldStop) {
+                setLog(`Processing ${fastItems.length} manual ${actionLabel.toLowerCase()} actions in high-speed batch...`);
 
-                const targetElem = item.button || item.badgeElem || item.container;
-                if (targetElem && typeof targetElem.scrollIntoView === 'function') {
-                    targetElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
+                for (let i = 0; i < fastItems.length; i++) {
+                    if (shouldStop) break;
 
-                if (item.isAutoView && item.autoViewUrl) {
-                    if (typeof autoViewActivity === 'function') {
-                        await autoViewActivity(item.autoViewUrl, item.badgeElem, item.container);
+                    const item = fastItems[i];
+                    processedCount++;
+
+                    // Throttled UI logging to avoid log feed DOM flooding on large lists
+                    if (i === 0 || i === fastItems.length - 1 || i % 3 === 0) {
+                        const gradeSuffix = item.gradePct !== null && item.gradePct !== undefined ? ` [${item.gradePct}%]` : '';
+                        setLog(`[${processedCount}/${totalCount}] ${actionLabel}: <b>${item.title.substring(0, 22)}...</b>${gradeSuffix}`);
                     }
-                } else if (item.button) {
+
+                    // Reliable pointer dispatch without jarring smooth-scroll
                     if (typeof triggerClick === 'function') {
                         triggerClick(item.button);
                     } else {
                         item.button.click();
                     }
+
                     if (goal === 'mark_done') {
                         try {
                             item.button.classList.remove('btn-outline-secondary');
@@ -25547,13 +25645,36 @@ function setupAccountTransferUI() {
                             item.button.style.opacity = '0.8';
                         } catch (_) {}
                     }
-                }
-                processedCount++;
 
-                await new Promise(r => setTimeout(r, 450));
+                    // Yield to browser event loop: keeps UI 60fps responsive, Stop button functional, and avoids server session queue deadlocks
+                    await new Promise(resolve => setTimeout(resolve, 40));
+                }
             }
 
-            if (!shouldStop) {
+            // Track 2: Safe Sequential Queue for Activities Requiring Page Loads ("To do: View")
+            if (autoViewItems.length > 0 && !shouldStop) {
+                setLog(`Opening ${autoViewItems.length} lecture activities requiring view verification...`, "var(--accent-blue)");
+
+                for (let i = 0; i < autoViewItems.length; i++) {
+                    if (shouldStop) break;
+
+                    const item = autoViewItems[i];
+                    processedCount++;
+                    setLog(`[${processedCount}/${totalCount}] Viewing: <b>${item.title.substring(0, 22)}...</b>`);
+
+                    if (typeof autoViewActivity === 'function') {
+                        await autoViewActivity(item.autoViewUrl, item.badgeElem, item.container);
+                    }
+
+                    // Safe network cadence
+                    await new Promise(resolve => setTimeout(resolve, 250));
+                }
+            }
+
+            if (shouldStop) {
+                showToast(`Stopped. Processed ${processedCount} of ${totalCount} items.`);
+                setLog(`Stopped by user. Processed ${processedCount} of ${totalCount} items.`, "var(--accent-amber)");
+            } else {
                 if (typeof playToolkitSound === 'function') {
                     playToolkitSound('quest_done');
                 }

@@ -1725,6 +1725,17 @@
                                                     oMatched.input.checked = true;
                                                     oMatched.input.click();
                                                 }
+                                            } else if (aiAutoSelect && oMatched && Array.isArray(oMatched.matchingRows)) {
+                                                oMatched.matchingRows.forEach(item => {
+                                                    if (item.select && item.option) {
+                                                        item.select.value = item.option.value;
+                                                        item.select.dispatchEvent(new Event('input', { bubbles: true }));
+                                                        item.select.dispatchEvent(new Event('change', { bubbles: true }));
+                                                        item.select.dispatchEvent(new Event('blur', { bubbles: true }));
+                                                        item.select.style.outline = '2px solid #a855f7';
+                                                        item.select.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+                                                    }
+                                                });
                                             }
                                         }
                                     }).catch(() => {});
@@ -4076,6 +4087,11 @@
     // Decorate Attempt quiz now / Re-attempt quiz button with key hint (Press A)
     function decorateQuizLandingAttemptButton() {
         if (typeof window === 'undefined' || !window.location.pathname.includes('/mod/quiz/view.php')) return;
+
+        if (typeof checkAndAutoMarkDoneOnQuizLanding === 'function') {
+            checkAndAutoMarkDoneOnQuizLanding();
+        }
+
         const startBtn = document.querySelector(
             'form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], ' +
             '.quizstartbutton button, .quizstartbutton input[type="submit"], ' +
@@ -4095,10 +4111,6 @@
             if (!startBtn.value.includes('(Press A)')) {
                 startBtn.value = `${startBtn.value} (Press A)`;
             }
-        }
-
-        if (typeof checkAndAutoMarkDoneOnQuizLanding === 'function') {
-            checkAndAutoMarkDoneOnQuizLanding();
         }
     }
 
@@ -4127,7 +4139,12 @@
             // Attempt / Re-attempt Quiz Shortcut on Quiz Landing Pages (/mod/quiz/view.php): 'A' or 'Enter'
             const isQuizLanding = typeof window !== 'undefined' && window.location.pathname.includes('/mod/quiz/view.php');
             if (isQuizLanding && (e.key === 'a' || e.key === 'A' || e.key === 'Enter')) {
-                const confirmModalBtn = document.querySelector('.moodle-dialogue-bd button.btn-primary, .modal.show button.btn-primary, .modal button.btn-primary[data-action="save"]');
+                const confirmModalBtn = document.querySelector(
+                    '.moodle-dialogue-bd button.btn-primary, .moodle-dialogue-bd input[type="submit"], ' +
+                    '.modal.show button.btn-primary, .modal.show input[type="submit"], ' +
+                    '.modal button.btn-primary[data-action="save"], input[type="submit"][value*="Start attempt" i], ' +
+                    'button[data-action="save"], .confirmation-dialog button.btn-primary'
+                );
                 if (confirmModalBtn) {
                     e.preventDefault();
                     confirmModalBtn.click();
@@ -4145,6 +4162,24 @@
                     showToast("Starting quiz attempt... (A)");
                     setLog("Triggered <b>Attempt Quiz</b> via keyboard shortcut [A]", "var(--accent-green)");
                     startBtn.click();
+
+                    // Immediately auto-confirm attempt modal if Moodle pops it up
+                    let attempts = 0;
+                    const confirmInterval = setInterval(() => {
+                        attempts++;
+                        const mBtn = document.querySelector(
+                            '.moodle-dialogue-bd button.btn-primary, .moodle-dialogue-bd input[type="submit"], ' +
+                            '.modal.show button.btn-primary, .modal.show input[type="submit"], ' +
+                            '.modal button.btn-primary[data-action="save"], input[type="submit"][value*="Start attempt" i], ' +
+                            'button[data-action="save"], .confirmation-dialog button.btn-primary'
+                        );
+                        if (mBtn) {
+                            clearInterval(confirmInterval);
+                            mBtn.click();
+                        } else if (attempts >= 25) {
+                            clearInterval(confirmInterval);
+                        }
+                    }, 40);
                     return;
                 }
             }

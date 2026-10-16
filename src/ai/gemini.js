@@ -1450,6 +1450,7 @@
                 const matchingRows = getMatchingAiRows(que);
                 const suggestions = parseMatchingAiResponse(answerText, matchingRows);
                 if (suggestions.length > 0) {
+                    const shouldAutoApply = Boolean(aiAutoSelect || autoPickQuiz || autoQuizMode);
                     suggestions.forEach(suggestion => {
                         suggestion.row.querySelectorAll('.amaes-ai-matching-suggestion').forEach(el => el.remove());
                         const badge = document.createElement('div');
@@ -1463,8 +1464,10 @@
                         useButton.textContent = 'Use suggestion';
                         useButton.style.cssText = 'padding: 2px 7px; border: 1px solid #c084fc; border-radius: 4px; background: #faf5ff; color: #7e22ce; font-size: 10px; font-weight: 700; cursor: pointer;';
                         useButton.addEventListener('click', event => {
-                            event.preventDefault();
-                            event.stopPropagation();
+                            if (event) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                            }
                             suggestion.select.value = suggestion.option.value;
                             suggestion.select.dispatchEvent(new Event('input', { bubbles: true }));
                             suggestion.select.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1476,11 +1479,21 @@
                         });
                         badge.append(label, useButton);
                         suggestion.select.insertAdjacentElement('afterend', badge);
+
+                        if (shouldAutoApply) {
+                            useButton.click();
+                        }
                     });
                     const summary = suggestions.map(item => `Row ${item.rowIndex + 1}: ${item.option.text.trim()}`).join('; ');
                     const partial = suggestions.length < matchingRows.length;
-                    setLog(`[AI Suggestion] Gemini suggested ${suggestions.length} of ${matchingRows.length} matching rows${partial ? '; unmatched rows were left unchanged' : ''}. Review each unverified row before continuing.`, "var(--accent-purple)");
-                    showToast(`Gemini suggested ${suggestions.length} matching answer${suggestions.length === 1 ? '' : 's'}; review before continuing.`, 3500);
+                    setLog(`[AI Suggestion] Gemini suggested ${suggestions.length} of ${matchingRows.length} matching rows${partial ? '; unmatched rows were left unchanged' : ''}.${shouldAutoApply ? ' Auto-selected choices.' : ' Review each unverified row before continuing.'}`, "var(--accent-purple)");
+                    showToast(`Gemini suggested ${suggestions.length} matching answer${suggestions.length === 1 ? '' : 's'}${shouldAutoApply ? ' (auto-selected)' : '; review before continuing'}.`, 3500);
+
+                    if (shouldAutoApply) {
+                        que.querySelectorAll('.amaes-blockage-hud, .amaes-ai-fallback-bar, .amaes-unanswered-hint').forEach(el => el.remove());
+                        setQuestionAiTag(que, true);
+                    }
+
                     if (typeof onSuccess === 'function') {
                         await onSuccess({ choiceText: summary, matchingRows: suggestions });
                     }
@@ -1775,11 +1788,7 @@
         const courseCode = courseInfo.subjectCode || '';
 
         if (qData.questionType === 'match') {
-            if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini} <span>Built-in AI</span>`;
-            if (blockageAiBtn) blockageAiBtn.innerHTML = `${ICONS.gemini} <span>Built-in AI</span>`;
-            showToast("Matching questions: click '+ AI' beside each dropdown to solve on-demand without rate limits.", 4000);
-            setLog("[AI Matching] Use the dedicated '+ AI' button beside each dropdown to avoid rate-limit exhaustion.", "var(--accent-purple)");
-            return;
+            setLog("[AI Matching] Analyzing matching rows with Gemini...", "var(--accent-purple)");
         }
 
         const promptText = buildGeminiCompactPrompt(qData, courseCode, que);
@@ -1808,6 +1817,17 @@
                         matched.input.dispatchEvent(new Event('input', { bubbles: true }));
                         matched.input.dispatchEvent(new Event('change', { bubbles: true }));
                     }
+                } else if (matched && Array.isArray(matched.matchingRows)) {
+                    matched.matchingRows.forEach(item => {
+                        if (item.select && item.option) {
+                            item.select.value = item.option.value;
+                            item.select.dispatchEvent(new Event('input', { bubbles: true }));
+                            item.select.dispatchEvent(new Event('change', { bubbles: true }));
+                            item.select.dispatchEvent(new Event('blur', { bubbles: true }));
+                            item.select.style.outline = '2px solid #a855f7';
+                            item.select.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
+                        }
+                    });
                 }
 
                 if (cardAiBtn) cardAiBtn.innerHTML = `${ICONS.gemini} <span>Retry AI</span>`;
