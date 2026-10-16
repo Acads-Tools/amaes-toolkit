@@ -17,6 +17,11 @@
   <a href=".github/workflows/privacy-check.yml"><img src="https://img.shields.io/badge/privacy--audit-passing-brightgreen.svg" alt="Privacy Check Passed"></a>
 </p>
 
+<p align="center">
+  <a href="https://amaestoolkit.pages.dev/"><strong>Open Fast Web Installer: https://amaestoolkit.pages.dev</strong></a>
+</p>
+
+> [!IMPORTANT]
 > **Compatibility Notice:** Version **1.13.0** is the active supported release. Older clients are blocked at startup and must be updated via Violentmonkey or the [official userscript link](https://raw.githubusercontent.com/Acads-Tools/amaes-toolkit/main/amaes-toolkit.user.js). Review [CLIENT-COMPATIBILITY.md](docs/CLIENT-COMPATIBILITY.md) for full version lifecycle policies.
 
 ---
@@ -40,6 +45,7 @@
 * [Installation & Setup](#installation--setup)
 * [Keyboard Shortcuts](#keyboard-shortcuts)
 * [Developer & Contributing Guide](#developer--contributing-guide)
+  * [Forking & Adapting for Other Moodle Portals](#forking--adapting-for-other-moodle-portals)
 * [Zero Telemetry & Privacy Architecture](#zero-telemetry--privacy-architecture)
 * [Frequently Asked Questions](#frequently-asked-questions)
 * [Academic Integrity & Liability Disclaimer](#academic-integrity--liability-disclaimer)
@@ -297,6 +303,45 @@ npm run test:live:jenny
 # Validate JavaScript syntax
 npm run syntax
 ```
+
+### Forking & Adapting for Other Moodle Portals
+
+AMAES Toolkit is designed to be fully modular and adaptable to other institutions running standard Moodle 3.x or 4.x installations. If you want to fork this project and deploy it for your own university, college, or study group, follow these steps:
+
+#### 1. Configure Portal Domain Matches
+Open `src/meta.js` and update the `@match` headers to include your institution's Moodle URL:
+```javascript
+// @match        https://moodle.youruniversity.edu/*
+// @match        https://portal.youruniversity.edu/*
+```
+
+#### 2. Update Repository & Service Constants
+Open `src/core/config.js` and update the repository endpoints and portal links:
+```javascript
+const SCRIPT_RAW_URL = "https://raw.githubusercontent.com/YOUR_ORG/YOUR_REPO/main/amaes-toolkit.user.js";
+const GITHUB_REPO_URL = "https://github.com/YOUR_ORG/YOUR_REPO";
+const WEBSITE_URL = "https://your-domain.pages.dev/";
+```
+If your school's Moodle uses dynamic term path prefixes (such as `/term2026/`), adjust the regular expression in `getSemesterBasePath()` inside `src/core/config.js`.
+
+#### 3. Standard Moodle DOM Compatibility
+The toolkit uses universal Moodle CSS selectors located in `src/moodle/detector.js`:
+* Question Blocks: `.que` (covering `.multichoice`, `.truefalse`, `.shortanswer`, `.match`, `.gapselect`)
+* Question Formulations: `.formulation`, `.qtext`
+* Choices & Options: `.answer > div`, `input[type="radio"]`, `input[type="checkbox"]`
+* Navigation Buttons: `.mod_quiz-next-nav`, `input[name="next"]`, `.submitbtns`
+
+These standard classes work natively across standard Moodle distributions. If your institution uses a customized Moodle theme that alters standard class names, you can customize the query selectors in `src/moodle/detector.js`.
+
+#### 4. Build, Verify & Deploy
+```bash
+# Bundle your modules into root and public/ distribution files
+npm run build
+
+# Verify your build passes the unit test suite
+npm test
+```
+The static installer portal in `public/` can be deployed for free in seconds using Cloudflare Pages (`npx wrangler pages deploy public --project-name your-project --branch main`) or GitHub Pages.
 
 ### Privacy & Contributor Rules
 * **Mandatory Zero-PII Rule:** All commits must adhere strictly to anonymous project identity:
