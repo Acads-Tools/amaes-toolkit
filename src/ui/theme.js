@@ -654,9 +654,10 @@
                 }
             });
         }
-        if (courseCode) {
+        const cCode = courseCode || (typeof detectCourseInfo === 'function' ? (detectCourseInfo().subjectCode || '') : '');
+        if (cCode) {
             try {
-                const cached = getCachedAnswers(courseCode);
+                const cached = getCachedAnswers(cCode);
                 if (Array.isArray(cached) && qData && qData.qText) {
                     const qNorm = normalizeText(qData.qText);
                     const candidates = cached.filter(item => questionTextMatches(item.qNorm || item.qRaw || item.question, qNorm));

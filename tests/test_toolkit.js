@@ -2714,7 +2714,7 @@ test("Study-Guide Links & Opt-In Auto-Pick: links sources and keeps unverified f
     assert.ok(script.includes("Suggested (${studyGuide.label}, unconfirmed):</a>"), "Unconfirmed study-guide headers must link to their source");
     assert.ok(script.includes(".amaes-verified-badge, .amaes-unverified-badge, .amaes-eliminated-badge"), "Re-highlighting must remove prior unverified badges to prevent duplicates");
     assert.ok(script.includes("setQuestionStudyGuideTag(que, studyGuide.label)"), "Matched study-guide answers must receive a prominent unverified source banner");
-    assert.ok(script.includes("!ANSWER_SHARING_DISABLED_COURSES.has(String(sCode || '').toUpperCase())"), "Test Another Choice must be omitted for courses whose overall scores cannot validate answers");
+    assert.ok(!script.includes("Test Another Choice"), "Deprecated Test Another Choice must be omitted");
     assert.ok(script.includes("STUDY-GUIDE MATCH") && script.includes("(Unverified — review before submitting)"), "Study-guide banner must not imply AI or verified evidence");
 
     // 3. Automatic selection/fill requires confirmed evidence unless study-guide fallback is explicitly enabled in Auto-Quiz.
@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.16'), "Userscript header must specify v1.13.16");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.16";'), "Constant SCRIPT_VERSION must be v1.13.16");
+    assert.ok(script.includes('@version      1.13.17'), "Userscript header must specify v1.13.17");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.17";'), "Constant SCRIPT_VERSION must be v1.13.17");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -5207,8 +5207,8 @@ test("Monotone Course Tools Design, Non-Reviewed Quiz Intelligence & Admin Kills
     assert.ok(script.includes("function getUnreviewedAttemptEntry"), "Must define getUnreviewedAttemptEntry helper");
     assert.ok(script.includes("function saveUnreviewedAttemptEvidence"), "Must define saveUnreviewedAttemptEvidence helper");
     assert.ok(script.includes("[PREVIOUS UNREVIEWED ATTEMPT]"), "Prompt builder must include prior unreviewed attempt context");
-    assert.ok(script.includes("amaes-unreviewed-history-note"), "Must define unreviewed attempt history notice class");
-    assert.ok(script.includes("Test Another Choice"), "Must offer an explicitly speculative alternative action on unreviewed attempts");
+    assert.ok(!script.includes("amaes-unreviewed-history-note"), "Deprecated amaes-unreviewed-history-note banner must be removed");
+    assert.ok(!script.includes("Test Another Choice"), "Deprecated Test Another Choice button must be removed");
 
     // 5. Remote Admin Feature Flags & Killswitch
     assert.ok(script.includes("function getRemoteFeatureFlags"), "Must define getRemoteFeatureFlags helper");
@@ -6309,7 +6309,7 @@ test("Composite Matching Question UI Hygiene, Configurable Summary Leeway Delay 
     assert.ok(harvesterSrc.includes("selectedDropdownTexts.length === 1 && !isMatchingQuestion"), "harvester.js must not harvest composite dropdowns as joined string");
     assert.ok(harvesterSrc.includes("if (q.questionType === 'match' && ansText.includes(',')) return false;"), "harvester.js queueCommunityContribution must reject joined match answers");
     assert.ok(solverSrc.includes("selectInputs.length === 1"), "solver.js syncCurrentPageSelectionsToEvidence must only record single select answers");
-    assert.ok(solverSrc.includes("!isCompositeOrMatching && !hasAnyVerifiedCandidate && prevAnsText"), "solver.js must suppress unreviewed history banner on composite/matching questions");
+    assert.ok(!solverSrc.includes("amaes-unreviewed-history-note"), "solver.js must not render unreviewed history banner on questions");
 });
 
 // --------------------------------------------------
@@ -6893,6 +6893,48 @@ test("Multi-Choice Checkbox Selection Invariants, Non-Inverting safelySelectInpu
     // 6. Elimination auto-uncheck guard for checkboxes
     assert.ok(solverSrc.includes("if (input && input.type === 'checkbox' && input.checked && (autoQuizMode || autoPickQuiz || isManualSelect) && hasAnyVerifiedCandidate)"),
         "solver.js must auto-uncheck eliminated checkboxes when verified candidates exist");
+});
+
+// --------------------------------------------------
+// 204. Deprecated Unreviewed Attempt Probe Removal & TOGAF Phase C Answer Precision (v1.13.17)
+// --------------------------------------------------
+test("Deprecated Unreviewed Attempt Probe Removal & TOGAF Phase C Answer Precision (v1.13.17)", () => {
+    const fs = require('fs');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const themeSrc = fs.readFileSync('src/ui/theme.js', 'utf8');
+    const builtScript = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Complete removal of deprecated "Test Another Choice" button and unreviewed history note
+    assert.ok(!solverSrc.includes("amaes-btn-try-alt"), "solver.js must not contain deprecated amaes-btn-try-alt class");
+    assert.ok(!solverSrc.includes("Test Another Choice"), "solver.js must not contain deprecated Test Another Choice button");
+    assert.ok(!solverSrc.includes("amaes-unreviewed-history-note"), "solver.js must not contain deprecated amaes-unreviewed-history-note");
+    assert.ok(!builtScript.includes("amaes-btn-try-alt"), "Built userscript must not contain deprecated amaes-btn-try-alt class");
+    assert.ok(!builtScript.includes("Test Another Choice"), "Built userscript must not contain deprecated Test Another Choice button");
+    assert.ok(!builtScript.includes("amaes-unreviewed-history-note"), "Built userscript must not contain deprecated amaes-unreviewed-history-note");
+
+    // 2. Unreviewed probe questions must not block question focus or solver progression
+    assert.ok(!solverSrc.includes("hasUnreviewedNote"), "solver.js must not check hasUnreviewedNote in unreviewedOrProbeQuestions");
+    assert.ok(!solverSrc.includes("!que.querySelector('.amaes-unreviewed-history-note')"), "solver.js must not guard new question focus banner with unreviewed note");
+
+    // 3. getEliminatedChoicesForQuestion falls back to detected course code
+    assert.ok(themeSrc.includes("const cCode = courseCode || (typeof detectCourseInfo === 'function' ? (detectCourseInfo().subjectCode || '') : '');"),
+        "getEliminatedChoicesForQuestion must fall back to detectCourseInfo subjectCode when courseCode argument is omitted");
+
+    // 4. IT6205A TOGAF Security Architecture Question Validation
+    const dbPath = '../database/data/verified/IT6205A.json';
+    if (fs.existsSync(dbPath)) {
+        const verifiedDb = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+        const questions = Array.isArray(verifiedDb) ? verifiedDb : (verifiedDb.questions || []);
+        const togafEntry = questions.find(item =>
+            item.question && item.question.includes("appropriate to the security architecture must be addressed within each phase in addition to the generic phase activities")
+        );
+        assert.ok(togafEntry, "IT6205A verified database must contain TOGAF security architecture entry");
+        assert.strictEqual(togafEntry.answer, "Phase C: Information Systems Architecture",
+            "TOGAF generic phase activities question must have correct answer Phase C: Information Systems Architecture");
+        assert.ok(Array.isArray(togafEntry.wrongAnswers), "Entry must have wrongAnswers array");
+        assert.ok(togafEntry.wrongAnswers.includes("Phase A: Architecture Vision"),
+            "Eliminated prior attempt answer Phase A: Architecture Vision must be in wrongAnswers");
+    }
 });
 
 console.log("\n==================================================");

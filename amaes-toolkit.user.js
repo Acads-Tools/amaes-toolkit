@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AMAES Toolkit
 // @namespace    https://semestral.amaes.com/
-// @version      1.13.16
+// @version      1.13.17
 // @description  Universal Study Toolkit for AMA Online Education (AMAOEd / AMAES) Moodle portals. Features Auto-Harvesting with Dynamic Fallback, Multi-Course Grades Harvester, AI Prompt Formatter, Cross-Attempt Database, Cloud Sync, and Auto-Quiz Solver.
 // @author       Academic Contributor
 // @match        https://semestral.amaes.com/*
@@ -35,7 +35,7 @@
 (function () {
     'use strict';
 
-    const SCRIPT_VERSION = "v1.13.16";
+    const SCRIPT_VERSION = "v1.13.17";
     const CLIENT_VERSION = SCRIPT_VERSION.replace(/^v/i, '');
     const COMMUNITY_RELAY_URL = 'https://amaes-community-relay.acads-tools.workers.dev';
     const ANSWER_DB_SCHEMA_VERSION = 2;
@@ -2817,9 +2817,10 @@
                 }
             });
         }
-        if (courseCode) {
+        const cCode = courseCode || (typeof detectCourseInfo === 'function' ? (detectCourseInfo().subjectCode || '') : '');
+        if (cCode) {
             try {
-                const cached = getCachedAnswers(courseCode);
+                const cached = getCachedAnswers(cCode);
                 if (Array.isArray(cached) && qData && qData.qText) {
                     const qNorm = normalizeText(qData.qText);
                     const candidates = cached.filter(item => questionTextMatches(item.qNorm || item.qRaw || item.question, qNorm));
@@ -5416,7 +5417,6 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
                 const hasVerifiedBadge = que.querySelector('.amaes-verified-badge');
                 const hasAdaptiveBadge = que.querySelector('.amaes-adaptive-probe-badge');
-                const hasUnreviewedNote = que.querySelector('.amaes-unreviewed-history-note');
                 const hasAiBadge = que.querySelector('.amaes-ai-suggested-badge');
                 const hasUnverifiedBadge = que.querySelector('.amaes-unverified-badge');
                 const hasDragHint = que.querySelector('.amaes-drag-hint');
@@ -5427,7 +5427,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 const isAutoPickedStudyGuideFallback = autoQuizMode && autoPickStudyGuideFallback &&
                     que.dataset.amaesStudyGuideFallbackPicked === 'true';
                 if (!isAutoPickedStudyGuideFallback &&
-                    (hasUnreviewedNote || hasAdaptiveBadge || hasAiBadge || hasUnverifiedBadge)) {
+                    (hasAdaptiveBadge || hasAiBadge || hasUnverifiedBadge)) {
                     unreviewedOrProbeQuestions.push(que);
                 }
 
@@ -5436,7 +5436,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 const textInputs = que.querySelectorAll('input[type="text"], input.form-control, textarea, input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
 
                 let isFullyVerified = false;
-                if (hasVerifiedBadge && !hasUnreviewedNote && !hasAdaptiveBadge && !hasAiBadge && !hasUnverifiedBadge) {
+                if (hasVerifiedBadge && !hasAdaptiveBadge && !hasAiBadge && !hasUnverifiedBadge) {
                     isFullyVerified = true;
                 } else if (dropZones.length > 0) {
                     isFullyVerified = que.querySelectorAll('.amaes-drag-hint').length >= dropZones.length;
@@ -8974,7 +8974,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
             // Clone qtext and remove input, select, textarea, drop zones, and badges so inline blanks match AMAUOED entries cleanly
             const qClone = qtextElem.cloneNode(true);
-            qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-new-question-focus-banner, .amaes-unsure-help-chip, .amaes-unreviewed-history-note, .amaes-known-wrong-answer-warning, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-question-tag').forEach(el => el.remove());
+            qClone.querySelectorAll('input, select, textarea, .drop, .draghome, .drags, .amaes-shortans-hint, .amaes-select-hint, .amaes-drag-hint, .amaes-unanswered-hint, .amaes-blockage-hud, .amaes-new-question-focus-banner, .amaes-unsure-help-chip, .amaes-known-wrong-answer-warning, .amaes-verified-badge, .amaes-probability-hint, .amaes-review-status-pill, .amaes-review-outcome-banner, .amaes-que-top-toolbar, .amaes-que-stop-btn, .amaes-ai-question-tag').forEach(el => el.remove());
             const moodleQRaw = qClone.innerText.trim();
             const moodleQNorm = normalizeText(moodleQRaw);
 
@@ -9042,84 +9042,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             const hasAnyVerifiedCandidate = candidates.some(item => isConfirmedCandidate(item));
 
             // Clean up any prior hints
-            que.querySelectorAll('.amaes-unanswered-hint, .amaes-unreviewed-history-note, .amaes-known-wrong-answer-warning, .amaes-ambiguous-question-match-note, .amaes-study-guide-question-tag').forEach(b => b.remove());
-
-            // Check if this question was previously answered under an unreviewed attempt (<100% score)
-            const unreviewed = typeof getUnreviewedAttemptEntry === 'function' ? getUnreviewedAttemptEntry(moodleQNorm, sCode) : null;
-            const probeData = typeof getProbeEntry === 'function' ? getProbeEntry(moodleQNorm, sCode) : null;
-            const displayPercentage = unreviewed ? unreviewed.percentage : (probeData ? probeData.lastPercentage : (quizSummary ? quizSummary.percentage : null));
-            const preCheckedRadio = que.querySelector('.answer input[type="radio"]:checked');
-            const preCheckedText = preCheckedRadio ? cleanDOMToAI(preCheckedRadio.closest('label') || preCheckedRadio.parentElement).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim() : null;
-            const prevAnsText = (unreviewed && unreviewed.selectedAnswer) || (probeData && probeData.lastAns) || preCheckedText || null;
-            const isCompositeOrMatching = (typeof identifyQuestionType === 'function' && identifyQuestionType(que) === 'match') ||
-                que.querySelectorAll('select').length > 1 ||
-                que.querySelectorAll('.answer table tr select, .answer tr select').length > 0 ||
-                Boolean(prevAnsText && prevAnsText.includes(','));
-
-            if (!isCompositeOrMatching && !hasAnyVerifiedCandidate && prevAnsText && displayPercentage !== null && displayPercentage < 100 && checkIsQuizAttemptPage()) {
-                const formulation = que.querySelector('.formulation, .content') || que;
-                const note = document.createElement('div');
-                note.className = 'amaes-unreviewed-history-note';
-                note.style.cssText = `
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    gap: 8px;
-                    margin-bottom: 8px;
-                    padding: 4px 10px;
-                    background: rgba(245, 158, 11, 0.08);
-                    border: 1px solid rgba(245, 158, 11, 0.28);
-                    border-left: 3px solid #f59e0b;
-                    border-radius: 6px;
-                    font-size: 10.5px;
-                    color: var(--text-secondary);
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                `;
-                const canTestAnotherChoice = !ANSWER_SHARING_DISABLED_COURSES.has(String(sCode || '').toUpperCase());
-                note.innerHTML = `
-                    <div>
-                        <span style="background: rgba(245, 158, 11, 0.2); color: #d97706; padding: 1px 5px; border-radius: 3px; font-weight: 700; font-size: 9px; margin-right: 4px;">UNREVIEWED ATTEMPT</span>
-                        <span>Prior attempt scored <b>${displayPercentage}% overall</b>; this selection is not confirmed. Selected: <i>"${escapeHtml(prevAnsText)}"</i></span>
-                    </div>
-                    ${canTestAnotherChoice ? '<button type="button" class="amaes-btn-try-alt" title="A different choice is only a test; the overall quiz score does not show this answer was wrong." style="background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); border-radius: 4px; padding: 2px 7px; font-size: 9.5px; cursor: pointer; white-space: nowrap; font-weight: 600;">Test Another Choice</button>' : ''}
-                `;
-                const altBtn = note.querySelector('.amaes-btn-try-alt');
-                if (altBtn) {
-                    altBtn.onclick = (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const prevNorm = unreviewed ? unreviewed.ansNorm : normalizeChoice(prevAnsText);
-                        // Eliminate previous choice row
-                        const choiceRows = que.querySelectorAll('.answer > div, .answer div.r0, .answer div.r1, .answer li, .answer tr, .answer label');
-                        choiceRows.forEach(r => {
-                            const lbl = r.querySelector('label') || r;
-                            const txt = normalizeChoice(cleanDOMToAI(lbl));
-                            if (txt && prevNorm && (txt === prevNorm || txt.includes(prevNorm) || prevNorm.includes(txt))) {
-                                r.classList.add('amaes-eliminated-row');
-                                lbl.style.textDecoration = 'line-through';
-                                lbl.style.opacity = '0.5';
-                            }
-                        });
-                        showToast('Previous choice marked. Switching to alternative choice...', 2500);
-                        // Find remaining alternative row and select it
-                        const altRow = Array.from(choiceRows).find(r => !r.classList.contains('amaes-eliminated-row') && !r.classList.contains('amaes-eliminated-choice'));
-                        if (altRow) {
-                            const inp = altRow.querySelector('input[type="radio"], input[type="checkbox"]');
-                            const lbl = altRow.querySelector('label') || altRow;
-                            if (inp) {
-                                safelySelectInput(inp);
-                                const choiceText = cleanDOMToAI(lbl).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
-                                altRow.classList.add('amaes-adaptive-probe-choice');
-                                que.dataset.amaesProbeFlipped = 'true';
-                                recordAttemptAnswerEvidence(que, choiceText, 'manual_alt_probe', { verified: false, isAdaptiveProbe: true });
-                            }
-                        } else if (typeof manualSolveWithAi === 'function') {
-                            manualSolveWithAi(que);
-                        }
-                    };
-                }
-                formulation.insertBefore(note, formulation.firstChild);
-            }
+            que.querySelectorAll('.amaes-unanswered-hint, .amaes-known-wrong-answer-warning, .amaes-ambiguous-question-match-note, .amaes-study-guide-question-tag').forEach(b => b.remove());
 
             if (hasAmbiguousQuestionMatch) {
                 const formulation = que.querySelector('.formulation, .content') || que;
@@ -9132,7 +9055,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
             }
 
             if (candidates.length === 0) {
-                if (checkIsQuizAttemptPage() && !que.querySelector('.amaes-new-question-focus-banner') && !que.querySelector('.amaes-unreviewed-history-note') && !que.querySelector('.amaes-blockage-hud')) {
+                if (checkIsQuizAttemptPage() && !que.querySelector('.amaes-new-question-focus-banner') && !que.querySelector('.amaes-blockage-hud')) {
                     que.classList.add('amaes-no-answer-que');
                     const numElem = que.querySelector('.info .no, .qno');
                     const qNum = numElem ? numElem.innerText.replace(/[^0-9]/g, '') : '';
