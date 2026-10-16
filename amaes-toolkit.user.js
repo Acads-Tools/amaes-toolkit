@@ -30,7 +30,7 @@
 // @connect      api.typesafe.ai
 // @run-at       document-end
 // @license      MIT
-// @homepageURL  https://github.com/Acads-Tools/amaes-toolkit
+// @homepageURL  https://amaestoolkit.pages.dev/
 // @supportURL   https://github.com/Acads-Tools/amaes-toolkit/issues
 // ==/UserScript==
 (function () {
