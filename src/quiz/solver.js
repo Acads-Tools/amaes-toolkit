@@ -1632,11 +1632,7 @@
                             } else if (aiAutoSelect && matched && matched.input) {
                                 const anyChecked = Boolean(firstBlockedQue.querySelector('.answer input[type="radio"]:checked, .answer input[type="checkbox"]:checked'));
                                 if (!anyChecked) {
-                                    matched.input.checked = true;
-                                    matched.input.click();
-                                    if (matched.input.parentElement) matched.input.parentElement.click();
-                                    matched.input.dispatchEvent(new Event('input', { bubbles: true }));
-                                    matched.input.dispatchEvent(new Event('change', { bubbles: true }));
+                                    safelySelectInput(matched.input);
                                 }
                                 showToast(`Gemini selected a choice for #${qData ? qData.qNum : ''}. (Paused for review)`, 3000);
                                 setLog(`[AI Suggestion] Gemini selected <b>${escapeHtml(matched.choiceText)}</b> for #${qData ? qData.qNum : ''}. (Prompt copied) Paused for review—press <b>N</b> or click Next page when ready.`, "var(--accent-purple)");
@@ -1675,10 +1671,7 @@
                                         oQue.style.borderRadius = '8px';
                                         setQuestionAiTag(oQue, true);
                                         if (aiAutoSelect && oMatched && oMatched.input) {
-                                            if (oMatched.input.type === 'radio' || oMatched.input.type === 'checkbox') {
-                                                oMatched.input.checked = true;
-                                                oMatched.input.click();
-                                            }
+                                            safelySelectInput(oMatched.input);
                                         }
                                     }
                                 }).catch(() => {});
@@ -1721,10 +1714,7 @@
                                             oQue.style.borderRadius = '8px';
                                             setQuestionAiTag(oQue, true);
                                             if (aiAutoSelect && oMatched && oMatched.input) {
-                                                if (oMatched.input.type === 'radio' || oMatched.input.type === 'checkbox') {
-                                                    oMatched.input.checked = true;
-                                                    oMatched.input.click();
-                                                }
+                                                safelySelectInput(oMatched.input);
                                             } else if (aiAutoSelect && oMatched && Array.isArray(oMatched.matchingRows)) {
                                                 oMatched.matchingRows.forEach(item => {
                                                     if (item.select && item.option) {
@@ -1955,6 +1945,32 @@
         try { el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window })); } catch (_) {}
         try { el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window })); } catch (_) {}
         try { el.click(); } catch (_) {}
+    }
+
+    function safelySelectInput(input) {
+        if (!input) return false;
+        try {
+            // If already checked, preserve checked state and avoid double-toggling
+            if (input.checked) return true;
+
+            // Trigger native activation behavior
+            try {
+                input.click();
+            } catch (_) {}
+
+            // Failsafe: Ensure checked property is strictly true
+            if (!input.checked) {
+                input.checked = true;
+            }
+
+            // Dispatch standard events so Moodle recognizes the selection
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+        } catch (err) {
+            logDebug(`safelySelectInput error: ${err.message}`);
+            return false;
+        }
     }
 
     function setInputValueWithEvents(input, val) {
@@ -3294,17 +3310,15 @@
 
             const isCheckbox = targetQue.querySelectorAll('.answer input[type="checkbox"]').length > 0;
 
-            // 1. Multi-letter matching for multi-choice checkbox questions (e.g. "a, c", "a and d", "A, B, C")
-            const multiLetters = cleanText.match(/\b([a-dA-D])\b/g);
+            // 1. Multi-letter matching for multi-choice checkbox questions (e.g. "a, c", "a and d", "A, B, C, E, F")
+            const multiLetters = cleanText.match(/\b([a-zA-Z])\b/g);
             if (isCheckbox && multiLetters && multiLetters.length > 1) {
                 const uniqueLetters = Array.from(new Set(multiLetters.map(l => l.toUpperCase())));
                 let checkedCount = 0;
                 uniqueLetters.forEach(letter => {
                     const idx = letter.charCodeAt(0) - 65;
-                    if (inputElements[idx]) {
-                        if (!inputElements[idx].checked) {
-                            inputElements[idx].click();
-                        }
+                    if (inputElements[idx] && idx >= 0 && idx < inputElements.length) {
+                        safelySelectInput(inputElements[idx]);
                         checkedCount++;
                     }
                 });
@@ -3318,13 +3332,13 @@
                 }
             }
 
-            // 2. Direct single letter matching: Look for option letter (A, B, C, D)
-            const matchLetter = cleanText.match(/(?:^|\b)(?:answer|option|choice|the correct answer is)?\s*[:\-–*]*\s*([a-dA-D])(?:\.|\)|:|\s|$)/i);
+            // 2. Direct single letter matching: Look for option letter (A through Z)
+            const matchLetter = cleanText.match(/(?:^|\b)(?:answer|option|choice|the correct answer is)?\s*[:\-–*]*\s*([a-zA-Z])(?:\.|\)|:|\s|$)/i);
             if (matchLetter && matchLetter[1]) {
                 const letter = matchLetter[1].toUpperCase();
                 const idx = letter.charCodeAt(0) - 65;
-                if (inputElements[idx]) {
-                    inputElements[idx].click();
+                if (inputElements[idx] && idx >= 0 && idx < inputElements.length) {
+                    safelySelectInput(inputElements[idx]);
                     showToast(`Auto-selected Option ${letter} from AI clipboard`);
                     setLog(`AI Paste: Selected Option <b>${letter}</b> from clipboard`, "var(--accent-green)");
                     if (autoNextQuiz) {
@@ -5037,11 +5051,7 @@
                             const inp = altRow.querySelector('input[type="radio"], input[type="checkbox"]');
                             const lbl = altRow.querySelector('label') || altRow;
                             if (inp) {
-                                inp.checked = true;
-                                inp.click();
-                                if (lbl && lbl !== inp) lbl.click();
-                                inp.dispatchEvent(new Event('input', { bubbles: true }));
-                                inp.dispatchEvent(new Event('change', { bubbles: true }));
+                                safelySelectInput(inp);
                                 const choiceText = cleanDOMToAI(lbl).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
                                 altRow.classList.add('amaes-adaptive-probe-choice');
                                 que.dataset.amaesProbeFlipped = 'true';
@@ -5324,17 +5334,38 @@
                     return normalizeChoice(cleanDOMToAI(lbl));
                 }).filter(Boolean);
 
-                // Check if the top verified candidate's stored answer appears in the live choices
+                // Check if candidate stored answer(s) appear in live choices (supporting multi-answer questions)
+                const getCandidateSubAnswers = (cand) => {
+                    if (!cand) return [];
+                    return (Array.isArray(cand.answers) ? cand.answers : [])
+                        .concat((cand.ansRaw || '').split(/[,;&\n]+|\s+and\s+/i))
+                        .concat((cand.answer || '').split(/[,;&\n]+|\s+and\s+/i))
+                        .map(s => normalizeChoice(s))
+                        .filter(Boolean);
+                };
+
                 const topCand = candidates[0];
                 const storedChoices = Array.isArray(topCand.choices) ? topCand.choices : [];
                 const storedAnsNorm = topCand.ansNorm || normalizeChoice(topCand.ansRaw || topCand.answer || '');
+                const topSubAnswers = getCandidateSubAnswers(topCand);
 
-                // Pool mismatch: stored answer exists but doesn't match any live choice
-                const storedAnsInLive = liveChoiceNorms.some(ln =>
-                    ln === storedAnsNorm || unscriptDigits(ln) === unscriptDigits(storedAnsNorm)
+                const matchesLive = (targetNorm) => liveChoiceNorms.some(ln =>
+                    ln === targetNorm || unscriptDigits(ln) === unscriptDigits(targetNorm)
                 );
-                // Only flag if the stored answer is non-empty AND not found in live choices
-                const poolChanged = storedAnsNorm && !storedAnsInLive && liveChoiceNorms.length > 0;
+
+                const topAnsInLive = topSubAnswers.length > 0
+                    ? topSubAnswers.some(matchesLive)
+                    : matchesLive(storedAnsNorm);
+
+                const anyCandInLive = topAnsInLive || candidates.some(cand => {
+                    if (!isConfirmedCandidate(cand)) return false;
+                    const subs = getCandidateSubAnswers(cand);
+                    const norm = cand.ansNorm || normalizeChoice(cand.ansRaw || cand.answer || '');
+                    return subs.length > 0 ? subs.some(matchesLive) : matchesLive(norm);
+                });
+
+                // Only flag if stored answer is non-empty AND none of the candidate answers match live choices
+                const poolChanged = storedAnsNorm && !anyCandInLive && liveChoiceNorms.length > 0;
 
                 if (poolChanged && !que.querySelector('.amaes-pool-changed-hint')) {
                     const formulation = que.querySelector('.formulation, .content') || que;
@@ -5494,11 +5525,7 @@
 
                         const canSelectAnswer = isManualSelect || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode));
                         if (canSelectAnswer && probeTarget.input && !probeTarget.input.checked) {
-                            probeTarget.input.checked = true;
-                            probeTarget.input.click();
-                            if (targetLbl && targetLbl !== probeTarget.input) targetLbl.click();
-                            probeTarget.input.dispatchEvent(new Event('input', { bubbles: true }));
-                            probeTarget.input.dispatchEvent(new Event('change', { bubbles: true }));
+                            safelySelectInput(probeTarget.input);
                         }
 
                         recordAttemptAnswerEvidence(que, probeTarget.rawText, 'adaptive_probe', {
@@ -5712,13 +5739,7 @@
                         const anyRadioChecked = isRadio && Boolean(que.querySelector('.answer input[type="radio"]:checked'));
                         const shouldSelect = canSelectAnswer && input && !input.checked && (!anyRadioChecked || hasVerifiedSource || isManualSelect);
                         if (shouldSelect) {
-                            input.checked = true;
-                            input.click();
-                            if (label && label !== input) {
-                                label.click();
-                            }
-                            input.dispatchEvent(new Event('input', { bubbles: true }));
-                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                            safelySelectInput(input);
                             const choiceTextClean = cleanDOMToAI(label).replace(/^[a-zA-Z0-9][.)]\s*/, '').trim();
                             recordAttemptAnswerEvidence(que, choiceTextClean,
                                 hasAiSource ? 'ai_inference' : (hasVerifiedSource ? 'verified_db' : 'study_guide_suggestion'), {
@@ -5784,6 +5805,14 @@
                             `;
                             targetRow.appendChild(badge);
                         }
+
+                        // Auto-uncheck eliminated checkbox if student or previous attempt pre-checked it
+                        if (input && input.type === 'checkbox' && input.checked && (autoQuizMode || autoPickQuiz || isManualSelect) && hasAnyVerifiedCandidate) {
+                            try { input.click(); } catch (_) {}
+                            if (input.checked) input.checked = false;
+                            input.dispatchEvent(new Event('input', { bubbles: true }));
+                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
                     }
                 }
             });
@@ -5836,13 +5865,7 @@
                     const canSelectAnswer = isManualSelect || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode));
                     const anyDeducedRadioChecked = Boolean(que.querySelector('.answer input[type="radio"]:checked'));
                     if (canSelectAnswer && deducedInput && !deducedInput.checked && (!anyDeducedRadioChecked || isManualSelect)) {
-                        deducedInput.checked = true;
-                        deducedInput.click();
-                        if (deducedLabel && deducedLabel !== deducedInput) {
-                            deducedLabel.click();
-                        }
-                        deducedInput.dispatchEvent(new Event('input', { bubbles: true }));
-                        deducedInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        safelySelectInput(deducedInput);
                     }
 
                     // Auto-save the deduced answer into course cache for permanent verification!
@@ -5905,11 +5928,7 @@
                         const canSelectAnswer = isManualSelect || (Boolean(autoSelect) && (autoPickQuiz || autoQuizMode) && aiAutoSelect);
                         const anyRadioChecked = Boolean(que.querySelector('.answer input[type="radio"]:checked'));
                         if (canSelectAnswer && matchedAi.input && !matchedAi.input.checked && (!anyRadioChecked || isManualSelect)) {
-                            matchedAi.input.checked = true;
-                            matchedAi.input.click();
-                            if (matchedAi.input.parentElement) matchedAi.input.parentElement.click();
-                            matchedAi.input.dispatchEvent(new Event('input', { bubbles: true }));
-                            matchedAi.input.dispatchEvent(new Event('change', { bubbles: true }));
+                            safelySelectInput(matchedAi.input);
                         }
                     }
                 }

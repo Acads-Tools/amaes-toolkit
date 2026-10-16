@@ -1843,11 +1843,16 @@
 
                 if (matched && matched.input) {
                     if (matched.input.type === 'radio' || matched.input.type === 'checkbox') {
-                        matched.input.checked = true;
-                        matched.input.click();
-                        if (matched.input.parentElement) matched.input.parentElement.click();
-                        matched.input.dispatchEvent(new Event('input', { bubbles: true }));
-                        matched.input.dispatchEvent(new Event('change', { bubbles: true }));
+                        if (typeof safelySelectInput === 'function') {
+                            safelySelectInput(matched.input);
+                        } else {
+                            if (!matched.input.checked) {
+                                matched.input.click();
+                                if (!matched.input.checked) matched.input.checked = true;
+                                matched.input.dispatchEvent(new Event('input', { bubbles: true }));
+                                matched.input.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                        }
                     }
                 } else if (matched && Array.isArray(matched.matchingRows)) {
                     matched.matchingRows.forEach(item => {

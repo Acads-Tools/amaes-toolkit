@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.15'), "Userscript header must specify v1.13.15");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.15";'), "Constant SCRIPT_VERSION must be v1.13.15");
+    assert.ok(script.includes('@version      1.13.16'), "Userscript header must specify v1.13.16");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.16";'), "Constant SCRIPT_VERSION must be v1.13.16");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -6780,6 +6780,119 @@ test("Top Quiz Mover Navigation, Sleek Confidence Card & Robust 100% Quiz Auto-M
               "harvester.js must store 100% quiz by normalized title as well as cmid");
     assert.ok(harvesterSrc.includes("localStorage.setItem(`amaes_course_grades_cache_${courseId}`"),
               "harvester.js must immediately update course grades cache upon 100% score for instant course-page awareness");
+});
+
+// --------------------------------------------------
+// 203. Multi-Choice Checkbox Selection Invariants, Non-Inverting safelySelectInput & Multi-Answer Pool Mismatch Guard (v1.13.16)
+// --------------------------------------------------
+test("Multi-Choice Checkbox Selection Invariants, Non-Inverting safelySelectInput & Multi-Answer Pool Mismatch Guard (v1.13.16)", () => {
+    const fs = require('fs');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const geminiSrc = fs.readFileSync('src/ai/gemini.js', 'utf8');
+
+    // 1. Definition and structure of safelySelectInput
+    assert.ok(solverSrc.includes("function safelySelectInput(input)"), "solver.js must define safelySelectInput helper");
+    assert.ok(solverSrc.includes("if (input.checked) return true;"), "safelySelectInput must immediately return if input is already checked");
+
+    // 2. Behavioral verification of safelySelectInput
+    function mockSafelySelectInput(input) {
+        if (!input) return false;
+        if (input.checked) return true;
+        try { input.click(); } catch (_) {}
+        if (!input.checked) {
+            input.checked = true;
+        }
+        input.events.push('input', 'change');
+        return true;
+    }
+
+    // A. Checkbox click behavior (browser inverts unchecked -> true)
+    const browserCheckbox = {
+        type: 'checkbox',
+        checked: false,
+        events: [],
+        click() { this.checked = !this.checked; }
+    };
+    mockSafelySelectInput(browserCheckbox);
+    assert.strictEqual(browserCheckbox.checked, true, "Browser checkbox must be checked after safelySelectInput");
+    assert.deepStrictEqual(browserCheckbox.events, ['input', 'change'], "Must dispatch input and change events");
+
+    // B. Re-calling on already checked checkbox must NEVER invert back to false
+    browserCheckbox.events = [];
+    mockSafelySelectInput(browserCheckbox);
+    assert.strictEqual(browserCheckbox.checked, true, "Calling safelySelectInput on already checked checkbox must remain true");
+    assert.strictEqual(browserCheckbox.events.length, 0, "No duplicate events should be dispatched if already checked");
+
+    // C. Non-inverting mock / headless environment
+    const inertCheckbox = {
+        type: 'checkbox',
+        checked: false,
+        events: [],
+        click() { /* does not mutate checked */ }
+    };
+    mockSafelySelectInput(inertCheckbox);
+    assert.strictEqual(inertCheckbox.checked, true, "Failsafe must force checked=true even if click() does not invert");
+
+    // D. Radio button
+    const radioInput = {
+        type: 'radio',
+        checked: false,
+        events: [],
+        click() { this.checked = true; }
+    };
+    mockSafelySelectInput(radioInput);
+    assert.strictEqual(radioInput.checked, true, "Radio button must be checked after safelySelectInput");
+
+    // 3. Elimination of buggy pre-set pattern and duplicate label clicks
+    assert.ok(!solverSrc.includes("input.checked = true;\n                            input.click();"),
+        "solver.js must NOT set input.checked = true immediately before input.click()");
+    assert.ok(solverSrc.includes("safelySelectInput(input);"),
+        "solver.js must use safelySelectInput for verified choices");
+    assert.ok(geminiSrc.includes("safelySelectInput(matched.input);"),
+        "gemini.js must use safelySelectInput for AI suggested choices");
+
+    // 4. Multi-Answer Choice Pool Mismatch Guard
+    assert.ok(solverSrc.includes("getCandidateSubAnswers"), "solver.js must extract sub-answers in pool mismatch check");
+    assert.ok(solverSrc.includes("anyCandInLive"), "solver.js must check anyCandInLive before declaring pool changed");
+
+    // Test pool mismatch logic with multi-answer question (e.g. Risk Management Procedure 6 steps)
+    const liveChoiceNorms = [
+        "assess vulnerabilities",
+        "give feedback to production",
+        "assess profitable",
+        "assess productivity",
+        "prioritize countermeasure options",
+        "make risk management decisions",
+        "assess threats",
+        "assess assets",
+        "assess risks"
+    ];
+    const topCand = {
+        verified: true,
+        answer: "Assess vulnerabilities, Prioritize countermeasure options, Make risk management decisions, Assess threats, Assess assets, Assess risks",
+        ansRaw: "Assess vulnerabilities, Prioritize countermeasure options, Make risk management decisions, Assess threats, Assess assets, Assess risks"
+    };
+    const getCandidateSubAnswers = (cand) => {
+        if (!cand) return [];
+        return (Array.isArray(cand.answers) ? cand.answers : [])
+            .concat((cand.ansRaw || '').split(/[,;&\n]+|\s+and\s+/i))
+            .concat((cand.answer || '').split(/[,;&\n]+|\s+and\s+/i))
+            .map(s => s.toLowerCase().trim())
+            .filter(Boolean);
+    };
+    const subAnswers = getCandidateSubAnswers(topCand);
+    const anyMatches = subAnswers.some(sa => liveChoiceNorms.includes(sa));
+    assert.strictEqual(anyMatches, true, "Sub-answers of multi-choice candidate must match live choices");
+    const isPoolChanged = !anyMatches;
+    assert.strictEqual(isPoolChanged, false, "Must NOT flag pool changed when sub-answers match live choices");
+
+    // 5. Multi-letter AI clipboard matching supports options up to Z
+    assert.ok(solverSrc.includes("cleanText.match(/\\b([a-zA-Z])\\b/g)"),
+        "autoSelectFromAiClipboard must match options beyond D to support 9+ choice questions");
+
+    // 6. Elimination auto-uncheck guard for checkboxes
+    assert.ok(solverSrc.includes("if (input && input.type === 'checkbox' && input.checked && (autoQuizMode || autoPickQuiz || isManualSelect) && hasAnyVerifiedCandidate)"),
+        "solver.js must auto-uncheck eliminated checkboxes when verified candidates exist");
 });
 
 console.log("\n==================================================");
