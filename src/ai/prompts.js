@@ -858,6 +858,9 @@
         handleQuizReviewPageLoad();
         if (checkIsReviewPage()) {
             injectReviewQuestionMarkers();
+            if (typeof injectReviewRetakeButton === 'function') {
+                injectReviewRetakeButton();
+            }
         }
 
         if (checkIsQuizAttemptPage()) {
@@ -920,6 +923,9 @@
                 handleQuizReviewPageLoad();
                 if (checkIsReviewPage()) {
                     injectReviewQuestionMarkers();
+                    if (typeof injectReviewRetakeButton === 'function') {
+                        injectReviewRetakeButton();
+                    }
                 }
                 if (checkIsQuizAttemptPage()) {
                     setupQuizAnswerListeners();

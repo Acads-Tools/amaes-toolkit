@@ -86,7 +86,16 @@
             }, 800);
         }
 
+        if (checkIsReviewPage()) {
+            if (typeof injectReviewRetakeButton === 'function') {
+                injectReviewRetakeButton();
+            }
+        }
+
         if (checkIsQuizViewPage()) {
+            if (typeof checkAutoStartAttemptOnLanding === 'function') {
+                checkAutoStartAttemptOnLanding();
+            }
             try {
                 const landingData = parseQuizLandingData();
                 if (landingData && landingData.cmid) {

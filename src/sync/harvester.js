@@ -2899,6 +2899,11 @@
             reviewBadge.parentNode.insertBefore(topNav, reviewBadge.nextSibling);
         }
 
+        // Mount Retake Quiz action bar directly below review summary table
+        if (typeof injectReviewRetakeButton === 'function') {
+            injectReviewRetakeButton();
+        }
+
         // Check for 100% score and trigger auto-mark activity as Done if enabled
         if (typeof checkQuizAttemptIs100Percent === 'function' && checkQuizAttemptIs100Percent(harvested, document)) {
             const urlParams = new URLSearchParams(window.location.search);

@@ -3627,7 +3627,14 @@
         const m = search.match(/[?&]id=(\d+)/) || search.match(/[?&]cmid=(\d+)/);
         if (m) return m[1];
         const idInput = document.querySelector('input[name="cmid"], input[name="id"]');
-        if (idInput && idInput.value) return idInput.value;
+        if (idInput && idInput.value) return idInput.value.trim();
+        const mBody = (document.body?.className || '').match(/\bcmid-(\d+)\b/);
+        if (mBody) return mBody[1];
+        const viewLink = document.querySelector('a[href*="/mod/quiz/view.php?id="], a[href*="/mod/quiz/view.php?cmid="], .breadcrumb a[href*="id="], .breadcrumb-item a[href*="id="]');
+        if (viewLink) {
+            const mLink = (viewLink.getAttribute('href') || viewLink.href || '').match(/[?&](?:id|cmid)=(\d+)/);
+            if (mLink) return mLink[1];
+        }
         return '';
     }
 
@@ -3862,6 +3869,8 @@
             jumpOptions
         };
 
+        const isReviewPage = typeof checkIsReviewPage === 'function' && checkIsReviewPage();
+
         function populateQuizNavElement(container, isTop) {
             if (isTop) {
                 container.innerHTML = `
@@ -3872,7 +3881,13 @@
                             <span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; font-weight: 500;">(Press [)</span>
                         </button>
                     </div>
-                    <div style="flex: 0 1 auto; text-align: center;">
+                    <div style="flex: 0 1 auto; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;">
+                        ${isReviewPage ? `
+                            <button id="amaes-top-btn-nav-retake" class="btn btn-primary btn-sm amaes-retake-nav-btn" style="display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; font-size: 12px; font-weight: 700; border-radius: 6px; background: #0f6cbf; border: 1px solid #0f6cbf; color: #fff; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(15,108,191,0.25);" title="Retake this quiz immediately (Press R)">
+                                ${ICONS.rotateCcw || ''}
+                                <span>Retake (R)</span>
+                            </button>
+                        ` : ''}
                         ${list.length > 0 ? `
                             <select id="amaes-top-quiz-cycle-select" class="custom-select form-control amaes-cycle-select" style="max-width: 280px; font-size: 12px; font-weight: 500; height: 34px; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(148, 163, 184, 0.4); background: inherit; color: inherit;">
                                 ${jumpOptions}
@@ -3907,6 +3922,14 @@
                     btnNext.addEventListener('click', (e) => {
                         e.preventDefault();
                         cycleToNextQuizOrExam();
+                    });
+                }
+
+                const btnTopRetake = container.querySelector('#amaes-top-btn-nav-retake');
+                if (btnTopRetake) {
+                    btnTopRetake.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        triggerQuizRetake();
                     });
                 }
 
@@ -3945,7 +3968,13 @@
                             <span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.85; font-weight: 500;">(Press [)</span>
                         </button>
                     </div>
-                    <div id="amaes-jump-quiz-container" style="flex: 0 1 auto; text-align: center;">
+                    <div id="amaes-jump-quiz-container" style="flex: 0 1 auto; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;">
+                        ${isReviewPage ? `
+                            <button id="amaes-btn-nav-retake" class="btn btn-primary btn-sm amaes-retake-nav-btn" style="display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; font-size: 12.5px; font-weight: 700; border-radius: 6px; background: #0f6cbf; border: 1px solid #0f6cbf; color: #fff; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(15,108,191,0.25);" title="Retake this quiz immediately (Press R)">
+                                ${ICONS.rotateCcw || ''}
+                                <span>Retake (R)</span>
+                            </button>
+                        ` : ''}
                         ${list.length > 0 ? `
                             <select id="amaes-quiz-cycle-select" class="custom-select form-control amaes-cycle-select" style="max-width: 280px; font-size: 12.5px; font-weight: 500; height: 36px; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(148, 163, 184, 0.4); background: inherit; color: inherit;">
                                 ${jumpOptions}
@@ -3980,6 +4009,14 @@
                     btnNext.addEventListener('click', (e) => {
                         e.preventDefault();
                         cycleToNextQuizOrExam();
+                    });
+                }
+
+                const btnBottomRetake = container.querySelector('#amaes-btn-nav-retake');
+                if (btnBottomRetake) {
+                    btnBottomRetake.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        triggerQuizRetake();
                     });
                 }
 
@@ -4229,6 +4266,283 @@
         return cycleQuizOrExam('prev', opts);
     }
 
+    // Helper to resolve quiz landing URL (view.php?id=...)
+    function resolveQuizViewUrl(cmid) {
+        if (typeof window === 'undefined') return '';
+        const finishLink = document.querySelector('a[href*="/mod/quiz/view.php?id="], a[href*="/mod/quiz/view.php?cmid="], .submitbtns a[href*="view.php"], a.btn[href*="view.php"]');
+        if (finishLink && finishLink.getAttribute('href')) {
+            const rawHref = finishLink.getAttribute('href');
+            if (rawHref && !rawHref.startsWith('#') && !rawHref.startsWith('javascript:')) {
+                try {
+                    return new URL(rawHref, window.location.origin).toString();
+                } catch (_) {}
+            }
+        }
+
+        const resolvedCmid = cmid || getCurrentQuizCmid();
+        if (resolvedCmid) {
+            const basePath = window.location.pathname.includes('/mod/quiz/')
+                ? window.location.pathname.replace(/\/mod\/quiz\/.*/, '/mod/quiz/view.php')
+                : '/mod/quiz/view.php';
+            return `${window.location.origin}${basePath}?id=${encodeURIComponent(resolvedCmid)}`;
+        }
+        return '';
+    }
+
+    // Initiates an immediate re-attempt of the current quiz
+    async function triggerQuizRetake(options = {}) {
+        if (typeof window === 'undefined') return;
+
+        const viewUrl = resolveQuizViewUrl();
+        const cmid = getCurrentQuizCmid();
+
+        if (!viewUrl && !cmid) {
+            if (typeof showToast === 'function') {
+                showToast("Could not resolve quiz landing page to retake.", 3000);
+            }
+            return;
+        }
+
+        // Visual feedback on all retake buttons across page
+        const retakeButtons = document.querySelectorAll('#amaes-btn-retake-quiz, #amaes-top-btn-nav-retake, #amaes-btn-nav-retake, .amaes-retake-nav-btn');
+        retakeButtons.forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
+            btn.innerHTML = `${ICONS.rotateCcw || ''} <span>Starting Retake...</span>`;
+        });
+
+        if (typeof showToast === 'function') {
+            showToast("Initiating quiz retake...", 2000);
+        }
+        if (typeof setLog === 'function') {
+            setLog("Initiating <b>Retake Quiz</b>...", "var(--accent-blue)");
+        }
+
+        // Store auto-start flag in sessionStorage in case of navigation
+        if (cmid) {
+            try {
+                sessionStorage.setItem('amaes_auto_start_attempt', String(cmid));
+            } catch (_) {}
+        }
+
+        // 1. Fast Path: Fetch view.php in background, extract startattempt form, and submit
+        if (viewUrl) {
+            try {
+                const resp = await fetch(viewUrl, { credentials: 'same-origin' });
+                if (resp && resp.ok) {
+                    const htmlText = await resp.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(htmlText, 'text/html');
+
+                    const startForm = doc.querySelector(
+                        'form[action*="startattempt.php"], form[action*="attempt.php"], .quizstartbutton form'
+                    );
+
+                    // If form has a password input, user must enter password on view.php so skip fast post
+                    const hasPassword = startForm && startForm.querySelector('input[type="password"]');
+
+                    if (startForm && !hasPassword && startForm.getAttribute('action')) {
+                        const targetAction = new URL(startForm.getAttribute('action'), viewUrl).toString();
+                        const submitForm = document.createElement('form');
+                        submitForm.method = (startForm.getAttribute('method') || 'POST').toUpperCase();
+                        submitForm.action = targetAction;
+                        submitForm.style.display = 'none';
+
+                        Array.from(startForm.elements).forEach(el => {
+                            if (el.name && !el.disabled) {
+                                const hidden = document.createElement('input');
+                                hidden.type = 'hidden';
+                                hidden.name = el.name;
+                                hidden.value = el.value || '';
+                                submitForm.appendChild(hidden);
+                            }
+                        });
+
+                        document.body.appendChild(submitForm);
+                        if (typeof showToast === 'function') {
+                            showToast("Attempt initialized! Launching quiz...", 2000);
+                        }
+                        submitForm.submit();
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn('[AMAES Toolkit] Fast retake background submission skipped, using direct landing auto-start:', err);
+            }
+        }
+
+        // 2. Fallback Path: Navigate to view.php with amaes_auto_start=1 query param
+        const fallbackTarget = viewUrl || (cmid ? `${window.location.origin}/mod/quiz/view.php?id=${encodeURIComponent(cmid)}` : '');
+        if (fallbackTarget) {
+            try {
+                const u = new URL(fallbackTarget, window.location.origin);
+                u.searchParams.set('amaes_auto_start', '1');
+                window.location.href = u.toString();
+            } catch (_) {
+                window.location.href = fallbackTarget;
+            }
+        }
+    }
+
+    // Auto-clicks attempt start button and auto-confirms attempt modal when navigating from retake
+    function checkAutoStartAttemptOnLanding() {
+        if (typeof window === 'undefined' || !window.location.pathname.includes('/mod/quiz/view.php')) return;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const hasAutoStartParam = urlParams.get('amaes_auto_start') === '1';
+        const sessionTargetCmid = sessionStorage.getItem('amaes_auto_start_attempt');
+        const currentCmid = getCurrentQuizCmid();
+
+        const shouldAutoStart = hasAutoStartParam || (sessionTargetCmid && (!currentCmid || sessionTargetCmid === currentCmid));
+        if (!shouldAutoStart) return;
+
+        // Clean up flags immediately to prevent looping
+        try {
+            sessionStorage.removeItem('amaes_auto_start_attempt');
+            if (hasAutoStartParam) {
+                urlParams.delete('amaes_auto_start');
+                const cleanQuery = urlParams.toString();
+                const cleanUrl = window.location.pathname + (cleanQuery ? '?' + cleanQuery : '') + window.location.hash;
+                window.history.replaceState({}, '', cleanUrl);
+            }
+        } catch (_) {}
+
+        if (typeof showToast === 'function') {
+            showToast("Auto-starting retake attempt...", 2000);
+        }
+        if (typeof setLog === 'function') {
+            setLog("Auto-starting quiz attempt on landing...", "var(--accent-blue)");
+        }
+
+        const triggerAttempt = () => {
+            const startBtn = document.querySelector(
+                'form[action*="startattempt.php"] button, form[action*="startattempt.php"] input[type="submit"], ' +
+                'form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], ' +
+                '.quizstartbutton button, .quizstartbutton input[type="submit"], ' +
+                '#region-main button.btn-primary, #region-main input.btn-primary'
+            );
+            if (startBtn) {
+                startBtn.click();
+            }
+
+            // Immediately poll for confirmation dialogue (up to 30 attempts x 50ms = 1.5s)
+            let attempts = 0;
+            const confirmInterval = setInterval(() => {
+                attempts++;
+                const confirmModalBtn = document.querySelector(
+                    '.moodle-dialogue-bd button.btn-primary, .moodle-dialogue-bd input[type="submit"], ' +
+                    '.modal.show button.btn-primary, .modal.show input[type="submit"], ' +
+                    '.modal button.btn-primary[data-action="save"], input[type="submit"][value*="Start attempt" i], ' +
+                    'button[data-action="save"], .confirmation-dialog button.btn-primary'
+                );
+                if (confirmModalBtn) {
+                    clearInterval(confirmInterval);
+                    confirmModalBtn.click();
+                } else if (attempts >= 30) {
+                    clearInterval(confirmInterval);
+                }
+            }, 50);
+        };
+
+        if (document.readyState !== 'complete' && document.readyState !== 'interactive') {
+            document.addEventListener('DOMContentLoaded', triggerAttempt, { once: true });
+        } else {
+            setTimeout(triggerAttempt, 100);
+        }
+    }
+
+    // Injects dedicated Retake Quiz action bar directly below .quizreviewsummary table
+    function injectReviewRetakeButton() {
+        if (typeof document === 'undefined') return;
+        if (typeof checkIsReviewPage === 'function' && !checkIsReviewPage()) return;
+
+        let retakeBar = document.getElementById('amaes-review-retake-bar');
+        const viewUrl = resolveQuizViewUrl();
+
+        if (!retakeBar) {
+            retakeBar = document.createElement('div');
+            retakeBar.id = 'amaes-review-retake-bar';
+            retakeBar.className = 'amaes-review-retake-bar';
+            retakeBar.style.cssText = `
+                margin: 14px 0 20px 0;
+                padding: 12px 18px;
+                background: rgba(15, 108, 191, 0.05);
+                border: 1px solid rgba(15, 108, 191, 0.25);
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 12px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                box-shadow: 0 1px 3px rgba(15, 108, 191, 0.08);
+            `;
+
+            retakeBar.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <div style="font-weight: 700; font-size: 13.5px; color: #0f6cbf; display: flex; align-items: center; gap: 6px;">
+                        ${ICONS.rotateCcw || ''}
+                        <span>Ready for another attempt?</span>
+                    </div>
+                    <div style="font-size: 12px; color: #475569;">Retake this quiz immediately with fresh questions and verified answers.</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <button id="amaes-btn-retake-quiz" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 7px; padding: 7px 16px; font-size: 13px; font-weight: 700; border-radius: 6px; background: #0f6cbf; border: 1px solid #0f6cbf; color: #ffffff; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(15,108,191,0.2);" title="Retake this quiz immediately (Press R or A)">
+                        ${ICONS.rotateCcw || ''}
+                        <span>Retake Quiz</span>
+                        <span class="amaes-nav-key-hint" style="font-size: 0.85em; opacity: 0.9; font-weight: 600; padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,0.22);">(Press R)</span>
+                    </button>
+                    ${viewUrl ? `
+                        <a id="amaes-btn-finish-review-link" href="${escapeHtml(viewUrl)}" class="btn btn-outline-secondary" style="display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; font-size: 12.5px; font-weight: 600; border-radius: 6px; text-decoration: none; border: 1px solid rgba(148, 163, 184, 0.4); color: #475569; background: #fff;" title="Back to quiz landing page">
+                            <span>Finish Review</span>
+                        </a>
+                    ` : ''}
+                </div>
+            `;
+
+            // Injection position: strictly directly below .quizreviewsummary table
+            const summaryTable = document.querySelector('.quizreviewsummary, table.quizreviewsummary');
+            if (summaryTable && summaryTable.parentNode) {
+                summaryTable.parentNode.insertBefore(retakeBar, summaryTable.nextSibling);
+            } else {
+                const firstQue = document.querySelector('.que');
+                if (firstQue && firstQue.parentNode) {
+                    firstQue.parentNode.insertBefore(retakeBar, firstQue);
+                } else {
+                    const topNav = document.getElementById('amaes-quiz-top-nav');
+                    if (topNav && topNav.parentNode) {
+                        topNav.parentNode.insertBefore(retakeBar, topNav.nextSibling);
+                    } else {
+                        const targetArea = document.querySelector('#region-main, main, [role="main"]') || document.body;
+                        if (targetArea) {
+                            if (typeof targetArea.prepend === 'function') {
+                                targetArea.prepend(retakeBar);
+                            } else if (targetArea.firstChild) {
+                                targetArea.insertBefore(retakeBar, targetArea.firstChild);
+                            } else if (typeof targetArea.appendChild === 'function') {
+                                targetArea.appendChild(retakeBar);
+                            }
+                        }
+                    }
+                }
+            }
+
+            const retakeBtn = retakeBar.querySelector('#amaes-btn-retake-quiz');
+            if (retakeBtn) {
+                retakeBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    triggerQuizRetake();
+                });
+            }
+        } else {
+            // Update finish review link if viewUrl changed or became available
+            const finishLink = retakeBar.querySelector('#amaes-btn-finish-review-link');
+            if (finishLink && viewUrl && finishLink.getAttribute('href') !== viewUrl) {
+                finishLink.setAttribute('href', viewUrl);
+            }
+        }
+    }
+
     // Decorate Attempt quiz now / Re-attempt quiz button with key hint (Press A)
     function decorateQuizLandingAttemptButton() {
         if (typeof window === 'undefined' || !window.location.pathname.includes('/mod/quiz/view.php')) return;
@@ -4236,9 +4550,13 @@
         if (typeof checkAndAutoMarkDoneOnQuizLanding === 'function') {
             checkAndAutoMarkDoneOnQuizLanding();
         }
+        if (typeof checkAutoStartAttemptOnLanding === 'function') {
+            checkAutoStartAttemptOnLanding();
+        }
 
         const startBtn = document.querySelector(
             'form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], ' +
+            'form[action*="startattempt.php"] button, form[action*="startattempt.php"] input[type="submit"], ' +
             '.quizstartbutton button, .quizstartbutton input[type="submit"], ' +
             '#region-main button.btn-primary, #region-main input.btn-primary'
         );
@@ -4264,6 +4582,12 @@
         decorateNativeActivityNavigation();
         injectQuizBottomNavigation();
         decorateQuizLandingAttemptButton();
+        if (typeof injectReviewRetakeButton === 'function') {
+            injectReviewRetakeButton();
+        }
+        if (typeof checkAutoStartAttemptOnLanding === 'function') {
+            checkAutoStartAttemptOnLanding();
+        }
 
         window.addEventListener('keydown', (e) => {
             if (!enableKeyboardShortcuts) return;
@@ -4280,6 +4604,18 @@
             }
 
             if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+            // Retake Quiz Shortcut on Review Pages (/mod/quiz/review.php): 'R', 'r', 'A', 'a'
+            const isReviewPage = typeof checkIsReviewPage === 'function' && checkIsReviewPage();
+            if (isReviewPage && (e.key === 'r' || e.key === 'R' || e.key === 'a' || e.key === 'A')) {
+                e.preventDefault();
+                if (typeof triggerQuizRetake === 'function') {
+                    showToast("Retaking quiz... (" + e.key.toUpperCase() + ")");
+                    setLog("Triggered <b>Retake Quiz</b> via keyboard shortcut [" + e.key.toUpperCase() + "]", "var(--accent-green)");
+                    triggerQuizRetake();
+                }
+                return;
+            }
 
             // Attempt / Re-attempt Quiz Shortcut on Quiz Landing Pages (/mod/quiz/view.php): 'A' or 'Enter'
             const isQuizLanding = typeof window !== 'undefined' && window.location.pathname.includes('/mod/quiz/view.php');
@@ -4299,6 +4635,7 @@
 
                 const startBtn = document.querySelector(
                     'form[action*="attempt.php"] button, form[action*="attempt.php"] input[type="submit"], ' +
+                    'form[action*="startattempt.php"] button, form[action*="startattempt.php"] input[type="submit"], ' +
                     '.quizstartbutton button, .quizstartbutton input[type="submit"], ' +
                     '#region-main button.btn-primary, #region-main input.btn-primary'
                 );

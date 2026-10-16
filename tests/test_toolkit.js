@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.17'), "Userscript header must specify v1.13.17");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.17";'), "Constant SCRIPT_VERSION must be v1.13.17");
+    assert.ok(script.includes('@version      1.13.18'), "Userscript header must specify v1.13.18");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.18";'), "Constant SCRIPT_VERSION must be v1.13.18");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -6935,6 +6935,75 @@ test("Deprecated Unreviewed Attempt Probe Removal & TOGAF Phase C Answer Precisi
         assert.ok(togafEntry.wrongAnswers.includes("Phase A: Architecture Vision"),
             "Eliminated prior attempt answer Phase A: Architecture Vision must be in wrongAnswers");
     }
+});
+
+// --------------------------------------------------
+// 205. Instant Quiz Retake Button, Fast Form Start & Review Page Keyboard Shortcut [R] (v1.13.18)
+// --------------------------------------------------
+test("Instant Quiz Retake Button, Fast Form Start & Review Page Keyboard Shortcut [R] (v1.13.18)", () => {
+    const fs = require('fs');
+    const solverSrc = fs.readFileSync('src/quiz/solver.js', 'utf8');
+    const harvesterSrc = fs.readFileSync('src/sync/harvester.js', 'utf8');
+    const promptsSrc = fs.readFileSync('src/ai/prompts.js', 'utf8');
+    const initSrc = fs.readFileSync('src/init.js', 'utf8');
+    const modalsSrc = fs.readFileSync('src/ui/modals.js', 'utf8');
+    const builtScript = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+
+    // 1. Core Quiz Landing and CMID Resolvers
+    assert.ok(solverSrc.includes("function resolveQuizViewUrl(cmid)"), "solver.js must define resolveQuizViewUrl");
+    assert.ok(solverSrc.includes("function getCurrentQuizCmid()"), "solver.js must define getCurrentQuizCmid");
+    assert.ok(solverSrc.includes("mBody[1]") && solverSrc.includes("viewLink"),
+        "getCurrentQuizCmid must support body class and breadcrumb/viewLink fallbacks");
+
+    // 2. Dedicated Review Retake Action Bar (#amaes-review-retake-bar)
+    assert.ok(solverSrc.includes("function injectReviewRetakeButton()"), "solver.js must define injectReviewRetakeButton");
+    assert.ok(solverSrc.includes("id = 'amaes-review-retake-bar'"), "injectReviewRetakeButton must create #amaes-review-retake-bar");
+    assert.ok(solverSrc.includes("id=\"amaes-btn-retake-quiz\""), "Retake bar must render #amaes-btn-retake-quiz primary button");
+    assert.ok(solverSrc.includes("(Press R)"), "Retake button must display key hint (Press R)");
+    assert.ok(solverSrc.includes("summaryTable.parentNode.insertBefore(retakeBar, summaryTable.nextSibling)"),
+        "Retake bar must be injected directly below .quizreviewsummary table");
+    assert.ok(solverSrc.includes("id=\"amaes-btn-finish-review-link\""), "Retake bar must render #amaes-btn-finish-review-link");
+
+    // 3. Top and Bottom Quiz Mover Navigation Retake Integration
+    assert.ok(solverSrc.includes("id=\"amaes-top-btn-nav-retake\""), "Top quiz mover must render #amaes-top-btn-nav-retake on review page");
+    assert.ok(solverSrc.includes("id=\"amaes-btn-nav-retake\""), "Bottom quiz mover must render #amaes-btn-nav-retake on review page");
+    assert.ok(solverSrc.includes("Retake (R)"), "Navigation retake buttons must include 'Retake (R)'");
+
+    // 4. Fast-Path Background Form Start and Fallback Landing Auto-Start
+    assert.ok(solverSrc.includes("async function triggerQuizRetake("), "solver.js must define triggerQuizRetake");
+    assert.ok(solverSrc.includes("fetch(viewUrl, { credentials: 'same-origin' })"),
+        "triggerQuizRetake must attempt background fetch of view.php for fast start");
+    assert.ok(solverSrc.includes("submitForm.submit()"), "triggerQuizRetake must submit startattempt form directly when available");
+    assert.ok(solverSrc.includes("amaes_auto_start_attempt"), "triggerQuizRetake must store cmid in sessionStorage");
+    assert.ok(solverSrc.includes("searchParams.set('amaes_auto_start', '1')"), "triggerQuizRetake must set amaes_auto_start query parameter on fallback");
+
+    // 5. Landing Page Auto-Start and Confirmation Dialog Handling
+    assert.ok(solverSrc.includes("function checkAutoStartAttemptOnLanding()"), "solver.js must define checkAutoStartAttemptOnLanding");
+    assert.ok(solverSrc.includes("sessionStorage.removeItem('amaes_auto_start_attempt')"),
+        "checkAutoStartAttemptOnLanding must clean up sessionStorage to prevent loops");
+    assert.ok(solverSrc.includes("form[action*=\"startattempt.php\"] button"),
+        "checkAutoStartAttemptOnLanding must detect startattempt form buttons");
+    assert.ok(solverSrc.includes("confirmModalBtn.click()"),
+        "checkAutoStartAttemptOnLanding must poll and auto-confirm Moodle attempt dialogue");
+
+    // 6. Review Page Keyboard Shortcut [R]
+    assert.ok(solverSrc.includes("isReviewPage && (e.key === 'r' || e.key === 'R' || e.key === 'a' || e.key === 'A')"),
+        "setupQuizKeyboardShortcuts must listen for R and A keys on review pages");
+    assert.ok(solverSrc.includes("triggerQuizRetake()"),
+        "Keyboard shortcut handler must call triggerQuizRetake on review page");
+    assert.ok(modalsSrc.includes(">R</kbd>") && modalsSrc.includes("Retake Quiz (Review Page)"),
+        "modals.js cheatsheet must document R shortcut for retaking quizzes");
+
+    // 7. Review Page and Lifecycle Hook Integration
+    assert.ok(harvesterSrc.includes("injectReviewRetakeButton()"), "harvester.js must call injectReviewRetakeButton in handleQuizReviewPageLoad");
+    assert.ok(promptsSrc.includes("injectReviewRetakeButton()"), "prompts.js must call injectReviewRetakeButton in setupQuizAutomation");
+    assert.ok(initSrc.includes("injectReviewRetakeButton()"), "init.js must call injectReviewRetakeButton on review page load");
+    assert.ok(initSrc.includes("checkAutoStartAttemptOnLanding()"), "init.js must call checkAutoStartAttemptOnLanding on quiz landing page load");
+
+    // 8. Zero Generic Emojis Policy Enforcement
+    assert.ok(!solverSrc.includes("\uD83D\uDD04"), "solver.js must not contain generic rotate emoji");
+    assert.ok(!builtScript.includes("\uD83D\uDD04"), "Built script must not contain generic rotate emoji");
+    assert.ok(solverSrc.includes("ICONS.rotateCcw"), "solver.js must use professional SVG ICONS.rotateCcw");
 });
 
 console.log("\n==================================================");
