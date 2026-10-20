@@ -116,12 +116,15 @@
                 SHARED_STORAGE_KEYS.forEach(k => {
                     const gmVal = (typeof GM_getValue === 'function') ? GM_getValue(k, undefined) : undefined;
                     const localVal = localStorage.getItem(k);
-                    if ((gmVal === undefined || gmVal === null) && (localVal !== null && localVal !== undefined)) {
-                        if (typeof GM_setValue === 'function') {
-                            GM_setValue(k, localVal);
+                    if (gmVal !== undefined && gmVal !== null) {
+                        const strVal = typeof gmVal === 'string' ? gmVal : JSON.stringify(gmVal);
+                        if (localVal !== strVal) {
+                            try { localStorage.setItem(k, strVal); } catch (_) {}
                         }
-                    } else if (gmVal !== undefined && gmVal !== null && (localVal === null || localVal === undefined)) {
-                        localStorage.setItem(k, typeof gmVal === 'string' ? gmVal : JSON.stringify(gmVal));
+                    } else if (localVal !== null && localVal !== undefined) {
+                        if (typeof GM_setValue === 'function') {
+                            try { GM_setValue(k, localVal); } catch (_) {}
+                        }
                     }
                 });
             } catch (_) {}

@@ -415,7 +415,7 @@
 
     // Inject sleek in-question AI tools: Left sidebar (.info below Flag question) for core tools & Built-in AI; Right side (.formulation) for Web AI launchers
     function injectQuestionCopyButtons() {
-        if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') return;
+        if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') return;
         if (!checkIsQuizPage()) return;
         const queElements = document.querySelectorAll('.que');
 
@@ -680,7 +680,7 @@
 
     // Inject sleek in-question top toolbar with Stop / Resume button on every question card ("uptopquestion")
     function injectQuestionTopToolbars() {
-        if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') return;
+        if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') return;
         if (!checkIsQuizAttemptPage()) return;
         const queElements = document.querySelectorAll('.que');
         queElements.forEach(que => {
@@ -886,7 +886,7 @@
     // Observer and initializer for quiz automation
     let observerDebounceTimer = null;
     function setupQuizAutomation() {
-        if (localStorage.getItem('amaes_terms_acknowledged') !== 'true') return;
+        if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') return;
         if (!checkIsQuizPage()) return;
 
         injectQuestionCopyButtons();

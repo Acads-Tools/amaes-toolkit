@@ -1381,7 +1381,7 @@
         const viewTermsBtn = document.getElementById('amaes-btn-lock-view-terms');
 
         const updatePanelLockState = () => {
-            const isAccepted = localStorage.getItem('amaes_terms_acknowledged') === 'true';
+            const isAccepted = (typeof toolkitStorage !== 'undefined' ? toolkitStorage.get('amaes_terms_acknowledged') : null) === 'true' || localStorage.getItem('amaes_terms_acknowledged') === 'true';
             const isMin = localStorage.getItem('amaes_pref_minimized') === 'true';
 
             if (!isAccepted) {
@@ -1401,7 +1401,7 @@
             lockChk.onchange = () => {
                 if (lockChk.checked) {
                     if (lockContainer) lockContainer.style.borderColor = 'rgba(16, 185, 129, 0.5)';
-                    localStorage.setItem('amaes_terms_acknowledged', 'true');
+                    toolkitStorage.set('amaes_terms_acknowledged', 'true');
                     showToast("Terms accepted! Toolkit unlocked. Refreshing to activate...", 2500);
                     updatePanelLockState();
 
@@ -1416,9 +1416,9 @@
                         window.location.reload();
                     }, 500);
                 } else {
-                    localStorage.setItem('amaes_terms_acknowledged', 'false');
+                    toolkitStorage.set('amaes_terms_acknowledged', 'false');
                     autoQuizMode = false;
-                    localStorage.setItem('amaes_auto_quiz_mode', 'false');
+                    toolkitStorage.set('amaes_auto_quiz_mode', 'false');
                     showToast("Agreement unaccepted. Pausing all tools and refreshing page...", 2500);
                     updatePanelLockState();
                     setTimeout(() => {
@@ -1492,7 +1492,7 @@
 
         if (minBtn) minBtn.onclick = (e) => {
             if (e) e.stopPropagation();
-            const isLocked = localStorage.getItem('amaes_terms_acknowledged') !== 'true';
+            const isLocked = toolkitStorage.get('amaes_terms_acknowledged') !== 'true';
             const targetEl = (isLocked && lockOverlay) ? lockOverlay : bodyEl;
             if (targetEl && targetEl.style.display === 'none') {
                 targetEl.style.display = isLocked ? 'flex' : 'block';
@@ -1517,7 +1517,7 @@
         if (panelEl) {
             panelEl.addEventListener('click', (e) => {
                 if (panelEl.classList.contains('amaes-minimized') && !e.target.closest('#amaes-min-btn')) {
-                    const isLocked = localStorage.getItem('amaes_terms_acknowledged') !== 'true';
+                    const isLocked = toolkitStorage.get('amaes_terms_acknowledged') !== 'true';
                     const targetEl = (isLocked && lockOverlay) ? lockOverlay : bodyEl;
                     if (targetEl) {
                         targetEl.style.display = isLocked ? 'flex' : 'block';

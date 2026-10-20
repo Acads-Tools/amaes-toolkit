@@ -30,7 +30,7 @@
         if (!isTermsAccepted) {
             autoQuizMode = false;
             toolkitStorage.set('amaes_auto_quiz_mode', 'false');
-            showWelcomeOnboardingModal(false);
+            showWelcomeOnboardingModal(true);
             logDebug("Terms not acknowledged. Toolkit paused in locked state.");
             return;
         }

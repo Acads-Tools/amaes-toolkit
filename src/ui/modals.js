@@ -4,7 +4,7 @@
     // ==========================================
 
     function showWelcomeOnboardingModal(force = false, focusDev = false) {
-        if (!force && toolkitStorage.get('amaes_welcome_dismissed') === 'true') {
+        if (!force && toolkitStorage.get('amaes_welcome_dismissed') === 'true' && toolkitStorage.get('amaes_terms_acknowledged') === 'true') {
             return;
         }
 
