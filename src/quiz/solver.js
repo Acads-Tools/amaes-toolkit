@@ -2927,6 +2927,7 @@
             autoQuizMode = !autoQuizMode;
         }
         localStorage.setItem('amaes_auto_quiz_mode', autoQuizMode ? 'true' : 'false');
+        try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_quiz_mode', autoQuizMode ? 'true' : 'false'); } catch (_) {}
 
         if (autoQuizMode) {
             autoPickQuiz = true;

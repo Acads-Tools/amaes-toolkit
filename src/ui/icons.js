@@ -238,6 +238,36 @@
         localStorage.setItem('amaes_ai_quiz_enabled', 'true');
         localStorage.setItem('amaes_ai_auto_select', 'true');
 
+        if (typeof toolkitStorage !== 'undefined') {
+            [
+                ['amaes_auto_quiz_mode', 'false'],
+                ['amaes_quiz_personality', 'passive'],
+                ['amaes_auto_pick_quiz', 'true'],
+                ['amaes_auto_next_quiz', 'false'],
+                ['amaes_auto_next_verified', 'true'],
+                ['amaes_auto_pick_study_guide_fallback', 'true'],
+                ['amaes_auto_submit_quiz', 'false'],
+                ['amaes_auto_push_github', 'false'],
+                ['amaes_auto_copy_search', 'true'],
+                ['amaes_auto_cloud_sync', 'true'],
+                ['amaes_auto_scrape_amauoed', 'true'],
+                ['amaes_auto_harvest_grades', 'true'],
+                ['amaes_enable_hotkeys', 'true'],
+                ['amaes_auto_highlight_quiz', 'true'],
+                ['amaes_copy_include_confidence', 'true'],
+                ['amaes_auto_copy_ai', 'true'],
+                ['amaes_smart_skip_quiz', 'false'],
+                ['amaes_show_in_question_ai_btns', 'true'],
+                ['amaes_ai_prompt_hint', 'true'],
+                ['amaes_auto_community_share', 'true'],
+                ['amaes_auto_min_quiz', 'false'],
+                ['amaes_ai_quiz_enabled', 'true'],
+                ['amaes_ai_auto_select', 'true']
+            ].forEach(([k, v]) => {
+                try { toolkitStorage.set(k, v); } catch (_) {}
+            });
+        }
+
         autoQuizMode = false;
         autoPickQuiz = true;
         autoNextVerified = true;

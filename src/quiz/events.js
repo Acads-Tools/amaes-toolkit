@@ -79,6 +79,7 @@
             chkAutoHlQuiz.onchange = () => {
                 autoHighlightQuiz = chkAutoHlQuiz.checked;
                 localStorage.setItem('amaes_auto_highlight_quiz', autoHighlightQuiz);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_highlight_quiz', autoHighlightQuiz); } catch (_) {}
                 showToast(`Highlight Answers: ${autoHighlightQuiz ? 'Enabled' : 'Disabled'}`);
                 setLog(`Highlight Answers: <b>${autoHighlightQuiz ? 'ON' : 'OFF'}</b>`, autoHighlightQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoHighlightQuiz ? "Visual answer badges enabled on quizzes" : "Badges hidden");
                 if (autoHighlightQuiz && checkIsQuizAttemptPage()) {
@@ -99,6 +100,7 @@
             chkCopyConfidence.onchange = () => {
                 copyIncludeConfidence = chkCopyConfidence.checked;
                 localStorage.setItem('amaes_copy_include_confidence', copyIncludeConfidence);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_copy_include_confidence', copyIncludeConfidence); } catch (_) {}
                 showToast(`Include DB Hints: ${copyIncludeConfidence ? 'Enabled' : 'Disabled'}`);
                 setLog(`Include DB Hints on Copy: <b>${copyIncludeConfidence ? 'ON' : 'OFF'}</b>`, "var(--accent-blue)", copyIncludeConfidence ? "Prompt will include verified answer hints & confidence" : "Question & choices only");
             };
@@ -109,6 +111,7 @@
             chkAutoNext.onchange = () => {
                 autoNextQuiz = chkAutoNext.checked;
                 localStorage.setItem('amaes_auto_next_quiz', autoNextQuiz);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_next_quiz', autoNextQuiz); } catch (_) {}
                 showToast(`Auto-Next (Manual): ${autoNextQuiz ? 'Enabled' : 'Disabled'}`);
                 setLog(`Auto-Next Navigation: <b>${autoNextQuiz ? 'ON (Auto-advancing)' : 'OFF (Safe Manual Review)'}</b>`, autoNextQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoNextQuiz ? "Advances automatically on manual choice selection" : "Stay on question until manual Next / N press");
                 if (autoNextQuiz && checkIsQuizAttemptPage()) runAutoQuizSolver();
@@ -120,6 +123,7 @@
             chkSmartSkip.onchange = () => {
                 smartSkipQuiz = chkSmartSkip.checked;
                 localStorage.setItem('amaes_smart_skip_quiz', smartSkipQuiz);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_smart_skip_quiz', smartSkipQuiz); } catch (_) {}
                 showToast(`Smart Skip: ${smartSkipQuiz ? 'Enabled' : 'Disabled'}`);
                 setLog(`Smart Skip Unverified: <b>${smartSkipQuiz ? 'ON (Pause on unverified)' : 'OFF'}</b>`, smartSkipQuiz ? "var(--accent-green)" : "var(--accent-amber)", smartSkipQuiz ? "Pauses auto-next on unverified questions" : "Attempts all matching questions");
             };
@@ -130,6 +134,7 @@
             chkShowInQBtns.onchange = (e) => {
                 showInQuestionAiBtns = e.target.checked;
                 localStorage.setItem('amaes_show_in_question_ai_btns', showInQuestionAiBtns);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_show_in_question_ai_btns', showInQuestionAiBtns); } catch (_) {}
                 injectQuestionCopyButtons();
                 showToast(`In-question buttons: ${showInQuestionAiBtns ? 'Shown' : 'Hidden'}`);
                 setLog(`In-Question Action Buttons: <b>${showInQuestionAiBtns ? 'ON' : 'OFF'}</b>`, "var(--accent-blue)", showInQuestionAiBtns ? "Injected beside each question box" : "Buttons hidden");
@@ -144,6 +149,7 @@
                 }
                 autoPickQuiz = chkAutoPick.checked;
                 localStorage.setItem('amaes_auto_pick_quiz', autoPickQuiz);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_pick_quiz', autoPickQuiz); } catch (_) {}
                 showToast(`Auto-Pick: ${autoPickQuiz ? 'Enabled' : 'Disabled'}`);
                 setLog(`Auto-Pick Answers: <b>${autoPickQuiz ? 'ON (Auto-select verified)' : 'OFF (Companion Mode)'}</b>`, autoPickQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoPickQuiz ? "Will auto-select answers on quiz attempts" : "Highlights only; manual clicks required");
                 if (autoPickQuiz && checkIsQuizAttemptPage()) runAutoQuizSolver();
@@ -158,6 +164,7 @@
                 }
                 autoNextVerified = chkAutoNextVerified.checked;
                 localStorage.setItem('amaes_auto_next_verified', autoNextVerified);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_next_verified', autoNextVerified); } catch (_) {}
                 showToast(`Auto-Next (Verified): ${autoNextVerified ? 'Enabled' : 'Disabled'}`);
                 setLog(`Auto-Next on Verified Answers: <b>${autoNextVerified ? 'ON' : 'OFF'}</b>`, autoNextVerified ? "var(--accent-green)" : "var(--accent-amber)");
                 if (autoNextVerified && checkIsQuizAttemptPage()) runAutoQuizSolver();
@@ -172,6 +179,7 @@
                 }
                 autoPickStudyGuideFallback = chkAutoPickStudyGuideFallback.checked;
                 localStorage.setItem('amaes_auto_pick_study_guide_fallback', String(autoPickStudyGuideFallback));
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_pick_study_guide_fallback', String(autoPickStudyGuideFallback)); } catch (_) {}
                 showToast(`Study-guide fallback Auto-Pick: ${autoPickStudyGuideFallback ? 'Enabled in Auto-Quiz' : 'Disabled'}`);
                 setLog(`Study-guide fallback Auto-Pick: <b>${autoPickStudyGuideFallback ? 'ON (unverified suggestions)' : 'OFF'}</b>`, autoPickStudyGuideFallback ? 'var(--accent-amber)' : 'var(--text-secondary)', 'Auto-Quiz only; Smart Next controls automatic advancement');
                 if (autoPickStudyGuideFallback && autoQuizMode && checkIsQuizAttemptPage()) runAutoQuizSolver();
@@ -183,6 +191,7 @@
             chkAutoMinQuiz.onchange = () => {
                 autoMinimizeQuiz = chkAutoMinQuiz.checked;
                 localStorage.setItem('amaes_auto_min_quiz', autoMinimizeQuiz);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_min_quiz', autoMinimizeQuiz); } catch (_) {}
                 showToast(`Auto-minimize during quizzes: ${autoMinimizeQuiz ? 'Enabled' : 'Disabled'}`);
                 setLog(`Auto-Minimize During Quizzes: <b>${autoMinimizeQuiz ? 'ON' : 'OFF'}</b>`, autoMinimizeQuiz ? "var(--accent-cyan)" : "var(--accent-amber)", autoMinimizeQuiz ? "Minimizes panel upon entering quiz" : "Panel remains open");
             };
@@ -193,6 +202,7 @@
             chkAutoSubmitQuiz.onchange = () => {
                 autoSubmitQuiz = chkAutoSubmitQuiz.checked;
                 localStorage.setItem('amaes_auto_submit_quiz', autoSubmitQuiz);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_submit_quiz', autoSubmitQuiz); } catch (_) {}
                 showToast(`Auto-Submit on Summary: ${autoSubmitQuiz ? 'Enabled' : 'Disabled'}`);
                 setLog(`Auto-Submit on Summary Review: <b>${autoSubmitQuiz ? 'ON' : 'OFF'}</b>`, autoSubmitQuiz ? "var(--accent-green)" : "var(--accent-amber)", autoSubmitQuiz ? "Auto-submits from summary page & plays completion chime" : "Safe manual submission");
             };
@@ -203,6 +213,7 @@
             chkAdaptiveProbe.onchange = () => {
                 adaptiveProbeQuiz = chkAdaptiveProbe.checked;
                 localStorage.setItem('amaes_adaptive_probe_quiz', adaptiveProbeQuiz);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_adaptive_probe_quiz', adaptiveProbeQuiz); } catch (_) {}
                 showToast(`Adaptive Probe: ${adaptiveProbeQuiz ? 'Enabled' : 'Disabled'}`);
                 setLog(`Adaptive Probe (Unreviewed Quizzes): <b>${adaptiveProbeQuiz ? 'ON (Rotating unverified choices)' : 'OFF'}</b>`, adaptiveProbeQuiz ? "var(--accent-purple)" : "var(--accent-amber)", adaptiveProbeQuiz ? "Rotates unverified choices across attempts to find 100%" : "Repeats static choices on re-attempts");
                 if (adaptiveProbeQuiz && checkIsQuizAttemptPage()) runAutoQuizSolver();
@@ -214,6 +225,7 @@
             selAdaptiveProbeBudget.onchange = () => {
                 adaptiveProbeBudget = parseInt(selAdaptiveProbeBudget.value, 10) || 2;
                 localStorage.setItem('amaes_adaptive_probe_budget', adaptiveProbeBudget);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_adaptive_probe_budget', adaptiveProbeBudget); } catch (_) {}
                 showToast(`Probe Budget: ${adaptiveProbeBudget} questions/attempt`);
                 setLog(`Probe Budget: <b>${adaptiveProbeBudget}</b> unverified questions rotated per attempt`, "var(--accent-purple)");
             };
@@ -225,6 +237,7 @@
                 autoSubmitDelay = parseInt(selAutoSubmitDelay.value, 10);
                 if (isNaN(autoSubmitDelay) || autoSubmitDelay < 0) autoSubmitDelay = 10;
                 localStorage.setItem('amaes_auto_submit_delay', autoSubmitDelay);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_submit_delay', autoSubmitDelay); } catch (_) {}
                 showToast(`Auto-Submit Leeway: ${autoSubmitDelay === 0 ? 'Instant' : autoSubmitDelay + 's'}`);
                 setLog(`Auto-Submit Leeway: <b>${autoSubmitDelay === 0 ? 'Instant' : autoSubmitDelay + 's'}</b> before auto-submitting on summary page`, "var(--accent-green)");
             };
@@ -235,6 +248,7 @@
             chkKeyboardShortcuts.onchange = () => {
                 enableKeyboardShortcuts = chkKeyboardShortcuts.checked;
                 localStorage.setItem('amaes_enable_hotkeys', enableKeyboardShortcuts);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_enable_hotkeys', enableKeyboardShortcuts); } catch (_) {}
                 showToast(`Keyboard Navigation: ${enableKeyboardShortcuts ? 'Enabled' : 'Disabled'}`);
                 setLog(`Keyboard Navigation: <b>${enableKeyboardShortcuts ? 'ON' : 'OFF'}</b>`, enableKeyboardShortcuts ? "var(--accent-blue)" : "var(--accent-amber)", enableKeyboardShortcuts ? "N, Space, [ ], 1-4, C, P, H active" : "Key navigation disabled");
             };
@@ -245,6 +259,7 @@
             chkSkipPassedQuizzes.onchange = () => {
                 const isSkip = chkSkipPassedQuizzes.checked;
                 localStorage.setItem('amaes_skip_passed_quizzes', isSkip ? 'true' : 'false');
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_skip_passed_quizzes', isSkip ? 'true' : 'false'); } catch (_) {}
                 showToast(`Skip Passed Quizzes: ${isSkip ? 'Enabled (≥80%)' : 'Disabled (Cycle all)'}`);
                 setLog(`Quiz Cycling: <b>${isSkip ? 'Skip Passed (≥80%)' : 'All Quizzes'}</b>`, isSkip ? "var(--accent-blue)" : "var(--text-secondary)", isSkip ? "Keyboard cycling [ and ] jumps over completed/passing quizzes" : "Keyboard cycling advances to every quiz in sequence");
                 if (typeof injectQuizBottomNavigation === 'function') {
@@ -258,6 +273,7 @@
             chkAutoCloseCourseIndex.onchange = () => {
                 const isAuto = chkAutoCloseCourseIndex.checked;
                 localStorage.setItem('amaes_auto_close_course_index', isAuto ? 'true' : 'false');
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_close_course_index', isAuto ? 'true' : 'false'); } catch (_) {}
                 showToast(`Auto-Close Course Index: ${isAuto ? 'Enabled' : 'Disabled'}`);
                 setLog(`Course Index Drawer: <b>${isAuto ? 'Auto-Close ON' : 'Keep Open'}</b>`, isAuto ? "var(--accent-blue)" : "var(--text-secondary)", isAuto ? "Course index drawer automatically closes on course pages" : "Course index drawer remains in default state");
                 if (isAuto && typeof autoCloseCourseIndexDrawer === 'function') {
@@ -271,6 +287,7 @@
             chkAutoMarkDone100.onchange = () => {
                 autoMarkDoneOn100 = chkAutoMarkDone100.checked;
                 localStorage.setItem('amaes_auto_mark_done_100', autoMarkDoneOn100 ? 'true' : 'false');
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_auto_mark_done_100', autoMarkDoneOn100 ? 'true' : 'false'); } catch (_) {}
                 showToast(`Auto-Mark 100% Done: ${autoMarkDoneOn100 ? 'Enabled' : 'Disabled'}`);
                 setLog(`Auto-Mark Done on 100%: <b>${autoMarkDoneOn100 ? 'ON' : 'OFF'}</b>`, autoMarkDoneOn100 ? "var(--accent-green)" : "var(--accent-amber)", autoMarkDoneOn100 ? "Automatically marks Moodle activity as Done upon achieving a 100% quiz score" : "Requires manual activity completion click");
             };
@@ -281,6 +298,7 @@
             chkAudioAlerts.onchange = () => {
                 enableAudioAlerts = chkAudioAlerts.checked;
                 localStorage.setItem('amaes_enable_audio_alerts', enableAudioAlerts ? 'true' : 'false');
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_enable_audio_alerts', enableAudioAlerts ? 'true' : 'false'); } catch (_) {}
                 showToast(`Audio Notifications: ${enableAudioAlerts ? 'Enabled' : 'Disabled'}`);
                 setLog(`Audio Notifications: <b>${enableAudioAlerts ? 'ON' : 'OFF'}</b>`, enableAudioAlerts ? "var(--accent-green)" : "var(--accent-amber)");
                 if (enableAudioAlerts) {
@@ -294,6 +312,7 @@
             chkAiQuizEnabled.onchange = () => {
                 aiQuizEnabled = chkAiQuizEnabled.checked;
                 localStorage.setItem('amaes_ai_quiz_enabled', aiQuizEnabled);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_ai_quiz_enabled', aiQuizEnabled); } catch (_) {}
                 showToast(`AI Quiz Solver: ${aiQuizEnabled ? 'Enabled' : 'Disabled'}`);
                 setLog(`Gemini AI Quiz Solver: <b>${aiQuizEnabled ? 'ON' : 'OFF'}</b>`, aiQuizEnabled ? "var(--accent-purple)" : "var(--accent-amber)");
             };
@@ -304,6 +323,7 @@
             chkAiAutoSelect.onchange = () => {
                 aiAutoSelect = chkAiAutoSelect.checked;
                 localStorage.setItem('amaes_ai_auto_select', aiAutoSelect);
+                try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_ai_auto_select', aiAutoSelect); } catch (_) {}
                 showToast(`AI Auto-Select: ${aiAutoSelect ? 'Auto-Select ON' : 'Highlight Only'}`);
                 setLog(`AI Auto-Select Answers: <b>${aiAutoSelect ? 'ON (Auto-select AI answers)' : 'OFF (Highlight only)'}</b>`, aiAutoSelect ? "var(--accent-purple)" : "var(--accent-amber)");
             };

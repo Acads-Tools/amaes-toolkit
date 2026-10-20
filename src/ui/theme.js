@@ -81,6 +81,7 @@
         const t = THEMES[themeKey] || THEMES.dark;
         currentTheme = themeKey;
         localStorage.setItem('amaes_toolkit_theme', themeKey);
+        try { if (typeof toolkitStorage !== 'undefined') toolkitStorage.set('amaes_toolkit_theme', themeKey); } catch (_) {}
 
         let varSheet = document.getElementById('amaes-theme-variables');
         if (!varSheet) {

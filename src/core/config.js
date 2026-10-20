@@ -57,8 +57,18 @@
         'amaes_auto_community_share',
         'amaes_auto_min_quiz',
         'amaes_theme',
+        'amaes_toolkit_theme',
         'amaes_active_tab',
         'amaes_auto_submit_delay',
+        'amaes_fast_quiz_mode',
+        'amaes_adaptive_probe_quiz',
+        'amaes_adaptive_probe_budget',
+        'amaes_auto_mark_done_100',
+        'amaes_enable_audio_alerts',
+        'amaes_pref_minimized',
+        'amaes_pref_show_logs',
+        'amaes_preferred_web_ai',
+        'amaes_anon_install_id',
         'amaes_anonymous_contributor_id'
     ];
 

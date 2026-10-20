@@ -8,6 +8,8 @@
             return;
         }
 
+        const wasAlreadyAcknowledged = isTermsAcknowledged();
+
         const existing = document.getElementById('amaes-welcome-modal');
         if (existing) existing.remove();
 
@@ -261,7 +263,7 @@
                         ${ICONS.book} <span>FAQs & Guide</span>
                     </a>
                     <button id="btn-got-it-welcome" class="amaes-btn amaes-btn-green" ${toolkitStorage.get('amaes_terms_acknowledged') === 'true' ? '' : 'disabled'} style="padding: 8px 22px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; background: #10b981; color: #fff; border: none; opacity: ${toolkitStorage.get('amaes_terms_acknowledged') === 'true' ? '1' : '0.5'};">
-                        ${ICONS.zap} Get Started
+                        ${ICONS.zap} ${wasAlreadyAcknowledged ? 'Done' : 'Get Started'}
                     </button>
                 </div>
             </div>
@@ -479,6 +481,10 @@
             if (e.key === 'Escape' || e.key === 'Esc') {
                 e.preventDefault();
                 e.stopPropagation();
+                if (!isTermsAcknowledged()) {
+                    showToast("Please acknowledge the terms before proceeding.");
+                    return;
+                }
                 closeModalClean();
                 showToast("Closed Quick Start (Esc)");
                 return;
@@ -512,6 +518,10 @@
 
         modal.onclick = (e) => {
             if (e.target === modal) {
+                if (!isTermsAcknowledged()) {
+                    showToast("Please acknowledge the terms before proceeding.");
+                    return;
+                }
                 closeModalClean();
             }
         };
@@ -524,8 +534,12 @@
             closeModalClean();
             toolkitStorage.set('amaes_welcome_dismissed', 'true');
             if (typeof window._amaesUpdatePanelLockState === 'function') window._amaesUpdatePanelLockState();
-            showToast("Terms accepted! Toolkit unlocked. Refreshing to activate...", 2500);
-            setTimeout(() => window.location.reload(), 500);
+            if (!wasAlreadyAcknowledged) {
+                showToast("Terms accepted! Toolkit unlocked. Refreshing to activate...", 2500);
+                setTimeout(() => window.location.reload(), 500);
+            } else {
+                showToast("Preferences saved.");
+            }
         };
 
         if (gotItButton) gotItButton.onclick = dismiss;
