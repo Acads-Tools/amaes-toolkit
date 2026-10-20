@@ -1332,7 +1332,7 @@
     const quizStudyGuideLoads = new Map();
 
     async function runAutoQuizSolver(forceRun = false) {
-        if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') {
+        if (!isTermsAcknowledged()) {
             autoQuizMode = false;
             return;
         }
@@ -3053,7 +3053,7 @@
 
     // Floating HUD for Quiz Attempt Screen
     function injectQuizFloatingHUD() {
-        if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') return;
+        if (!isTermsAcknowledged()) return;
         if (!checkIsQuizAttemptPage()) return;
         if (document.getElementById('amaes-quiz-hud')) return;
 
@@ -4726,7 +4726,7 @@
                 const bodyEl = document.getElementById('amaes-panel-body');
                 const lockOverlay = document.getElementById('amaes-panel-lock-overlay');
                 const minBtn = document.getElementById('amaes-min-btn');
-                const isLocked = toolkitStorage.get('amaes_terms_acknowledged') !== 'true';
+                const isLocked = !isTermsAcknowledged();
                 const targetEl = (isLocked && lockOverlay) ? lockOverlay : bodyEl;
                 if (bodyEl) {
                     e.preventDefault();
@@ -5229,7 +5229,7 @@
     }
 
     function highlightQuizAnswers(questionsDb, autoSelect = false, isManualSelect = false) {
-        if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') {
+        if (!isTermsAcknowledged()) {
             return { matched: 0, total: 0, error: "Toolkit locked" };
         }
         if (!questionsDb || questionsDb.length === 0) {

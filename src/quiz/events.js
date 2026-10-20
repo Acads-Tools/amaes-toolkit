@@ -1492,7 +1492,7 @@
 
         if (minBtn) minBtn.onclick = (e) => {
             if (e) e.stopPropagation();
-            const isLocked = toolkitStorage.get('amaes_terms_acknowledged') !== 'true';
+            const isLocked = !isTermsAcknowledged();
             const targetEl = (isLocked && lockOverlay) ? lockOverlay : bodyEl;
             if (targetEl && targetEl.style.display === 'none') {
                 targetEl.style.display = isLocked ? 'flex' : 'block';
@@ -1517,7 +1517,7 @@
         if (panelEl) {
             panelEl.addEventListener('click', (e) => {
                 if (panelEl.classList.contains('amaes-minimized') && !e.target.closest('#amaes-min-btn')) {
-                    const isLocked = toolkitStorage.get('amaes_terms_acknowledged') !== 'true';
+                    const isLocked = !isTermsAcknowledged();
                     const targetEl = (isLocked && lockOverlay) ? lockOverlay : bodyEl;
                     if (targetEl) {
                         targetEl.style.display = isLocked ? 'flex' : 'block';

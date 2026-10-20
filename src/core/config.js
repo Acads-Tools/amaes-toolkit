@@ -133,6 +133,21 @@
 
     toolkitStorage.syncAll();
 
+    function isTermsAcknowledged() {
+        const fromToolkit = (typeof toolkitStorage !== 'undefined') ? toolkitStorage.get('amaes_terms_acknowledged') : null;
+        const fromLocal = (typeof localStorage !== 'undefined') ? localStorage.getItem('amaes_terms_acknowledged') : null;
+        if (fromToolkit === 'true' || fromLocal === 'true') {
+            if (fromToolkit !== 'true' && typeof toolkitStorage !== 'undefined') {
+                toolkitStorage.set('amaes_terms_acknowledged', 'true');
+            }
+            if (fromLocal !== 'true' && typeof localStorage !== 'undefined') {
+                try { localStorage.setItem('amaes_terms_acknowledged', 'true'); } catch (_) {}
+            }
+            return true;
+        }
+        return false;
+    }
+
     // The installer page uses a same-page event as a privacy-safe installation check.
     if ((window.location.hostname === 'acads-tools.github.io' && window.location.pathname.startsWith('/amaes-toolkit')) ||
         window.location.hostname === 'amaestoolkit.pages.dev') {

@@ -4,7 +4,7 @@
     // ==========================================
 
     function showWelcomeOnboardingModal(force = false, focusDev = false) {
-        if (!force && toolkitStorage.get('amaes_welcome_dismissed') === 'true' && toolkitStorage.get('amaes_terms_acknowledged') === 'true') {
+        if (!force && toolkitStorage.get('amaes_welcome_dismissed') === 'true' && isTermsAcknowledged()) {
             return;
         }
 
@@ -517,7 +517,7 @@
         };
 
         const dismiss = () => {
-            if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') {
+            if (!isTermsAcknowledged()) {
                 showToast("Please acknowledge the terms before proceeding.");
                 return;
             }

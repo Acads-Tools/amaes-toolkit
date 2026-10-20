@@ -168,6 +168,21 @@
 
     toolkitStorage.syncAll();
 
+    function isTermsAcknowledged() {
+        const fromToolkit = (typeof toolkitStorage !== 'undefined') ? toolkitStorage.get('amaes_terms_acknowledged') : null;
+        const fromLocal = (typeof localStorage !== 'undefined') ? localStorage.getItem('amaes_terms_acknowledged') : null;
+        if (fromToolkit === 'true' || fromLocal === 'true') {
+            if (fromToolkit !== 'true' && typeof toolkitStorage !== 'undefined') {
+                toolkitStorage.set('amaes_terms_acknowledged', 'true');
+            }
+            if (fromLocal !== 'true' && typeof localStorage !== 'undefined') {
+                try { localStorage.setItem('amaes_terms_acknowledged', 'true'); } catch (_) {}
+            }
+            return true;
+        }
+        return false;
+    }
+
     // The installer page uses a same-page event as a privacy-safe installation check.
     if ((window.location.hostname === 'acads-tools.github.io' && window.location.pathname.startsWith('/amaes-toolkit')) ||
         window.location.hostname === 'amaestoolkit.pages.dev') {
@@ -5430,7 +5445,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     const quizStudyGuideLoads = new Map();
 
     async function runAutoQuizSolver(forceRun = false) {
-        if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') {
+        if (!isTermsAcknowledged()) {
             autoQuizMode = false;
             return;
         }
@@ -7151,7 +7166,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
 
     // Floating HUD for Quiz Attempt Screen
     function injectQuizFloatingHUD() {
-        if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') return;
+        if (!isTermsAcknowledged()) return;
         if (!checkIsQuizAttemptPage()) return;
         if (document.getElementById('amaes-quiz-hud')) return;
 
@@ -8824,7 +8839,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
                 const bodyEl = document.getElementById('amaes-panel-body');
                 const lockOverlay = document.getElementById('amaes-panel-lock-overlay');
                 const minBtn = document.getElementById('amaes-min-btn');
-                const isLocked = toolkitStorage.get('amaes_terms_acknowledged') !== 'true';
+                const isLocked = !isTermsAcknowledged();
                 const targetEl = (isLocked && lockOverlay) ? lockOverlay : bodyEl;
                 if (bodyEl) {
                     e.preventDefault();
@@ -9327,7 +9342,7 @@ async function loadJennysonlineAnswersForCourse(subjectCode) {
     }
 
     function highlightQuizAnswers(questionsDb, autoSelect = false, isManualSelect = false) {
-        if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') {
+        if (!isTermsAcknowledged()) {
             return { matched: 0, total: 0, error: "Toolkit locked" };
         }
         if (!questionsDb || questionsDb.length === 0) {
@@ -15374,7 +15389,7 @@ function setupAccountTransferUI() {
 
     // Inject sleek in-question AI tools: Left sidebar (.info below Flag question) for core tools & Built-in AI; Right side (.formulation) for Web AI launchers
     function injectQuestionCopyButtons() {
-        if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') return;
+        if (!isTermsAcknowledged()) return;
         if (!checkIsQuizPage()) return;
         const queElements = document.querySelectorAll('.que');
 
@@ -15639,7 +15654,7 @@ function setupAccountTransferUI() {
 
     // Inject sleek in-question top toolbar with Stop / Resume button on every question card ("uptopquestion")
     function injectQuestionTopToolbars() {
-        if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') return;
+        if (!isTermsAcknowledged()) return;
         if (!checkIsQuizAttemptPage()) return;
         const queElements = document.querySelectorAll('.que');
         queElements.forEach(que => {
@@ -15845,7 +15860,7 @@ function setupAccountTransferUI() {
     // Observer and initializer for quiz automation
     let observerDebounceTimer = null;
     function setupQuizAutomation() {
-        if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') return;
+        if (!isTermsAcknowledged()) return;
         if (!checkIsQuizPage()) return;
 
         injectQuestionCopyButtons();
@@ -22480,7 +22495,7 @@ function setupAccountTransferUI() {
     // ==========================================
 
     function showWelcomeOnboardingModal(force = false, focusDev = false) {
-        if (!force && toolkitStorage.get('amaes_welcome_dismissed') === 'true' && toolkitStorage.get('amaes_terms_acknowledged') === 'true') {
+        if (!force && toolkitStorage.get('amaes_welcome_dismissed') === 'true' && isTermsAcknowledged()) {
             return;
         }
 
@@ -22993,7 +23008,7 @@ function setupAccountTransferUI() {
         };
 
         const dismiss = () => {
-            if (toolkitStorage.get('amaes_terms_acknowledged') !== 'true') {
+            if (!isTermsAcknowledged()) {
                 showToast("Please acknowledge the terms before proceeding.");
                 return;
             }
@@ -26467,7 +26482,7 @@ function setupAccountTransferUI() {
 
         if (minBtn) minBtn.onclick = (e) => {
             if (e) e.stopPropagation();
-            const isLocked = toolkitStorage.get('amaes_terms_acknowledged') !== 'true';
+            const isLocked = !isTermsAcknowledged();
             const targetEl = (isLocked && lockOverlay) ? lockOverlay : bodyEl;
             if (targetEl && targetEl.style.display === 'none') {
                 targetEl.style.display = isLocked ? 'flex' : 'block';
@@ -26492,7 +26507,7 @@ function setupAccountTransferUI() {
         if (panelEl) {
             panelEl.addEventListener('click', (e) => {
                 if (panelEl.classList.contains('amaes-minimized') && !e.target.closest('#amaes-min-btn')) {
-                    const isLocked = toolkitStorage.get('amaes_terms_acknowledged') !== 'true';
+                    const isLocked = !isTermsAcknowledged();
                     const targetEl = (isLocked && lockOverlay) ? lockOverlay : bodyEl;
                     if (targetEl) {
                         targetEl.style.display = isLocked ? 'flex' : 'block';
@@ -26851,7 +26866,7 @@ function setupAccountTransferUI() {
         checkForScriptUpdates(false);
 
         // Strict Terms Acceptance Guard: if not acknowledged, pause all tools except update checking
-        const isTermsAccepted = toolkitStorage.get('amaes_terms_acknowledged') === 'true';
+        const isTermsAccepted = isTermsAcknowledged();
         if (!isTermsAccepted) {
             autoQuizMode = false;
             toolkitStorage.set('amaes_auto_quiz_mode', 'false');
