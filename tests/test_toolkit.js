@@ -2926,8 +2926,8 @@ test("Navbar Version Badge, Persistent Top-Right Update Notice, and Reinstall Re
     const script = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
 
     // 1. Version integrity
-    assert.ok(script.includes('@version      1.13.20'), "Userscript header must specify v1.13.20");
-    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.20";'), "Constant SCRIPT_VERSION must be v1.13.20");
+    assert.ok(script.includes('@version      1.13.21'), "Userscript header must specify v1.13.21");
+    assert.ok(script.includes('const SCRIPT_VERSION = "v1.13.21";'), "Constant SCRIPT_VERSION must be v1.13.21");
 
     // 2. Elimination of redundant topbar brand badge clutter
     assert.ok(!script.includes("function injectTopNavbarToolkitBadge()"), "Redundant topbar badge function must be removed");
@@ -4142,7 +4142,7 @@ test("Gemini AI: Welcome Modal, README documentation, and Website Presentation",
     assert.ok(readme.includes("usernames and passwords are not encrypted"), "README must disclose that saved account credentials are unencrypted");
 
     // 3. Website (index.html)
-    assert.ok(indexHtml.includes("release-badge\">v1.13.9<") || indexHtml.includes("release-badge\">v1.13.20<"), "Website must display release badge");
+    assert.ok(indexHtml.includes("release-badge\">v1.13.9<") || indexHtml.includes("release-badge\">v1.13.20<") || indexHtml.includes("release-badge\">v1.13.21<"), "Website must display release badge");
     assert.ok(indexHtml.includes("Optional Account Switcher credentials stay in your local userscript-manager storage and are not encrypted"), "Website must disclose local, unencrypted account storage");
     assert.ok(terms.includes("kept unencrypted in your userscript manager's local storage"), "Terms must disclose that saved account credentials are unencrypted");
     assert.ok(readme.includes("Fast Account Switcher:** Optionally save an account from the Moodle login page"), "README must describe login-page saving and current-account status");
@@ -7150,6 +7150,35 @@ test("Reinforced Bug Reporting & Sub-Passing Score Anomaly Telemetry: header 1-c
     // 5. Zero Generic Emojis Policy
     assert.ok(!builtScript.includes("⚡") && !builtScript.includes("⚠️") && !builtScript.includes("🚀") && !builtScript.includes("🤖"),
         "Built script must strictly enforce Zero Generic Emojis Policy");
+});
+
+// --------------------------------------------------
+// 209. Cross-Domain Storage Synchronization, Self-Healing Terms Guard & Safe Onboarding (v1.13.21)
+// --------------------------------------------------
+test("Cross-Domain Storage Synchronization, Self-Healing Terms Guard & Safe Onboarding (v1.13.21)", () => {
+    const fs = require('fs');
+    const builtScript = fs.readFileSync('amaes-toolkit.user.js', 'utf8');
+    const configSrc = fs.readFileSync('src/core/config.js', 'utf8');
+    const modalsSrc = fs.readFileSync('src/ui/modals.js', 'utf8');
+
+    // 1. Storage Keys cross-domain completeness
+    assert.ok(configSrc.includes("'amaes_toolkit_theme'"), "SHARED_STORAGE_KEYS must include amaes_toolkit_theme");
+    assert.ok(configSrc.includes("'amaes_fast_quiz_mode'"), "SHARED_STORAGE_KEYS must include amaes_fast_quiz_mode");
+    assert.ok(configSrc.includes("'amaes_adaptive_probe_quiz'"), "SHARED_STORAGE_KEYS must include amaes_adaptive_probe_quiz");
+    assert.ok(configSrc.includes("'amaes_auto_mark_done_100'"), "SHARED_STORAGE_KEYS must include amaes_auto_mark_done_100");
+    assert.ok(configSrc.includes("'amaes_enable_audio_alerts'"), "SHARED_STORAGE_KEYS must include amaes_enable_audio_alerts");
+
+    // 2. Self-healing terms acknowledgment
+    assert.ok(configSrc.includes("function isTermsAcknowledged()"), "config.js must export self-healing isTermsAcknowledged");
+    assert.ok(builtScript.includes("isTermsAcknowledged()"), "Built script must invoke isTermsAcknowledged");
+
+    // 3. Safe onboarding modal without disruptive reloads
+    assert.ok(modalsSrc.includes("const wasAlreadyAcknowledged = isTermsAcknowledged()"), "modals.js must track pre-existing terms state");
+    assert.ok(modalsSrc.includes("if (!wasAlreadyAcknowledged)"), "modals.js must only trigger page reload on initial terms acceptance");
+
+    // 4. Modal backdrop & Esc safety for unacknowledged users
+    assert.ok(modalsSrc.includes("showToast(\"Please acknowledge the terms before proceeding.\")"),
+        "modals.js must notify users to acknowledge terms on backdrop or Esc click");
 });
 
 console.log("\n==================================================");
